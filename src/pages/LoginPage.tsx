@@ -37,7 +37,27 @@ export default function LoginPage() {
 
   return (
     <div className={styles.container}>
-      {/* Left panel - Login form (2/3) */}
+      {/* Left panel - Random image (2/3) */}
+      <div className={styles.imagePanel}>
+        {imageUrl && (
+          <>
+            <img
+              src={imageUrl}
+              alt="Background"
+              className={`${styles.backgroundImage} ${imageLoaded ? styles.imageVisible : ''}`}
+              onLoad={() => setImageLoaded(true)}
+            />
+            <div className={styles.imageOverlay} />
+            <div className={styles.imageContent}>
+              <blockquote className={styles.quote}>
+                "Gerencie seu negócio com inteligência e eficiência"
+              </blockquote>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Right panel - Login form (1/3) */}
       <div className={styles.formPanel}>
         <div className={styles.formWrapper}>
           <div className={styles.logo}>
@@ -134,26 +154,6 @@ export default function LoginPage() {
             </a>
           </p>
         </div>
-      </div>
-
-      {/* Right panel - Random image (1/3) */}
-      <div className={styles.imagePanel}>
-        {imageUrl && (
-          <>
-            <img
-              src={imageUrl}
-              alt="Background"
-              className={`${styles.backgroundImage} ${imageLoaded ? styles.imageVisible : ''}`}
-              onLoad={() => setImageLoaded(true)}
-            />
-            <div className={styles.imageOverlay} />
-            <div className={styles.imageContent}>
-              <blockquote className={styles.quote}>
-                "Gerencie seu negócio com inteligência e eficiência"
-              </blockquote>
-            </div>
-          </>
-        )}
       </div>
     </div>
   )
