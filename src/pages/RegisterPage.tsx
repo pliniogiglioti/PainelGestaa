@@ -1,30 +1,74 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import AuthLayout from '../components/AuthLayout'
 import { useAuth } from '../context/AuthContext'
 import styles from './AuthForm.module.css'
 
-export default function LoginPage() {
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
+export default function RegisterPage() {
+  const { signUp } = useAuth()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setLoading(true)
-    const { error } = await signIn(email, password)
-    setLoading(false)
-    if (error) {
-      setError('E-mail ou senha incorretos.')
-    } else {
-      navigate('/dashboard')
+
+    if (password.length < 6) {
+      setError('A senha deve ter pelo menos 6 caracteres.')
+      return
     }
+    if (password !== confirmPassword) {
+      setError('As senhas não coincidem.')
+      return
+    }
+
+    setLoading(true)
+    const { error, needsConfirmation } = await signUp(email, password)
+    setLoading(false)
+
+    if (error) {
+      setError(error)
+    } else if (needsConfirmation) {
+      setSuccess(true)
+    }
+  }
+
+  if (success) {
+    return (
+      <AuthLayout>
+        <div className={styles.wrapper}>
+          <div className={styles.logo}>
+            <svg width="34" height="34" viewBox="0 0 36 36" fill="none">
+              <rect width="36" height="36" rx="8" fill="#6366f1" />
+              <path d="M10 18L16 24L26 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className={styles.logoText}>PainelGestaa</span>
+          </div>
+
+          <div className={styles.header}>
+            <h1 className={styles.title}>Verifique seu e-mail</h1>
+            <p className={styles.subtitle}>
+              Enviamos um link de confirmação para <strong style={{ color: '#94a3b8' }}>{email}</strong>.
+              Clique no link para ativar sua conta.
+            </p>
+          </div>
+
+          <div className={styles.successBox}>
+            Após confirmar seu e-mail, você poderá fazer login normalmente.
+          </div>
+
+          <p className={styles.footer}>
+            <Link to="/login" className={styles.link}>Voltar para o login</Link>
+          </p>
+        </div>
+      </AuthLayout>
+    )
   }
 
   return (
@@ -39,8 +83,8 @@ export default function LoginPage() {
         </div>
 
         <div className={styles.header}>
-          <h1 className={styles.title}>Bem-vindo de volta</h1>
-          <p className={styles.subtitle}>Entre com sua conta para continuar</p>
+          <h1 className={styles.title}>Criar conta</h1>
+          <p className={styles.subtitle}>Preencha os dados abaixo para se cadastrar</p>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
@@ -64,21 +108,18 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.field}>
-            <div className={styles.labelRow}>
-              <label htmlFor="password" className={styles.label}>Senha</label>
-              <Link to="/forgot-password" className={styles.link}>Esqueceu a senha?</Link>
-            </div>
+            <label htmlFor="password" className={styles.label}>Senha</label>
             <div className={styles.inputWrapper}>
               <IconLock />
               <input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 className={styles.input}
-                placeholder="••••••••"
+                placeholder="Mínimo 6 caracteres"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                autoComplete="current-password"
+                autoComplete="new-password"
               />
               <button type="button" className={styles.eyeBtn} onClick={() => setShowPassword(!showPassword)}>
                 {showPassword ? <IconEyeOff /> : <IconEye />}
@@ -86,14 +127,31 @@ export default function LoginPage() {
             </div>
           </div>
 
+          <div className={styles.field}>
+            <label htmlFor="confirmPassword" className={styles.label}>Confirmar senha</label>
+            <div className={styles.inputWrapper}>
+              <IconLock />
+              <input
+                id="confirmPassword"
+                type={showPassword ? 'text' : 'password'}
+                className={styles.input}
+                placeholder="Repita a senha"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+                autoComplete="new-password"
+              />
+            </div>
+          </div>
+
           <button type="submit" className={styles.submitBtn} disabled={loading}>
-            {loading ? <span className={styles.spinner} /> : 'Entrar'}
+            {loading ? <span className={styles.spinner} /> : 'Criar conta'}
           </button>
         </form>
 
         <p className={styles.footer}>
-          Não tem uma conta?{' '}
-          <Link to="/register" className={styles.link}>Cadastre-se</Link>
+          Já tem uma conta?{' '}
+          <Link to="/login" className={styles.link}>Entrar</Link>
         </p>
       </div>
     </AuthLayout>
