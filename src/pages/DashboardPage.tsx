@@ -501,17 +501,8 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 {IS_ADMIN && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
               </div>
             ) : (
-              // ✅ AQUI É A CORREÇÃO: vira GRID (várias linhas), não carrossel em uma linha
-              <div
-                className={styles.netflixRow}
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-                  gap: 16,
-                  overflow: 'visible',
-                  paddingBottom: 4,
-                }}
-              >
+              // ✅ AQUI: troca de netflixRow (carrossel) para netflixGrid (várias linhas)
+              <div className={styles.netflixGrid}>
                 {filteredApps.map((app, i) => (
                   <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
                 ))}
