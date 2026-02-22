@@ -255,13 +255,8 @@
 
 /* ── Mobile extras ───────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  .logo img {
-    width: 42px;
-    height: 42px;
-  }
-
   .logoImg {
-    height: 26px;
+    height: 32px;
   }
 
   .title {
