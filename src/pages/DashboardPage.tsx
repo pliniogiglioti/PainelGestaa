@@ -273,8 +273,8 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
       <div className={styles.netflixCardContent}>
         <span className={styles.netflixCategory}>{categoryLabel}</span>
         <h3 className={styles.netflixTitle}>{app.name}</h3>
+        {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
         <div className={`${styles.netflixExpandable} ${hovered ? styles.netflixExpandableOpen : ''}`}>
-          {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
           <div className={styles.netflixActions}>
             <a href={app.internal_link ?? '#'} className={styles.netflixBtnPrimary}>Acessar</a>
             {app.external_link && (
