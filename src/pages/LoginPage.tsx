@@ -1,20 +1,29 @@
 import { useState } from 'react'
 import styles from './LoginPage.module.css'
-import { User } from '../App'
+import { supabase } from '../lib/supabase'
 
-interface LoginPageProps {
-  onLogin: (user: User) => void
-}
-
-export default function LoginPage({ onLogin }: LoginPageProps) {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+export default function LoginPage() {
+  const [email,        setEmail]        = useState('')
+  const [password,     setPassword]     = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [error,        setError]        = useState('')
+  const [loading,      setLoading]      = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-    onLogin({ name, email })
+    setError('')
+    setLoading(true)
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    if (error) {
+      setError(error.message === 'Invalid login credentials'
+        ? 'E-mail ou senha incorretos.'
+        : error.message)
+    }
+    // On success, App.tsx onAuthStateChange fires and switches to Dashboard automatically
+
+    setLoading(false)
   }
 
   return (
@@ -96,10 +105,13 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </div>
           </div>
 
-          <button type="submit" className={styles.submitButton}>Entrar</button>
+          {error && <p className={styles.errorMsg}>{error}</p>}
+
+          <button type="submit" className={styles.submitButton} disabled={loading}>
+            {loading ? 'Entrando...' : 'Entrar'}
+          </button>
         </form>
 
-        {/* Footer */}
         <p className={styles.footerText}>
           Não tem uma conta?{' '}
           <a href="#" className={styles.registerLink}>Cadastre-se</a>
