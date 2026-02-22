@@ -425,8 +425,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
         </aside>
         <main className={styles.main}>
           <div className={styles.mobileHeader}>
-            <img src="/favicon.png" width="28" height="28" alt="" />
-            <img src="/logo.png" height="22" alt="PainelGestaa" className={styles.mobileHeaderLogo} />
+            <img src="/logo.png" height="26" alt="PainelGestaa" />
           </div>
           <ForumTopicPage topicId={openTopicId} currentUser={user} onBack={() => setOpenTopicId(null)} />
         </main>

@@ -35,8 +35,7 @@ export default function LoginPage({ onRegister }: LoginPageProps) {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logo}>
-          <img src="/favicon.png" width="36" height="36" alt="" />
-          <img src="/logo.png" height="30" alt="PainelGestaa" className={styles.logoImg} />
+          <img src="/logo.png" height="34" alt="PainelGestaa" className={styles.logoImg} />
         </div>
 
         {/* Header */}

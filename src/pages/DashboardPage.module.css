@@ -1042,11 +1042,6 @@
     flex-shrink: 0;
   }
 
-  .mobileHeaderLogo {
-    filter: brightness(0) invert(1);
-    opacity: 0.9;
-  }
-
   .pageContent {
     padding: 16px 16px 24px;
   }
