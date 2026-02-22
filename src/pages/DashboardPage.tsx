@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
@@ -309,24 +309,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [showCreateCat,   setShowCreateCat]   = useState(false)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
 
-  // Drag-to-scroll
-  const rowRef    = useRef<HTMLDivElement>(null)
-  const dragState = useRef({ dragging: false, startX: 0, scrollLeft: 0 })
-
-  const onMouseDown = (e: React.MouseEvent) => {
-    dragState.current = { dragging: true, startX: e.pageX, scrollLeft: rowRef.current?.scrollLeft ?? 0 }
-    if (rowRef.current) rowRef.current.style.cursor = 'grabbing'
-  }
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!dragState.current.dragging || !rowRef.current) return
-    e.preventDefault()
-    rowRef.current.scrollLeft = dragState.current.scrollLeft - (e.pageX - dragState.current.startX)
-  }
-  const onMouseUp = () => {
-    dragState.current.dragging = false
-    if (rowRef.current) rowRef.current.style.cursor = 'grab'
-  }
-
   // ── Fetch categories ──
   const fetchCategories = async () => {
     const { data } = await supabase.from('app_categories').select('*').order('name')
@@ -479,26 +461,13 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </div>
             </div>
 
-            {/* Categories (VERTICAL) */}
-            <div className={styles.categoriesBar} style={{ alignItems: 'flex-start' }}>
-              <div
-                className={styles.categoriesScroll}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                  overflowX: 'visible',
-                  overflowY: 'visible',
-                  width: '100%',
-                }}
-              >
+            {/* Categories */}
+            <div className={styles.categoriesBar}>
+              <div className={styles.categoriesScroll}>
                 {allCategories.map(cat => (
-                  <button
-                    key={cat.slug}
+                  <button key={cat.slug}
                     className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setActiveCategory(cat.slug)}
-                    style={{ width: '100%', justifyContent: 'flex-start' }}
-                  >
+                    onClick={() => setActiveCategory(cat.slug)}>
                     {cat.name}
                   </button>
                 ))}
@@ -532,9 +501,17 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 {IS_ADMIN && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
               </div>
             ) : (
-              <div className={styles.netflixRow} ref={rowRef}
-                onMouseDown={onMouseDown} onMouseMove={onMouseMove}
-                onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+              // ✅ AQUI É A CORREÇÃO: vira GRID (várias linhas), não carrossel em uma linha
+              <div
+                className={styles.netflixRow}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+                  gap: 16,
+                  overflow: 'visible',
+                  paddingBottom: 4,
+                }}
+              >
                 {filteredApps.map((app, i) => (
                   <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
                 ))}
@@ -556,34 +533,14 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </button>
             </div>
 
-            {/* Forum categories (VERTICAL) */}
-            <div className={styles.categoriesBar} style={{ alignItems: 'flex-start' }}>
-              <div
-                className={styles.categoriesScroll}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 10,
-                  overflowX: 'visible',
-                  overflowY: 'visible',
-                  width: '100%',
-                }}
-              >
-                <button
-                  className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
-                  onClick={() => setForumFilter('todos')}
-                  style={{ width: '100%', justifyContent: 'flex-start' }}
-                >
-                  Todos
-                </button>
-
+            <div className={styles.categoriesBar}>
+              <div className={styles.categoriesScroll}>
+                <button className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
+                  onClick={() => setForumFilter('todos')}>Todos</button>
                 {categories.map(cat => (
-                  <button
-                    key={cat.slug}
+                  <button key={cat.slug}
                     className={`${styles.categoryChip} ${forumFilter === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setForumFilter(cat.slug)}
-                    style={{ width: '100%', justifyContent: 'flex-start' }}
-                  >
+                    onClick={() => setForumFilter(cat.slug)}>
                     {cat.name}
                   </button>
                 ))}
