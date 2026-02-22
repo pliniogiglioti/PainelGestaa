@@ -57,8 +57,8 @@ export default function RegisterPage({ onBack }: RegisterPageProps) {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logo}>
-          <img src="/favicon.png" width="36" height="36" alt="Logo" />
-          <span className={styles.logoText}>PainelGestaa</span>
+          <img src="/favicon.png" width="36" height="36" alt="" />
+          <img src="/logo.png" height="30" alt="PainelGestaa" className={styles.logoImg} />
         </div>
 
         {/* Header */}

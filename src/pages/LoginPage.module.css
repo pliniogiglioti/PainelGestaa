@@ -75,14 +75,10 @@
   gap: 12px;
 }
 
-.logoText {
-  font-size: 20px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--gold-light), var(--gold));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.4px;
+.logoImg {
+  height: 30px;
+  width: auto;
+  object-fit: contain;
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -264,8 +260,8 @@
     height: 42px;
   }
 
-  .logoText {
-    font-size: 22px;
+  .logoImg {
+    height: 26px;
   }
 
   .title {
