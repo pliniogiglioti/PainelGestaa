@@ -1,6 +1,6 @@
-// ── Supabase generated types ─────────────────────────────────────────────
-// Run: npx supabase gen types typescript --project-id <id> > src/lib/types.ts
-// to regenerate automatically from your Supabase schema.
+// Supabase Database type — matches @supabase/supabase-js v2 expected shape.
+// Regenerate automatically with:
+//   npx supabase gen types typescript --project-id <your-project-id>
 
 export interface Database {
   public: {
@@ -10,14 +10,32 @@ export interface Database {
           id:         string
           name:       string | null
           email:      string | null
-          role:       string          // 'user' | 'admin'
-          plan:       string          // 'free' | 'pro'
+          role:       string
+          plan:       string
           avatar_url: string | null
           created_at: string
           updated_at: string
         }
-        Insert: Omit<Database['public']['Tables']['profiles']['Row'], 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['profiles']['Insert']>
+        Insert: {
+          id:         string
+          name?:      string | null
+          email?:     string | null
+          role?:      string
+          plan?:      string
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?:        string
+          name?:      string | null
+          email?:     string | null
+          role?:      string
+          plan?:      string
+          avatar_url?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       app_categories: {
         Row: {
@@ -26,8 +44,18 @@ export interface Database {
           slug:       string
           created_at: string
         }
-        Insert: { name: string; slug: string }
-        Update: Partial<Database['public']['Tables']['app_categories']['Insert']>
+        Insert: {
+          id?:        string
+          name:       string
+          slug:       string
+          created_at?: string
+        }
+        Update: {
+          id?:        string
+          name?:      string
+          slug?:      string
+        }
+        Relationships: []
       }
       apps: {
         Row: {
@@ -41,8 +69,28 @@ export interface Database {
           created_at:       string
           updated_at:       string
         }
-        Insert: Omit<Database['public']['Tables']['apps']['Row'], 'id' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['apps']['Insert']>
+        Insert: {
+          id?:              string
+          name:             string
+          description?:     string | null
+          category:         string
+          external_link?:   string | null
+          internal_link?:   string | null
+          background_image?: string | null
+          created_at?:      string
+          updated_at?:      string
+        }
+        Update: {
+          id?:              string
+          name?:            string
+          description?:     string | null
+          category?:        string
+          external_link?:   string | null
+          internal_link?:   string | null
+          background_image?: string | null
+          updated_at?:      string
+        }
+        Relationships: []
       }
       forum_categories: {
         Row: {
@@ -51,8 +99,18 @@ export interface Database {
           slug:       string
           created_at: string
         }
-        Insert: { name: string; slug: string }
-        Update: Partial<Database['public']['Tables']['forum_categories']['Insert']>
+        Insert: {
+          id?:        string
+          name:       string
+          slug:       string
+          created_at?: string
+        }
+        Update: {
+          id?:   string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
       }
       forum_topics: {
         Row: {
@@ -66,8 +124,28 @@ export interface Database {
           created_at:  string
           updated_at:  string
         }
-        Insert: Omit<Database['public']['Tables']['forum_topics']['Row'], 'id' | 'views' | 'pinned' | 'created_at' | 'updated_at'>
-        Update: Partial<Database['public']['Tables']['forum_topics']['Insert']>
+        Insert: {
+          id?:          string
+          category_id?: string | null
+          author_id?:   string | null
+          title:        string
+          content:      string
+          views?:       number
+          pinned?:      boolean
+          created_at?:  string
+          updated_at?:  string
+        }
+        Update: {
+          id?:          string
+          category_id?: string | null
+          author_id?:   string | null
+          title?:       string
+          content?:     string
+          views?:       number
+          pinned?:      boolean
+          updated_at?:  string
+        }
+        Relationships: []
       }
       forum_replies: {
         Row: {
@@ -77,21 +155,47 @@ export interface Database {
           content:    string
           created_at: string
         }
-        Insert: Omit<Database['public']['Tables']['forum_replies']['Row'], 'id' | 'created_at'>
-        Update: Partial<Database['public']['Tables']['forum_replies']['Insert']>
+        Insert: {
+          id?:        string
+          topic_id:   string
+          author_id?: string | null
+          content:    string
+          created_at?: string
+        }
+        Update: {
+          id?:       string
+          topic_id?: string
+          content?:  string
+        }
+        Relationships: []
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      increment_topic_views: {
+        Args: { topic_id: string }
+        Returns: undefined
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
     }
   }
 }
 
 // ── Convenience aliases ───────────────────────────────────────────────────
 
-export type Profile        = Database['public']['Tables']['profiles']['Row']
-export type AppCategory    = Database['public']['Tables']['app_categories']['Row']
-export type App            = Database['public']['Tables']['apps']['Row']
-export type ForumCategory  = Database['public']['Tables']['forum_categories']['Row']
-export type ForumTopic     = Database['public']['Tables']['forum_topics']['Row']
-export type ForumReply     = Database['public']['Tables']['forum_replies']['Row']
+export type Profile       = Database['public']['Tables']['profiles']['Row']
+export type AppCategory   = Database['public']['Tables']['app_categories']['Row']
+export type App           = Database['public']['Tables']['apps']['Row']
+export type ForumCategory = Database['public']['Tables']['forum_categories']['Row']
+export type ForumTopic    = Database['public']['Tables']['forum_topics']['Row']
+export type ForumReply    = Database['public']['Tables']['forum_replies']['Row']
 
 // ── Extended types with joined data ──────────────────────────────────────
 

@@ -52,7 +52,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
 
   // Increment views once on mount
   useEffect(() => {
-    supabase.rpc('increment_topic_views', { topic_id: topicId }).then(() => {})
+    supabase.rpc('increment_topic_views', { topic_id: topicId } as any).then(() => {})
   }, [topicId])
 
   // Fetch topic + replies
@@ -80,7 +80,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
         })
       }
 
-      setReplies((repliesData as ForumReplyWithAuthor[]) ?? [])
+      setReplies((repliesData as unknown as ForumReplyWithAuthor[]) ?? [])
       setLoading(false)
     }
 
@@ -101,7 +101,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
             .eq('id', payload.new.id)
             .single()
           if (data) {
-            setReplies(prev => [...prev, data as ForumReplyWithAuthor])
+            setReplies(prev => [...prev, data as unknown as ForumReplyWithAuthor])
             setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
           }
         }
