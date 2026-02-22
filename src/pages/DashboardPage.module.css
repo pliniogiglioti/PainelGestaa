@@ -154,7 +154,7 @@
 }
 
 .pageContent {
-  padding: 40px 44px;
+  padding: 40px 44px 40px 44px;
 }
 
 /* ── Welcome — no card, just text ───────────────────────────────────────── */
@@ -286,9 +286,17 @@
   display: flex;
   gap: 14px;
   overflow-x: auto;
-  padding: 8px 4px 24px;
-  /* allow cards to breathe on hover */
   overflow-y: visible;
+  padding: 8px 0 24px;
+  /* extend to the right edge of the viewport, past pageContent padding */
+  margin-right: -44px;
+  padding-right: 44px;
+  /* hide scrollbar */
+  scrollbar-width: none;
+}
+
+.netflixRow::-webkit-scrollbar {
+  display: none;
 }
 
 /* ── Netflix Card ────────────────────────────────────────────────────────── */

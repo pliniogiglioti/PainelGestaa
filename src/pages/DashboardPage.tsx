@@ -248,8 +248,8 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       <aside className={styles.sidebar}>
         {/* Logo — favicon only when collapsed, full logo on hover */}
         <div className={styles.sidebarLogo}>
-          <img src="/favicon.svg" width="30" height="30" alt="Logo" className={styles.sidebarFavicon} />
-          <img src="/logo.svg"    height="28"             alt="PainelGestaa" className={styles.sidebarLogoFull} />
+          <img src="/favicon.png" width="30" height="30" alt="Logo" className={styles.sidebarFavicon} />
+          <img src="/logo.png"   height="28"             alt="PainelGestaa" className={styles.sidebarLogoFull} />
         </div>
 
         <nav className={styles.sidebarNav}>

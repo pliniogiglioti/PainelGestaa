@@ -22,7 +22,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
       <div className={styles.card}>
         {/* Logo */}
         <div className={styles.logo}>
-          <img src="/favicon.svg" width="36" height="36" alt="Logo" />
+          <img src="/favicon.png" width="36" height="36" alt="Logo" />
           <span className={styles.logoText}>PainelGestaa</span>
         </div>
 
