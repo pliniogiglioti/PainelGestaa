@@ -2,7 +2,11 @@ import { useState } from 'react'
 import styles from './LoginPage.module.css'
 import { supabase } from '../lib/supabase'
 
-export default function LoginPage() {
+interface LoginPageProps {
+  onRegister: () => void
+}
+
+export default function LoginPage({ onRegister }: LoginPageProps) {
   const [email,        setEmail]        = useState('')
   const [password,     setPassword]     = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -114,7 +118,9 @@ export default function LoginPage() {
 
         <p className={styles.footerText}>
           Não tem uma conta?{' '}
-          <a href="#" className={styles.registerLink}>Cadastre-se</a>
+          <button className={styles.registerLink} onClick={onRegister}>
+            Cadastre-se
+          </button>
         </p>
       </div>
     </div>

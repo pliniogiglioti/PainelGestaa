@@ -424,6 +424,10 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
           </div>
         </aside>
         <main className={styles.main}>
+          <div className={styles.mobileHeader}>
+            <img src="/favicon.png" width="28" height="28" alt="" />
+            <img src="/logo.png" height="22" alt="PainelGestaa" className={styles.mobileHeaderLogo} />
+          </div>
           <ForumTopicPage topicId={openTopicId} currentUser={user} onBack={() => setOpenTopicId(null)} />
         </main>
       </div>
@@ -459,6 +463,12 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
       {/* ── Main ── */}
       <main className={styles.main}>
+
+        {/* Mobile-only top bar with logo */}
+        <div className={styles.mobileHeader}>
+          <img src="/favicon.png" width="28" height="28" alt="" />
+          <img src="/logo.png" height="22" alt="PainelGestaa" className={styles.mobileHeaderLogo} />
+        </div>
 
         {/* APLICATIVOS */}
         {activePage === 'aplicativos' && (

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import type { Session } from '@supabase/supabase-js'
 import LoginPage from './pages/LoginPage'
+import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 
 export interface User {
@@ -19,8 +20,9 @@ function sessionToUser(session: Session): User {
 }
 
 function App() {
-  const [user,    setUser]    = useState<User | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [user,       setUser]       = useState<User | null>(null)
+  const [loading,    setLoading]    = useState(true)
+  const [showRegister, setShowRegister] = useState(false)
 
   useEffect(() => {
     // 1. Restore session that's already persisted in localStorage
@@ -64,7 +66,11 @@ function App() {
     return <DashboardPage user={user} onLogout={handleLogout} />
   }
 
-  return <LoginPage />
+  if (showRegister) {
+    return <RegisterPage onBack={() => setShowRegister(false)} />
+  }
+
+  return <LoginPage onRegister={() => setShowRegister(true)} />
 }
 
 export default App
