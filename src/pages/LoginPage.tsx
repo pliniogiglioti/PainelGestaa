@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import styles from './LoginPage.module.css'
+import { User } from '../App'
 
 const IMAGE_CATEGORIES = [
   'nature',
@@ -18,7 +19,11 @@ function getRandomImageUrl(): string {
   return `https://picsum.photos/seed/${seed}/800/1200?${category}`
 }
 
-export default function LoginPage() {
+interface LoginPageProps {
+  onLogin: (user: User) => void
+}
+
+export default function LoginPage({ onLogin }: LoginPageProps) {
   const [imageUrl, setImageUrl] = useState<string>('')
   const [imageLoaded, setImageLoaded] = useState(false)
   const [email, setEmail] = useState('')
@@ -31,8 +36,9 @@ export default function LoginPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    // Handle login logic here
-    console.log('Login attempt:', { email, password })
+    // Derive name from email for demo purposes
+    const name = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+    onLogin({ name, email })
   }
 
   return (

@@ -1,0 +1,534 @@
+/* ── Layout ──────────────────────────────────────────────────────────────── */
+
+.layout {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #0f0f17;
+  color: #e2e8f0;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────────────────── */
+
+.sidebar {
+  width: 240px;
+  min-width: 240px;
+  background-color: #13131f;
+  border-right: 1px solid #1e1e2e;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 0;
+  position: relative;
+  z-index: 10;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+.sidebarLogo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px 28px;
+  border-bottom: 1px solid #1e1e2e;
+  margin-bottom: 20px;
+}
+
+.sidebarLogoText {
+  font-size: 16px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: -0.3px;
+}
+
+.sidebarNav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.navItem:hover {
+  background-color: #1e1e2e;
+  color: #e2e8f0;
+}
+
+.navItemActive {
+  background: linear-gradient(135deg, #6366f122, #8b5cf622);
+  color: #a5b4fc;
+  border: 1px solid #6366f133;
+}
+
+.navItemActive:hover {
+  background: linear-gradient(135deg, #6366f133, #8b5cf633);
+  color: #a5b4fc;
+}
+
+.navIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.navLabel {
+  flex: 1;
+}
+
+.sidebarBottom {
+  padding: 12px 12px 0;
+  border-top: 1px solid #1e1e2e;
+  margin-top: 8px;
+}
+
+.logoutButton {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  color: #f87171;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  text-align: left;
+  width: 100%;
+}
+
+.logoutButton:hover {
+  background-color: #f871711a;
+}
+
+/* ── Main Content ────────────────────────────────────────────────────────── */
+
+.main {
+  flex: 1;
+  overflow-y: auto;
+  background-color: #0f0f17;
+}
+
+.main::-webkit-scrollbar {
+  width: 6px;
+}
+
+.main::-webkit-scrollbar-track {
+  background: #0f0f17;
+}
+
+.main::-webkit-scrollbar-thumb {
+  background: #2a2a3e;
+  border-radius: 3px;
+}
+
+.pageContent {
+  padding: 32px 36px;
+  max-width: 1200px;
+}
+
+/* ── Welcome Header ──────────────────────────────────────────────────────── */
+
+.welcomeHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 32px;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #1a1a2e 100%);
+  border-radius: 16px;
+  border: 1px solid #2a2a3e;
+  position: relative;
+  overflow: hidden;
+}
+
+.welcomeHeader::before {
+  content: '';
+  position: absolute;
+  top: -40px;
+  right: -40px;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle, #6366f133 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.welcomeText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.welcomeGreeting {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 400;
+}
+
+.welcomeName {
+  font-size: 26px;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: -0.5px;
+}
+
+.welcomeAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+  box-shadow: 0 4px 16px #6366f144;
+}
+
+/* ── Categories ──────────────────────────────────────────────────────────── */
+
+.categoriesWrapper {
+  margin-bottom: 28px;
+}
+
+.categoriesScroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.categoriesScroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.categoriesScroll::-webkit-scrollbar-thumb {
+  background: #2a2a3e;
+  border-radius: 2px;
+}
+
+.categoryChip {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border-radius: 50px;
+  border: 1px solid #2a2a3e;
+  background: #13131f;
+  color: #94a3b8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.categoryChip:hover {
+  border-color: #6366f155;
+  color: #e2e8f0;
+  background: #1e1e2e;
+}
+
+.categoryChipActive {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 2px 12px #6366f155;
+}
+
+.categoryChipActive:hover {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: #ffffff;
+}
+
+/* ── Section Header ──────────────────────────────────────────────────────── */
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.sectionCount {
+  font-size: 13px;
+  color: #64748b;
+  background: #1e1e2e;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid #2a2a3e;
+}
+
+/* ── Apps Grid ───────────────────────────────────────────────────────────── */
+
+.appsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.appCard {
+  background: #13131f;
+  border: 1px solid #1e1e2e;
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+}
+
+.appCard:hover {
+  border-color: #6366f144;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.appIconWrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.appEmoji {
+  font-size: 26px;
+  line-height: 1;
+}
+
+.appInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.appName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.appDescription {
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+}
+
+.starRating {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ratingText {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: 4px;
+  font-weight: 500;
+}
+
+.appMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.appInstalls {
+  font-size: 11px;
+  color: #475569;
+}
+
+.installButton {
+  align-self: flex-start;
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  letter-spacing: 0.2px;
+}
+
+.installButton:hover {
+  opacity: 0.85;
+  transform: scale(1.03);
+}
+
+/* ── Placeholder Pages ───────────────────────────────────────────────────── */
+
+.placeholderPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 16px;
+  text-align: center;
+}
+
+.placeholderIcon {
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #6366f122, #8b5cf622);
+  border: 1px solid #6366f133;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a5b4fc;
+}
+
+.placeholderTitle {
+  font-size: 24px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.placeholderText {
+  font-size: 14px;
+  color: #64748b;
+  max-width: 320px;
+  line-height: 1.6;
+}
+
+.placeholderButton {
+  padding: 10px 28px;
+  border-radius: 10px;
+  border: 1px solid #2a2a3e;
+  background: #1e1e2e;
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: default;
+  margin-top: 8px;
+}
+
+/* ── Profile Page ────────────────────────────────────────────────────────── */
+
+.profilePage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 48px;
+  gap: 12px;
+}
+
+.profileAvatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 700;
+  color: white;
+  box-shadow: 0 8px 32px #6366f155;
+  margin-bottom: 8px;
+}
+
+.profileName {
+  font-size: 22px;
+  font-weight: 700;
+  color: #e2e8f0;
+}
+
+.profileEmail {
+  font-size: 14px;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.profileCard {
+  width: 100%;
+  max-width: 420px;
+  background: #13131f;
+  border: 1px solid #1e1e2e;
+  border-radius: 14px;
+  padding: 8px 0;
+  margin-top: 16px;
+  margin-bottom: 8px;
+}
+
+.profileField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid #1e1e2e;
+}
+
+.profileField:last-child {
+  border-bottom: none;
+}
+
+.profileFieldLabel {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.profileFieldValue {
+  font-size: 14px;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+
+.profileFieldBadge {
+  font-size: 12px;
+  color: #a5b4fc;
+  background: #6366f122;
+  border: 1px solid #6366f133;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+
+.logoutButtonProfile {
+  padding: 12px 32px;
+  border-radius: 10px;
+  border: 1px solid #f871711a;
+  background: transparent;
+  color: #f87171;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  margin-top: 8px;
+}
+
+.logoutButtonProfile:hover {
+  background: #f871711a;
+}
