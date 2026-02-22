@@ -246,13 +246,8 @@
     justify-content: center;
   }
 
-  .logo img {
-    width: 42px;
-    height: 42px;
-  }
-
   .logoImg {
-    height: 26px;
+    height: 32px;
   }
 
   .title {
