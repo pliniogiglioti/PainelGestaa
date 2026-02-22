@@ -529,12 +529,12 @@
 .netflixDescription {
   font-size: 11px;
   color: rgba(255,255,255,0.62);
-  line-height: 1.5;
+  line-height: 1.45;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  padding-top: 6px;
+  margin-top: 5px;
 }
 
 .netflixActions {
