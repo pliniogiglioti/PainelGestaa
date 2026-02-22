@@ -1,6 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
+import { supabase } from '../lib/supabase'
+import type { App, AppCategory, ForumTopicWithMeta } from '../lib/types'
+import ForumTopicPage from './ForumTopicPage'
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
@@ -9,74 +12,7 @@ interface DashboardPageProps {
   onLogout: () => void
 }
 
-// Hardcoded — will come from Supabase
-const IS_ADMIN = true
-
-// ── Types ─────────────────────────────────────────────────────────────────
-
-interface Category {
-  id: string
-  label: string
-}
-
-interface AppItem {
-  id: number
-  name: string
-  description: string
-  category: string
-  externalLink: string
-  internalLink: string
-  backgroundImage: string
-}
-
-interface ForumTopic {
-  id: number
-  title: string
-  category: string
-  author: string
-  date: string
-  replies: number
-  views: number
-  pinned?: boolean
-}
-
-// ── Initial data ──────────────────────────────────────────────────────────
-
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'todos',         label: 'Todos' },
-  { id: 'produtividade', label: 'Produtividade' },
-  { id: 'financas',      label: 'Finanças' },
-  { id: 'gestao',        label: 'Gestão' },
-  { id: 'comunicacao',   label: 'Comunicação' },
-  { id: 'relatorios',    label: 'Relatórios' },
-  { id: 'estoque',       label: 'Estoque' },
-]
-
-const APPS: AppItem[] = [
-  { id: 1,  name: 'GestCaixa',  description: 'Controle de caixa e fluxo financeiro em tempo real com dashboards interativos.',          category: 'financas',      externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/101/400/600' },
-  { id: 2,  name: 'StockPro',   description: 'Gestão completa de estoque, inventário e rastreamento de produtos.',                        category: 'estoque',       externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/202/400/600' },
-  { id: 3,  name: 'RelatóriOS', description: 'Relatórios e análises avançadas com exportação em PDF e Excel.',                            category: 'relatorios',    externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/303/400/600' },
-  { id: 4,  name: 'ChatBiz',    description: 'Comunicação interna da equipe com canais, mensagens diretas e videochamadas.',              category: 'comunicacao',   externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/404/400/600' },
-  { id: 5,  name: 'TaskFlow',   description: 'Gerenciamento de tarefas, projetos e sprints com metodologia ágil.',                       category: 'gestao',        externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/505/400/600' },
-  { id: 6,  name: 'PagaFácil',  description: 'Pagamentos, cobranças e conciliação bancária em um só lugar.',                             category: 'financas',      externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/606/400/600' },
-  { id: 7,  name: 'DocManager', description: 'Gestão de documentos, contratos e arquivos com assinatura digital.',                       category: 'produtividade', externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/707/400/600' },
-  { id: 8,  name: 'HRConnect',  description: 'Gestão de recursos humanos, folha de pagamento e ponto eletrônico.',                       category: 'gestao',        externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/808/400/600' },
-  { id: 9,  name: 'NoteFast',   description: 'Anotações rápidas, lembretes e base de conhecimento da equipe.',                           category: 'produtividade', externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/909/400/600' },
-  { id: 10, name: 'VendaPro',   description: 'Sistema de vendas completo com PDV, CRM e gestão de clientes.',                            category: 'financas',      externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/110/400/600' },
-  { id: 11, name: 'LogiTrack',  description: 'Rastreamento de logística, rotas de entrega e gestão de frotas.',                          category: 'estoque',       externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/211/400/600' },
-  { id: 12, name: 'MeetSync',   description: 'Agendamento inteligente de reuniões, salas e integração com calendários.',                 category: 'comunicacao',   externalLink: '#', internalLink: '#', backgroundImage: 'https://picsum.photos/seed/312/400/600' },
-]
-
-const FORUM_TOPICS: ForumTopic[] = [
-  { id: 1, title: 'Como integrar o GestCaixa com meu ERP?',         category: 'financas',      author: 'Ana Lima',      date: '22 fev',  replies: 12, views: 340, pinned: true },
-  { id: 2, title: 'Dicas para otimizar o controle de estoque',      category: 'estoque',       author: 'Carlos Mota',   date: '21 fev',  replies: 8,  views: 210 },
-  { id: 3, title: 'Relatórios personalizados — passo a passo',      category: 'relatorios',    author: 'Julia Santos',  date: '20 fev',  replies: 5,  views: 180 },
-  { id: 4, title: 'Melhores práticas de gestão de equipe remota',   category: 'gestao',        author: 'Pedro Alves',   date: '19 fev',  replies: 23, views: 620 },
-  { id: 5, title: 'Integração ChatBiz com WhatsApp Business',       category: 'comunicacao',   externalLink: '#', internalLink: '#', author: 'Mariana Costa', date: '18 fev', replies: 15, views: 440 } as any,
-  { id: 6, title: 'Erro ao exportar PDF no RelatóriOS v2.1',        category: 'relatorios',    author: 'Rafael Nunes',  date: '17 fev',  replies: 3,  views: 95 },
-  { id: 7, title: 'TaskFlow — como usar templates de projeto',      category: 'gestao',        author: 'Fernanda Lima', date: '16 fev',  replies: 9,  views: 280 },
-  { id: 8, title: 'Configurando NoteFast para toda a equipe',       category: 'produtividade', author: 'Diego Silva',   date: '15 fev',  replies: 6,  views: 160 },
-]
+const IS_ADMIN = true  // TODO: pull from profiles.role once auth is wired
 
 // ── Icons ─────────────────────────────────────────────────────────────────
 
@@ -86,96 +22,101 @@ const IconApps = () => (
     <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
   </svg>
 )
-
 const IconCommunity = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
     <circle cx="9" cy="7" r="4"/>
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
   </svg>
 )
-
 const IconProfile = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-    <circle cx="12" cy="7" r="4"/>
+    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
   </svg>
 )
-
 const IconLogout = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-    <polyline points="16 17 21 12 16 7"/>
-    <line x1="21" y1="12" x2="9" y2="12"/>
+    <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
   </svg>
 )
-
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
   </svg>
 )
-
 const IconExternal = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
     <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
   </svg>
 )
-
 const IconTag = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
     <line x1="7" y1="7" x2="7.01" y2="7"/>
   </svg>
 )
-
 const IconMessageSquare = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
   </svg>
 )
-
 const IconEye = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-    <circle cx="12" cy="12" r="3"/>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+)
+const IconPin = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
   </svg>
 )
 
-const IconPin = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
-    <circle cx="12" cy="10" r="3"/>
-  </svg>
-)
+// ── Spinner ───────────────────────────────────────────────────────────────
+
+function Spinner() {
+  return <div className={styles.spinner} />
+}
 
 // ── Modals ────────────────────────────────────────────────────────────────
 
 interface NewAppForm {
-  name: string
-  description: string
-  category: string
-  externalLink: string
-  internalLink: string
-  backgroundImage: string
+  name: string; description: string; category: string
+  externalLink: string; internalLink: string; backgroundImage: string
 }
 
-function CreateAppModal({ categories, onClose }: { categories: Category[], onClose: () => void }) {
+function CreateAppModal({ categories, onClose, onCreated }: {
+  categories: AppCategory[]
+  onClose: () => void
+  onCreated: () => void
+}) {
   const [form, setForm] = useState<NewAppForm>({
-    name: '', description: '', category: 'produtividade',
+    name: '', description: '', category: '',
     externalLink: '', internalLink: '', backgroundImage: '',
   })
+  const [saving, setSaving] = useState(false)
+  const [error, setError]   = useState('')
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
-      setForm(prev => ({ ...prev, [f]: e.target.value }))
+      setForm(p => ({ ...p, [f]: e.target.value }))
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('New app:', form)
-    onClose()
+    setSaving(true); setError('')
+
+    const { error } = await supabase.from('apps').insert({
+      name:             form.name,
+      description:      form.description || null,
+      category:         form.category,
+      external_link:    form.externalLink || null,
+      internal_link:    form.internalLink || null,
+      background_image: form.backgroundImage || null,
+    })
+
+    if (error) { setError(error.message); setSaving(false); return }
+    onCreated(); onClose()
   }
 
   return (
@@ -193,16 +134,17 @@ function CreateAppModal({ categories, onClose }: { categories: Category[], onClo
             </div>
             <div className={styles.modalField}>
               <label className={styles.modalLabel}>Categoria</label>
-              <select className={styles.modalInput} value={form.category} onChange={set('category')}>
-                {categories.filter(c => c.id !== 'todos').map(c => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
+              <select className={styles.modalInput} value={form.category} onChange={set('category')} required>
+                <option value="">Selecione...</option>
+                {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
               </select>
             </div>
           </div>
           <div className={styles.modalField}>
             <label className={styles.modalLabel}>Descrição</label>
-            <textarea className={`${styles.modalInput} ${styles.modalTextarea}`} placeholder="Descreva o que este app faz..." value={form.description} onChange={set('description')} required rows={3} />
+            <textarea className={`${styles.modalInput} ${styles.modalTextarea}`}
+              placeholder="Descreva o que este app faz..."
+              value={form.description} onChange={set('description')} rows={3} />
           </div>
           <div className={styles.modalRow}>
             <div className={styles.modalField}>
@@ -218,9 +160,12 @@ function CreateAppModal({ categories, onClose }: { categories: Category[], onClo
             <label className={styles.modalLabel}>URL da Imagem de Fundo</label>
             <input className={styles.modalInput} type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
           </div>
+          {error && <p className={styles.formError}>{error}</p>}
           <div className={styles.modalActions}>
             <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit}>Criar App</button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Criar App'}
+            </button>
           </div>
         </form>
       </div>
@@ -228,14 +173,16 @@ function CreateAppModal({ categories, onClose }: { categories: Category[], onClo
   )
 }
 
-function CreateCategoryModal({ onClose, onCreate }: { onClose: () => void, onCreate: (cat: Category) => void }) {
+function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
+  const [saving, setSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    const id = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')
-    onCreate({ id, label: name })
-    onClose()
+    setSaving(true)
+    const slug = name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_')
+    await supabase.from('app_categories').insert({ name, slug })
+    onCreated(); onClose()
   }
 
   return (
@@ -247,12 +194,12 @@ function CreateCategoryModal({ onClose, onCreate }: { onClose: () => void, onCre
         </div>
         <form className={styles.modalForm} onSubmit={handleSubmit}>
           <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Nome da categoria</label>
+            <label className={styles.modalLabel}>Nome</label>
             <input className={styles.modalInput} placeholder="Ex: Marketing" value={name} onChange={e => setName(e.target.value)} required autoFocus />
           </div>
           <div className={styles.modalActions}>
             <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit}>Criar</button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>{saving ? '...' : 'Criar'}</button>
           </div>
         </form>
       </div>
@@ -260,34 +207,81 @@ function CreateCategoryModal({ onClose, onCreate }: { onClose: () => void, onCre
   )
 }
 
-// ── Netflix Card ──────────────────────────────────────────────────────────
+function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [title,   setTitle]   = useState('')
+  const [content, setContent] = useState('')
+  const [saving,  setSaving]  = useState(false)
 
-function AppCard({ app, categoryLabel, index }: { app: AppItem, categoryLabel: string, index: number }) {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      await supabase.from('forum_topics').insert({
+        author_id: user.id,
+        title: title.trim(),
+        content: content.trim(),
+      })
+    }
+    onCreated(); onClose()
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Novo Tópico</h2>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <form className={styles.modalForm} onSubmit={handleSubmit}>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Título</label>
+            <input className={styles.modalInput} placeholder="Qual é a sua dúvida ou tema?" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Conteúdo</label>
+            <textarea className={`${styles.modalInput} ${styles.modalTextarea}`}
+              placeholder="Descreva em detalhes..." rows={5}
+              value={content} onChange={e => setContent(e.target.value)} required />
+          </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>{saving ? 'Publicando...' : 'Publicar'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── Netflix App Card ──────────────────────────────────────────────────────
+
+function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
       className={styles.netflixCard}
       style={{
-        backgroundImage: `url(${app.backgroundImage})`,
+        backgroundImage: app.background_image ? `url(${app.background_image})` : undefined,
         animationDelay: `${index * 60}ms`,
       }}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
       <div className={`${styles.netflixOverlay} ${hovered ? styles.netflixOverlayHovered : ''}`} />
-
       <div className={styles.netflixCardContent}>
         <span className={styles.netflixCategory}>{categoryLabel}</span>
         <h3 className={styles.netflixTitle}>{app.name}</h3>
-
         <div className={`${styles.netflixExpandable} ${hovered ? styles.netflixExpandableOpen : ''}`}>
-          <p className={styles.netflixDescription}>{app.description}</p>
+          {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
           <div className={styles.netflixActions}>
-            <a href={app.internalLink} className={styles.netflixBtnPrimary}>Acessar</a>
-            <a href={app.externalLink} className={styles.netflixBtnIcon} target="_blank" rel="noreferrer" title="Abrir externamente">
-              <IconExternal />
-            </a>
+            <a href={app.internal_link ?? '#'} className={styles.netflixBtnPrimary}>Acessar</a>
+            {app.external_link && (
+              <a href={app.external_link} className={styles.netflixBtnIcon} target="_blank" rel="noreferrer" title="Abrir externamente">
+                <IconExternal />
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -298,12 +292,22 @@ function AppCard({ app, categoryLabel, index }: { app: AppItem, categoryLabel: s
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
-  const [activePage, setActivePage]       = useState<Page>('aplicativos')
+  const [activePage, setActivePage]   = useState<Page>('aplicativos')
   const [activeCategory, setActiveCategory] = useState('todos')
-  const [categories, setCategories]       = useState(INITIAL_CATEGORIES)
-  const [showCreateApp, setShowCreateApp] = useState(false)
-  const [showCreateCat, setShowCreateCat] = useState(false)
-  const [forumFilter, setForumFilter]     = useState('todos')
+  const [forumFilter, setForumFilter] = useState('todos')
+  const [openTopicId, setOpenTopicId] = useState<string | null>(null)
+
+  // Supabase data
+  const [apps,       setApps]       = useState<App[]>([])
+  const [categories, setCategories] = useState<AppCategory[]>([])
+  const [topics,     setTopics]     = useState<ForumTopicWithMeta[]>([])
+  const [loadingApps,   setLoadingApps]   = useState(true)
+  const [loadingTopics, setLoadingTopics] = useState(true)
+
+  // Modals
+  const [showCreateApp,   setShowCreateApp]   = useState(false)
+  const [showCreateCat,   setShowCreateCat]   = useState(false)
+  const [showCreateTopic, setShowCreateTopic] = useState(false)
 
   // Drag-to-scroll
   const rowRef    = useRef<HTMLDivElement>(null)
@@ -316,16 +320,76 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const onMouseMove = (e: React.MouseEvent) => {
     if (!dragState.current.dragging || !rowRef.current) return
     e.preventDefault()
-    const dx = e.pageX - dragState.current.startX
-    rowRef.current.scrollLeft = dragState.current.scrollLeft - dx
+    rowRef.current.scrollLeft = dragState.current.scrollLeft - (e.pageX - dragState.current.startX)
   }
   const onMouseUp = () => {
     dragState.current.dragging = false
     if (rowRef.current) rowRef.current.style.cursor = 'grab'
   }
 
-  const filteredApps   = activeCategory === 'todos' ? APPS : APPS.filter(a => a.category === activeCategory)
-  const filteredTopics = forumFilter    === 'todos' ? FORUM_TOPICS : FORUM_TOPICS.filter(t => t.category === forumFilter)
+  // ── Fetch categories ──
+  const fetchCategories = async () => {
+    const { data } = await supabase.from('app_categories').select('*').order('name')
+    if (data) setCategories(data)
+  }
+
+  // ── Fetch apps ──
+  const fetchApps = async () => {
+    setLoadingApps(true)
+    const { data } = await supabase.from('apps').select('*').order('name')
+    if (data) setApps(data)
+    setLoadingApps(false)
+  }
+
+  // ── Fetch topics ──
+  const fetchTopics = async () => {
+    setLoadingTopics(true)
+    const { data } = await supabase
+      .from('forum_topics')
+      .select(`*, profiles(name, avatar_url), forum_categories(name, slug)`)
+      .order('pinned', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (data) {
+      // Get reply counts
+      const withCounts = await Promise.all(
+        (data as any[]).map(async t => {
+          const { count } = await supabase
+            .from('forum_replies')
+            .select('id', { count: 'exact', head: true })
+            .eq('topic_id', t.id)
+          return { ...t, reply_count: count ?? 0 }
+        })
+      )
+      setTopics(withCounts)
+    }
+    setLoadingTopics(false)
+  }
+
+  useEffect(() => { fetchCategories() }, [])
+  useEffect(() => { fetchApps()       }, [])
+  useEffect(() => { fetchTopics()     }, [])
+
+  // Realtime: new apps
+  useEffect(() => {
+    const ch = supabase.channel('apps-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'apps' }, fetchApps)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  // Realtime: new topics
+  useEffect(() => {
+    const ch = supabase.channel('topics-changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'forum_topics' }, fetchTopics)
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  const allCategories = [{ id: 'all', name: 'Todos', slug: 'todos' } as AppCategory, ...categories]
+  const filteredApps  = activeCategory === 'todos' ? apps : apps.filter(a => a.category === activeCategory)
+  const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
+
+  const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
 
   const navItems = [
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
@@ -333,30 +397,58 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
     { id: 'perfil'      as Page, label: 'Perfil',      icon: <IconProfile /> },
   ]
 
+  // Forum topic detail view overlays the community page
+  if (activePage === 'comunidade' && openTopicId) {
+    return (
+      <div className={styles.layout}>
+        <aside className={styles.sidebar}>
+          <div className={styles.sidebarLogo}>
+            <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
+            <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
+          </div>
+          <nav className={styles.sidebarNav}>
+            {navItems.map(item => (
+              <button key={item.id}
+                className={`${styles.navItem} ${activePage === item.id ? styles.navItemActive : ''}`}
+                onClick={() => { setActivePage(item.id); setOpenTopicId(null) }}>
+                <span className={styles.navIcon}>{item.icon}</span>
+                <span className={styles.navLabel}>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className={styles.sidebarBottom}>
+            <button className={styles.logoutButton} onClick={onLogout}>
+              <span className={styles.navIcon}><IconLogout /></span>
+              <span className={styles.navLabel}>Sair</span>
+            </button>
+          </div>
+        </aside>
+        <main className={styles.main}>
+          <ForumTopicPage topicId={openTopicId} currentUser={user} onBack={() => setOpenTopicId(null)} />
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.layout}>
 
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
-          {/* Cross-fade: favicon → logo */}
           <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
-          <img src="/logo.png"    height="26"            alt="PainelGestaa" className={styles.sidebarLogoFull} />
+          <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
         </div>
-
         <nav className={styles.sidebarNav}>
           {navItems.map(item => (
-            <button
-              key={item.id}
+            <button key={item.id}
               className={`${styles.navItem} ${activePage === item.id ? styles.navItemActive : ''}`}
-              onClick={() => setActivePage(item.id)}
-            >
+              onClick={() => setActivePage(item.id)}>
               <span className={styles.navIcon}>{item.icon}</span>
               <span className={styles.navLabel}>{item.label}</span>
             </button>
           ))}
         </nav>
-
         <div className={styles.sidebarBottom}>
           <button className={styles.logoutButton} onClick={onLogout}>
             <span className={styles.navIcon}><IconLogout /></span>
@@ -371,7 +463,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
         {/* APLICATIVOS */}
         {activePage === 'aplicativos' && (
           <div className={styles.pageContent} key="apps">
-            {/* Welcome — no avatar */}
             <div className={styles.welcomeRow}>
               <div>
                 <p className={styles.welcomeGreeting}>Bem-vindo de volta,</p>
@@ -379,16 +470,14 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </div>
             </div>
 
-            {/* Categories row */}
+            {/* Categories */}
             <div className={styles.categoriesBar}>
               <div className={styles.categoriesScroll}>
-                {categories.map(cat => (
-                  <button
-                    key={cat.id}
-                    className={`${styles.categoryChip} ${activeCategory === cat.id ? styles.categoryChipActive : ''}`}
-                    onClick={() => setActiveCategory(cat.id)}
-                  >
-                    {cat.label}
+                {allCategories.map(cat => (
+                  <button key={cat.slug}
+                    className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
+                    onClick={() => setActiveCategory(cat.slug)}>
+                    {cat.name}
                   </button>
                 ))}
               </div>
@@ -399,11 +488,10 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               )}
             </div>
 
-            {/* Section header */}
             <div className={styles.sectionHeader}>
               <div className={styles.sectionLeft}>
                 <h2 className={styles.sectionTitle}>
-                  {activeCategory === 'todos' ? 'Todos os Aplicativos' : categories.find(c => c.id === activeCategory)?.label}
+                  {activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
                 </h2>
                 <span className={styles.sectionCount}>{filteredApps.length} apps</span>
               </div>
@@ -414,24 +502,22 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               )}
             </div>
 
-            {/* Netflix cards — drag to scroll */}
-            <div
-              className={styles.netflixRow}
-              ref={rowRef}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
-            >
-              {filteredApps.map((app, i) => (
-                <AppCard
-                  key={app.id}
-                  app={app}
-                  index={i}
-                  categoryLabel={categories.find(c => c.id === app.category)?.label ?? app.category}
-                />
-              ))}
-            </div>
+            {loadingApps ? (
+              <div className={styles.centeredSpinner}><Spinner /></div>
+            ) : filteredApps.length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>Nenhum app encontrado nesta categoria.</p>
+                {IS_ADMIN && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
+              </div>
+            ) : (
+              <div className={styles.netflixRow} ref={rowRef}
+                onMouseDown={onMouseDown} onMouseMove={onMouseMove}
+                onMouseUp={onMouseUp} onMouseLeave={onMouseUp}>
+                {filteredApps.map((app, i) => (
+                  <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -443,56 +529,60 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 <p className={styles.welcomeGreeting}>Fórum da comunidade</p>
                 <h1 className={styles.welcomeName}>Comunidade</h1>
               </div>
-              <button className={styles.adminCreateBtn}>
+              <button className={styles.adminCreateBtn} onClick={() => setShowCreateTopic(true)}>
                 <IconPlus /> Novo Tópico
               </button>
             </div>
 
-            {/* Forum category filter */}
             <div className={styles.categoriesBar}>
               <div className={styles.categoriesScroll}>
-                {[{ id: 'todos', label: 'Todos' }, ...categories.filter(c => c.id !== 'todos')].map(cat => (
-                  <button
-                    key={cat.id}
-                    className={`${styles.categoryChip} ${forumFilter === cat.id ? styles.categoryChipActive : ''}`}
-                    onClick={() => setForumFilter(cat.id)}
-                  >
-                    {cat.label}
+                <button className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
+                  onClick={() => setForumFilter('todos')}>Todos</button>
+                {categories.map(cat => (
+                  <button key={cat.slug}
+                    className={`${styles.categoryChip} ${forumFilter === cat.slug ? styles.categoryChipActive : ''}`}
+                    onClick={() => setForumFilter(cat.slug)}>
+                    {cat.name}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Topics list */}
-            <div className={styles.forumList}>
-              {filteredTopics.map((topic, i) => (
-                <div
-                  key={topic.id}
-                  className={`${styles.forumTopic} ${topic.pinned ? styles.forumTopicPinned : ''}`}
-                  style={{ animationDelay: `${i * 50}ms` }}
-                >
-                  <div className={styles.forumTopicMain}>
-                    {topic.pinned && (
-                      <span className={styles.forumPinBadge}>
-                        <IconPin /> Fixado
-                      </span>
-                    )}
-                    <h3 className={styles.forumTopicTitle}>{topic.title}</h3>
-                    <div className={styles.forumTopicMeta}>
-                      <span className={styles.forumCategoryTag}>
-                        {categories.find(c => c.id === topic.category)?.label ?? topic.category}
-                      </span>
-                      <span className={styles.forumAuthor}>por <strong>{topic.author}</strong></span>
-                      <span className={styles.forumDate}>{topic.date}</span>
+            {loadingTopics ? (
+              <div className={styles.centeredSpinner}><Spinner /></div>
+            ) : (
+              <div className={styles.forumList}>
+                {filteredTopics.length === 0 && (
+                  <p className={styles.emptyTopics}>Nenhum tópico ainda. Seja o primeiro!</p>
+                )}
+                {filteredTopics.map((topic, i) => (
+                  <div key={topic.id}
+                    className={`${styles.forumTopic} ${topic.pinned ? styles.forumTopicPinned : ''}`}
+                    style={{ animationDelay: `${i * 50}ms` }}
+                    onClick={() => setOpenTopicId(topic.id)}>
+                    <div className={styles.forumTopicMain}>
+                      {topic.pinned && <span className={styles.forumPinBadge}><IconPin /> Fixado</span>}
+                      <h3 className={styles.forumTopicTitle}>{topic.title}</h3>
+                      <div className={styles.forumTopicMeta}>
+                        {topic.forum_categories && (
+                          <span className={styles.forumCategoryTag}>{topic.forum_categories.name}</span>
+                        )}
+                        <span className={styles.forumAuthor}>
+                          por <strong>{topic.profiles?.name ?? 'Anônimo'}</strong>
+                        </span>
+                        <span className={styles.forumDate}>
+                          {new Date(topic.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
+                        </span>
+                      </div>
+                    </div>
+                    <div className={styles.forumTopicStats}>
+                      <span className={styles.forumStat}><IconMessageSquare />{topic.reply_count}</span>
+                      <span className={styles.forumStat}><IconEye />{topic.views}</span>
                     </div>
                   </div>
-                  <div className={styles.forumTopicStats}>
-                    <span className={styles.forumStat}><IconMessageSquare />{topic.replies}</span>
-                    <span className={styles.forumStat}><IconEye />{topic.views}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -503,42 +593,30 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               <div className={styles.profileAvatar}>{user.name.charAt(0).toUpperCase()}</div>
               <h2 className={styles.profileName}>{user.name}</h2>
               <p className={styles.profileEmail}>{user.email}</p>
-
               <div className={styles.profileCard}>
-                <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>Nome</span>
-                  <span className={styles.profileFieldValue}>{user.name}</span>
-                </div>
-                <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>E-mail</span>
-                  <span className={styles.profileFieldValue}>{user.email}</span>
-                </div>
+                {[
+                  { label: 'Nome',   value: user.name },
+                  { label: 'E-mail', value: user.email },
+                ].map(f => (
+                  <div key={f.label} className={styles.profileField}>
+                    <span className={styles.profileFieldLabel}>{f.label}</span>
+                    <span className={styles.profileFieldValue}>{f.value}</span>
+                  </div>
+                ))}
                 <div className={styles.profileField}>
                   <span className={styles.profileFieldLabel}>Função</span>
                   <span className={styles.profileFieldBadge}>{IS_ADMIN ? 'Admin' : 'Usuário'}</span>
                 </div>
-                <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>Plano</span>
-                  <span className={styles.profileFieldBadge}>Pro</span>
-                </div>
               </div>
-
               <button className={styles.logoutButtonProfile} onClick={onLogout}>Sair da conta</button>
             </div>
           </div>
         )}
       </main>
 
-      {/* Modals */}
-      {showCreateApp && (
-        <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)} />
-      )}
-      {showCreateCat && (
-        <CreateCategoryModal
-          onClose={() => setShowCreateCat(false)}
-          onCreate={cat => setCategories(prev => [...prev, cat])}
-        />
-      )}
+      {showCreateApp  && <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)}  onCreated={fetchApps} />}
+      {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
+      {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
     </div>
   )
 }
