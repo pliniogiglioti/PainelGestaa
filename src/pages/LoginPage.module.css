@@ -176,6 +176,16 @@
   color: var(--gold);
 }
 
+/* ── Error message ───────────────────────────────────────────────────────── */
+.errorMsg {
+  font-size: 13px;
+  color: #e05555;
+  background: rgba(224, 85, 85, 0.08);
+  border: 1px solid rgba(224, 85, 85, 0.2);
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
 /* ── Submit ──────────────────────────────────────────────────────────────── */
 .submitButton {
   width: 100%;
@@ -199,6 +209,12 @@
 
 .submitButton:active {
   transform: scale(0.98);
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */
