@@ -479,13 +479,26 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </div>
             </div>
 
-            {/* Categories */}
-            <div className={styles.categoriesBar}>
-              <div className={styles.categoriesScroll}>
+            {/* Categories (VERTICAL) */}
+            <div className={styles.categoriesBar} style={{ alignItems: 'flex-start' }}>
+              <div
+                className={styles.categoriesScroll}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  overflowX: 'visible',
+                  overflowY: 'visible',
+                  width: '100%',
+                }}
+              >
                 {allCategories.map(cat => (
-                  <button key={cat.slug}
+                  <button
+                    key={cat.slug}
                     className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setActiveCategory(cat.slug)}>
+                    onClick={() => setActiveCategory(cat.slug)}
+                    style={{ width: '100%', justifyContent: 'flex-start' }}
+                  >
                     {cat.name}
                   </button>
                 ))}
@@ -543,14 +556,34 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </button>
             </div>
 
-            <div className={styles.categoriesBar}>
-              <div className={styles.categoriesScroll}>
-                <button className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
-                  onClick={() => setForumFilter('todos')}>Todos</button>
+            {/* Forum categories (VERTICAL) */}
+            <div className={styles.categoriesBar} style={{ alignItems: 'flex-start' }}>
+              <div
+                className={styles.categoriesScroll}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  overflowX: 'visible',
+                  overflowY: 'visible',
+                  width: '100%',
+                }}
+              >
+                <button
+                  className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
+                  onClick={() => setForumFilter('todos')}
+                  style={{ width: '100%', justifyContent: 'flex-start' }}
+                >
+                  Todos
+                </button>
+
                 {categories.map(cat => (
-                  <button key={cat.slug}
+                  <button
+                    key={cat.slug}
                     className={`${styles.categoryChip} ${forumFilter === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setForumFilter(cat.slug)}>
+                    onClick={() => setForumFilter(cat.slug)}
+                    style={{ width: '100%', justifyContent: 'flex-start' }}
+                  >
                     {cat.name}
                   </button>
                 ))}
