@@ -4,6 +4,7 @@ import { User } from '../App'
 import { supabase } from '../lib/supabase'
 import type { App, AppCategory, DreClassificacao, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
+import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
@@ -93,45 +94,6 @@ const IconSettings = () => (
 
 function Spinner() {
   return <div className={styles.spinner} />
-}
-
-function DesignButton({
-  children,
-  onClick,
-  variant = 'ghost',
-  active = false,
-  title,
-}: {
-  children: ReactNode
-  onClick?: () => void
-  variant?: 'ghost' | 'primary' | 'pill'
-  active?: boolean
-  title?: string
-}) {
-  const variantClass = variant === 'primary'
-    ? styles.designButtonPrimary
-    : variant === 'pill'
-      ? styles.designButtonPill
-      : styles.designButtonGhost
-
-  return (
-    <button
-      className={`${styles.designButtonBase} ${variantClass} ${active ? styles.designButtonActive : ''}`}
-      onClick={onClick}
-      title={title}
-      type="button"
-    >
-      {children}
-    </button>
-  )
-}
-
-function DesignIconButton({ children, onClick, title }: { children: ReactNode; onClick: () => void; title: string }) {
-  return (
-    <button type="button" className={styles.designIconButton} onClick={onClick} title={title}>
-      {children}
-    </button>
-  )
 }
 
 function TopNavigation({
