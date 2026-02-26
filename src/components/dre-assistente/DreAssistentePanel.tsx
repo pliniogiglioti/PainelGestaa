@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DreLancamento } from '../../lib/types'
 import styles from './DreAssistentePanel.module.css'
 
@@ -92,13 +92,22 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [response, setResponse] = useState('')
+  const [isAutoAnalyzed, setIsAutoAnalyzed] = useState(false)
+  const lastAutoKeyRef = useRef('')
 
   const renderedResponse = useMemo(() => renderMarkdownSafe(response), [response])
   const resumo = useMemo(() => calcResumo(lancamentos), [lancamentos])
 
-  const analisarDre = async () => {
+  const analiseKey = useMemo(
+    () => `${lancamentos.length}-${lancamentos.map(item => `${item.id}:${item.updated_at ?? item.created_at}`).join('|')}`,
+    [lancamentos],
+  )
+
+  const analisarDre = async (trigger: 'manual' | 'auto' = 'manual') => {
     setError('')
-    setResponse('')
+    if (trigger === 'manual') {
+      setResponse('')
+    }
 
     if (lancamentos.length === 0) {
       setError('Adicione lançamentos no modal "Novo lançamento" antes de solicitar a análise.')
@@ -128,6 +137,7 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       }
 
       setResponse(data.analysis)
+      setIsAutoAnalyzed(trigger === 'auto')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado ao analisar o DRE.'
       setError(message)
@@ -135,6 +145,14 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (!lancamentos.length || loading) return
+    if (lastAutoKeyRef.current === analiseKey) return
+
+    lastAutoKeyRef.current = analiseKey
+    analisarDre('auto')
+  }, [analiseKey, lancamentos.length, loading])
 
   return (
     <section className={styles.panel}>
@@ -149,9 +167,16 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
         </p>
       </div>
 
-      <button className={styles.button} onClick={analisarDre} disabled={loading}>
-        {loading ? 'Analisando...' : 'Analisar lançamentos já cadastrados'}
-      </button>
+      <div className={styles.actionsRow}>
+        <button className={styles.button} onClick={() => analisarDre('manual')} disabled={loading}>
+          {loading ? 'Analisando...' : 'Atualizar análise'}
+        </button>
+        {response && (
+          <span className={styles.statusChip}>
+            {isAutoAnalyzed ? 'Análise automática ativa' : 'Análise atualizada manualmente'}
+          </span>
+        )}
+      </div>
 
       {error && <p className={styles.error}>{error}</p>}
 

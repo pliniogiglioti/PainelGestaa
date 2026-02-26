@@ -1,18 +1,20 @@
 .panel {
   margin-top: 1.5rem;
-  background: #fff;
+  background: linear-gradient(150deg, rgba(20, 20, 20, 0.95), rgba(8, 8, 8, 0.95));
   border-radius: 1rem;
-  padding: 1rem;
-  border: 1px solid #e5e7eb;
+  padding: 1.2rem;
+  border: 1px solid rgba(213, 175, 69, 0.28);
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.35), inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .header h2 {
   margin: 0;
+  color: #f7e7b0;
 }
 
 .header p {
   margin: .35rem 0 1rem;
-  color: #4b5563;
+  color: #b4b4b4;
 }
 
 .input {
@@ -28,10 +30,27 @@
   margin-top: .75rem;
   border: 0;
   border-radius: .75rem;
-  padding: .65rem 1rem;
-  background: #111827;
-  color: #fff;
+  padding: .65rem 1.1rem;
+  background: linear-gradient(135deg, #d8b250, #a57c1d);
+  color: #1d1d1d;
+  font-weight: 700;
   cursor: pointer;
+}
+
+.actionsRow {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  flex-wrap: wrap;
+}
+
+.statusChip {
+  font-size: .8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(213, 175, 69, .45);
+  color: #f0d583;
+  background: rgba(213, 175, 69, .13);
+  padding: .28rem .72rem;
 }
 
 .button:disabled {
@@ -41,13 +60,18 @@
 
 .error {
   margin-top: .75rem;
-  color: #b91c1c;
+  color: #ff9191;
 }
 
 .response {
   margin-top: 1rem;
-  padding: .75rem;
-  border: 1px solid #e5e7eb;
+  padding: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: .75rem;
-  background: #f9fafb;
+  background: linear-gradient(180deg, rgba(16, 16, 16, 0.9), rgba(10, 10, 10, 0.96));
+  color: #e9e9e9;
+}
+
+.response a {
+  color: #f2ce74;
 }
