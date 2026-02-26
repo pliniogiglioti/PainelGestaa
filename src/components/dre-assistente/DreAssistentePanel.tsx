@@ -101,11 +101,28 @@ const serializeLancamentos = (lancamentos: DreLancamento[]) =>
     grupo: item.grupo,
   }))
 
+// Strips markdown syntax so the text reads naturally when spoken aloud
+function stripMarkdownForSpeech(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, '')              // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')        // bold
+    .replace(/\[(.+?)\]\(https?:\/\/\S+\)/g, '$1') // [label](url)
+    .replace(/https?:\/\/\S+/g, '')         // bare URLs
+    .replace(/[▶•]/g, '')                   // special bullets
+    .replace(/^\s*[-*]\s/gm, '')            // list markers
+    .replace(/\n{2,}/g, '. ')              // paragraph breaks → pause
+    .replace(/\n/g, ' ')                    // remaining newlines
+    .replace(/\s{2,}/g, ' ')               // extra spaces
+    .trim()
+}
+
 export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [analysis, setAnalysis] = useState('')
+  const [audioState, setAudioState] = useState<'idle' | 'playing' | 'paused'>('idle')
   const lastCountRef            = useRef(-1)
+  const utteranceRef            = useRef<SpeechSynthesisUtterance | null>(null)
 
   const resumo = useMemo(
     () => lancamentos.reduce(
@@ -157,6 +174,52 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       setLoading(false)
     }
   }
+
+  const lerAnalise = () => {
+    if (!analysis || typeof window === 'undefined' || !window.speechSynthesis) return
+
+    if (audioState === 'playing') {
+      window.speechSynthesis.pause()
+      setAudioState('paused')
+      return
+    }
+
+    if (audioState === 'paused') {
+      window.speechSynthesis.resume()
+      setAudioState('playing')
+      return
+    }
+
+    // Start fresh reading
+    window.speechSynthesis.cancel()
+    const text = stripMarkdownForSpeech(analysis)
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang  = 'pt-BR'
+    utterance.rate  = 0.92
+    utterance.pitch = 1
+
+    utterance.onstart = () => setAudioState('playing')
+    utterance.onend   = () => setAudioState('idle')
+    utterance.onerror = () => setAudioState('idle')
+
+    utteranceRef.current = utterance
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const pararLeitura = () => {
+    window.speechSynthesis.cancel()
+    setAudioState('idle')
+  }
+
+  // Stop reading when a new analysis arrives or component unmounts
+  useEffect(() => {
+    window.speechSynthesis?.cancel()
+    setAudioState('idle')
+  }, [analysis])
+
+  useEffect(() => {
+    return () => { window.speechSynthesis?.cancel() }
+  }, [])
 
   // Auto-analyze whenever the number of lancamentos changes
   useEffect(() => {
@@ -235,9 +298,31 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       {!loading && analysis && (
         <article className={styles.result}>
           {rendered}
-          <button className={styles.reanalizeBtn} onClick={analisarDre} disabled={loading}>
-            ↺ Reanalisar
-          </button>
+          <div className={styles.resultActions}>
+            <button className={styles.reanalizeBtn} onClick={analisarDre} disabled={loading}>
+              ↺ Reanalisar
+            </button>
+            <div className={styles.audioControls}>
+              <button
+                className={`${styles.audioBtn} ${audioState === 'playing' ? styles.audioBtnActive : ''}`}
+                onClick={lerAnalise}
+                title={audioState === 'playing' ? 'Pausar leitura' : audioState === 'paused' ? 'Retomar leitura' : 'Ler análise em voz alta'}
+              >
+                {audioState === 'playing' ? (
+                  <><span className={styles.audioIcon}>⏸</span> Pausar</>
+                ) : audioState === 'paused' ? (
+                  <><span className={styles.audioIcon}>▶</span> Retomar</>
+                ) : (
+                  <><span className={styles.audioIcon}>🔊</span> Ouvir análise</>
+                )}
+              </button>
+              {audioState !== 'idle' && (
+                <button className={styles.audioStopBtn} onClick={pararLeitura} title="Parar leitura">
+                  ⏹ Parar
+                </button>
+              )}
+            </div>
+          </div>
         </article>
       )}
     </section>
