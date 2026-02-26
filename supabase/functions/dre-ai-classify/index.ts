@@ -72,20 +72,21 @@ Lançamento financeiro:
 - Descrição: "${descricao}"
 - Valor: R$ ${valor.toFixed(2).replace('.', ',')}
 
-Classificações disponíveis (escolha UMA):
+Classificações disponíveis (use quando fizer sentido):
 ${listaClassificacoes}
 
 Grupos já existentes no sistema: ${listaGrupos}
 
 Sua tarefa:
 1. Determine se este lançamento é "receita" (entrada de dinheiro: venda, serviço prestado, recebimento) ou "despesa" (saída de dinheiro: compra, pagamento, custo, fornecedor).
-2. Escolha a classificação mais adequada da lista acima (o tipo da classificação deve coincidir com o tipo que você determinou).
-3. Sugira um grupo/categoria conciso (1-4 palavras, em português). Prefira reutilizar um grupo existente se fizer sentido. Crie um novo apenas se necessário.
+2. Escolha a classificação mais adequada para a movimentação. Reutilize uma classificação da lista quando fizer sentido; se não houver boa correspondência, crie um nome novo (1-5 palavras, em português).
+3. Sugira o grupo/categoria MAIS correto para a movimentação (1-4 palavras, em português), mesmo que não exista ainda.
+4. Só reutilize um grupo existente quando ele realmente representar esta movimentação. Não force correspondência.
 
 Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 {
   "tipo": "receita",
-  "classificacao_nome": "nome exato de uma classificação da lista",
+  "classificacao_nome": "classificação mais adequada",
   "grupo": "grupo mais adequado"
 }`
 
@@ -129,13 +130,16 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
     const tipo: 'receita' | 'despesa' =
       result.tipo === 'receita' || result.tipo === 'despesa' ? result.tipo : 'despesa'
 
-    // Validate classificacao_nome: must match one of the provided options exactly
+    // Keep AI suggestion (existing or new). If empty, fallback to one of available classifications.
+    const nomeAi = String(result.classificacao_nome ?? '').trim()
     const matched = classificacoes_disponiveis.find(
-      c => c.nome.toLowerCase() === String(result.classificacao_nome ?? '').toLowerCase()
+      c => c.nome.toLowerCase() === nomeAi.toLowerCase()
     )
-    const classificacao_nome = matched
-      ? matched.nome
-      : (classificacoes_disponiveis.find(c => c.tipo === tipo)?.nome ?? classificacoes_disponiveis[0]?.nome ?? '')
+    const classificacao_nome = matched?.nome
+      || nomeAi
+      || classificacoes_disponiveis.find(c => c.tipo === tipo)?.nome
+      || classificacoes_disponiveis[0]?.nome
+      || ''
 
     const grupo = String(result.grupo ?? '').trim() || 'Geral'
 

@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreClassificacao, DreLancamento } from '../lib/types'
+import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
+
+type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -78,6 +80,7 @@ export default function AnaliseDrePage() {
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
+  const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
 
   const fetchLancamentos = async () => {
     const { data, error } = await supabase
@@ -92,7 +95,13 @@ export default function AnaliseDrePage() {
     setClassificacoes(data ?? [])
   }
 
-  useEffect(() => { fetchLancamentos(); fetchClassificacoes() }, [])
+  const fetchGrupos = async () => {
+    const { data } = await supabase
+      .from('dre_grupos').select('*').eq('ativo', true).order('nome')
+    setGrupos(data ?? [])
+  }
+
+  useEffect(() => { fetchLancamentos(); fetchClassificacoes(); fetchGrupos() }, [])
 
   const valorNumerico = useMemo(() => {
     const parsed = Number(form.valor.replace(',', '.'))
@@ -117,19 +126,52 @@ export default function AnaliseDrePage() {
   const resultado = totais.receitas - totais.despesas
 
   const gruposExistentes = useMemo(() =>
-    [...new Set(lancamentos.map(l => l.grupo).filter(Boolean))].slice(0, 12),
-  [lancamentos])
+    [...new Set([
+      ...grupos.map(g => g.nome).filter(Boolean),
+      ...lancamentos.map(l => l.grupo).filter(Boolean),
+    ])].slice(0, 12),
+  [grupos, lancamentos])
 
   // Classifications filtered by the tipo chosen in step 3
   const classificacoesFiltradas = useMemo(() =>
     form.tipo ? classificacoes.filter(c => c.tipo === form.tipo) : classificacoes,
   [classificacoes, form.tipo])
 
+  const classificacaoEhNova = useMemo(() => {
+    const nome = form.classificacaoNome.trim().toLowerCase()
+    if (!nome) return false
+    return !classificacoes.some(c => c.nome.trim().toLowerCase() === nome)
+  }, [classificacoes, form.classificacaoNome])
+
   const openWizard = () => {
     setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setShowWizard(true)
   }
   const closeWizard = () => {
     setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError('')
+  }
+
+  const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
+    const grupoNome = grupoNomeRaw.trim()
+    if (!grupoNome) return { ok: false as const, error: 'Grupo vazio.' }
+
+    const tipoGrupo: 'receita' | 'despesa' = tipoRaw === 'receita' ? 'receita' : 'despesa'
+
+    const { error } = await supabase
+      .from('dre_grupos')
+      .upsert({ nome: grupoNome, tipo: tipoGrupo, ativo: true }, { onConflict: 'nome,tipo' })
+
+    if (!error) return { ok: true as const }
+
+    // Fallback defensivo para ambientes em que o upsert conflita com schema legado.
+    const { error: insertError } = await supabase
+      .from('dre_grupos')
+      .insert({ nome: grupoNome, tipo: tipoGrupo, ativo: true })
+
+    if (insertError && !String(insertError.message).toLowerCase().includes('duplicate')) {
+      return { ok: false as const, error: insertError.message }
+    }
+
+    return { ok: true as const }
   }
 
   // After step 3 (valor): AI identifies classificacao + grupo (tipo already chosen in step 1)
@@ -165,11 +207,21 @@ export default function AnaliseDrePage() {
       } else if (data?.error) {
         setAiError(`IA indisponível: ${data.error}`)
       } else if (data) {
+        const grupoIa = String(data.grupo ?? '').trim()
         setForm(p => ({
           ...p,
           classificacaoNome: data.classificacao_nome ?? '',
-          grupo:             data.grupo              ?? '',
+          grupo:             grupoIa,
         }))
+
+        if (grupoIa) {
+          const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
+          if (!resGrupo.ok) {
+            setAiError(`Grupo sugerido, mas falha ao cadastrar no catálogo: ${resGrupo.error}`)
+          } else {
+            fetchGrupos()
+          }
+        }
       }
     } catch (e) {
       setAiError(`Erro inesperado: ${String(e)}`)
@@ -186,16 +238,38 @@ export default function AnaliseDrePage() {
     }
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
+
+    const classificacaoNome = form.classificacaoNome.trim()
+    const grupoNome = form.grupo.trim()
+    const tipoClassificacao = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
+
+    const { error: classError } = await supabase
+      .from('dre_classificacoes')
+      .upsert({ nome: classificacaoNome, tipo: tipoClassificacao, ativo: true }, { onConflict: 'nome' })
+
+    if (classError) {
+      setSaving(false)
+      setError(`Não foi possível cadastrar a classificação: ${classError.message}`)
+      return
+    }
+
+    const resGrupo = await ensureGrupoCatalogado(grupoNome, form.tipo)
+    if (!resGrupo.ok) {
+      setSaving(false)
+      setError(`Não foi possível cadastrar o grupo: ${resGrupo.error}`)
+      return
+    }
+
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
-      classificacao: form.classificacaoNome,
-      grupo:         form.grupo.trim(),
+      classificacao: classificacaoNome,
+      grupo:         grupoNome,
       user_id:       authData.user?.id ?? null,
     })
     setSaving(false)
     if (error) { setError(error.message); return }
-    closeWizard(); fetchLancamentos()
+    closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
   }
 
   const getPillClass = (classificacao: string) => {
@@ -370,6 +444,9 @@ export default function AnaliseDrePage() {
                       <div className={styles.aiSelectedBox}>
                         <span className={styles.aiSelectedLabel}>IA identificou</span>
                         <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>
+                        {classificacaoEhNova && (
+                          <span className={styles.aiSelectedLabel}>Será cadastrada como nova classificação ao salvar.</span>
+                        )}
                       </div>
                     )}
 
