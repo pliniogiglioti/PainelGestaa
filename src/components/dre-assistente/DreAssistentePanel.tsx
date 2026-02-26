@@ -7,55 +7,86 @@ type DreAssistentePanelProps = {
   lancamentos: DreLancamento[]
 }
 
+// Validates that a URL is safe (http/https only)
+const safeUrl = (raw: string): string => {
+  try {
+    const url = new URL(raw.trim())
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : ''
+  } catch {
+    return ''
+  }
+}
+
+// Splits a text into spans/links, converting **bold** and bare URLs
+function inlineRender(text: string, key: string | number): JSX.Element {
+  // Pattern: **bold** | https://... URL
+  const parts = text.split(/(\*\*[^*]+\*\*|https?:\/\/\S+)/g)
+  return (
+    <span key={key}>
+      {parts.map((part, idx) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return <strong key={idx}>{part.slice(2, -2)}</strong>
+        }
+        if (part.startsWith('http://') || part.startsWith('https://')) {
+          const href = safeUrl(part)
+          return href
+            ? <a key={idx} href={href} target="_blank" rel="noreferrer" className={styles.mdLink}>{href}</a>
+            : <span key={idx}>{part}</span>
+        }
+        return <span key={idx}>{part}</span>
+      })}
+    </span>
+  )
+}
+
 function renderMarkdownSafe(markdown: string) {
   const elements: JSX.Element[] = []
   const lines = markdown.split('\n')
-  let i = 0
 
-  while (i < lines.length) {
-    const line = lines[i]
-
-    if (!line.trim()) {
-      i++
-      continue
-    }
+  lines.forEach((line, i) => {
+    if (!line.trim()) return
 
     if (line.startsWith('### ')) {
       elements.push(<h3 key={i} className={styles.mdH3}>{line.slice(4)}</h3>)
-      i++
-      continue
+      return
     }
-
     if (line.startsWith('## ')) {
       elements.push(<h2 key={i} className={styles.mdH2}>{line.slice(3)}</h2>)
-      i++
-      continue
+      return
     }
-
     if (line.startsWith('# ')) {
       elements.push(<h1 key={i} className={styles.mdH1}>{line.slice(2)}</h1>)
-      i++
-      continue
+      return
     }
 
-    // Bold inline
-    const boldLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-
+    // List item — check for course link pattern: - **Title** — https://...
     if (line.startsWith('- ') || line.startsWith('* ')) {
-      elements.push(
-        <li key={i} className={styles.mdLi}
-          dangerouslySetInnerHTML={{ __html: boldLine.slice(2) }} />,
-      )
-      i++
-      continue
+      const content = line.slice(2)
+
+      // Pattern: **Title** — https://url
+      const courseMatch = content.match(/^\*\*(.+?)\*\*\s*—\s*(https?:\/\/\S+)/)
+      if (courseMatch) {
+        const [, title, rawUrl] = courseMatch
+        const href = safeUrl(rawUrl)
+        elements.push(
+          <li key={i} className={`${styles.mdLi} ${styles.mdLiCourse}`}>
+            <strong>{title}</strong>
+            {' — '}
+            {href
+              ? <a href={href} target="_blank" rel="noreferrer" className={styles.mdLink}>{href}</a>
+              : <span className={styles.mdInvalidLink}>(link inválido)</span>
+            }
+          </li>,
+        )
+        return
+      }
+
+      elements.push(<li key={i} className={styles.mdLi}>{inlineRender(content, `li-${i}`)}</li>)
+      return
     }
 
-    elements.push(
-      <p key={i} className={styles.mdP}
-        dangerouslySetInnerHTML={{ __html: boldLine }} />,
-    )
-    i++
-  }
+    elements.push(<p key={i} className={styles.mdP}>{inlineRender(line, `p-${i}`)}</p>)
+  })
 
   return elements
 }

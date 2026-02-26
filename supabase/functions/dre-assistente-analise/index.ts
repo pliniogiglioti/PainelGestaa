@@ -1,5 +1,7 @@
 // Supabase Edge Function: dre-assistente-analise
 // Analyzes all user lancamentos using Groq AI and returns a markdown DRE report.
+// Context: plano de contas + course links embedded directly (edge functions
+// cannot access the filesystem, so the content from public/ia/ is inlined here).
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -11,6 +13,115 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CONTEXTO DA IA — conteúdo de public/ia/plano_de_contas_dre.md
+// ─────────────────────────────────────────────────────────────────────────────
+const PLANO_DE_CONTAS = `
+# Plano de Contas — DRE (Grupos e Classificações)
+
+## Regras rápidas de classificação
+- Receitas: entradas de vendas/serviços/produtos.
+- Deduções de receita: estornos, cancelamentos e taxas de cartão/antecipação/POS.
+- Impostos sobre faturamento: Simples/Presumido (sobre receita).
+- Despesas operacionais: gastos diretamente ligados à entrega (laboratório, materiais, terceiros).
+- Despesas com pessoal: salários, encargos, benefícios, pró-labore.
+- Despesas administrativas/gerais: aluguel, energia, internet, contabilidade, etc.
+
+## 1. RECEITAS OPERACIONAIS
+1.1 — Receita Dinheiro | 1.2 — Receita Cartão | 1.3 — Receita Financeiras
+1.4 — Receita PIX / Transferências | 1.5 — Receita Subadquirência (BT)
+
+## 2. DEDUÇÕES DE RECEITA
+2.1 — Vendas Canceladas / Devoluções | 2.2 — Tarifa de Cartão / Aluguel de POS
+2.3 — Tarifa de Cartão / Antecipação | 2.4 — Tarifa de Cartão / Padrão
+
+## 3. IMPOSTOS SOBRE O FATURAMENTO
+3.1 — Impostos sobre Receitas - Presumido e Simples Nacional
+
+## 4. DESPESAS OPERACIONAIS
+4.1 — OP Gratificações | 4.2 — Custo de Materiais e Insumos
+4.3 — Serviços Terceiros PF (dentistas) | 4.4 — Serviços técnicos para Laboratórios
+4.5 — Royalties e Assistência Técnica | 4.6 — Fundo Nacional de Marketing
+
+## 5. MARGEM DE CONTRIBUIÇÃO (Receita − Despesas Variáveis)
+
+## 6. DESPESAS COM PESSOAL
+6.1 — Pró-labore | 6.2 — Salários e Ordenados | 6.3 — 13° Salário
+6.4 — Rescisões | 6.5 — INSS | 6.6 — FGTS
+6.7 — Outras Despesas Com Funcionários | 6.8 — Vale Transporte
+6.9 — Vale Refeição | 6.10 — Combustível
+
+## 7. DESPESAS ADMINISTRATIVAS
+7.1 — Adiantamento a Fornecedor | 7.2 — Energia Elétrica | 7.3 — Água e Esgoto
+7.4 — Aluguel | 7.5 — Manutenção Predial | 7.6 — Telefonia | 7.7 — Uniformes
+7.8 — Manutenção e Reparos | 7.9 — Seguros | 7.10 — Uber e Táxi
+7.11 — Copa e Cozinha | 7.12 — Cartórios | 7.13 — Viagens e Estadias
+7.14 — Material de Escritório | 7.15 — Estacionamento | 7.16 — Material de Limpeza
+7.17 — Bens de Pequeno Valor | 7.18 — Custas Processuais | 7.19 — Outras Despesas
+7.20 — Consultoria | 7.21 — Contabilidade | 7.22 — Jurídico | 7.23 — Limpeza
+7.24 — Segurança e Vigilância | 7.25 — Serviço de Motoboy | 7.26 — IOF
+7.27 — Taxas e Emolumentos | 7.28 — Multa e Juros s/ Contas Pagas em Atraso
+7.29 — Exames Ocupacionais
+
+## 8. DESPESAS COMERCIAIS E MARKETING
+8.1 — Refeições e Lanches | 8.2 — Outras Despesas com Vendas
+8.3 — Agência e Assessoria | 8.4 — Produção de Material
+8.5 — Marketing Digital | 8.6 — Feiras e Eventos
+
+## 9. DESPESAS COM TI
+9.1 — Internet | 9.2 — Informática e Software
+9.3 — Hospedagem de Dados | 9.4 — Sistema de Gestão
+
+## 10. EBITDA (Resultado Operacional antes de depreciação)
+
+## 11. RECEITAS FINANCEIRAS
+11.1 — Rendimento de Aplicação Financeira | 11.2 — Descontos Obtidos
+
+## 12. DESPESAS FINANCEIRAS
+12.1 — Despesas Bancárias | 12.2 — Depreciação e Amortização
+12.3 — Juros Passivos | 12.4 — Financiamentos / Empréstimos
+
+## 13. EBIT (Lucro Operacional Real)
+
+## 14. INVESTIMENTOS
+14.1 — Investimento - Máquinas e Equipamentos
+14.2 — Investimento - Computadores e Periféricos
+14.3 — Investimento - Móveis e Utensílios
+14.4 — Investimento - Instalações de Terceiros
+14.4 — Dividendos e Despesas dos Sócios
+
+## 15. NOPAT (RESULTADO OPERACIONAL)
+`
+
+// ─────────────────────────────────────────────────────────────────────────────
+// LINKS DAS AULAS — conteúdo de public/ia/aulas_gestao_financeira.md
+// Use APENAS estas URLs ao recomendar aulas. Não invente links.
+// ─────────────────────────────────────────────────────────────────────────────
+const AULAS_LINKS = `
+## Aulas disponíveis na plataforma (cite APENAS estas URLs)
+
+- **M6_A2_Gestão Financeira** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8f102f08eade02c8e7f7a6e00379a21ddf9166f6b87f35ce034c3eb45cdc3775ea16e334ccb3053e
+  Tópicos: o que é gestão financeira, custo fixo vs variável, gasto vs investimento.
+
+- **M6_A3_Fundamentos Financeiros** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe3b0c3137a472dca022c568c3ad69ea61ebb5dfc1b81550cd3b6966629255b28210a0dc615155d7f
+  Tópicos: fluxo de caixa, contas a pagar/receber, controle de estoque.
+
+- **M6_A4_DRE** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fb334e1273ae0f6b915375684fe428ed57efb99688046f0a323e66fa6aa2b12f38837e03360a61de5
+  Tópicos: o que é DRE, estrutura do demonstrativo, como analisar resultados.
+
+- **M6_A5_EBIT** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe2e54ea87eaf1955bcb330114df5ede79d778a1fee96bb52bdfa65933febf4aed57f863d86a6a1a6
+  Tópicos: EBIT, EBITDA, lucro operacional, valuation da empresa.
+
+- **M6_A6_Balanço Patrimonial** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f874e8a957bd891e8ca8bacf58ef5d3e41f47e3ab2995963f09e63bb503eb0240ae1a105003d658e8
+  Tópicos: balanço patrimonial, ativo, passivo, patrimônio líquido.
+
+- **M6_A7_Ponto de Equilíbrio e CG** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f5e7fb6918e7c0e82e4aa9f037b3eeeafcecab5a136bcfc52ab479213b0786bca091d4f8bcb1cded2
+  Tópicos: ponto de equilíbrio, capital de giro, margem de contribuição.
+
+- **M6_A8_Regime Contábil** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8a227f1dac8f6f5ce0e911927ebd0681b22ae5f3221af01b29f2ababb2854459fea1d09f0d046bfb
+  Tópicos: regime de caixa vs competência, obrigações fiscais, Simples Nacional.
+`
 
 type Lancamento = {
   data?: string
@@ -26,17 +137,24 @@ const moeda = (v: number) =>
 
 const buildPrompt = (lancamentos: Lancamento[], resumo: { receitas: number; despesas: number }) => {
   const resultado = resumo.receitas - resumo.despesas
-  const margem = resumo.receitas > 0 ? ((resultado / resumo.receitas) * 100).toFixed(1) : '0.0'
+  const margem    = resumo.receitas > 0 ? ((resultado / resumo.receitas) * 100).toFixed(1) : '0.0'
 
   const linhas = lancamentos
     .map(l => {
-      const data = l.data ? new Date(l.data).toLocaleDateString('pt-BR') : '—'
-      const desc = l.descricao || l.classificacao
-      return `| ${data} | ${desc} | ${l.grupo} | ${l.classificacao} | ${l.tipo === 'receita' ? '✅' : '🔴'} | ${moeda(Number(l.valor))} |`
+      const data  = l.data ? new Date(l.data).toLocaleDateString('pt-BR') : '—'
+      const desc  = l.descricao || l.classificacao
+      const sinal = l.tipo === 'receita' ? '✅' : '🔴'
+      return `| ${data} | ${desc} | ${l.grupo} | ${l.classificacao} | ${sinal} | ${moeda(Number(l.valor))} |`
     })
     .join('\n')
 
-  return `Você é um assistente financeiro especializado em DRE (Demonstração de Resultado do Exercício) para pequenas e médias empresas brasileiras.
+  return `Você é um assistente financeiro especializado em DRE para clínicas e pequenas empresas brasileiras.
+Você TEM ACESSO ao plano de contas completo e às aulas da plataforma listados no CONTEXTO abaixo.
+
+═══════════════════════════ CONTEXTO ═══════════════════════════
+${PLANO_DE_CONTAS}
+${AULAS_LINKS}
+════════════════════════════════════════════════════════════════
 
 Analise os lançamentos financeiros abaixo e gere um relatório executivo em Markdown.
 
@@ -47,31 +165,34 @@ Analise os lançamentos financeiros abaixo e gere um relatório executivo em Mar
 - Resultado: ${moeda(resultado)} (${resultado >= 0 ? 'LUCRO' : 'PREJUÍZO'})
 - Margem líquida: ${margem}%
 
-## Lançamentos
+## Lançamentos registrados
 | Data | Descrição | Grupo | Classificação | Tipo | Valor |
 |------|-----------|-------|---------------|------|-------|
 ${linhas}
 
-## Instruções para o relatório
-Responda APENAS em Markdown válido com as seguintes seções:
+═══════════════════ INSTRUÇÕES DO RELATÓRIO ═══════════════════
+Responda APENAS em Markdown com as seguintes seções:
 
 ### 📊 Diagnóstico
-Análise objetiva do cenário financeiro atual (2-4 parágrafos).
+Análise objetiva do cenário financeiro atual com base nos lançamentos. Comente sobre o resultado (lucro/prejuízo), os principais grupos de despesa e a composição da receita. (2-4 parágrafos)
 
 ### 💡 Sugestões práticas
-Lista com 3-5 ações concretas para melhorar o resultado.
+Lista com 3-5 ações concretas e específicas para melhorar o resultado, baseadas nos dados.
 
 ### ⚠️ Alertas
-Pontos de atenção: despesas elevadas, classificações inadequadas, riscos financeiros.
+Pontos de atenção: despesas elevadas, classificações inadequadas (compare com o plano de contas), riscos financeiros visíveis nos dados.
 
-### 📈 Oportunidades
-Oportunidades de crescimento ou redução de custos identificadas nos dados.
+### 📚 Aulas recomendadas
+Com base nos problemas identificados, recomende as aulas mais relevantes da plataforma.
+Use EXATAMENTE o formato abaixo para cada aula recomendada:
+- **Nome da aula** — URL_EXATA_DO_CONTEXTO
 
-Regras:
+REGRAS OBRIGATÓRIAS:
 - Responda em PT-BR, de forma objetiva e profissional.
-- Não invente dados que não estejam nos lançamentos.
-- Seja direto e prático, evite linguagem genérica.
-- Não inclua URLs externas.`
+- Cite APENAS as URLs que estão no CONTEXTO acima. Nunca invente URLs.
+- Se nenhuma aula for relevante, escreva "Nenhuma aula específica identificada para este cenário."
+- Não assuma dados ausentes; analise apenas o que foi enviado.
+- Seja direto e prático, evite linguagem genérica.`
 }
 
 serve(async (req: Request) => {
@@ -90,9 +211,9 @@ serve(async (req: Request) => {
   let modelo = DEFAULT_MODEL
 
   try {
-    const body = await req.json()
+    const body  = await req.json()
     lancamentos = Array.isArray(body.lancamentos) ? body.lancamentos : []
-    modelo = String(body.modelo ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL
+    modelo      = String(body.modelo ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
       status: 400,
@@ -110,14 +231,13 @@ serve(async (req: Request) => {
   const resumo = lancamentos.reduce(
     (acc, l) => {
       if (l.tipo === 'receita') acc.receitas += Number(l.valor)
-      else acc.despesas += Number(l.valor)
+      else                      acc.despesas += Number(l.valor)
       return acc
     },
     { receitas: 0, despesas: 0 },
   )
 
   const groqApiKey = Deno.env.get('GROQ_API_KEY')
-
   if (!groqApiKey) {
     return new Response(
       JSON.stringify({ error: 'GROQ_API_KEY não configurada no servidor Supabase.' }),
@@ -127,78 +247,61 @@ serve(async (req: Request) => {
 
   const prompt = buildPrompt(lancamentos, resumo)
 
-  try {
+  const callGroq = async (modelToUse: string): Promise<Response> => {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 30000)
-
-    let groqRes: Response
+    const timeout    = setTimeout(() => controller.abort(), 30000)
     try {
-      groqRes = await fetch(GROQ_API_URL, {
+      return await fetch(GROQ_API_URL, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${groqApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: modelo,
-          messages: [{ role: 'user', content: prompt }],
+          model:      modelToUse,
+          messages:   [{ role: 'user', content: prompt }],
           temperature: 0.2,
-          max_tokens: 1024,
+          max_tokens:  1500,
         }),
         signal: controller.signal,
       })
     } finally {
       clearTimeout(timeout)
     }
+  }
+
+  try {
+    let groqRes = await callGroq(modelo)
+
+    // Fallback to default model if the configured one is unavailable
+    if (!groqRes.ok) {
+      const errText = await groqRes.text()
+      if (modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)) {
+        groqRes = await callGroq(DEFAULT_MODEL)
+      } else {
+        return new Response(
+          JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }),
+          { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        )
+      }
+    }
 
     if (!groqRes.ok) {
       const errText = await groqRes.text()
-      // Try fallback to default model if the configured model failed
-      if (modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)) {
-        const retryRes = await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${groqApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: DEFAULT_MODEL,
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.2,
-            max_tokens: 1024,
-          }),
-        })
-
-        if (!retryRes.ok) {
-          const retryErr = await retryRes.text()
-          return new Response(JSON.stringify({ error: `Groq indisponível: ${retryErr.slice(0, 200)}` }), {
-            status: 502,
-            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-          })
-        }
-
-        const retryData = await retryRes.json()
-        const analysis = String(retryData?.choices?.[0]?.message?.content ?? '').trim()
-        return new Response(JSON.stringify({ analysis }), {
-          status: 200,
-          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        })
-      }
-
-      return new Response(JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }), {
-        status: 502,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }),
+        { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      )
     }
 
     const groqData = await groqRes.json()
     const analysis = String(groqData?.choices?.[0]?.message?.content ?? '').trim()
 
     if (!analysis) {
-      return new Response(JSON.stringify({ error: 'IA não retornou conteúdo.' }), {
-        status: 502,
-        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return new Response(
+        JSON.stringify({ error: 'IA não retornou conteúdo.' }),
+        { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+      )
     }
 
     return new Response(JSON.stringify({ analysis }), {
@@ -207,9 +310,9 @@ serve(async (req: Request) => {
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return new Response(JSON.stringify({ error: `Erro ao chamar a IA: ${msg}` }), {
-      status: 500,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return new Response(
+      JSON.stringify({ error: `Erro ao chamar a IA: ${msg}` }),
+      { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+    )
   }
 })
