@@ -95,29 +95,6 @@ function Spinner() {
   return <div className={styles.spinner} />
 }
 
-function DesignSection({
-  eyebrow,
-  title,
-  subtitle,
-  children,
-}: {
-  eyebrow: string
-  title: string
-  subtitle: string
-  children: ReactNode
-}) {
-  return (
-    <section className={styles.designSection}>
-      <div className={styles.designSectionHead}>
-        <p className={styles.designEyebrow}>{eyebrow}</p>
-        <h2 className={styles.designTitle}>{title}</h2>
-        <p className={styles.designSubtitle}>{subtitle}</p>
-      </div>
-      {children}
-    </section>
-  )
-}
-
 function DesignButton({
   children,
   onClick,
@@ -645,6 +622,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [showCreateTopic, setShowCreateTopic] = useState(false)
   const [showSettings,    setShowSettings]    = useState(false)
   const appsListRef = useRef<HTMLDivElement | null>(null)
+  const categorySectionRefs = useRef<Record<string, HTMLElement | null>>({})
 
   // Check if current user is admin
   useEffect(() => {
@@ -717,7 +695,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   }, [])
 
   const allCategories = [{ id: 'all', name: 'Todos', slug: 'todos' } as AppCategory, ...categories]
-  const filteredApps  = activeCategory === 'todos' ? apps : apps.filter(a => a.category === activeCategory)
+  const filteredApps  = apps
   const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
 
   const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
@@ -743,7 +721,15 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
   const handleCategoryClick = (slug: string) => {
     setActiveCategory(slug)
-    appsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    if (slug === 'todos') {
+      appsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      return
+    }
+
+    const target = categorySectionRefs.current[slug]
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   }
 
   const navItems = [
@@ -818,41 +804,25 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 )}
               </div>
             ) : (
-              <>
-
-                <DesignSection
-                  eyebrow="Biblioteca"
-                  title={activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
-                  subtitle="Todos os cards usam o mesmo tamanho para manter consistência visual."
-                >
-                  <div className={styles.sectionHeader} ref={appsListRef}>
-                    <div className={styles.sectionLeft}>
-                      <span className={styles.sectionCount}>{filteredApps.length} apps</span>
+              <div className={styles.categoryRows} ref={appsListRef}>
+                {appsByCategory.map(category => (
+                  <section
+                    key={category.id}
+                    className={styles.categoryRowSection}
+                    ref={el => { categorySectionRefs.current[category.slug] = el }}
+                  >
+                    <div className={styles.categoryRowHeader}>
+                      <h3 className={styles.categoryRowTitle}>{category.name}</h3>
+                      <span className={styles.sectionCount}>{category.apps.length} apps</span>
                     </div>
-                    {isAdmin && (
-                      <DesignButton variant="primary" onClick={() => setShowCreateApp(true)}>
-                        <span className={styles.topNavButtonContent}><IconPlus /><span>Novo App</span></span>
-                      </DesignButton>
-                    )}
-                  </div>
-
-                  <div className={styles.categoryRows}>
-                    {appsByCategory.map(category => (
-                      <section key={category.id} className={styles.categoryRowSection}>
-                        <div className={styles.categoryRowHeader}>
-                          <h3 className={styles.categoryRowTitle}>{category.name}</h3>
-                          <span className={styles.sectionCount}>{category.apps.length} apps</span>
-                        </div>
-                        <div className={styles.netflixRow}>
-                          {category.apps.map((app, i) => (
-                            <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                </DesignSection>
-              </>
+                    <div className={styles.netflixRow}>
+                      {category.apps.map((app, i) => (
+                        <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
             )}
           </div>
         )}
