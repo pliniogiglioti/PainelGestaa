@@ -148,6 +148,26 @@ th, td {
 
 th { color: #8f8f8f; font-weight: 500; }
 
+.actionsCell {
+  text-align: right;
+}
+
+.editBtn {
+  border: 1px solid rgba(213, 175, 69, 0.35);
+  background: rgba(213, 175, 69, 0.08);
+  color: #d5af45;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.editBtn:hover {
+  opacity: 0.85;
+}
+
 .tablePill {
   display: inline-flex;
   font-size: 11px;

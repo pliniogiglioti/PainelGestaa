@@ -74,6 +74,7 @@ function AiSpinner() {
 
 export default function AnaliseDrePage() {
   const [showWizard,     setShowWizard]     = useState(false)
+  const [editingId,      setEditingId]      = useState<string | null>(null)
   const [step,           setStep]           = useState<Step>(1)
   const [saving,         setSaving]         = useState(false)
   const [aiLoading,      setAiLoading]      = useState(false)
@@ -159,10 +160,38 @@ export default function AnaliseDrePage() {
   }, [classificacoes, form.classificacaoNome])
 
   const openWizard = () => {
-    setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning(''); setShowWizard(true)
+    setEditingId(null)
+    setForm(INITIAL_FORM)
+    setStep(1)
+    setError('')
+    setAiError('')
+    setAiWarning('')
+    setShowWizard(true)
+  }
+
+  const openEditWizard = (item: DreLancamento) => {
+    setEditingId(item.id)
+    setForm({
+      descricao: item.descricao ?? '',
+      valor: String(item.valor),
+      tipo: item.tipo,
+      classificacaoNome: item.classificacao,
+      grupo: item.grupo,
+    })
+    setStep(1)
+    setError('')
+    setAiError('')
+    setAiWarning('')
+    setShowWizard(true)
   }
   const closeWizard = () => {
-    setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning('')
+    setShowWizard(false)
+    setEditingId(null)
+    setForm(INITIAL_FORM)
+    setStep(1)
+    setError('')
+    setAiError('')
+    setAiWarning('')
   }
 
   const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
@@ -283,14 +312,26 @@ export default function AnaliseDrePage() {
       return
     }
 
-    const { error } = await supabase.from('dre_lancamentos').insert({
+    const payload = {
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
       tipo:          tipoClassificacao,
       classificacao: classificacaoNome,
       grupo:         grupoNome,
-      user_id:       authData.user?.id ?? null,
-    })
+    }
+
+    const { error } = editingId
+      ? await supabase
+          .from('dre_lancamentos')
+          .update(payload)
+          .eq('id', editingId)
+      : await supabase
+          .from('dre_lancamentos')
+          .insert({
+            ...payload,
+            user_id: authData.user?.id ?? null,
+          })
+
     setSaving(false)
     if (error) { setError(error.message); return }
     closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
@@ -333,7 +374,7 @@ export default function AnaliseDrePage() {
         <div className={styles.tableWrap}>
           <table>
             <thead>
-              <tr><th>Data</th><th>Descrição</th><th>Classificação</th><th>Grupo</th><th>Valor</th></tr>
+              <tr><th>Data</th><th>Descrição</th><th>Classificação</th><th>Grupo</th><th>Valor</th><th>Ações</th></tr>
             </thead>
             <tbody>
               {lancamentos.map(item => (
@@ -347,11 +388,16 @@ export default function AnaliseDrePage() {
                   </td>
                   <td>{item.grupo}</td>
                   <td>{moeda(Number(item.valor))}</td>
+                  <td className={styles.actionsCell}>
+                    <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
+                      Editar
+                    </button>
+                  </td>
                 </tr>
               ))}
               {lancamentos.length === 0 && (
                 <tr>
-                  <td colSpan={5} className={styles.empty}>
+                  <td colSpan={6} className={styles.empty}>
                     Nenhum lançamento ainda.{' '}
                     <button className={styles.emptyAction} onClick={openWizard}>Adicionar agora</button>
                   </td>
@@ -367,7 +413,7 @@ export default function AnaliseDrePage() {
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
 
             <div className={styles.modalHeader}>
-              <h2>Novo lançamento</h2>
+              <h2>{editingId ? 'Editar lançamento' : 'Novo lançamento'}</h2>
               <button className={styles.closeBtn} onClick={closeWizard} aria-label="Fechar">✕</button>
             </div>
 
@@ -569,7 +615,7 @@ export default function AnaliseDrePage() {
                   disabled={saving || !form.grupo.trim()}
                   onClick={salvar}
                 >
-                  {saving ? 'Salvando…' : 'Salvar lançamento'}
+                  {saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Salvar lançamento'}
                 </button>
                 <button className={styles.backBtn} onClick={() => setStep(4)}>← Voltar</button>
               </div>
