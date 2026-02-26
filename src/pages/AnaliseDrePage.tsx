@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
+import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -362,6 +363,8 @@ export default function AnaliseDrePage() {
         <StatCard title="Despesas"  value={moeda(totais.despesas)} tone="negative" />
         <StatCard title="Resultado" value={moeda(resultado)} tone={resultado >= 0 ? 'positive' : 'negative'} />
       </section>
+
+      <DreAssistentePanel lancamentos={lancamentos} />
 
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
