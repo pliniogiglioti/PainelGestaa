@@ -66,6 +66,7 @@ export default function AnaliseDrePage() {
   const [step,           setStep]           = useState<Step>(1)
   const [saving,         setSaving]         = useState(false)
   const [aiLoading,      setAiLoading]      = useState(false)
+  const [aiError,        setAiError]        = useState('')
   const [error,          setError]          = useState('')
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
@@ -129,6 +130,7 @@ export default function AnaliseDrePage() {
     setForm(INITIAL_FORM)
     setStep(1)
     setError('')
+    setAiError('')
     setShowWizard(true)
   }
 
@@ -137,6 +139,7 @@ export default function AnaliseDrePage() {
     setForm(INITIAL_FORM)
     setStep(1)
     setError('')
+    setAiError('')
   }
 
   // After step 2: call AI and pre-fill both classificacao and grupo
@@ -144,6 +147,7 @@ export default function AnaliseDrePage() {
     if (valorNumerico <= 0) return
     setStep(3)
     setAiLoading(true)
+    setAiError('')
     setForm(p => ({ ...p, classificacaoNome: '', grupo: '' }))
 
     try {
@@ -155,7 +159,7 @@ export default function AnaliseDrePage() {
 
       const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
 
-      const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
+      const { data, error: fnError } = await supabase.functions.invoke('dre-ai-classify', {
         body: {
           descricao: form.descricao,
           valor: valorNumerico,
@@ -165,15 +169,21 @@ export default function AnaliseDrePage() {
         },
       })
 
-      if (!error && data) {
+      if (fnError) {
+        // Supabase function invocation error (network, auth, etc.)
+        setAiError(`Erro ao chamar IA: ${fnError.message ?? String(fnError)}`)
+      } else if (data?.error) {
+        // Edge function returned an error payload (e.g. GroqCloud model error)
+        setAiError(`IA indisponível: ${data.error}`)
+      } else if (data) {
         setForm(p => ({
           ...p,
           classificacaoNome: data.classificacao_nome ?? '',
           grupo:             data.grupo             ?? '',
         }))
       }
-    } catch {
-      // AI failed — user fills manually
+    } catch (e) {
+      setAiError(`Erro inesperado: ${String(e)}`)
     } finally {
       setAiLoading(false)
     }
@@ -344,8 +354,20 @@ export default function AnaliseDrePage() {
                   <AiSpinner />
                 ) : (
                   <>
-                    {/* Seleção atual destacada */}
-                    {form.classificacaoNome && (
+                    {/* Aviso quando a IA falhou */}
+                    {aiError && (
+                      <div className={styles.aiErrorBox}>
+                        <span className={styles.aiErrorIcon}>⚠️</span>
+                        <div>
+                          <strong>IA indisponível</strong>
+                          <p className={styles.aiErrorDetail}>{aiError}</p>
+                          <p className={styles.aiErrorHint}>Selecione manualmente abaixo ou verifique as configurações da IA no painel admin.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Seleção atual destacada (só quando IA funcionou) */}
+                    {form.classificacaoNome && !aiError && (
                       <div className={styles.aiSelectedBox}>
                         <span className={styles.aiSelectedLabel}>IA identificou</span>
                         <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>

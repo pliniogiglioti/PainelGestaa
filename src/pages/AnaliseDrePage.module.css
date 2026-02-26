@@ -517,6 +517,45 @@ th { color: #8f8f8f; font-weight: 500; }
   opacity: 0.8;
 }
 
+/* ── AI Error Box ── */
+
+.aiErrorBox {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  background: rgba(255, 193, 7, 0.08);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 14px;
+}
+
+.aiErrorIcon {
+  font-size: 18px;
+  flex-shrink: 0;
+  line-height: 1.2;
+}
+
+.aiErrorBox strong {
+  display: block;
+  font-size: 13px;
+  color: #ffc107;
+  margin-bottom: 3px;
+}
+
+.aiErrorDetail {
+  font-size: 11px;
+  color: #a08040;
+  word-break: break-all;
+  margin: 0 0 4px;
+}
+
+.aiErrorHint {
+  font-size: 11px;
+  color: #888;
+  margin: 0;
+}
+
 /* ── AI Selected Box ── */
 
 .aiSelectedBox {
