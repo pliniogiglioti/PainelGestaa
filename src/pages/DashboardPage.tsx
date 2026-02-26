@@ -118,14 +118,106 @@ function DesignSection({
   )
 }
 
-function SidebarBrand() {
+function DesignButton({
+  children,
+  onClick,
+  variant = 'ghost',
+  active = false,
+  title,
+}: {
+  children: ReactNode
+  onClick?: () => void
+  variant?: 'ghost' | 'primary' | 'pill'
+  active?: boolean
+  title?: string
+}) {
+  const variantClass = variant === 'primary'
+    ? styles.designButtonPrimary
+    : variant === 'pill'
+      ? styles.designButtonPill
+      : styles.designButtonGhost
+
   return (
-    <div className={styles.sidebarLogo}>
-      <img src="/favicon.png" width="24" height="24" alt="" className={styles.sidebarFavicon} />
-      <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
-    </div>
+    <button
+      className={`${styles.designButtonBase} ${variantClass} ${active ? styles.designButtonActive : ''}`}
+      onClick={onClick}
+      title={title}
+      type="button"
+    >
+      {children}
+    </button>
   )
 }
+
+function DesignIconButton({ children, onClick, title }: { children: ReactNode; onClick: () => void; title: string }) {
+  return (
+    <button type="button" className={styles.designIconButton} onClick={onClick} title={title}>
+      {children}
+    </button>
+  )
+}
+
+function TopNavigation({
+  navItems,
+  activePage,
+  onSelect,
+  isAdmin,
+  onSettings,
+  onLogout,
+}: {
+  navItems: { id: Page; label: string; icon: ReactNode }[]
+  activePage: Page
+  onSelect: (page: Page) => void
+  isAdmin: boolean
+  onSettings: () => void
+  onLogout: () => void
+}) {
+  return (
+    <header className={styles.topNavWrap}>
+      <div className={styles.topNavBrand}>
+        <img src="/favicon.png" width="24" height="24" alt="" />
+        <img src="/logo.png" height="24" alt="PainelGestaa" />
+      </div>
+
+      <nav className={styles.topNavMenu}>
+        {navItems.map(item => (
+          <DesignButton
+            key={item.id}
+            variant="pill"
+            active={activePage === item.id}
+            onClick={() => onSelect(item.id)}
+          >
+            <span className={styles.topNavButtonContent}>{item.icon}<span>{item.label}</span></span>
+          </DesignButton>
+        ))}
+      </nav>
+
+      <div className={styles.topNavActions}>
+        {isAdmin && (
+          <DesignIconButton onClick={onSettings} title="Configurações">
+            <IconSettings />
+          </DesignIconButton>
+        )}
+        <DesignButton variant="primary" onClick={onLogout}>
+          <span className={styles.topNavButtonContent}><IconLogout /><span>Sair</span></span>
+        </DesignButton>
+      </div>
+    </header>
+  )
+}
+
+function CategoryChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`${styles.categoryChip} ${active ? styles.categoryChipActive : ''}`}
+      onClick={onClick}
+    >
+      {label}
+    </button>
+  )
+}
+
 
 // ── Admin Settings Modal ──────────────────────────────────────────────────
 
@@ -699,35 +791,15 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   if (activePage === 'comunidade' && openTopicId) {
     return (
       <div className={styles.layout}>
-        <aside className={styles.sidebar}>
-          <SidebarBrand />
-          <nav className={styles.sidebarNav}>
-            {navItems.map(item => (
-              <button key={item.id}
-                className={`${styles.navItem} ${activePage === item.id ? styles.navItemActive : ''}`}
-                onClick={() => { setActivePage(item.id); setOpenTopicId(null) }}>
-                <span className={styles.navIcon}>{item.icon}</span>
-                <span className={styles.navLabel}>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className={styles.sidebarBottom}>
-            {isAdmin && (
-              <button className={styles.navItem} onClick={() => setShowSettings(true)}>
-                <span className={styles.navIcon}><IconSettings /></span>
-                <span className={styles.navLabel}>Configurações</span>
-              </button>
-            )}
-            <button className={styles.logoutButton} onClick={onLogout}>
-              <span className={styles.navIcon}><IconLogout /></span>
-              <span className={styles.navLabel}>Sair</span>
-            </button>
-          </div>
-        </aside>
-        <main className={styles.main}>
-          <div className={styles.mobileHeader}>
-            <img src="/logo.png" height="26" alt="PainelGestaa" />
-          </div>
+        <TopNavigation
+          navItems={navItems}
+          activePage={activePage}
+          onSelect={page => { setActivePage(page); setOpenTopicId(null) }}
+          isAdmin={isAdmin}
+          onSettings={() => setShowSettings(true)}
+          onLogout={onLogout}
+        />
+        <main className={styles.mainTopNavOnly}>
           <ForumTopicPage topicId={openTopicId} currentUser={user} onBack={() => setOpenTopicId(null)} />
         </main>
       </div>
@@ -736,42 +808,16 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
   return (
     <div className={styles.layout}>
+      <TopNavigation
+        navItems={navItems}
+        activePage={activePage}
+        onSelect={setActivePage}
+        isAdmin={isAdmin}
+        onSettings={() => setShowSettings(true)}
+        onLogout={onLogout}
+      />
 
-      {/* ── Sidebar ── */}
-      <aside className={styles.sidebar}>
-        <SidebarBrand />
-        <nav className={styles.sidebarNav}>
-          {navItems.map(item => (
-            <button key={item.id}
-              className={`${styles.navItem} ${activePage === item.id ? styles.navItemActive : ''}`}
-              onClick={() => setActivePage(item.id)}>
-              <span className={styles.navIcon}>{item.icon}</span>
-              <span className={styles.navLabel}>{item.label}</span>
-            </button>
-          ))}
-        </nav>
-        <div className={styles.sidebarBottom}>
-          {isAdmin && (
-            <button className={styles.navItem} onClick={() => setShowSettings(true)}>
-              <span className={styles.navIcon}><IconSettings /></span>
-              <span className={styles.navLabel}>Configurações</span>
-            </button>
-          )}
-          <button className={styles.logoutButton} onClick={onLogout}>
-            <span className={styles.navIcon}><IconLogout /></span>
-            <span className={styles.navLabel}>Sair</span>
-          </button>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <main className={styles.main}>
-
-        {/* Mobile-only top bar with logo */}
-        <div className={styles.mobileHeader}>
-          <img src="/favicon.png" width="28" height="28" alt="" />
-          <img src="/logo.png" height="22" alt="PainelGestaa" className={styles.mobileHeaderLogo} />
-        </div>
+      <main className={styles.mainTopNavOnly}>
 
         {/* APLICATIVOS */}
         {activePage === 'aplicativos' && (
@@ -787,17 +833,18 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
             <div className={styles.categoriesBar}>
               <div className={styles.categoriesScroll}>
                 {allCategories.map(cat => (
-                  <button key={cat.slug}
-                    className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => handleCategoryClick(cat.slug)}>
-                    {cat.name}
-                  </button>
+                  <CategoryChip
+                    key={cat.slug}
+                    label={cat.name}
+                    active={activeCategory === cat.slug}
+                    onClick={() => handleCategoryClick(cat.slug)}
+                  />
                 ))}
               </div>
               {isAdmin && (
-                <button className={styles.btnIconGhost} onClick={() => setShowCreateCat(true)} title="Nova categoria">
+                <DesignIconButton onClick={() => setShowCreateCat(true)} title="Nova categoria">
                   <IconTag />
-                </button>
+                </DesignIconButton>
               )}
             </div>
 
@@ -806,7 +853,11 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
             ) : filteredApps.length === 0 ? (
               <div className={styles.emptyState}>
                 <p>Nenhum app encontrado nesta categoria.</p>
-                {isAdmin && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
+                {isAdmin && (
+                  <DesignButton variant="primary" onClick={() => setShowCreateApp(true)}>
+                    <span className={styles.topNavButtonContent}><IconPlus /><span>Criar primeiro app</span></span>
+                  </DesignButton>
+                )}
               </div>
             ) : (
               <>
@@ -834,9 +885,9 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                       <span className={styles.sectionCount}>{filteredApps.length} apps</span>
                     </div>
                     {isAdmin && (
-                      <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}>
-                        <IconPlus /> Novo App
-                      </button>
+                      <DesignButton variant="primary" onClick={() => setShowCreateApp(true)}>
+                        <span className={styles.topNavButtonContent}><IconPlus /><span>Novo App</span></span>
+                      </DesignButton>
                     )}
                   </div>
 
@@ -869,21 +920,21 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 <p className={styles.welcomeGreeting}>Fórum da comunidade</p>
                 <h1 className={styles.welcomeName}>Comunidade</h1>
               </div>
-              <button className={styles.adminCreateBtn} onClick={() => setShowCreateTopic(true)}>
-                <IconPlus /> Novo Tópico
-              </button>
+              <DesignButton variant="primary" onClick={() => setShowCreateTopic(true)}>
+                <span className={styles.topNavButtonContent}><IconPlus /><span>Novo Tópico</span></span>
+              </DesignButton>
             </div>
 
             <div className={styles.categoriesBar}>
               <div className={styles.categoriesScroll}>
-                <button className={`${styles.categoryChip} ${forumFilter === 'todos' ? styles.categoryChipActive : ''}`}
-                  onClick={() => setForumFilter('todos')}>Todos</button>
+                <CategoryChip label="Todos" active={forumFilter === 'todos'} onClick={() => setForumFilter('todos')} />
                 {categories.map(cat => (
-                  <button key={cat.slug}
-                    className={`${styles.categoryChip} ${forumFilter === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setForumFilter(cat.slug)}>
-                    {cat.name}
-                  </button>
+                  <CategoryChip
+                    key={cat.slug}
+                    label={cat.name}
+                    active={forumFilter === cat.slug}
+                    onClick={() => setForumFilter(cat.slug)}
+                  />
                 ))}
               </div>
             </div>
