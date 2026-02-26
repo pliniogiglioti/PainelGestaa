@@ -78,6 +78,7 @@ export default function AnaliseDrePage() {
   const [saving,         setSaving]         = useState(false)
   const [aiLoading,      setAiLoading]      = useState(false)
   const [aiError,        setAiError]        = useState('')
+  const [aiWarning,      setAiWarning]      = useState('')
   const [error,          setError]          = useState('')
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
@@ -157,10 +158,10 @@ export default function AnaliseDrePage() {
   }, [classificacoes, form.classificacaoNome])
 
   const openWizard = () => {
-    setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setShowWizard(true)
+    setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning(''); setShowWizard(true)
   }
   const closeWizard = () => {
-    setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError('')
+    setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning('')
   }
 
   const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
@@ -193,6 +194,7 @@ export default function AnaliseDrePage() {
     setStep(4)
     setAiLoading(true)
     setAiError('')
+    setAiWarning('')
     setForm(p => ({ ...p, classificacaoNome: '', grupo: '' }))
 
     try {
@@ -209,6 +211,7 @@ export default function AnaliseDrePage() {
         body: {
           descricao: form.descricao,
           valor: valorNumerico,
+          tipo: form.tipo,
           modelo,
           classificacoes_disponiveis: classesDoTipo,
           grupos_existentes: gruposExistentes,
@@ -221,11 +224,17 @@ export default function AnaliseDrePage() {
         setAiError(`IA indisponível: ${data.error}`)
       } else if (data) {
         const grupoIa = String(data.grupo ?? '').trim()
+        const classificacaoIa = String(data.classificacao_nome ?? '').trim()
+
         setForm(p => ({
           ...p,
-          classificacaoNome: data.classificacao_nome ?? '',
+          classificacaoNome: classificacaoIa,
           grupo:             grupoIa,
         }))
+
+        if (data?.aviso) {
+          setAiWarning(String(data.aviso))
+        }
 
         if (grupoIa) {
           const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
@@ -449,6 +458,16 @@ export default function AnaliseDrePage() {
                           <strong>IA indisponível</strong>
                           <p className={styles.aiErrorDetail}>{aiError}</p>
                           <p className={styles.aiErrorHint}>Selecione manualmente. Verifique as configurações da IA.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiWarning && !aiError && (
+                      <div className={styles.aiErrorBox}>
+                        <span className={styles.aiErrorIcon}>ℹ️</span>
+                        <div>
+                          <strong>Sugestão por fallback</strong>
+                          <p className={styles.aiErrorDetail}>{aiWarning}</p>
                         </div>
                       </div>
                     )}
