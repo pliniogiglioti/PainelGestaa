@@ -1,5 +1,6 @@
 // Supabase Edge Function: dre-ai-classify
-// Calls GroqCloud API to suggest the best classification for a DRE lancamento.
+// Calls GroqCloud API to identify BOTH the classification AND the group
+// for a DRE lancamento, pre-filling the wizard fields for the user.
 //
 // Environment variable required (Supabase Dashboard → Edge Functions → Secrets):
 //   GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
@@ -20,7 +21,6 @@ serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
-
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }), {
       status: 405,
@@ -40,6 +40,7 @@ serve(async (req: Request) => {
   let valor: number
   let modelo: string
   let classificacoes_disponiveis: ClassificacaoItem[]
+  let grupos_existentes: string[]
 
   try {
     const body = await req.json()
@@ -47,8 +48,9 @@ serve(async (req: Request) => {
     valor                      = Number(body.valor ?? 0)
     modelo                     = String(body.modelo ?? 'llama-3.3-70b-versatile')
     classificacoes_disponiveis = Array.isArray(body.classificacoes_disponiveis)
-      ? body.classificacoes_disponiveis
-      : []
+      ? body.classificacoes_disponiveis : []
+    grupos_existentes          = Array.isArray(body.grupos_existentes)
+      ? body.grupos_existentes : []
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
       status: 400,
@@ -56,31 +58,34 @@ serve(async (req: Request) => {
     })
   }
 
-  if (classificacoes_disponiveis.length === 0) {
-    return new Response(JSON.stringify({ error: 'No classifications provided' }), {
-      status: 400,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
-  }
+  const listaClassificacoes = classificacoes_disponiveis.length > 0
+    ? classificacoes_disponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
+    : '(nenhuma cadastrada)'
 
-  // Build numbered list for the prompt
-  const listaClassificacoes = classificacoes_disponiveis
-    .map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`)
-    .join('\n')
+  const listaGrupos = grupos_existentes.length > 0
+    ? grupos_existentes.map(g => `"${g}"`).join(', ')
+    : 'nenhum ainda'
 
-  const prompt = `Você é um assistente contábil brasileiro especializado em DRE (Demonstração do Resultado do Exercício).
+  const prompt = `Você é um assistente contábil brasileiro especializado em DRE.
 
 Lançamento financeiro:
 - Descrição: "${descricao}"
 - Valor: R$ ${valor.toFixed(2).replace('.', ',')}
 
-Classificações disponíveis:
+Classificações disponíveis (escolha UMA):
 ${listaClassificacoes}
 
-Sua tarefa: escolha a classificação da lista acima que melhor representa este lançamento.
+Grupos já existentes no sistema: ${listaGrupos}
 
-Responda SOMENTE com um JSON válido, sem explicações, sem markdown:
-{"nome": "nome exato de uma das classificações da lista acima"}`
+Sua tarefa:
+1. Escolha a classificação mais adequada da lista acima
+2. Sugira um grupo/categoria conciso (1-4 palavras, em português). Prefira reutilizar um grupo existente se fizer sentido. Crie um novo apenas se necessário.
+
+Responda SOMENTE em JSON válido, sem markdown, sem explicações:
+{
+  "classificacao_nome": "nome exato de uma classificação da lista",
+  "grupo": "grupo mais adequado"
+}`
 
   try {
     const groqRes = await fetch(GROQ_API_URL, {
@@ -93,7 +98,7 @@ Responda SOMENTE com um JSON válido, sem explicações, sem markdown:
         model: modelo,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
-        max_tokens: 60,
+        max_tokens: 80,
       }),
     })
 
@@ -108,7 +113,6 @@ Responda SOMENTE com um JSON válido, sem explicações, sem markdown:
     const groqData = await groqRes.json()
     const content: string = groqData?.choices?.[0]?.message?.content ?? ''
 
-    // Extract JSON (handle possible markdown code blocks)
     const jsonMatch = content.match(/\{[\s\S]*?\}/)
     if (!jsonMatch) {
       return new Response(JSON.stringify({ error: 'Could not parse AI response', raw: content }), {
@@ -117,18 +121,19 @@ Responda SOMENTE com um JSON válido, sem explicações, sem markdown:
       })
     }
 
-    const result = JSON.parse(jsonMatch[0]) as { nome: string }
-    const nomeRaw = String(result.nome ?? '').trim()
+    const result = JSON.parse(jsonMatch[0]) as { classificacao_nome: string; grupo: string }
 
-    // Validate: nome must match one of the provided classifications exactly
+    // Validate classificacao_nome: must match one of the provided options exactly
     const matched = classificacoes_disponiveis.find(
-      c => c.nome.toLowerCase() === nomeRaw.toLowerCase()
+      c => c.nome.toLowerCase() === String(result.classificacao_nome ?? '').toLowerCase()
     )
+    const classificacao_nome = matched
+      ? matched.nome
+      : (classificacoes_disponiveis[0]?.nome ?? '')
 
-    // Use matched nome (preserves original casing) or first item as fallback
-    const nome = matched ? matched.nome : classificacoes_disponiveis[0].nome
+    const grupo = String(result.grupo ?? '').trim() || 'Geral'
 
-    return new Response(JSON.stringify({ nome }), {
+    return new Response(JSON.stringify({ classificacao_nome, grupo }), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })

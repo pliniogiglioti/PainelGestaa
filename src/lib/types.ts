@@ -101,7 +101,7 @@ export interface Database {
           user_id:       string | null
           descricao:     string | null
           valor:         number
-          classificacao: 'receita' | 'despesa'
+          classificacao: string
           grupo:         string
           created_at:    string
           updated_at:    string
@@ -111,7 +111,7 @@ export interface Database {
           user_id?:       string | null
           descricao?:     string | null
           valor:          number
-          classificacao:  'receita' | 'despesa'
+          classificacao:  string
           grupo:          string
           created_at?:    string
           updated_at?:    string
@@ -121,7 +121,7 @@ export interface Database {
           user_id?:       string | null
           descricao?:     string | null
           valor?:         number
-          classificacao?: 'receita' | 'despesa'
+          classificacao?: string
           grupo?:         string
           updated_at?:    string
         }
