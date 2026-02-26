@@ -31,7 +31,7 @@ function StatCard({ title, value, tone = 'default' }: {
 }
 
 const STEP_LABELS: Record<Step, string> = {
-  1: 'Descrição', 2: 'Valor', 3: 'Tipo', 4: 'Classificação', 5: 'Grupo',
+  1: 'Tipo', 2: 'Descrição', 3: 'Valor', 4: 'Classificação', 5: 'Grupo',
 }
 
 function StepProgress({ current }: { current: Step }) {
@@ -132,25 +132,30 @@ export default function AnaliseDrePage() {
     setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError('')
   }
 
-  // After step 2: AI identifies tipo + classificacao + grupo all at once
-  const goToStep3 = async () => {
+  // After step 3 (valor): AI identifies classificacao + grupo (tipo already chosen in step 1)
+  const goToStep4 = async () => {
     if (valorNumerico <= 0) return
-    setStep(3)
+    setStep(4)
     setAiLoading(true)
     setAiError('')
-    setForm(p => ({ ...p, tipo: '', classificacaoNome: '', grupo: '' }))
+    setForm(p => ({ ...p, classificacaoNome: '', grupo: '' }))
 
     try {
       const { data: configData } = await supabase
         .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
       const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
 
+      // Only send classifications matching the tipo the user already chose
+      const classesDoTipo = classificacoes
+        .filter(c => c.tipo === form.tipo)
+        .map(c => ({ nome: c.nome, tipo: c.tipo }))
+
       const { data, error: fnError } = await supabase.functions.invoke('dre-ai-classify', {
         body: {
           descricao: form.descricao,
           valor: valorNumerico,
           modelo,
-          classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
+          classificacoes_disponiveis: classesDoTipo,
           grupos_existentes: gruposExistentes,
         },
       })
@@ -162,7 +167,6 @@ export default function AnaliseDrePage() {
       } else if (data) {
         setForm(p => ({
           ...p,
-          tipo:              (data.tipo === 'receita' || data.tipo === 'despesa') ? data.tipo : '',
           classificacaoNome: data.classificacao_nome ?? '',
           grupo:             data.grupo              ?? '',
         }))
@@ -270,25 +274,63 @@ export default function AnaliseDrePage() {
 
             <StepProgress current={step} />
 
-            {/* ── STEP 1: Descrição ── */}
+            {/* ── STEP 1: Tipo (Venda ou Compra?) ── */}
             {step === 1 && (
               <div className={styles.wizardStep}>
-                <label className={styles.wizardLabel}>O que você comprou ou recebeu?</label>
-                <input
-                  className={styles.wizardInput}
-                  value={form.descricao}
-                  onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))}
-                  placeholder="Ex: Pagamento pelo serviço de design"
-                  autoFocus
-                />
-                <button className={styles.submit} disabled={!form.descricao.trim()} onClick={() => setStep(2)}>
+                <label className={styles.wizardLabel}>O que foi isso?</label>
+
+                <div className={styles.tipoGrid}>
+                  <button
+                    className={`${styles.tipoBtn} ${styles.tipoBtnReceita} ${form.tipo === 'receita' ? styles.tipoBtnSelected : ''}`}
+                    onClick={() => setForm(p => ({ ...p, tipo: 'receita' }))}
+                  >
+                    <span className={styles.tipoArrow}>↑</span>
+                    <div className={styles.tipoBtnText}>
+                      <strong>Entrou dinheiro</strong>
+                      <small>Venda, serviço prestado, recebimento</small>
+                    </div>
+                  </button>
+
+                  <button
+                    className={`${styles.tipoBtn} ${styles.tipoBtnDespesa} ${form.tipo === 'despesa' ? styles.tipoBtnSelected : ''}`}
+                    onClick={() => setForm(p => ({ ...p, tipo: 'despesa' }))}
+                  >
+                    <span className={styles.tipoArrow}>↓</span>
+                    <div className={styles.tipoBtnText}>
+                      <strong>Saiu dinheiro</strong>
+                      <small>Compra, pagamento, fornecedor, custo</small>
+                    </div>
+                  </button>
+                </div>
+
+                <button className={styles.submit} disabled={!form.tipo} onClick={() => setStep(2)}>
                   Próximo →
                 </button>
               </div>
             )}
 
-            {/* ── STEP 2: Valor ── */}
+            {/* ── STEP 2: Descrição ── */}
             {step === 2 && (
+              <div className={styles.wizardStep}>
+                <label className={styles.wizardLabel}>
+                  {form.tipo === 'receita' ? 'O que você vendeu ou recebeu?' : 'O que você comprou ou pagou?'}
+                </label>
+                <input
+                  className={styles.wizardInput}
+                  value={form.descricao}
+                  onChange={e => setForm(p => ({ ...p, descricao: e.target.value }))}
+                  placeholder={form.tipo === 'receita' ? 'Ex: Pagamento pelo serviço de design' : 'Ex: Compra de material de escritório'}
+                  autoFocus
+                />
+                <button className={styles.submit} disabled={!form.descricao.trim()} onClick={() => setStep(3)}>
+                  Próximo →
+                </button>
+                <button className={styles.backBtn} onClick={() => setStep(1)}>← Voltar</button>
+              </div>
+            )}
+
+            {/* ── STEP 3: Valor ── */}
+            {step === 3 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>Qual é o valor?</label>
                 <input
@@ -299,17 +341,17 @@ export default function AnaliseDrePage() {
                   inputMode="decimal"
                   autoFocus
                 />
-                <button className={styles.submit} disabled={valorNumerico <= 0} onClick={goToStep3}>
+                <button className={styles.submit} disabled={valorNumerico <= 0} onClick={goToStep4}>
                   Próximo →
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(1)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
               </div>
             )}
 
-            {/* ── STEP 3: Entrada ou Saída? ── */}
-            {step === 3 && (
+            {/* ── STEP 4: Classificação (listbox filtrado pelo tipo) ── */}
+            {step === 4 && (
               <div className={styles.wizardStep}>
-                <label className={styles.wizardLabel}>O que aconteceu?</label>
+                <label className={styles.wizardLabel}>Como classificar?</label>
 
                 {aiLoading ? <AiSpinner /> : (
                   <>
@@ -324,81 +366,39 @@ export default function AnaliseDrePage() {
                       </div>
                     )}
 
-                    <div className={styles.tipoGrid}>
-                      <button
-                        className={`${styles.tipoBtn} ${styles.tipoBtnReceita} ${form.tipo === 'receita' ? styles.tipoBtnSelected : ''}`}
-                        onClick={() => setForm(p => ({ ...p, tipo: 'receita' }))}
-                      >
-                        <span className={styles.tipoArrow}>↑</span>
-                        <div className={styles.tipoBtnText}>
-                          <strong>Entrada de dinheiro</strong>
-                          <small>Venda, serviço prestado, recebimento</small>
-                        </div>
-                        {form.tipo === 'receita' && !aiError && <span className={styles.tipoAiBadge}>IA ✓</span>}
-                      </button>
+                    {!aiError && form.classificacaoNome && (
+                      <div className={styles.aiSelectedBox}>
+                        <span className={styles.aiSelectedLabel}>IA identificou</span>
+                        <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>
+                      </div>
+                    )}
 
-                      <button
-                        className={`${styles.tipoBtn} ${styles.tipoBtnDespesa} ${form.tipo === 'despesa' ? styles.tipoBtnSelected : ''}`}
-                        onClick={() => setForm(p => ({ ...p, tipo: 'despesa' }))}
-                      >
-                        <span className={styles.tipoArrow}>↓</span>
-                        <div className={styles.tipoBtnText}>
-                          <strong>Saída de dinheiro</strong>
-                          <small>Compra, pagamento, fornecedor, custo</small>
-                        </div>
-                        {form.tipo === 'despesa' && !aiError && <span className={styles.tipoAiBadge}>IA ✓</span>}
-                      </button>
-                    </div>
+                    {classificacoesFiltradas.length === 0 ? (
+                      <p className={styles.error}>
+                        Nenhuma classificação cadastrada para este tipo. Acesse Configurações Admin.
+                      </p>
+                    ) : (
+                      <div className={styles.listbox}>
+                        {classificacoesFiltradas.map(c => (
+                          <button
+                            key={c.id}
+                            className={`${styles.listboxItem} ${form.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
+                            onClick={() => setForm(p => ({ ...p, classificacaoNome: c.nome }))}
+                          >
+                            <span className={styles.listboxRadio}>
+                              {form.classificacaoNome === c.nome ? '●' : '○'}
+                            </span>
+                            {c.nome}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </>
                 )}
 
                 <button
                   className={styles.submit}
-                  disabled={!form.tipo || aiLoading}
-                  onClick={() => setStep(4)}
-                >
-                  Próximo →
-                </button>
-                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
-              </div>
-            )}
-
-            {/* ── STEP 4: Classificação (listbox filtrado pelo tipo) ── */}
-            {step === 4 && (
-              <div className={styles.wizardStep}>
-                <label className={styles.wizardLabel}>Como classificar?</label>
-
-                {!aiError && form.classificacaoNome && (
-                  <div className={styles.aiSelectedBox}>
-                    <span className={styles.aiSelectedLabel}>IA identificou</span>
-                    <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>
-                  </div>
-                )}
-
-                {classificacoesFiltradas.length === 0 ? (
-                  <p className={styles.error}>
-                    Nenhuma classificação cadastrada para este tipo. Acesse Configurações Admin.
-                  </p>
-                ) : (
-                  <div className={styles.listbox}>
-                    {classificacoesFiltradas.map(c => (
-                      <button
-                        key={c.id}
-                        className={`${styles.listboxItem} ${form.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
-                        onClick={() => setForm(p => ({ ...p, classificacaoNome: c.nome }))}
-                      >
-                        <span className={styles.listboxRadio}>
-                          {form.classificacaoNome === c.nome ? '●' : '○'}
-                        </span>
-                        {c.nome}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  className={styles.submit}
-                  disabled={!form.classificacaoNome}
+                  disabled={!form.classificacaoNome || aiLoading}
                   onClick={() => setStep(5)}
                 >
                   Próximo →
