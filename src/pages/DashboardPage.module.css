@@ -175,6 +175,7 @@
   cursor: pointer;
   transition: background 0.18s ease, color 0.18s ease;
   text-align: left;
+  text-decoration: none;
   width: 100%;
   white-space: nowrap;
 }
