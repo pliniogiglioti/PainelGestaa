@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { ReactNode, useEffect, useRef, useState } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
@@ -93,6 +93,29 @@ const IconSettings = () => (
 
 function Spinner() {
   return <div className={styles.spinner} />
+}
+
+function DesignSection({
+  eyebrow,
+  title,
+  subtitle,
+  children,
+}: {
+  eyebrow: string
+  title: string
+  subtitle: string
+  children: ReactNode
+}) {
+  return (
+    <section className={styles.designSection}>
+      <div className={styles.designSectionHead}>
+        <p className={styles.designEyebrow}>{eyebrow}</p>
+        <h2 className={styles.designTitle}>{title}</h2>
+        <p className={styles.designSubtitle}>{subtitle}</p>
+      </div>
+      {children}
+    </section>
+  )
 }
 
 function SidebarBrand() {
@@ -509,6 +532,38 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
   )
 }
 
+function FeaturedAppsShowcase({
+  featured,
+  sideApps,
+  getCategoryLabel,
+}: {
+  featured: App
+  sideApps: App[]
+  getCategoryLabel: (slug: string) => string
+}) {
+  return (
+    <div className={styles.showcaseLayout}>
+      <div
+        className={styles.featuredHero}
+        style={{ backgroundImage: featured.background_image ? `url(${featured.background_image})` : undefined }}
+      >
+        <div className={styles.featuredHeroOverlay} />
+        <div className={styles.featuredHeroContent}>
+          <span className={styles.featuredHeroCategory}>{getCategoryLabel(featured.category)}</span>
+          <h3 className={styles.featuredHeroTitle}>{featured.name}</h3>
+          {featured.description && <p className={styles.featuredHeroDescription}>{featured.description}</p>}
+        </div>
+      </div>
+
+      <div className={styles.showcaseSideRow}>
+        {sideApps.map((app, index) => (
+          <AppCard key={app.id} app={app} index={index} categoryLabel={getCategoryLabel(app.category)} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
@@ -616,6 +671,8 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
     .filter(category => category.apps.length > 0)
 
   const uncategorizedApps = filteredApps.filter(app => !categories.some(category => category.slug === app.category))
+  const featuredApp = filteredApps[0]
+  const sideShowcaseApps = filteredApps.slice(1, 5)
 
   if (uncategorizedApps.length > 0) {
     appsByCategory.push({
@@ -744,20 +801,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               )}
             </div>
 
-            <div className={styles.sectionHeader} ref={appsListRef}>
-              <div className={styles.sectionLeft}>
-                <h2 className={styles.sectionTitle}>
-                  {activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
-                </h2>
-                <span className={styles.sectionCount}>{filteredApps.length} apps</span>
-              </div>
-              {isAdmin && (
-                <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}>
-                  <IconPlus /> Novo App
-                </button>
-              )}
-            </div>
-
             {loadingApps ? (
               <div className={styles.centeredSpinner}><Spinner /></div>
             ) : filteredApps.length === 0 ? (
@@ -766,21 +809,54 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 {isAdmin && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
               </div>
             ) : (
-              <div className={styles.categoryRows}>
-                {appsByCategory.map(category => (
-                  <section key={category.id} className={styles.categoryRowSection}>
-                    <div className={styles.categoryRowHeader}>
-                      <h3 className={styles.categoryRowTitle}>{category.name}</h3>
-                      <span className={styles.sectionCount}>{category.apps.length} apps</span>
+              <>
+                {featuredApp && (
+                  <DesignSection
+                    eyebrow="Explorar"
+                    title="Destaques da Semana"
+                    subtitle="Visual inspirado no layout da referência, mantendo a paleta original do PainelGestaa."
+                  >
+                    <FeaturedAppsShowcase
+                      featured={featuredApp}
+                      sideApps={sideShowcaseApps}
+                      getCategoryLabel={getCategoryLabel}
+                    />
+                  </DesignSection>
+                )}
+
+                <DesignSection
+                  eyebrow="Biblioteca"
+                  title={activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
+                  subtitle="Todos os cards usam o mesmo tamanho para manter consistência visual."
+                >
+                  <div className={styles.sectionHeader} ref={appsListRef}>
+                    <div className={styles.sectionLeft}>
+                      <span className={styles.sectionCount}>{filteredApps.length} apps</span>
                     </div>
-                    <div className={styles.netflixRow}>
-                      {category.apps.map((app, i) => (
-                        <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
+                    {isAdmin && (
+                      <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}>
+                        <IconPlus /> Novo App
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={styles.categoryRows}>
+                    {appsByCategory.map(category => (
+                      <section key={category.id} className={styles.categoryRowSection}>
+                        <div className={styles.categoryRowHeader}>
+                          <h3 className={styles.categoryRowTitle}>{category.name}</h3>
+                          <span className={styles.sectionCount}>{category.apps.length} apps</span>
+                        </div>
+                        <div className={styles.netflixRow}>
+                          {category.apps.map((app, i) => (
+                            <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                          ))}
+                        </div>
+                      </section>
+                    ))}
+                  </div>
+                </DesignSection>
+              </>
             )}
           </div>
         )}
