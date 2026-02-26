@@ -92,6 +92,35 @@ export interface Database {
         }
         Relationships: []
       }
+      dre_lancamentos: {
+        Row: {
+          id:            string
+          user_id:       string | null
+          valor:         number
+          classificacao: 'receita' | 'despesa'
+          grupo:         string
+          created_at:    string
+          updated_at:    string
+        }
+        Insert: {
+          id?:            string
+          user_id?:       string | null
+          valor:          number
+          classificacao:  'receita' | 'despesa'
+          grupo:          string
+          created_at?:    string
+          updated_at?:    string
+        }
+        Update: {
+          id?:            string
+          user_id?:       string | null
+          valor?:         number
+          classificacao?: 'receita' | 'despesa'
+          grupo?:         string
+          updated_at?:    string
+        }
+        Relationships: []
+      }
       forum_categories: {
         Row: {
           id:         string
@@ -193,6 +222,7 @@ export interface Database {
 export type Profile       = Database['public']['Tables']['profiles']['Row']
 export type AppCategory   = Database['public']['Tables']['app_categories']['Row']
 export type App           = Database['public']['Tables']['apps']['Row']
+export type DreLancamento = Database['public']['Tables']['dre_lancamentos']['Row']
 export type ForumCategory = Database['public']['Tables']['forum_categories']['Row']
 export type ForumTopic    = Database['public']['Tables']['forum_topics']['Row']
 export type ForumReply    = Database['public']['Tables']['forum_replies']['Row']

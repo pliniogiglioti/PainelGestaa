@@ -414,7 +414,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
-            <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
+            <img src="/favicon.png" width="24" height="24" alt="" className={styles.sidebarFavicon} />
             <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
           </div>
           <nav className={styles.sidebarNav}>
@@ -450,7 +450,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
-          <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
+          <img src="/favicon.png" width="24" height="24" alt="" className={styles.sidebarFavicon} />
           <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
         </div>
         <nav className={styles.sidebarNav}>
