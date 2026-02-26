@@ -895,6 +895,38 @@
   transform: translateY(-1px);
 }
 
+/* ── Link Type Toggle ────────────────────────────────────────────────────── */
+
+.linkTypeToggle {
+  display: flex;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  width: fit-content;
+}
+
+.linkTypeBtn {
+  padding: 8px 20px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.linkTypeBtn:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.linkTypeBtnActive {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-dark));
+  color: var(--bg);
+  font-weight: 700;
+}
+
 /* ── Profile ─────────────────────────────────────────────────────────────── */
 
 .profilePage {

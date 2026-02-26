@@ -63,6 +63,7 @@ export interface Database {
           name:             string
           description:      string | null
           category:         string
+          link_type:        'interno' | 'externo' | null
           external_link:    string | null
           internal_link:    string | null
           background_image: string | null
@@ -74,6 +75,7 @@ export interface Database {
           name:             string
           description?:     string | null
           category:         string
+          link_type?:       'interno' | 'externo' | null
           external_link?:   string | null
           internal_link?:   string | null
           background_image?: string | null
@@ -85,6 +87,7 @@ export interface Database {
           name?:            string
           description?:     string | null
           category?:        string
+          link_type?:       'interno' | 'externo' | null
           external_link?:   string | null
           internal_link?:   string | null
           background_image?: string | null
@@ -96,6 +99,7 @@ export interface Database {
         Row: {
           id:            string
           user_id:       string | null
+          descricao:     string | null
           valor:         number
           classificacao: 'receita' | 'despesa'
           grupo:         string
@@ -105,6 +109,7 @@ export interface Database {
         Insert: {
           id?:            string
           user_id?:       string | null
+          descricao?:     string | null
           valor:          number
           classificacao:  'receita' | 'despesa'
           grupo:          string
@@ -114,6 +119,7 @@ export interface Database {
         Update: {
           id?:            string
           user_id?:       string | null
+          descricao?:     string | null
           valor?:         number
           classificacao?: 'receita' | 'despesa'
           grupo?:         string
