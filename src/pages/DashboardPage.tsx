@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
@@ -308,6 +308,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [showCreateApp,   setShowCreateApp]   = useState(false)
   const [showCreateCat,   setShowCreateCat]   = useState(false)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
+  const appsListRef = useRef<HTMLDivElement | null>(null)
 
   // ── Fetch categories ──
   const fetchCategories = async () => {
@@ -372,6 +373,11 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
 
   const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
+
+  const handleCategoryClick = (slug: string) => {
+    setActiveCategory(slug)
+    appsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const navItems = [
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
@@ -463,11 +469,11 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
             {/* Categories */}
             <div className={styles.categoriesBar}>
-              <div className={styles.categoriesScroll}>
+              <div className={`${styles.categoriesScroll} ${styles.categoriesList}`}>
                 {allCategories.map(cat => (
                   <button key={cat.slug}
                     className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => setActiveCategory(cat.slug)}>
+                    onClick={() => handleCategoryClick(cat.slug)}>
                     {cat.name}
                   </button>
                 ))}
@@ -479,7 +485,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               )}
             </div>
 
-            <div className={styles.sectionHeader}>
+            <div className={styles.sectionHeader} ref={appsListRef}>
               <div className={styles.sectionLeft}>
                 <h2 className={styles.sectionTitle}>
                   {activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
