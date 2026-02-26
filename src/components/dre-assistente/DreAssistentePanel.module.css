@@ -1,0 +1,53 @@
+.panel {
+  margin-top: 1.5rem;
+  background: #fff;
+  border-radius: 1rem;
+  padding: 1rem;
+  border: 1px solid #e5e7eb;
+}
+
+.header h2 {
+  margin: 0;
+}
+
+.header p {
+  margin: .35rem 0 1rem;
+  color: #4b5563;
+}
+
+.input {
+  width: 100%;
+  min-height: 160px;
+  border: 1px solid #d1d5db;
+  border-radius: .75rem;
+  padding: .75rem;
+  font: inherit;
+}
+
+.button {
+  margin-top: .75rem;
+  border: 0;
+  border-radius: .75rem;
+  padding: .65rem 1rem;
+  background: #111827;
+  color: #fff;
+  cursor: pointer;
+}
+
+.button:disabled {
+  opacity: .65;
+  cursor: not-allowed;
+}
+
+.error {
+  margin-top: .75rem;
+  color: #b91c1c;
+}
+
+.response {
+  margin-top: 1rem;
+  padding: .75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: .75rem;
+  background: #f9fafb;
+}
