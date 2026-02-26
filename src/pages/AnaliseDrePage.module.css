@@ -94,13 +94,7 @@
   box-shadow: inset 0 0 0 1px rgba(255, 108, 108, 0.16);
 }
 
-/* ── Layout ── */
-
-.layout {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr;
-  gap: 14px;
-}
+/* ── Panel (tabela) ── */
 
 .panel {
   border-radius: 16px;
@@ -114,20 +108,126 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.panelHeader h2 { margin: 0; font-size: 18px; }
+.panelHeader h2 { margin: 0 0 2px; font-size: 18px; }
 
 .stepIndicator { font-size: 12px; color: #9f9f9f; }
 
-/* ── Step progress bar ── */
+/* ── Botão novo lançamento ── */
+
+.newBtn {
+  border: none;
+  border-radius: 10px;
+  background: #d5af45;
+  color: #191919;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 0.15s ease;
+}
+
+.newBtn:hover { opacity: 0.88; }
+
+/* ── Table ── */
+
+.tableWrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; }
+
+th, td {
+  text-align: left;
+  font-size: 13px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #202020;
+  white-space: nowrap;
+}
+
+th { color: #8f8f8f; font-weight: 500; }
+
+.tablePill {
+  display: inline-flex;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.receitaPill { color: #4ce09a; background: rgba(76, 224, 154, 0.15); }
+.despesaPill { color: #ff9f9f; background: rgba(255, 159, 159, 0.15); }
+
+.empty { text-align: center; color: #818181; padding: 24px 10px; }
+
+.emptyAction {
+  background: none;
+  border: none;
+  color: #d5af45;
+  cursor: pointer;
+  font-size: inherit;
+  text-decoration: underline;
+  padding: 0;
+}
+
+/* ── Modal overlay ── */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+}
+
+.modal {
+  background: #111;
+  border: 1px solid #2a2a2a;
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.modalHeader h2 { margin: 0; font-size: 20px; }
+
+.closeBtn {
+  background: #1e1e1e;
+  border: 1px solid #2e2e2e;
+  color: #888;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.15s ease;
+}
+
+.closeBtn:hover { color: #f2f2f2; }
+
+/* ── Step progress ── */
 
 .stepProgress {
   display: flex;
   align-items: flex-start;
   margin-bottom: 28px;
-  gap: 0;
 }
 
 .stepProgressItem {
@@ -168,12 +268,7 @@
   color: #d5af45;
 }
 
-.stepDotLabel {
-  font-size: 11px;
-  color: #606060;
-  white-space: nowrap;
-}
-
+.stepDotLabel { font-size: 11px; color: #606060; white-space: nowrap; }
 .stepDotLabelActive { color: #d5af45; }
 
 .stepConnector {
@@ -281,7 +376,7 @@
 .receitaText { color: #4ce09a; }
 .despesaText { color: #ff9f9f; }
 
-/* ── Actions ── */
+/* ── Submit / back ── */
 
 .submit {
   width: 100%;
@@ -310,45 +405,12 @@
 
 .backBtn:hover { color: #a0a0a0; }
 
-.error {
-  color: #ff8b8b;
-  font-size: 13px;
-  margin: 0;
-}
-
-/* ── Table ── */
-
-.tableWrap { overflow-x: auto; }
-
-table { width: 100%; border-collapse: collapse; }
-
-th, td {
-  text-align: left;
-  font-size: 13px;
-  padding: 10px 8px;
-  border-bottom: 1px solid #202020;
-  white-space: nowrap;
-}
-
-th { color: #8f8f8f; font-weight: 500; }
-
-.tablePill {
-  display: inline-flex;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 4px 8px;
-  border-radius: 999px;
-}
-
-.receitaPill { color: #4ce09a; background: rgba(76, 224, 154, 0.15); }
-.despesaPill { color: #ff9f9f; background: rgba(255, 159, 159, 0.15); }
-
-.empty { text-align: center; color: #818181; padding: 20px 10px; }
+.error { color: #ff8b8b; font-size: 13px; margin: 0; }
 
 /* ── Responsive ── */
 
-@media (max-width: 1000px) {
-  .layout, .statsGrid { grid-template-columns: 1fr; }
+@media (max-width: 700px) {
+  .statsGrid { grid-template-columns: 1fr; }
   .header { flex-direction: column; }
+  .modal { padding: 20px; }
 }
