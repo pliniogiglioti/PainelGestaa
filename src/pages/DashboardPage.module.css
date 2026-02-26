@@ -299,6 +299,13 @@
   flex: 1;
 }
 
+.categoriesList {
+  flex-direction: column;
+  gap: 10px;
+  max-width: 340px;
+  overflow-x: hidden;
+}
+
 .categoriesScroll::-webkit-scrollbar { display: none; }
 
 .categoryChip {
@@ -313,6 +320,13 @@
   cursor: pointer;
   transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.15s ease;
   white-space: nowrap;
+}
+
+.categoriesList .categoryChip {
+  width: 100%;
+  border-radius: 12px;
+  text-align: left;
+  padding: 11px 14px;
 }
 
 .categoryChip:hover {
