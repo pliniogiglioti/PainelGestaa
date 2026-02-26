@@ -80,11 +80,127 @@
 
 .layout {
   display: flex;
+  flex-direction: column;
   height: 100vh;
   width: 100vw;
   background: var(--bg);
   color: var(--text);
   overflow: hidden;
+}
+
+.mainTopNavOnly {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── Top navigation + design buttons ─────────────────────────────────────── */
+
+.topNavWrap {
+  height: 72px;
+  border-bottom: 1px solid var(--border);
+  background: rgba(8, 8, 8, 0.96);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.topNavBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.topNavMenu {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.topNavMenu::-webkit-scrollbar { display: none; }
+
+.topNavActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.topNavButtonContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.designButtonBase {
+  color: var(--text-muted);
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.designButtonPill:hover,
+.designButtonGhost:hover {
+  border-color: var(--border-gold);
+  color: var(--gold);
+  background: var(--gold-glow);
+}
+
+.designButtonPrimary {
+  border-color: var(--border-gold);
+  color: var(--gold);
+  background: var(--gold-glow);
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+.designButtonPrimary:hover {
+  background: var(--gold);
+  color: var(--bg);
+}
+
+.designButtonGhost {
+  border-radius: 10px;
+}
+
+.designButtonActive {
+  border-color: var(--border-gold);
+  color: var(--gold);
+  background: rgba(201, 162, 42, 0.12);
+}
+
+.designIconButton {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.designIconButton:hover {
+  border-color: var(--border-gold);
+  color: var(--gold);
+  background: var(--gold-glow);
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
@@ -363,6 +479,108 @@
   background: var(--gold-glow);
 }
 
+
+.designSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 26px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+}
+
+.designSectionHead {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.designEyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--gold);
+}
+
+.designTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.designSubtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.showcaseLayout {
+  display: grid;
+  grid-template-columns: minmax(300px, 1.8fr) minmax(0, 1fr);
+  gap: 14px;
+}
+
+.featuredHero {
+  position: relative;
+  min-height: 275px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  overflow: hidden;
+  background-color: var(--bg-elevated);
+  background-size: cover;
+  background-position: center;
+}
+
+.featuredHeroOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0,0,0,0.72), rgba(0,0,0,0.35));
+}
+
+.featuredHeroContent {
+  position: absolute;
+  inset: auto auto 0 0;
+  z-index: 1;
+  padding: 18px;
+  max-width: 70%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.featuredHeroCategory {
+  font-size: 11px;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-weight: 700;
+}
+
+.featuredHeroTitle {
+  font-size: 28px;
+  line-height: 1.1;
+  color: #fff;
+}
+
+.featuredHeroDescription {
+  font-size: 13px;
+  line-height: 1.4;
+  color: rgba(255,255,255,0.75);
+}
+
+.showcaseSideRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 12px;
+}
+
+.showcaseSideRow .netflixCard {
+  width: 100%;
+  min-width: 0;
+}
+
 /* ── Section header ──────────────────────────────────────────────────────── */
 
 .sectionHeader {
@@ -497,7 +715,6 @@
   transition:
     transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
     box-shadow 0.28s ease;
-  border: 1px solid var(--border);
 }
 
 
@@ -505,7 +722,6 @@
   transform: translateY(-10px);
   box-shadow:
     0 20px 48px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(201, 162, 42, 0.4),
     0 0 24px rgba(201, 162, 42, 0.08);
   z-index: 10;
 }
@@ -1288,3 +1504,41 @@
 }
 
 .classAddRow .modalInput { flex: 1; }
+
+
+@media (max-width: 980px) {
+  .showcaseLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .featuredHeroContent {
+    max-width: 100%;
+  }
+
+  .showcaseSideRow {
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  }
+}
+
+
+@media (max-width: 860px) {
+  .topNavWrap {
+    height: auto;
+    padding: 12px;
+    flex-wrap: wrap;
+  }
+
+  .topNavBrand {
+    order: 1;
+  }
+
+  .topNavActions {
+    order: 2;
+    margin-left: auto;
+  }
+
+  .topNavMenu {
+    order: 3;
+    width: 100%;
+  }
+}
