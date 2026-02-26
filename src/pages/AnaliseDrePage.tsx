@@ -129,7 +129,8 @@ export default function AnaliseDrePage() {
 
   const totais = useMemo(() =>
     lancamentos.reduce((acc, item) => {
-      const tipo = tipoMap[item.classificacao]
+      const tipo = item.tipo
+        ?? tipoMap[item.classificacao]
         ?? (item.classificacao === 'receita' ? 'receita' : 'despesa')
       if (tipo === 'receita') acc.receitas += Number(item.valor)
       else                   acc.despesas += Number(item.valor)
@@ -285,6 +286,7 @@ export default function AnaliseDrePage() {
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
+      tipo:          tipoClassificacao,
       classificacao: classificacaoNome,
       grupo:         grupoNome,
       user_id:       authData.user?.id ?? null,
@@ -294,8 +296,9 @@ export default function AnaliseDrePage() {
     closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
   }
 
-  const getPillClass = (classificacao: string) => {
-    const tipo = tipoMap[classificacao]
+  const getPillClass = (classificacao: string, tipoLancamento?: 'receita' | 'despesa') => {
+    const tipo = tipoLancamento
+      ?? tipoMap[classificacao]
       ?? (classificacao === 'receita' ? 'receita' : classificacao === 'despesa' ? 'despesa' : null)
     return tipo === 'receita' ? styles.receitaPill : styles.despesaPill
   }
@@ -338,7 +341,7 @@ export default function AnaliseDrePage() {
                   <td>{new Date(item.created_at).toLocaleDateString('pt-BR')}</td>
                   <td>{item.descricao ?? '—'}</td>
                   <td>
-                    <span className={`${styles.tablePill} ${getPillClass(item.classificacao)}`}>
+                    <span className={`${styles.tablePill} ${getPillClass(item.classificacao, item.tipo)}`}>
                       {item.classificacao}
                     </span>
                   </td>

@@ -101,6 +101,7 @@ export interface Database {
           user_id:       string | null
           descricao:     string | null
           valor:         number
+          tipo:          'receita' | 'despesa'
           classificacao: string
           grupo:         string
           created_at:    string
@@ -111,6 +112,7 @@ export interface Database {
           user_id?:       string | null
           descricao?:     string | null
           valor:          number
+          tipo:           'receita' | 'despesa'
           classificacao:  string
           grupo:          string
           created_at?:    string
@@ -121,6 +123,7 @@ export interface Database {
           user_id?:       string | null
           descricao?:     string | null
           valor?:         number
+          tipo?:          'receita' | 'despesa'
           classificacao?: string
           grupo?:         string
           updated_at?:    string
