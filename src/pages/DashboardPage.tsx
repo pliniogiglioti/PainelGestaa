@@ -485,7 +485,9 @@ function EditAppModal({
   onClose: () => void
   onUpdated: () => void
 }) {
-  const initialLinkType = app.link_type === 'interno' ? 'interno' : 'externo'
+  const initialLinkType: 'interno' | 'externo' =
+    app.link_type
+    ?? (app.internal_link ? 'interno' : 'externo')
   const initialLink = initialLinkType === 'interno'
     ? (app.internal_link ?? '')
     : (app.external_link ?? '')
