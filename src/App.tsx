@@ -4,6 +4,7 @@ import type { Session } from '@supabase/supabase-js'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
+import AnaliseDrePage from './pages/AnaliseDrePage'
 
 export interface User {
   name: string
@@ -23,6 +24,7 @@ function App() {
   const [user,       setUser]       = useState<User | null>(null)
   const [loading,    setLoading]    = useState(true)
   const [showRegister, setShowRegister] = useState(false)
+  const [pathname, setPathname] = useState(window.location.pathname)
 
   useEffect(() => {
     // 1. Restore session that's already persisted in localStorage
@@ -37,6 +39,12 @@ function App() {
     })
 
     return () => subscription.unsubscribe()
+  }, [])
+
+  useEffect(() => {
+    const onPopState = () => setPathname(window.location.pathname)
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
   }, [])
 
   const handleLogout = async () => {
@@ -63,6 +71,9 @@ function App() {
   }
 
   if (user) {
+    if (pathname === '/analise-dre') {
+      return <AnaliseDrePage />
+    }
     return <DashboardPage user={user} onLogout={handleLogout} />
   }
 

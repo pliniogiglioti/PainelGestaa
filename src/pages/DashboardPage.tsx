@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
+import { navigateTo } from '../lib/navigation'
 import type { App, AppCategory, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
 
@@ -263,6 +264,13 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
   const [hovered, setHovered] = useState(false)
 
+  const handleAccess = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (app.internal_link?.startsWith('/')) {
+      e.preventDefault()
+      navigateTo(app.internal_link)
+    }
+  }
+
   return (
     <div
       className={styles.netflixCard}
@@ -280,7 +288,7 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
         {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
         <div className={`${styles.netflixExpandable} ${hovered ? styles.netflixExpandableOpen : ''}`}>
           <div className={styles.netflixActions}>
-            <a href={app.internal_link ?? '#'} className={styles.netflixBtnPrimary}>Acessar</a>
+            <a href={app.internal_link ?? '#'} className={styles.netflixBtnPrimary} onClick={handleAccess}>Acessar</a>
             {app.external_link && (
               <a href={app.external_link} className={styles.netflixBtnIcon} target="_blank" rel="noreferrer" title="Abrir externamente">
                 <IconExternal />
@@ -324,7 +332,16 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const fetchApps = async () => {
     setLoadingApps(true)
     const { data } = await supabase.from('apps').select('*').order('name')
-    if (data) setApps(data)
+    if (data) {
+      const deduped = data.filter((item, index, arr) => {
+        const key = `${item.name}`.trim().toLowerCase() + '|' + `${item.internal_link ?? ''}`.trim().toLowerCase()
+        return arr.findIndex(other => {
+          const otherKey = `${other.name}`.trim().toLowerCase() + '|' + `${other.internal_link ?? ''}`.trim().toLowerCase()
+          return otherKey === key
+        }) === index
+      })
+      setApps(deduped)
+    }
     setLoadingApps(false)
   }
 
@@ -414,7 +431,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarLogo}>
-            <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
+            <img src="/favicon.png" width="24" height="24" alt="" className={styles.sidebarFavicon} />
             <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
           </div>
           <nav className={styles.sidebarNav}>
@@ -450,7 +467,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       {/* ── Sidebar ── */}
       <aside className={styles.sidebar}>
         <div className={styles.sidebarLogo}>
-          <img src="/favicon.png" width="30" height="30" alt="" className={styles.sidebarFavicon} />
+          <img src="/favicon.png" width="24" height="24" alt="" className={styles.sidebarFavicon} />
           <img src="/logo.png" height="26" alt="PainelGestaa" className={styles.sidebarLogoFull} />
         </div>
         <nav className={styles.sidebarNav}>

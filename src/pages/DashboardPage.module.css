@@ -110,10 +110,10 @@
 
 .sidebarLogo {
   position: relative;
-  height: 30px;
+  height: 24px;
   display: flex;
   align-items: center;
-  padding: 0 16px 28px;
+  padding: 0 16px 30px;
   flex-shrink: 0;
   margin-bottom: 8px;
 }
@@ -136,7 +136,7 @@
 .sidebarLogoFull {
   position: absolute;
   left: 16px;
-  top: 2px;
+  top: 0;
   opacity: 0;
   max-width: 160px;
   max-height: 26px;
