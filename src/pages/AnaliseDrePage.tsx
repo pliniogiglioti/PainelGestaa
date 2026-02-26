@@ -11,13 +11,9 @@ type FormState = {
   grupo: string
 }
 
-const INITIAL_FORM: FormState = {
-  valor: '',
-  classificacao: '',
-  grupo: '',
-}
+const INITIAL_FORM: FormState = { valor: '', classificacao: '', grupo: '' }
 
-const moeda = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 function StatCard({ title, value, tone = 'default' }: { title: string; value: string; tone?: 'default' | 'positive' | 'negative' }) {
   return (
@@ -28,15 +24,38 @@ function StatCard({ title, value, tone = 'default' }: { title: string; value: st
   )
 }
 
-function StepBadge({ index, isActive }: { index: Step; isActive: boolean }) {
-  return <span className={`${styles.badge} ${isActive ? styles.badgeActive : ''}`}>{index}</span>
+const STEP_LABELS: Record<Step, string> = { 1: 'Valor', 2: 'Classificação', 3: 'Grupo' }
+
+function StepProgress({ current }: { current: Step }) {
+  const steps: Step[] = [1, 2, 3]
+  return (
+    <div className={styles.stepProgress}>
+      {steps.map((s, i) => {
+        const done   = s < current
+        const active = s === current
+        return (
+          <div key={s} className={styles.stepProgressItem}>
+            <div className={`${styles.stepDot} ${active ? styles.stepDotActive : ''} ${done ? styles.stepDotDone : ''}`}>
+              {done ? '✓' : s}
+            </div>
+            <span className={`${styles.stepDotLabel} ${active ? styles.stepDotLabelActive : ''}`}>
+              {STEP_LABELS[s]}
+            </span>
+            {i < steps.length - 1 && (
+              <div className={`${styles.stepConnector} ${done ? styles.stepConnectorDone : ''}`} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 export default function AnaliseDrePage() {
-  const [step, setStep] = useState<Step>(1)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [form, setForm] = useState<FormState>(INITIAL_FORM)
+  const [step,        setStep]        = useState<Step>(1)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+  const [form,        setForm]        = useState<FormState>(INITIAL_FORM)
   const [lancamentos, setLancamentos] = useState<DreLancamento[]>([])
 
   const fetchLancamentos = async () => {
@@ -44,168 +63,168 @@ export default function AnaliseDrePage() {
       .from('dre_lancamentos')
       .select('*')
       .order('created_at', { ascending: false })
-
-    if (error) {
-      setError(error.message)
-      return
-    }
-
+    if (error) { setError(error.message); return }
     setLancamentos(data ?? [])
   }
 
-  useEffect(() => {
-    fetchLancamentos()
-  }, [])
+  useEffect(() => { fetchLancamentos() }, [])
 
   const valorNumerico = useMemo(() => {
     const parsed = Number(form.valor.replace(',', '.'))
-    return Number.isFinite(parsed) ? parsed : 0
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
   }, [form.valor])
 
-  const totais = useMemo(() => {
-    return lancamentos.reduce(
+  const totais = useMemo(() =>
+    lancamentos.reduce(
       (acc, item) => {
-        if (item.classificacao === 'receita') {
-          acc.receitas += Number(item.valor)
-        } else {
-          acc.despesas += Number(item.valor)
-        }
+        if (item.classificacao === 'receita') acc.receitas += Number(item.valor)
+        else                                  acc.despesas += Number(item.valor)
         return acc
       },
       { receitas: 0, despesas: 0 },
-    )
-  }, [lancamentos])
+    ),
+  [lancamentos])
 
   const resultado = totais.receitas - totais.despesas
 
-  const atualizarValor = (valor: string) => {
-    setForm(prev => ({ ...prev, valor }))
-    const parsed = Number(valor.replace(',', '.'))
-    if (Number.isFinite(parsed) && parsed > 0) {
-      setStep(2)
-    }
-  }
+  const resetForm = () => { setForm(INITIAL_FORM); setStep(1); setError('') }
 
-  const atualizarClassificacao = (classificacao: 'receita' | 'despesa') => {
-    setForm(prev => ({ ...prev, classificacao }))
-    setStep(3)
-  }
-
-  const atualizarGrupo = (grupo: string) => {
-    setForm(prev => ({ ...prev, grupo }))
-  }
-
-  const limparForm = () => {
-    setForm(INITIAL_FORM)
-    setStep(1)
-  }
-
-  const adicionarLancamento = async () => {
+  const salvar = async () => {
     setError('')
-
     if (valorNumerico <= 0 || !form.classificacao || !form.grupo.trim()) {
-      setError('Preencha valor, classificação e grupo para continuar.')
+      setError('Preencha todos os campos.')
       return
     }
-
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
-
     const { error } = await supabase.from('dre_lancamentos').insert({
-      valor: valorNumerico,
-      classificacao: form.classificacao,
-      grupo: form.grupo.trim(),
-      user_id: authData.user?.id ?? null,
+      valor:          valorNumerico,
+      classificacao:  form.classificacao,
+      grupo:          form.grupo.trim(),
+      user_id:        authData.user?.id ?? null,
     })
-
     setSaving(false)
-
-    if (error) {
-      setError(error.message)
-      return
-    }
-
-    limparForm()
+    if (error) { setError(error.message); return }
+    resetForm()
     fetchLancamentos()
   }
 
   return (
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
+
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Financeiro • Aplicativo interno</p>
           <h1>Análise DRE</h1>
-          <p className={styles.subtitle}>Lance receitas e despesas com visual guiado e acompanhe o resultado em tempo real.</p>
+          <p className={styles.subtitle}>Lance receitas e despesas e acompanhe o resultado em tempo real.</p>
         </div>
-        <a href="/" className={styles.backLink}>Voltar ao dashboard</a>
+        <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
       </header>
 
       <section className={styles.statsGrid}>
-        <StatCard title="Receitas" value={moeda(totais.receitas)} tone="positive" />
-        <StatCard title="Despesas" value={moeda(totais.despesas)} tone="negative" />
-        <StatCard title="Resultado" value={moeda(resultado)} tone={resultado >= 0 ? 'positive' : 'negative'} />
+        <StatCard title="Receitas"  value={moeda(totais.receitas)} tone="positive" />
+        <StatCard title="Despesas"  value={moeda(totais.despesas)} tone="negative" />
+        <StatCard title="Resultado" value={moeda(resultado)}       tone={resultado >= 0 ? 'positive' : 'negative'} />
       </section>
 
       <div className={styles.layout}>
+
+        {/* ── Painel de lançamento ── */}
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2>Novo lançamento</h2>
             <span className={styles.stepIndicator}>Etapa {step} de 3</span>
           </div>
 
-          <div className={styles.step}>
-            <StepBadge index={1} isActive={step === 1} />
-            <div className={styles.inputWrap}>
-              <label>Valor</label>
+          <StepProgress current={step} />
+
+          {/* STEP 1 — Valor */}
+          {step === 1 && (
+            <div className={styles.wizardStep}>
+              <label className={styles.wizardLabel}>Qual é o valor?</label>
               <input
+                className={styles.wizardInput}
                 value={form.valor}
-                onChange={e => atualizarValor(e.target.value)}
-                placeholder="Ex: 1250,00"
+                onChange={e => setForm(p => ({ ...p, valor: e.target.value }))}
+                placeholder="Ex: 1.250,00"
                 inputMode="decimal"
+                autoFocus
               />
+              <button
+                className={styles.submit}
+                disabled={valorNumerico <= 0}
+                onClick={() => setStep(2)}
+              >
+                Próximo →
+              </button>
             </div>
-          </div>
+          )}
 
-          <div className={styles.step}>
-            <StepBadge index={2} isActive={step === 2} />
-            <div className={styles.inputWrap}>
-              <label>Classificação</label>
-              <div className={styles.actions}>
-                <button type="button" onClick={() => atualizarClassificacao('receita')} className={form.classificacao === 'receita' ? styles.activeButton : ''}>Receita</button>
-                <button type="button" onClick={() => atualizarClassificacao('despesa')} className={form.classificacao === 'despesa' ? styles.activeButton : ''}>Despesa</button>
+          {/* STEP 2 — Classificação */}
+          {step === 2 && (
+            <div className={styles.wizardStep}>
+              <label className={styles.wizardLabel}>Como classificar?</label>
+              <div className={styles.classifyGrid}>
+                <button
+                  className={`${styles.classifyBtn} ${styles.classifyReceita}`}
+                  onClick={() => { setForm(p => ({ ...p, classificacao: 'receita' })); setStep(3) }}
+                >
+                  <span className={styles.classifyArrow}>↑</span>
+                  Receita
+                </button>
+                <button
+                  className={`${styles.classifyBtn} ${styles.classifyDespesa}`}
+                  onClick={() => { setForm(p => ({ ...p, classificacao: 'despesa' })); setStep(3) }}
+                >
+                  <span className={styles.classifyArrow}>↓</span>
+                  Despesa
+                </button>
               </div>
+              <button className={styles.backBtn} onClick={() => setStep(1)}>← Voltar</button>
             </div>
-          </div>
+          )}
 
-          <div className={styles.step}>
-            <StepBadge index={3} isActive={step === 3} />
-            <div className={styles.inputWrap}>
-              <label>Grupo</label>
+          {/* STEP 3 — Grupo */}
+          {step === 3 && (
+            <div className={styles.wizardStep}>
+              <label className={styles.wizardLabel}>Qual é o grupo?</label>
               <input
+                className={styles.wizardInput}
                 value={form.grupo}
-                onChange={e => atualizarGrupo(e.target.value)}
+                onChange={e => setForm(p => ({ ...p, grupo: e.target.value }))}
                 placeholder="Ex: Vendas, Custos, Impostos..."
+                autoFocus
               />
+
+              <div className={styles.summary}>
+                <div className={styles.summaryRow}>
+                  <span>Valor</span>
+                  <strong>{moeda(valorNumerico)}</strong>
+                </div>
+                <div className={styles.summaryRow}>
+                  <span>Classificação</span>
+                  <strong className={form.classificacao === 'receita' ? styles.receitaText : styles.despesaText}>
+                    {form.classificacao}
+                  </strong>
+                </div>
+              </div>
+
+              {error && <p className={styles.error}>{error}</p>}
+
+              <button
+                className={styles.submit}
+                disabled={saving || !form.grupo.trim()}
+                onClick={salvar}
+              >
+                {saving ? 'Salvando…' : 'Salvar lançamento'}
+              </button>
+              <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
             </div>
-          </div>
-
-          <div className={styles.preview}>
-            <h3>Prévia do lançamento</h3>
-            <div className={styles.previewRows}>
-              <p><span>Valor</span><strong>{moeda(valorNumerico)}</strong></p>
-              <p><span>Classificação</span><strong>{form.classificacao || '-'}</strong></p>
-              <p><span>Grupo</span><strong>{form.grupo || '-'}</strong></p>
-            </div>
-          </div>
-
-          {error && <p className={styles.error}>{error}</p>}
-
-          <button type="button" onClick={adicionarLancamento} disabled={saving} className={styles.submit}>
-            {saving ? 'Salvando...' : 'Adicionar lançamento'}
-          </button>
+          )}
         </section>
 
+        {/* ── Tabela de lançamentos ── */}
         <section className={styles.panel}>
           <div className={styles.panelHeader}>
             <h2>Lançamentos recentes</h2>
@@ -244,6 +263,7 @@ export default function AnaliseDrePage() {
             </table>
           </div>
         </section>
+
       </div>
     </div>
   )
