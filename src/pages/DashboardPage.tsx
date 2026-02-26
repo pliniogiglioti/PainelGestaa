@@ -256,12 +256,12 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 // ── Netflix App Card ──────────────────────────────────────────────────────
 
-function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
+function AppCard({ app, categoryLabel, index, isList = false }: { app: App; categoryLabel: string; index: number; isList?: boolean }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
-      className={styles.netflixCard}
+      className={`${styles.netflixCard} ${isList ? styles.netflixCardList : ""}`}
       style={{
         backgroundImage: app.background_image ? `url(${app.background_image})` : undefined,
         animationDelay: `${index * 60}ms`,
@@ -270,7 +270,7 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
       onMouseLeave={() => setHovered(false)}
     >
       <div className={`${styles.netflixOverlay} ${hovered ? styles.netflixOverlayHovered : ''}`} />
-      <div className={styles.netflixCardContent}>
+      <div className={`${styles.netflixCardContent} ${isList ? styles.netflixCardContentList : ""}`}>
         <span className={styles.netflixCategory}>{categoryLabel}</span>
         <h3 className={styles.netflixTitle}>{app.name}</h3>
         {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
@@ -469,7 +469,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
             {/* Categories */}
             <div className={styles.categoriesBar}>
-              <div className={`${styles.categoriesScroll} ${styles.categoriesList}`}>
+              <div className={styles.categoriesScroll}>
                 {allCategories.map(cat => (
                   <button key={cat.slug}
                     className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
@@ -508,9 +508,9 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </div>
             ) : (
               // ✅ AQUI: troca de netflixRow (carrossel) para netflixGrid (várias linhas)
-              <div className={styles.netflixGrid}>
+              <div className={styles.appsLineList}>
                 {filteredApps.map((app, i) => (
-                  <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                  <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} isList />
                 ))}
               </div>
             )}
