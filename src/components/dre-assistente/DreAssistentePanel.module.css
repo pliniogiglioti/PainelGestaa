@@ -43,16 +43,6 @@
   gap: .65rem;
   flex-wrap: wrap;
 }
-
-.statusChip {
-  font-size: .8rem;
-  border-radius: 999px;
-  border: 1px solid rgba(213, 175, 69, .45);
-  color: #f0d583;
-  background: rgba(213, 175, 69, .13);
-  padding: .28rem .72rem;
-}
-
 .button:disabled {
   opacity: .65;
   cursor: not-allowed;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { DreLancamento } from '../../lib/types'
 import styles from './DreAssistentePanel.module.css'
 
@@ -45,7 +45,7 @@ function renderMarkdownSafe(markdown: string) {
       return
     }
 
-    const linkMatch = line.match(/^-\s+\*\*(.+?)\*\*\s+—\s+(\S+)/)
+    const linkMatch = line.match(/^\-\s+\*\*(.+?)\*\*\s+—\s+(\S+)/)
     if (linkMatch) {
       const [, title, url] = linkMatch
       const href = safeUrl(url)
@@ -88,26 +88,28 @@ const calcResumo = (lancamentos: DreLancamento[]) =>
     return acc
   }, { receitas: 0, despesas: 0 })
 
+const parseApiResponse = async (res: Response): Promise<ApiResponse> => {
+  const raw = await res.text()
+  if (!raw.trim()) return {}
+
+  try {
+    return JSON.parse(raw) as ApiResponse
+  } catch {
+    return { error: raw.slice(0, 240) }
+  }
+}
+
 export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [response, setResponse] = useState('')
-  const [isAutoAnalyzed, setIsAutoAnalyzed] = useState(false)
-  const lastAutoKeyRef = useRef('')
 
   const renderedResponse = useMemo(() => renderMarkdownSafe(response), [response])
   const resumo = useMemo(() => calcResumo(lancamentos), [lancamentos])
 
-  const analiseKey = useMemo(
-    () => `${lancamentos.length}-${lancamentos.map(item => `${item.id}:${item.updated_at ?? item.created_at}`).join('|')}`,
-    [lancamentos],
-  )
-
-  const analisarDre = async (trigger: 'manual' | 'auto' = 'manual') => {
+  const analisarDre = async () => {
     setError('')
-    if (trigger === 'manual') {
-      setResponse('')
-    }
+    setResponse('')
 
     if (lancamentos.length === 0) {
       setError('Adicione lançamentos no modal "Novo lançamento" antes de solicitar a análise.')
@@ -130,14 +132,13 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
         }),
       })
 
-      const data = (await res.json()) as ApiResponse
+      const data = await parseApiResponse(res)
 
       if (!res.ok || !data.analysis) {
         throw new Error(data.error || 'Falha ao analisar o DRE.')
       }
 
       setResponse(data.analysis)
-      setIsAutoAnalyzed(trigger === 'auto')
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Erro inesperado ao analisar o DRE.'
       setError(message)
@@ -146,21 +147,13 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
     }
   }
 
-  useEffect(() => {
-    if (!lancamentos.length || loading) return
-    if (lastAutoKeyRef.current === analiseKey) return
-
-    lastAutoKeyRef.current = analiseKey
-    analisarDre('auto')
-  }, [analiseKey, lancamentos.length, loading])
-
   return (
     <section className={styles.panel}>
       <div className={styles.header}>
         <h2>Assistente de DRE (IA)</h2>
         <p>
-          Esta análise usa automaticamente os lançamentos já salvos nesta página
-          (criadas pelo modal <strong>“Novo lançamento”</strong>).
+          Clique no botão para analisar os lançamentos já salvos nesta página
+          (criados pelo modal <strong>“Novo lançamento”</strong>).
         </p>
         <p>
           <strong>{lancamentos.length}</strong> lançamentos carregados para análise.
@@ -168,14 +161,9 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       </div>
 
       <div className={styles.actionsRow}>
-        <button className={styles.button} onClick={() => analisarDre('manual')} disabled={loading}>
-          {loading ? 'Analisando...' : 'Atualizar análise'}
+        <button className={styles.button} onClick={analisarDre} disabled={loading}>
+          {loading ? 'Analisando...' : 'Analisar lançamentos'}
         </button>
-        {response && (
-          <span className={styles.statusChip}>
-            {isAutoAnalyzed ? 'Análise automática ativa' : 'Análise atualizada manualmente'}
-          </span>
-        )}
       </div>
 
       {error && <p className={styles.error}>{error}</p>}
