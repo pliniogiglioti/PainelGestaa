@@ -517,6 +517,133 @@ th { color: #8f8f8f; font-weight: 500; }
   opacity: 0.8;
 }
 
+/* ── Tipo Buttons (Step 3) ── */
+
+.tipoGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tipoBtn {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #2e2e2e;
+  background: #0e0e0e;
+  color: #b0b0b0;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  width: 100%;
+}
+
+.tipoBtn:hover { border-color: #444; color: #f2f2f2; }
+
+.tipoBtnReceita:hover {
+  border-color: rgba(52, 199, 89, 0.5);
+  background: rgba(52, 199, 89, 0.07);
+}
+
+.tipoBtnDespesa:hover {
+  border-color: rgba(255, 69, 58, 0.5);
+  background: rgba(255, 69, 58, 0.07);
+}
+
+.tipoBtnSelected {
+  outline: 2px solid #c9a22a;
+  outline-offset: 2px;
+}
+
+.tipoBtnText {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+}
+
+.tipoBtnText strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f2f2f2;
+}
+
+.tipoBtnText small {
+  font-size: 12px;
+  color: #707070;
+}
+
+.tipoArrow {
+  font-size: 26px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.tipoAiBadge {
+  flex-shrink: 0;
+  background: rgba(201, 162, 42, 0.15);
+  border: 1px solid rgba(201, 162, 42, 0.4);
+  color: #e8c84e;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 20px;
+}
+
+/* ── Listbox (Step 4) ── */
+
+.listbox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.listbox::-webkit-scrollbar { width: 4px; }
+.listbox::-webkit-scrollbar-track { background: transparent; }
+.listbox::-webkit-scrollbar-thumb { background: #2e2e2e; border-radius: 2px; }
+
+.listboxItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #c0c0c0;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.listboxItem:hover {
+  background: rgba(255,255,255,0.04);
+  border-color: #2e2e2e;
+  color: #f2f2f2;
+}
+
+.listboxItemSelected {
+  background: rgba(201, 162, 42, 0.1);
+  border-color: rgba(201, 162, 42, 0.4);
+  color: #f2f2f2;
+  font-weight: 700;
+}
+
+.listboxRadio {
+  font-size: 14px;
+  color: #c9a22a;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 /* ── AI Error Box ── */
 
 .aiErrorBox {
