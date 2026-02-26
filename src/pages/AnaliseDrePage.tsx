@@ -137,6 +137,12 @@ export default function AnaliseDrePage() {
     form.tipo ? classificacoes.filter(c => c.tipo === form.tipo) : classificacoes,
   [classificacoes, form.tipo])
 
+  const classificacaoEhNova = useMemo(() => {
+    const nome = form.classificacaoNome.trim().toLowerCase()
+    if (!nome) return false
+    return !classificacoes.some(c => c.nome.trim().toLowerCase() === nome)
+  }, [classificacoes, form.classificacaoNome])
+
   const openWizard = () => {
     setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setShowWizard(true)
   }
@@ -199,8 +205,20 @@ export default function AnaliseDrePage() {
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
 
+    const classificacaoNome = form.classificacaoNome.trim()
     const grupoNome = form.grupo.trim()
+    const tipoClassificacao = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const tipoGrupo = form.tipo || (tipoMap[form.classificacaoNome] === 'receita' ? 'receita' : 'despesa')
+
+    const { error: classError } = await supabase
+      .from('dre_classificacoes')
+      .upsert({ nome: classificacaoNome, tipo: tipoClassificacao, ativo: true }, { onConflict: 'nome' })
+
+    if (classError) {
+      setSaving(false)
+      setError(`Não foi possível cadastrar a classificação: ${classError.message}`)
+      return
+    }
 
     const { error: grupoError } = await supabase
       .from('dre_grupos')
@@ -215,13 +233,13 @@ export default function AnaliseDrePage() {
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
-      classificacao: form.classificacaoNome,
+      classificacao: classificacaoNome,
       grupo:         grupoNome,
       user_id:       authData.user?.id ?? null,
     })
     setSaving(false)
     if (error) { setError(error.message); return }
-    closeWizard(); fetchLancamentos(); fetchGrupos()
+    closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
   }
 
   const getPillClass = (classificacao: string) => {
@@ -396,6 +414,9 @@ export default function AnaliseDrePage() {
                       <div className={styles.aiSelectedBox}>
                         <span className={styles.aiSelectedLabel}>IA identificou</span>
                         <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>
+                        {classificacaoEhNova && (
+                          <span className={styles.aiSelectedLabel}>Será cadastrada como nova classificação ao salvar.</span>
+                        )}
                       </div>
                     )}
 
