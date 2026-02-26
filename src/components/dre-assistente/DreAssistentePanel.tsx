@@ -45,7 +45,7 @@ function renderMarkdownSafe(markdown: string) {
       return
     }
 
-    const linkMatch = line.match(/^-\s+\*\*(.+?)\*\*\s+—\s+(\S+)/)
+    const linkMatch = line.match(/^\-\s+\*\*(.+?)\*\*\s+—\s+(\S+)/)
     if (linkMatch) {
       const [, title, url] = linkMatch
       const href = safeUrl(url)
@@ -88,6 +88,17 @@ const calcResumo = (lancamentos: DreLancamento[]) =>
     return acc
   }, { receitas: 0, despesas: 0 })
 
+const parseApiResponse = async (res: Response): Promise<ApiResponse> => {
+  const raw = await res.text()
+  if (!raw.trim()) return {}
+
+  try {
+    return JSON.parse(raw) as ApiResponse
+  } catch {
+    return { error: raw.slice(0, 240) }
+  }
+}
+
 export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -121,7 +132,7 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
         }),
       })
 
-      const data = (await res.json()) as ApiResponse
+      const data = await parseApiResponse(res)
 
       if (!res.ok || !data.analysis) {
         throw new Error(data.error || 'Falha ao analisar o DRE.')
@@ -141,17 +152,19 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       <div className={styles.header}>
         <h2>Assistente de DRE (IA)</h2>
         <p>
-          Esta análise usa automaticamente os lançamentos já salvos nesta página
-          (criadas pelo modal <strong>“Novo lançamento”</strong>).
+          Clique no botão para analisar os lançamentos já salvos nesta página
+          (criados pelo modal <strong>“Novo lançamento”</strong>).
         </p>
         <p>
           <strong>{lancamentos.length}</strong> lançamentos carregados para análise.
         </p>
       </div>
 
-      <button className={styles.button} onClick={analisarDre} disabled={loading}>
-        {loading ? 'Analisando...' : 'Analisar lançamentos já cadastrados'}
-      </button>
+      <div className={styles.actionsRow}>
+        <button className={styles.button} onClick={analisarDre} disabled={loading}>
+          {loading ? 'Analisando...' : 'Analisar lançamentos'}
+        </button>
+      </div>
 
       {error && <p className={styles.error}>{error}</p>}
 
