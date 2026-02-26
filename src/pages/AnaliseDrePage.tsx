@@ -150,6 +150,30 @@ export default function AnaliseDrePage() {
     setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError('')
   }
 
+  const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
+    const grupoNome = grupoNomeRaw.trim()
+    if (!grupoNome) return { ok: false as const, error: 'Grupo vazio.' }
+
+    const tipoGrupo: 'receita' | 'despesa' = tipoRaw === 'receita' ? 'receita' : 'despesa'
+
+    const { error } = await supabase
+      .from('dre_grupos')
+      .upsert({ nome: grupoNome, tipo: tipoGrupo, ativo: true }, { onConflict: 'nome,tipo' })
+
+    if (!error) return { ok: true as const }
+
+    // Fallback defensivo para ambientes em que o upsert conflita com schema legado.
+    const { error: insertError } = await supabase
+      .from('dre_grupos')
+      .insert({ nome: grupoNome, tipo: tipoGrupo, ativo: true })
+
+    if (insertError && !String(insertError.message).toLowerCase().includes('duplicate')) {
+      return { ok: false as const, error: insertError.message }
+    }
+
+    return { ok: true as const }
+  }
+
   // After step 3 (valor): AI identifies classificacao + grupo (tipo already chosen in step 1)
   const goToStep4 = async () => {
     if (valorNumerico <= 0) return
@@ -183,11 +207,21 @@ export default function AnaliseDrePage() {
       } else if (data?.error) {
         setAiError(`IA indisponível: ${data.error}`)
       } else if (data) {
+        const grupoIa = String(data.grupo ?? '').trim()
         setForm(p => ({
           ...p,
           classificacaoNome: data.classificacao_nome ?? '',
-          grupo:             data.grupo              ?? '',
+          grupo:             grupoIa,
         }))
+
+        if (grupoIa) {
+          const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
+          if (!resGrupo.ok) {
+            setAiError(`Grupo sugerido, mas falha ao cadastrar no catálogo: ${resGrupo.error}`)
+          } else {
+            fetchGrupos()
+          }
+        }
       }
     } catch (e) {
       setAiError(`Erro inesperado: ${String(e)}`)
@@ -208,7 +242,6 @@ export default function AnaliseDrePage() {
     const classificacaoNome = form.classificacaoNome.trim()
     const grupoNome = form.grupo.trim()
     const tipoClassificacao = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
-    const tipoGrupo = form.tipo || (tipoMap[form.classificacaoNome] === 'receita' ? 'receita' : 'despesa')
 
     const { error: classError } = await supabase
       .from('dre_classificacoes')
@@ -220,13 +253,10 @@ export default function AnaliseDrePage() {
       return
     }
 
-    const { error: grupoError } = await supabase
-      .from('dre_grupos')
-      .upsert({ nome: grupoNome, tipo: tipoGrupo }, { onConflict: 'nome,tipo' })
-
-    if (grupoError) {
+    const resGrupo = await ensureGrupoCatalogado(grupoNome, form.tipo)
+    if (!resGrupo.ok) {
       setSaving(false)
-      setError(`Não foi possível cadastrar o grupo: ${grupoError.message}`)
+      setError(`Não foi possível cadastrar o grupo: ${resGrupo.error}`)
       return
     }
 
