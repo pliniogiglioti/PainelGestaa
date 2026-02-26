@@ -127,6 +127,46 @@ export interface Database {
         }
         Relationships: []
       }
+      dre_classificacoes: {
+        Row: {
+          id:         string
+          nome:       string
+          tipo:       'receita' | 'despesa'
+          ativo:      boolean
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          nome:        string
+          tipo:        'receita' | 'despesa'
+          ativo?:      boolean
+          created_at?: string
+        }
+        Update: {
+          id?:    string
+          nome?:  string
+          tipo?:  'receita' | 'despesa'
+          ativo?: boolean
+        }
+        Relationships: []
+      }
+      configuracoes: {
+        Row: {
+          chave:      string
+          valor:      string
+          updated_at: string
+        }
+        Insert: {
+          chave:       string
+          valor:       string
+          updated_at?: string
+        }
+        Update: {
+          valor?:      string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       forum_categories: {
         Row: {
           id:         string
@@ -225,13 +265,15 @@ export interface Database {
 
 // ── Convenience aliases ───────────────────────────────────────────────────
 
-export type Profile       = Database['public']['Tables']['profiles']['Row']
-export type AppCategory   = Database['public']['Tables']['app_categories']['Row']
-export type App           = Database['public']['Tables']['apps']['Row']
-export type DreLancamento = Database['public']['Tables']['dre_lancamentos']['Row']
-export type ForumCategory = Database['public']['Tables']['forum_categories']['Row']
-export type ForumTopic    = Database['public']['Tables']['forum_topics']['Row']
-export type ForumReply    = Database['public']['Tables']['forum_replies']['Row']
+export type Profile            = Database['public']['Tables']['profiles']['Row']
+export type AppCategory        = Database['public']['Tables']['app_categories']['Row']
+export type App                = Database['public']['Tables']['apps']['Row']
+export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
+export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
+export type Configuracao       = Database['public']['Tables']['configuracoes']['Row']
+export type ForumCategory      = Database['public']['Tables']['forum_categories']['Row']
+export type ForumTopic         = Database['public']['Tables']['forum_topics']['Row']
+export type ForumReply         = Database['public']['Tables']['forum_replies']['Row']
 
 // ── Extended types with joined data ──────────────────────────────────────
 

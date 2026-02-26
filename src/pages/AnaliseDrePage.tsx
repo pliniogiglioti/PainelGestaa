@@ -1,23 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreLancamento } from '../lib/types'
+import type { DreClassificacao, DreLancamento } from '../lib/types'
 
-type Step = 1 | 2 | 3 | 4
+type Step = 1 | 2 | 3
 
 type FormState = {
-  descricao: string
-  valor: string
-  classificacao: '' | 'receita' | 'despesa'
-  grupo: string
+  descricao:        string
+  valor:            string
+  classificacaoNome: string  // nome from dre_classificacoes
 }
 
-type AiSuggestion = {
-  classificacao: 'receita' | 'despesa'
-  grupo: string
-}
-
-const INITIAL_FORM: FormState = { descricao: '', valor: '', classificacao: '', grupo: '' }
+const INITIAL_FORM: FormState = { descricao: '', valor: '', classificacaoNome: '' }
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -30,10 +24,10 @@ function StatCard({ title, value, tone = 'default' }: { title: string; value: st
   )
 }
 
-const STEP_LABELS: Record<Step, string> = { 1: 'Descrição', 2: 'Valor', 3: 'Classificação', 4: 'Grupo' }
+const STEP_LABELS: Record<Step, string> = { 1: 'Descrição', 2: 'Valor', 3: 'Classificação' }
 
 function StepProgress({ current }: { current: Step }) {
-  const steps: Step[] = [1, 2, 3, 4]
+  const steps: Step[] = [1, 2, 3]
   return (
     <div className={styles.stepProgress}>
       {steps.map((s, i) => {
@@ -67,14 +61,15 @@ function AiSpinner() {
 }
 
 export default function AnaliseDrePage() {
-  const [showWizard,  setShowWizard]  = useState(false)
-  const [step,        setStep]        = useState<Step>(1)
-  const [saving,      setSaving]      = useState(false)
-  const [aiLoading,   setAiLoading]   = useState(false)
-  const [error,       setError]       = useState('')
-  const [form,        setForm]        = useState<FormState>(INITIAL_FORM)
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null)
-  const [lancamentos, setLancamentos] = useState<DreLancamento[]>([])
+  const [showWizard,       setShowWizard]       = useState(false)
+  const [step,             setStep]             = useState<Step>(1)
+  const [saving,           setSaving]           = useState(false)
+  const [aiLoading,        setAiLoading]        = useState(false)
+  const [error,            setError]            = useState('')
+  const [form,             setForm]             = useState<FormState>(INITIAL_FORM)
+  const [aiSuggestionNome, setAiSuggestionNome] = useState<string | null>(null)
+  const [lancamentos,      setLancamentos]      = useState<DreLancamento[]>([])
+  const [classificacoes,   setClassificacoes]   = useState<DreClassificacao[]>([])
 
   const fetchLancamentos = async () => {
     const { data, error } = await supabase
@@ -85,7 +80,20 @@ export default function AnaliseDrePage() {
     setLancamentos(data ?? [])
   }
 
-  useEffect(() => { fetchLancamentos() }, [])
+  const fetchClassificacoes = async () => {
+    const { data } = await supabase
+      .from('dre_classificacoes')
+      .select('*')
+      .eq('ativo', true)
+      .order('tipo')
+      .order('nome')
+    setClassificacoes(data ?? [])
+  }
+
+  useEffect(() => {
+    fetchLancamentos()
+    fetchClassificacoes()
+  }, [])
 
   const valorNumerico = useMemo(() => {
     const parsed = Number(form.valor.replace(',', '.'))
@@ -109,7 +117,7 @@ export default function AnaliseDrePage() {
     setForm(INITIAL_FORM)
     setStep(1)
     setError('')
-    setAiSuggestion(null)
+    setAiSuggestionNome(null)
     setShowWizard(true)
   }
 
@@ -118,56 +126,65 @@ export default function AnaliseDrePage() {
     setForm(INITIAL_FORM)
     setStep(1)
     setError('')
-    setAiSuggestion(null)
+    setAiSuggestionNome(null)
   }
 
-  // Call GroqCloud edge function after step 2
-  const callAiClassify = async () => {
+  // Fetch configured model + call edge function after step 2
+  const goToStep3 = async () => {
+    if (valorNumerico <= 0) return
+    setStep(3)
     setAiLoading(true)
-    setAiSuggestion(null)
+    setAiSuggestionNome(null)
+
     try {
-      const gruposExistentes = [...new Set(lancamentos.map(l => l.grupo).filter(Boolean))]
+      const { data: configData } = await supabase
+        .from('configuracoes')
+        .select('valor')
+        .eq('chave', 'modelo_groq')
+        .single()
+
+      const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
+
       const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
         body: {
           descricao: form.descricao,
           valor: valorNumerico,
-          grupos_existentes: gruposExistentes,
+          modelo,
+          classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
         },
       })
-      if (!error && data) {
-        setAiSuggestion(data as AiSuggestion)
-        setForm(p => ({
-          ...p,
-          classificacao: data.classificacao ?? '',
-          grupo: data.grupo ?? '',
-        }))
+
+      if (!error && data?.nome) {
+        setAiSuggestionNome(data.nome)
+        setForm(p => ({ ...p, classificacaoNome: data.nome }))
       }
     } catch {
-      // AI failed silently — user can fill manually
+      // AI failed silently — user selects manually
     } finally {
       setAiLoading(false)
     }
   }
 
-  const goToStep3 = async () => {
-    if (valorNumerico <= 0) return
-    setStep(3)
-    await callAiClassify()
-  }
-
   const salvar = async () => {
     setError('')
-    if (valorNumerico <= 0 || !form.classificacao || !form.grupo.trim()) {
-      setError('Preencha todos os campos.')
+    if (valorNumerico <= 0 || !form.classificacaoNome) {
+      setError('Selecione uma classificação.')
       return
     }
+
+    const classificacaoSelecionada = classificacoes.find(c => c.nome === form.classificacaoNome)
+    if (!classificacaoSelecionada) {
+      setError('Classificação inválida.')
+      return
+    }
+
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
-      classificacao: form.classificacao,
-      grupo:         form.grupo.trim(),
+      classificacao: classificacaoSelecionada.tipo,
+      grupo:         classificacaoSelecionada.nome,
       user_id:       authData.user?.id ?? null,
     })
     setSaving(false)
@@ -175,6 +192,9 @@ export default function AnaliseDrePage() {
     closeWizard()
     fetchLancamentos()
   }
+
+  const receitas = classificacoes.filter(c => c.tipo === 'receita')
+  const despesas = classificacoes.filter(c => c.tipo === 'despesa')
 
   return (
     <div className={styles.page}>
@@ -214,7 +234,6 @@ export default function AnaliseDrePage() {
                 <th>Data</th>
                 <th>Descrição</th>
                 <th>Classificação</th>
-                <th>Grupo</th>
                 <th>Valor</th>
               </tr>
             </thead>
@@ -225,16 +244,15 @@ export default function AnaliseDrePage() {
                   <td>{item.descricao ?? '—'}</td>
                   <td>
                     <span className={`${styles.tablePill} ${item.classificacao === 'receita' ? styles.receitaPill : styles.despesaPill}`}>
-                      {item.classificacao}
+                      {item.grupo || item.classificacao}
                     </span>
                   </td>
-                  <td>{item.grupo}</td>
                   <td>{moeda(Number(item.valor))}</td>
                 </tr>
               ))}
               {lancamentos.length === 0 && (
                 <tr>
-                  <td colSpan={5} className={styles.empty}>
+                  <td colSpan={4} className={styles.empty}>
                     Nenhum lançamento ainda.{' '}
                     <button className={styles.emptyAction} onClick={openWizard}>Adicionar agora</button>
                   </td>
@@ -301,88 +319,87 @@ export default function AnaliseDrePage() {
               </div>
             )}
 
-            {/* STEP 3 — Classificação (IA sugere) */}
+            {/* STEP 3 — Classificação (IA pré-seleciona) */}
             {step === 3 && (
               <div className={styles.wizardStep}>
-                <label className={styles.wizardLabel}>Como classificar?</label>
+                <label className={styles.wizardLabel}>Selecione a classificação</label>
 
                 {aiLoading ? (
                   <AiSpinner />
                 ) : (
                   <>
-                    {aiSuggestion && (
+                    {aiSuggestionNome && (
                       <div className={styles.aiSuggestionBadge}>
-                        IA sugeriu: <strong>{aiSuggestion.classificacao}</strong>
+                        IA sugeriu: <strong>{aiSuggestionNome}</strong>
                       </div>
                     )}
-                    <div className={styles.classifyGrid}>
-                      <button
-                        className={`${styles.classifyBtn} ${styles.classifyReceita} ${form.classificacao === 'receita' ? styles.classifySelected : ''}`}
-                        onClick={() => { setForm(p => ({ ...p, classificacao: 'receita' })); setStep(4) }}
-                      >
-                        <span className={styles.classifyArrow}>↑</span>
-                        Receita
-                      </button>
-                      <button
-                        className={`${styles.classifyBtn} ${styles.classifyDespesa} ${form.classificacao === 'despesa' ? styles.classifySelected : ''}`}
-                        onClick={() => { setForm(p => ({ ...p, classificacao: 'despesa' })); setStep(4) }}
-                      >
-                        <span className={styles.classifyArrow}>↓</span>
-                        Despesa
-                      </button>
-                    </div>
+
+                    {classificacoes.length === 0 ? (
+                      <p className={styles.error}>
+                        Nenhuma classificação cadastrada. Acesse Configurações Admin para adicionar.
+                      </p>
+                    ) : (
+                      <div className={styles.classGrid}>
+                        {receitas.length > 0 && (
+                          <div className={styles.classGroup}>
+                            <span className={styles.classGroupLabel}>Receitas</span>
+                            {receitas.map(c => (
+                              <button
+                                key={c.id}
+                                className={`${styles.classChip} ${styles.classChipReceita} ${form.classificacaoNome === c.nome ? styles.classChipSelected : ''}`}
+                                onClick={() => setForm(p => ({ ...p, classificacaoNome: c.nome }))}
+                              >
+                                {c.nome}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {despesas.length > 0 && (
+                          <div className={styles.classGroup}>
+                            <span className={styles.classGroupLabel}>Despesas</span>
+                            {despesas.map(c => (
+                              <button
+                                key={c.id}
+                                className={`${styles.classChip} ${styles.classChipDespesa} ${form.classificacaoNome === c.nome ? styles.classChipSelected : ''}`}
+                                onClick={() => setForm(p => ({ ...p, classificacaoNome: c.nome }))}
+                              >
+                                {c.nome}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {form.classificacaoNome && (
+                      <div className={styles.summary}>
+                        <div className={styles.summaryRow}>
+                          <span>Descrição</span>
+                          <strong>{form.descricao}</strong>
+                        </div>
+                        <div className={styles.summaryRow}>
+                          <span>Valor</span>
+                          <strong>{moeda(valorNumerico)}</strong>
+                        </div>
+                        <div className={styles.summaryRow}>
+                          <span>Classificação</span>
+                          <strong>{form.classificacaoNome}</strong>
+                        </div>
+                      </div>
+                    )}
                   </>
                 )}
-                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
-              </div>
-            )}
-
-            {/* STEP 4 — Grupo (IA sugere) */}
-            {step === 4 && (
-              <div className={styles.wizardStep}>
-                <label className={styles.wizardLabel}>Qual é o grupo?</label>
-
-                {aiSuggestion && (
-                  <div className={styles.aiSuggestionBadge}>
-                    IA sugeriu: <strong>{aiSuggestion.grupo}</strong>
-                  </div>
-                )}
-
-                <input
-                  className={styles.wizardInput}
-                  value={form.grupo}
-                  onChange={e => setForm(p => ({ ...p, grupo: e.target.value }))}
-                  placeholder="Ex: Vendas, Custos, Impostos..."
-                  autoFocus
-                />
-
-                <div className={styles.summary}>
-                  <div className={styles.summaryRow}>
-                    <span>Descrição</span>
-                    <strong>{form.descricao}</strong>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span>Valor</span>
-                    <strong>{moeda(valorNumerico)}</strong>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span>Classificação</span>
-                    <strong className={form.classificacao === 'receita' ? styles.receitaText : styles.despesaText}>
-                      {form.classificacao}
-                    </strong>
-                  </div>
-                </div>
 
                 {error && <p className={styles.error}>{error}</p>}
 
                 <button
                   className={styles.submit}
-                  disabled={saving || !form.grupo.trim()}
+                  disabled={saving || !form.classificacaoNome || aiLoading}
                   onClick={salvar}
                 >
                   {saving ? 'Salvando…' : 'Salvar lançamento'}
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(3)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
               </div>
             )}
 
