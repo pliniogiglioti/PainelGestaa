@@ -665,6 +665,36 @@
   z-index: 10;
 }
 
+
+.appCardSettingsBtn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.24);
+  background: rgba(0,0,0,0.46);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.netflixCard:hover .appCardSettingsBtn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.appCardSettingsBtn:hover {
+  background: rgba(201, 162, 42, 0.32);
+}
+
 .netflixOverlay {
   position: absolute;
   inset: 0;

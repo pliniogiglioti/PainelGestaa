@@ -474,6 +474,146 @@ function CreateAppModal({ categories, onClose, onCreated }: {
   )
 }
 
+function EditAppModal({
+  app,
+  categories,
+  onClose,
+  onUpdated,
+}: {
+  app: App
+  categories: AppCategory[]
+  onClose: () => void
+  onUpdated: () => void
+}) {
+  const initialLinkType: 'interno' | 'externo' =
+    app.link_type
+    ?? (app.internal_link ? 'interno' : 'externo')
+  const initialLink = initialLinkType === 'interno'
+    ? (app.internal_link ?? '')
+    : (app.external_link ?? '')
+
+  const [form, setForm] = useState<NewAppForm>({
+    name: app.name,
+    description: app.description ?? '',
+    category: app.category,
+    linkType: initialLinkType,
+    link: initialLink,
+    backgroundImage: app.background_image ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const set = (f: keyof NewAppForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+      setForm(prev => ({ ...prev, [f]: e.target.value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.link.trim()) {
+      setError('Informe o link do aplicativo.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+
+    const { error } = await supabase.from('apps').update({
+      name: form.name,
+      description: form.description || null,
+      category: form.category,
+      link_type: form.linkType,
+      external_link: form.linkType === 'externo' ? form.link || null : null,
+      internal_link: form.linkType === 'interno' ? form.link || null : null,
+      background_image: form.backgroundImage || null,
+    }).eq('id', app.id)
+
+    if (error) {
+      setError(error.message)
+      setSaving(false)
+      return
+    }
+
+    onUpdated()
+    onClose()
+  }
+
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Editar Aplicativo</h2>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <form className={styles.modalForm} onSubmit={handleSubmit}>
+          <div className={styles.modalRow}>
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Nome</label>
+              <input className={styles.modalInput} placeholder="Ex: GestCaixa" value={form.name} onChange={set('name')} required />
+            </div>
+            <div className={styles.modalField}>
+              <label className={styles.modalLabel}>Categoria</label>
+              <select className={styles.modalInput} value={form.category} onChange={set('category')} required>
+                <option value="">Selecione...</option>
+                {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Descrição</label>
+            <textarea
+              className={`${styles.modalInput} ${styles.modalTextarea}`}
+              placeholder="Descreva o que este app faz..."
+              value={form.description}
+              onChange={set('description')}
+              rows={3}
+            />
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Tipo de Link</label>
+            <div className={styles.linkTypeToggle}>
+              <button
+                type="button"
+                className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
+                onClick={() => setForm(prev => ({ ...prev, linkType: 'externo', link: '' }))}
+              >
+                Externo
+              </button>
+              <button
+                type="button"
+                className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
+                onClick={() => setForm(prev => ({ ...prev, linkType: 'interno', link: '' }))}
+              >
+                Interno
+              </button>
+            </div>
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>
+              {form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}
+            </label>
+            {form.linkType === 'externo' ? (
+              <input className={styles.modalInput} type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
+            ) : (
+              <input className={styles.modalInput} placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
+            )}
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>URL da Imagem de Fundo</label>
+            <input className={styles.modalInput} type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
+          </div>
+          {error && <p className={styles.formError}>{error}</p>}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar alterações'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
@@ -557,7 +697,19 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 // ── Netflix App Card ──────────────────────────────────────────────────────
 
-function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
+function AppCard({
+  app,
+  categoryLabel,
+  index,
+  isAdmin,
+  onEdit,
+}: {
+  app: App
+  categoryLabel: string
+  index: number
+  isAdmin: boolean
+  onEdit: (app: App) => void
+}) {
   const [hovered, setHovered] = useState(false)
 
   // Resolve link based on link_type (with backwards-compat fallback)
@@ -575,6 +727,19 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
       onMouseLeave={() => setHovered(false)}
     >
       <div className={`${styles.netflixOverlay} ${hovered ? styles.netflixOverlayHovered : ''}`} />
+      {isAdmin && (
+        <button
+          type="button"
+          className={styles.appCardSettingsBtn}
+          title="Editar aplicativo"
+          onClick={event => {
+            event.stopPropagation()
+            onEdit(app)
+          }}
+        >
+          <IconSettings />
+        </button>
+      )}
       <div className={styles.netflixCardContent}>
         <span className={styles.netflixCategory}>{categoryLabel}</span>
         <h3 className={styles.netflixTitle}>{app.name}</h3>
@@ -616,6 +781,7 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [showCreateCat,   setShowCreateCat]   = useState(false)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
   const [showSettings,    setShowSettings]    = useState(false)
+  const [editingApp,      setEditingApp]      = useState<App | null>(null)
   const appsListRef = useRef<HTMLDivElement | null>(null)
   const categorySectionRefs = useRef<Record<string, HTMLElement | null>>({})
 
@@ -812,7 +978,14 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                     </div>
                     <div className={styles.netflixRow}>
                       {category.apps.map((app, i) => (
-                        <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                        <AppCard
+                          key={app.id}
+                          app={app}
+                          index={i}
+                          categoryLabel={getCategoryLabel(app.category)}
+                          isAdmin={isAdmin}
+                          onEdit={setEditingApp}
+                        />
                       ))}
                     </div>
                   </section>
@@ -916,6 +1089,14 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
       </main>
 
       {showCreateApp  && <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)}  onCreated={fetchApps} />}
+      {editingApp && (
+        <EditAppModal
+          app={editingApp}
+          categories={categories}
+          onClose={() => setEditingApp(null)}
+          onUpdated={fetchApps}
+        />
+      )}
       {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
       {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
       {showSettings   && <AdminSettingsModal  onClose={() => setShowSettings(false)} />}
