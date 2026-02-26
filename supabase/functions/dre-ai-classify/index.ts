@@ -9,11 +9,6 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
-const SUPPORTED_MODELS = new Set([
-  DEFAULT_MODEL,
-  'llama-3.1-8b-instant',
-  'deepseek-r1-distill-llama-70b',
-])
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -85,6 +80,7 @@ Grupos já existentes no sistema: ${listaGrupos}
 
 Sua tarefa:
 1. Determine se este lançamento é "receita" (entrada de dinheiro: venda, serviço prestado, recebimento) ou "despesa" (saída de dinheiro: compra, pagamento, custo, fornecedor).
+   - Regra importante: compra de bens duráveis para uso da clínica/empresa (ex.: carro, veículo, máquina, equipamentos, computadores) deve ser classificada como "Ativo Imobilizado" (ou "Ativo Não Circulante") e grupo equivalente.
 2. Escolha a classificação mais adequada para a movimentação. Reutilize uma classificação da lista quando fizer sentido; se não houver boa correspondência, crie um nome novo (1-5 palavras, em português).
 3. Sugira o grupo/categoria MAIS correto para a movimentação (1-4 palavras, em português), mesmo que não exista ainda.
 4. Só reutilize um grupo existente quando ele realmente representar esta movimentação. Não force correspondência.
@@ -97,7 +93,7 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 }`
 
   try {
-    const model = SUPPORTED_MODELS.has(modelo) ? modelo : DEFAULT_MODEL
+    const model = String(modelo || DEFAULT_MODEL).trim() || DEFAULT_MODEL
     let groqRes = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
