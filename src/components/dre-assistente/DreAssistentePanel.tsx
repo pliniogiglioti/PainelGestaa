@@ -101,11 +101,29 @@ const serializeLancamentos = (lancamentos: DreLancamento[]) =>
     grupo: item.grupo,
   }))
 
+// Strips markdown syntax so the text reads naturally when spoken aloud
+function stripMarkdownForSpeech(text: string): string {
+  return text
+    .replace(/#{1,6}\s+/g, '')              // headings
+    .replace(/\*\*(.+?)\*\*/g, '$1')        // bold
+    .replace(/\[(.+?)\]\(https?:\/\/\S+\)/g, '$1') // [label](url)
+    .replace(/https?:\/\/\S+/g, '')         // bare URLs
+    .replace(/[▶•]/g, '')                   // special bullets
+    .replace(/^\s*[-*]\s/gm, '')            // list markers
+    .replace(/\n{2,}/g, '. ')              // paragraph breaks → pause
+    .replace(/\n/g, ' ')                    // remaining newlines
+    .replace(/\s{2,}/g, ' ')               // extra spaces
+    .trim()
+}
+
 export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [analysis, setAnalysis] = useState('')
+  const [audioState, setAudioState] = useState<'idle' | 'playing' | 'paused'>('idle')
+  const [audioRate, setAudioRate]   = useState(1.0)
   const lastCountRef            = useRef(-1)
+  const utteranceRef            = useRef<SpeechSynthesisUtterance | null>(null)
 
   const resumo = useMemo(
     () => lancamentos.reduce(
@@ -158,6 +176,62 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
     }
   }
 
+  const startSpeech = (rate: number) => {
+    if (!analysis || typeof window === 'undefined' || !window.speechSynthesis) return
+    window.speechSynthesis.cancel()
+    const text = stripMarkdownForSpeech(analysis)
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang  = 'pt-BR'
+    utterance.rate  = rate
+    utterance.pitch = 1
+    utterance.onstart = () => setAudioState('playing')
+    utterance.onend   = () => setAudioState('idle')
+    utterance.onerror = () => setAudioState('idle')
+    utteranceRef.current = utterance
+    window.speechSynthesis.speak(utterance)
+  }
+
+  const lerAnalise = () => {
+    if (!analysis || typeof window === 'undefined' || !window.speechSynthesis) return
+
+    if (audioState === 'playing') {
+      window.speechSynthesis.pause()
+      setAudioState('paused')
+      return
+    }
+
+    if (audioState === 'paused') {
+      window.speechSynthesis.resume()
+      setAudioState('playing')
+      return
+    }
+
+    startSpeech(audioRate)
+  }
+
+  const mudarVelocidade = (rate: number) => {
+    setAudioRate(rate)
+    // If already playing, restart with the new rate
+    if (audioState !== 'idle') {
+      startSpeech(rate)
+    }
+  }
+
+  const pararLeitura = () => {
+    window.speechSynthesis.cancel()
+    setAudioState('idle')
+  }
+
+  // Stop reading when a new analysis arrives or component unmounts
+  useEffect(() => {
+    window.speechSynthesis?.cancel()
+    setAudioState('idle')
+  }, [analysis])
+
+  useEffect(() => {
+    return () => { window.speechSynthesis?.cancel() }
+  }, [])
+
   // Auto-analyze whenever the number of lancamentos changes
   useEffect(() => {
     if (lancamentos.length === 0) return
@@ -184,17 +258,54 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
         </div>
 
         {hasData && (
-          <div className={styles.miniStats}>
-            <div className={styles.miniStat}>
-              <span className={styles.miniStatLabel}>Lançamentos</span>
-              <strong className={styles.miniStatValue}>{lancamentos.length}</strong>
+          <div className={styles.headerRight}>
+            <div className={styles.miniStats}>
+              <div className={styles.miniStat}>
+                <span className={styles.miniStatLabel}>Lançamentos</span>
+                <strong className={styles.miniStatValue}>{lancamentos.length}</strong>
+              </div>
+              <div className={`${styles.miniStat} ${resultado >= 0 ? styles.miniStatPositive : styles.miniStatNegative}`}>
+                <span className={styles.miniStatLabel}>Resultado</span>
+                <strong className={styles.miniStatValue}>
+                  {resultado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                </strong>
+              </div>
             </div>
-            <div className={`${styles.miniStat} ${resultado >= 0 ? styles.miniStatPositive : styles.miniStatNegative}`}>
-              <span className={styles.miniStatLabel}>Resultado</span>
-              <strong className={styles.miniStatValue}>
-                {resultado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </strong>
-            </div>
+
+            {analysis && !loading && (
+              <div className={styles.audioControls}>
+                <button
+                  className={`${styles.audioBtn} ${audioState === 'playing' ? styles.audioBtnActive : ''}`}
+                  onClick={lerAnalise}
+                  title={audioState === 'playing' ? 'Pausar leitura' : audioState === 'paused' ? 'Retomar leitura' : 'Ler análise em voz alta'}
+                >
+                  {audioState === 'playing' ? (
+                    <><span className={styles.audioIcon}>⏸</span> Pausar</>
+                  ) : audioState === 'paused' ? (
+                    <><span className={styles.audioIcon}>▶</span> Retomar</>
+                  ) : (
+                    <><span className={styles.audioIcon}>🔊</span> Ouvir</>
+                  )}
+                </button>
+                {audioState !== 'idle' && (
+                  <button className={styles.audioStopBtn} onClick={pararLeitura} title="Parar leitura">
+                    ⏹
+                  </button>
+                )}
+                <div className={styles.speedControls}>
+                  {([0.75, 1, 1.25, 1.5, 2] as const).map(rate => (
+                    <button
+                      key={rate}
+                      className={`${styles.speedBtn} ${audioRate === rate ? styles.speedBtnActive : ''}`}
+                      onClick={() => mudarVelocidade(rate)}
+                      title={`Velocidade ${rate}×`}
+                    >
+                      {rate}×
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -235,9 +346,11 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       {!loading && analysis && (
         <article className={styles.result}>
           {rendered}
-          <button className={styles.reanalizeBtn} onClick={analisarDre} disabled={loading}>
-            ↺ Reanalisar
-          </button>
+          <div className={styles.resultActions}>
+            <button className={styles.reanalizeBtn} onClick={analisarDre} disabled={loading}>
+              ↺ Reanalisar
+            </button>
+          </div>
         </article>
       )}
     </section>
