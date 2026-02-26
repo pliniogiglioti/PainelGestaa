@@ -78,11 +78,13 @@ ${listaClassificacoes}
 Grupos já existentes no sistema: ${listaGrupos}
 
 Sua tarefa:
-1. Escolha a classificação mais adequada da lista acima
-2. Sugira um grupo/categoria conciso (1-4 palavras, em português). Prefira reutilizar um grupo existente se fizer sentido. Crie um novo apenas se necessário.
+1. Determine se este lançamento é "receita" (entrada de dinheiro: venda, serviço prestado, recebimento) ou "despesa" (saída de dinheiro: compra, pagamento, custo, fornecedor).
+2. Escolha a classificação mais adequada da lista acima (o tipo da classificação deve coincidir com o tipo que você determinou).
+3. Sugira um grupo/categoria conciso (1-4 palavras, em português). Prefira reutilizar um grupo existente se fizer sentido. Crie um novo apenas se necessário.
 
 Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 {
+  "tipo": "receita",
   "classificacao_nome": "nome exato de uma classificação da lista",
   "grupo": "grupo mais adequado"
 }`
@@ -121,7 +123,11 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
       })
     }
 
-    const result = JSON.parse(jsonMatch[0]) as { classificacao_nome: string; grupo: string }
+    const result = JSON.parse(jsonMatch[0]) as { tipo: string; classificacao_nome: string; grupo: string }
+
+    // Validate tipo
+    const tipo: 'receita' | 'despesa' =
+      result.tipo === 'receita' || result.tipo === 'despesa' ? result.tipo : 'despesa'
 
     // Validate classificacao_nome: must match one of the provided options exactly
     const matched = classificacoes_disponiveis.find(
@@ -129,11 +135,11 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
     )
     const classificacao_nome = matched
       ? matched.nome
-      : (classificacoes_disponiveis[0]?.nome ?? '')
+      : (classificacoes_disponiveis.find(c => c.tipo === tipo)?.nome ?? classificacoes_disponiveis[0]?.nome ?? '')
 
     const grupo = String(result.grupo ?? '').trim() || 'Geral'
 
-    return new Response(JSON.stringify({ classificacao_nome, grupo }), {
+    return new Response(JSON.stringify({ tipo, classificacao_nome, grupo }), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
