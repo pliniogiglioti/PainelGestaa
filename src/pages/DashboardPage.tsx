@@ -76,12 +76,6 @@ const IconPin = () => (
     <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
   </svg>
 )
-const IconDre = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
-    <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
-  </svg>
-)
 
 // ── Spinner ───────────────────────────────────────────────────────────────
 
@@ -339,7 +333,10 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const fetchApps = async () => {
     setLoadingApps(true)
     const { data } = await supabase.from('apps').select('*').order('name')
-    if (data) setApps(data)
+    if (data) {
+      const seen = new Set<string>()
+      setApps(data.filter(app => seen.has(app.id) ? false : (seen.add(app.id), true)))
+    }
     setLoadingApps(false)
   }
 
@@ -438,10 +435,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 <span className={styles.navLabel}>{item.label}</span>
               </button>
             ))}
-            <a href="/analise-dre" className={styles.navItem}>
-              <span className={styles.navIcon}><IconDre /></span>
-              <span className={styles.navLabel}>Análise DRE</span>
-            </a>
           </nav>
           <div className={styles.sidebarBottom}>
             <button className={styles.logoutButton} onClick={onLogout}>
@@ -475,10 +468,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               <span className={styles.navLabel}>{item.label}</span>
             </button>
           ))}
-          <a href="/analise-dre" className={styles.navItem}>
-            <span className={styles.navIcon}><IconDre /></span>
-            <span className={styles.navLabel}>Análise DRE</span>
-          </a>
         </nav>
         <div className={styles.sidebarBottom}>
           <button className={styles.logoutButton} onClick={onLogout}>
