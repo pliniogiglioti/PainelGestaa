@@ -71,11 +71,19 @@
   line-height: 1.4;
 }
 
+/* ── Header right column (stats + audio) ── */
+.headerRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
 /* ── Mini stats ── */
 .miniStats {
   display: flex;
   gap: 10px;
-  flex-shrink: 0;
 }
 
 .miniStat {
@@ -393,6 +401,41 @@
 .audioIcon {
   font-size: 13px;
   line-height: 1;
+}
+
+/* ── Speed selector ── */
+.speedControls {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.speedBtn {
+  border: none;
+  background: transparent;
+  color: #666;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 7px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.speedBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #aaa;
+}
+
+.speedBtnActive {
+  background: rgba(99, 179, 237, 0.18);
+  color: #7ec8f0;
 }
 
 /* ── Reanalyze button ── */
