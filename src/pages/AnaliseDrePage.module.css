@@ -407,6 +407,49 @@ th { color: #8f8f8f; font-weight: 500; }
 
 .error { color: #ff8b8b; font-size: 13px; margin: 0; }
 
+/* ── AI Suggestion ── */
+
+.aiLoadingBox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #c9a22a;
+  font-size: 14px;
+  padding: 16px 0;
+}
+
+.aiSpinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(201, 162, 42, 0.25);
+  border-top-color: #c9a22a;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.aiSuggestionBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(201, 162, 42, 0.12);
+  border: 1px solid rgba(201, 162, 42, 0.3);
+  color: #e8c84e;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+.classifySelected {
+  outline: 2px solid #c9a22a;
+  outline-offset: 2px;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 700px) {

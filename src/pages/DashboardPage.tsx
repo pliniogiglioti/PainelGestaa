@@ -96,7 +96,8 @@ function SidebarBrand() {
 
 interface NewAppForm {
   name: string; description: string; category: string
-  externalLink: string; internalLink: string; backgroundImage: string
+  linkType: 'interno' | 'externo'
+  link: string; backgroundImage: string
 }
 
 function CreateAppModal({ categories, onClose, onCreated }: {
@@ -106,7 +107,7 @@ function CreateAppModal({ categories, onClose, onCreated }: {
 }) {
   const [form, setForm] = useState<NewAppForm>({
     name: '', description: '', category: '',
-    externalLink: '', internalLink: '', backgroundImage: '',
+    linkType: 'externo', link: '', backgroundImage: '',
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
@@ -117,14 +118,16 @@ function CreateAppModal({ categories, onClose, onCreated }: {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.link.trim()) { setError('Informe o link do aplicativo.'); return }
     setSaving(true); setError('')
 
     const { error } = await supabase.from('apps').insert({
       name:             form.name,
       description:      form.description || null,
       category:         form.category,
-      external_link:    form.externalLink || null,
-      internal_link:    form.internalLink || null,
+      link_type:        form.linkType,
+      external_link:    form.linkType === 'externo' ? form.link || null : null,
+      internal_link:    form.linkType === 'interno' ? form.link || null : null,
       background_image: form.backgroundImage || null,
     })
 
@@ -159,15 +162,34 @@ function CreateAppModal({ categories, onClose, onCreated }: {
               placeholder="Descreva o que este app faz..."
               value={form.description} onChange={set('description')} rows={3} />
           </div>
-          <div className={styles.modalRow}>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Link Externo</label>
-              <input className={styles.modalInput} type="url" placeholder="https://app.exemplo.com" value={form.externalLink} onChange={set('externalLink')} />
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Tipo de Link</label>
+            <div className={styles.linkTypeToggle}>
+              <button
+                type="button"
+                className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
+                onClick={() => setForm(p => ({ ...p, linkType: 'externo', link: '' }))}
+              >
+                Externo
+              </button>
+              <button
+                type="button"
+                className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
+                onClick={() => setForm(p => ({ ...p, linkType: 'interno', link: '' }))}
+              >
+                Interno
+              </button>
             </div>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Link Interno</label>
-              <input className={styles.modalInput} placeholder="/apps/gestcaixa" value={form.internalLink} onChange={set('internalLink')} />
-            </div>
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>
+              {form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}
+            </label>
+            {form.linkType === 'externo' ? (
+              <input className={styles.modalInput} type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
+            ) : (
+              <input className={styles.modalInput} placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
+            )}
           </div>
           <div className={styles.modalField}>
             <label className={styles.modalLabel}>URL da Imagem de Fundo</label>
@@ -272,6 +294,10 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
   const [hovered, setHovered] = useState(false)
 
+  // Resolve link based on link_type (with backwards-compat fallback)
+  const isExternal = app.link_type === 'externo' || (!app.link_type && !!app.external_link)
+  const href = isExternal ? (app.external_link ?? '#') : (app.internal_link ?? '#')
+
   return (
     <div
       className={styles.netflixCard}
@@ -289,12 +315,13 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
         {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
         <div className={`${styles.netflixExpandable} ${hovered ? styles.netflixExpandableOpen : ''}`}>
           <div className={styles.netflixActions}>
-            <a href={app.internal_link ?? '#'} className={styles.netflixBtnPrimary}>Acessar</a>
-            {app.external_link && (
-              <a href={app.external_link} className={styles.netflixBtnIcon} target="_blank" rel="noreferrer" title="Abrir externamente">
-                <IconExternal />
-              </a>
-            )}
+            <a
+              href={href}
+              className={styles.netflixBtnPrimary}
+              {...(isExternal ? { target: '_blank', rel: 'noreferrer' } : {})}
+            >
+              Acessar {isExternal && <IconExternal />}
+            </a>
           </div>
         </div>
       </div>
