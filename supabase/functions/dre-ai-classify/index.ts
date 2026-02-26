@@ -80,7 +80,8 @@ Grupos já existentes no sistema: ${listaGrupos}
 Sua tarefa:
 1. Determine se este lançamento é "receita" (entrada de dinheiro: venda, serviço prestado, recebimento) ou "despesa" (saída de dinheiro: compra, pagamento, custo, fornecedor).
 2. Escolha a classificação mais adequada da lista acima (o tipo da classificação deve coincidir com o tipo que você determinou).
-3. Sugira um grupo/categoria conciso (1-4 palavras, em português). Prefira reutilizar um grupo existente se fizer sentido. Crie um novo apenas se necessário.
+3. Sugira o grupo/categoria MAIS correto para a movimentação (1-4 palavras, em português), mesmo que não exista ainda.
+4. Só reutilize um grupo existente quando ele realmente representar esta movimentação. Não force correspondência.
 
 Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 {

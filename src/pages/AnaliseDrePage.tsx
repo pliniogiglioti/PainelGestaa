@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreClassificacao, DreLancamento } from '../lib/types'
+import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
+
+type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
 type Step = 1 | 2 | 3 | 4 | 5
 
@@ -78,6 +80,7 @@ export default function AnaliseDrePage() {
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
+  const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
 
   const fetchLancamentos = async () => {
     const { data, error } = await supabase
@@ -92,7 +95,13 @@ export default function AnaliseDrePage() {
     setClassificacoes(data ?? [])
   }
 
-  useEffect(() => { fetchLancamentos(); fetchClassificacoes() }, [])
+  const fetchGrupos = async () => {
+    const { data } = await supabase
+      .from('dre_grupos').select('*').eq('ativo', true).order('nome')
+    setGrupos(data ?? [])
+  }
+
+  useEffect(() => { fetchLancamentos(); fetchClassificacoes(); fetchGrupos() }, [])
 
   const valorNumerico = useMemo(() => {
     const parsed = Number(form.valor.replace(',', '.'))
@@ -117,8 +126,11 @@ export default function AnaliseDrePage() {
   const resultado = totais.receitas - totais.despesas
 
   const gruposExistentes = useMemo(() =>
-    [...new Set(lancamentos.map(l => l.grupo).filter(Boolean))].slice(0, 12),
-  [lancamentos])
+    [...new Set([
+      ...grupos.map(g => g.nome).filter(Boolean),
+      ...lancamentos.map(l => l.grupo).filter(Boolean),
+    ])].slice(0, 12),
+  [grupos, lancamentos])
 
   // Classifications filtered by the tipo chosen in step 3
   const classificacoesFiltradas = useMemo(() =>
@@ -186,16 +198,30 @@ export default function AnaliseDrePage() {
     }
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
+
+    const grupoNome = form.grupo.trim()
+    const tipoGrupo = form.tipo || (tipoMap[form.classificacaoNome] === 'receita' ? 'receita' : 'despesa')
+
+    const { error: grupoError } = await supabase
+      .from('dre_grupos')
+      .upsert({ nome: grupoNome, tipo: tipoGrupo }, { onConflict: 'nome,tipo' })
+
+    if (grupoError) {
+      setSaving(false)
+      setError(`Não foi possível cadastrar o grupo: ${grupoError.message}`)
+      return
+    }
+
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
       classificacao: form.classificacaoNome,
-      grupo:         form.grupo.trim(),
+      grupo:         grupoNome,
       user_id:       authData.user?.id ?? null,
     })
     setSaving(false)
     if (error) { setError(error.message); return }
-    closeWizard(); fetchLancamentos()
+    closeWizard(); fetchLancamentos(); fetchGrupos()
   }
 
   const getPillClass = (classificacao: string) => {

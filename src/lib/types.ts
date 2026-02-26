@@ -150,6 +150,32 @@ export interface Database {
         }
         Relationships: []
       }
+      dre_grupos: {
+        Row: {
+          id:         string
+          nome:       string
+          tipo:       'receita' | 'despesa'
+          ativo:      boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?:         string
+          nome:        string
+          tipo:        'receita' | 'despesa'
+          ativo?:      boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?:         string
+          nome?:       string
+          tipo?:       'receita' | 'despesa'
+          ativo?:      boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           chave:      string
