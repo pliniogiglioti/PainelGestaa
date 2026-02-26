@@ -8,13 +8,13 @@ import { DesignButton, DesignIconButton } from '../components/design/DesignSyste
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
-const GROQ_MODELS = [
+const GROQ_MODELS_FALLBACK = [
   { value: 'llama-3.3-70b-versatile',        label: 'Llama 3.3 70B Versatile (Recomendado)' },
   { value: 'llama-3.1-8b-instant',           label: 'Llama 3.1 8B Instant (Rápido)' },
-  { value: 'mixtral-8x7b-32768',             label: 'Mixtral 8x7B (32K contexto)' },
-  { value: 'gemma2-9b-it',                   label: 'Gemma2 9B' },
   { value: 'deepseek-r1-distill-llama-70b',  label: 'DeepSeek R1 70B' },
 ]
+
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 interface DashboardPageProps {
   user: User
@@ -161,7 +161,9 @@ function CategoryChip({ label, active, onClick }: { label: string; active: boole
 
 function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   const [tab,            setTab]            = useState<'modelo' | 'classificacoes'>('modelo')
-  const [modeloAtual,    setModeloAtual]    = useState('llama-3.3-70b-versatile')
+  const [groqModels,     setGroqModels]     = useState(GROQ_MODELS_FALLBACK)
+  const [modelsLoading,  setModelsLoading]  = useState(false)
+  const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_GROQ_MODEL)
   const [savingModelo,   setSavingModelo]   = useState(false)
   const [savedModelo,    setSavedModelo]    = useState(false)
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
@@ -179,10 +181,38 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   useEffect(() => {
-    supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      .then(({ data }) => { if (data) setModeloAtual(data.valor) })
+    const fetchGroqModels = async () => {
+      setModelsLoading(true)
+      const { data, error } = await supabase.functions.invoke('groq-models', { method: 'GET' })
+      if (!error && Array.isArray(data?.models) && data.models.length > 0) {
+        setGroqModels(data.models.map((model: string) => ({ value: model, label: model })))
+      }
+      setModelsLoading(false)
+    }
+
+    fetchGroqModels()
     fetchClassificacoes()
   }, [])
+
+  useEffect(() => {
+    supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
+      .then(({ data }) => {
+        if (!data) return
+        const existeNoCatalogo = groqModels.some(model => model.value === data.valor)
+        if (existeNoCatalogo) {
+          setModeloAtual(data.valor)
+          return
+        }
+
+        if (data.valor) {
+          setGroqModels(p => [...p, { value: data.valor, label: `${data.valor} (configurado)` }])
+          setModeloAtual(data.valor)
+          return
+        }
+
+        setModeloAtual(DEFAULT_GROQ_MODEL)
+      })
+  }, [groqModels])
 
   const salvarModelo = async () => {
     setSavingModelo(true)
@@ -239,13 +269,16 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
                 value={modeloAtual}
                 onChange={e => setModeloAtual(e.target.value)}
               >
-                {GROQ_MODELS.map(m => (
+                {groqModels.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
               <p className={styles.settingsHint}>
                 Modelo usado para sugerir a classificação automática nos lançamentos do DRE.
               </p>
+              {modelsLoading && (
+                <p className={styles.settingsHint}>Atualizando catálogo de modelos ativos...</p>
+              )}
             </div>
             <div className={styles.modalActions}>
               <button

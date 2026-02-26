@@ -19,6 +19,8 @@ const INITIAL_FORM: FormState = {
   descricao: '', valor: '', tipo: '', classificacaoNome: '', grupo: '',
 }
 
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 function StatCard({ title, value, tone = 'default' }: {
@@ -76,6 +78,7 @@ export default function AnaliseDrePage() {
   const [saving,         setSaving]         = useState(false)
   const [aiLoading,      setAiLoading]      = useState(false)
   const [aiError,        setAiError]        = useState('')
+  const [aiWarning,      setAiWarning]      = useState('')
   const [error,          setError]          = useState('')
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
@@ -83,8 +86,19 @@ export default function AnaliseDrePage() {
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
 
   const fetchLancamentos = async () => {
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData.user?.id
+    if (!userId) {
+      setLancamentos([])
+      return
+    }
+
     const { data, error } = await supabase
-      .from('dre_lancamentos').select('*').order('created_at', { ascending: false })
+      .from('dre_lancamentos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
     if (error) { setError(error.message); return }
     setLancamentos(data ?? [])
   }
@@ -115,7 +129,8 @@ export default function AnaliseDrePage() {
 
   const totais = useMemo(() =>
     lancamentos.reduce((acc, item) => {
-      const tipo = tipoMap[item.classificacao]
+      const tipo = item.tipo
+        ?? tipoMap[item.classificacao]
         ?? (item.classificacao === 'receita' ? 'receita' : 'despesa')
       if (tipo === 'receita') acc.receitas += Number(item.valor)
       else                   acc.despesas += Number(item.valor)
@@ -144,10 +159,10 @@ export default function AnaliseDrePage() {
   }, [classificacoes, form.classificacaoNome])
 
   const openWizard = () => {
-    setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setShowWizard(true)
+    setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning(''); setShowWizard(true)
   }
   const closeWizard = () => {
-    setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError('')
+    setShowWizard(false); setForm(INITIAL_FORM); setStep(1); setError(''); setAiError(''); setAiWarning('')
   }
 
   const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
@@ -180,12 +195,13 @@ export default function AnaliseDrePage() {
     setStep(4)
     setAiLoading(true)
     setAiError('')
+    setAiWarning('')
     setForm(p => ({ ...p, classificacaoNome: '', grupo: '' }))
 
     try {
       const { data: configData } = await supabase
         .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
+      const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
 
       // Only send classifications matching the tipo the user already chose
       const classesDoTipo = classificacoes
@@ -196,6 +212,7 @@ export default function AnaliseDrePage() {
         body: {
           descricao: form.descricao,
           valor: valorNumerico,
+          tipo: form.tipo,
           modelo,
           classificacoes_disponiveis: classesDoTipo,
           grupos_existentes: gruposExistentes,
@@ -208,11 +225,17 @@ export default function AnaliseDrePage() {
         setAiError(`IA indisponível: ${data.error}`)
       } else if (data) {
         const grupoIa = String(data.grupo ?? '').trim()
+        const classificacaoIa = String(data.classificacao_nome ?? '').trim()
+
         setForm(p => ({
           ...p,
-          classificacaoNome: data.classificacao_nome ?? '',
+          classificacaoNome: classificacaoIa,
           grupo:             grupoIa,
         }))
+
+        if (data?.aviso) {
+          setAiWarning(String(data.aviso))
+        }
 
         if (grupoIa) {
           const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
@@ -263,6 +286,7 @@ export default function AnaliseDrePage() {
     const { error } = await supabase.from('dre_lancamentos').insert({
       descricao:     form.descricao.trim() || null,
       valor:         valorNumerico,
+      tipo:          tipoClassificacao,
       classificacao: classificacaoNome,
       grupo:         grupoNome,
       user_id:       authData.user?.id ?? null,
@@ -272,8 +296,9 @@ export default function AnaliseDrePage() {
     closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
   }
 
-  const getPillClass = (classificacao: string) => {
-    const tipo = tipoMap[classificacao]
+  const getPillClass = (classificacao: string, tipoLancamento?: 'receita' | 'despesa') => {
+    const tipo = tipoLancamento
+      ?? tipoMap[classificacao]
       ?? (classificacao === 'receita' ? 'receita' : classificacao === 'despesa' ? 'despesa' : null)
     return tipo === 'receita' ? styles.receitaPill : styles.despesaPill
   }
@@ -316,7 +341,7 @@ export default function AnaliseDrePage() {
                   <td>{new Date(item.created_at).toLocaleDateString('pt-BR')}</td>
                   <td>{item.descricao ?? '—'}</td>
                   <td>
-                    <span className={`${styles.tablePill} ${getPillClass(item.classificacao)}`}>
+                    <span className={`${styles.tablePill} ${getPillClass(item.classificacao, item.tipo)}`}>
                       {item.classificacao}
                     </span>
                   </td>
@@ -436,6 +461,16 @@ export default function AnaliseDrePage() {
                           <strong>IA indisponível</strong>
                           <p className={styles.aiErrorDetail}>{aiError}</p>
                           <p className={styles.aiErrorHint}>Selecione manualmente. Verifique as configurações da IA.</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {aiWarning && !aiError && (
+                      <div className={styles.aiErrorBox}>
+                        <span className={styles.aiErrorIcon}>ℹ️</span>
+                        <div>
+                          <strong>Sugestão por fallback</strong>
+                          <p className={styles.aiErrorDetail}>{aiWarning}</p>
                         </div>
                       </div>
                     )}

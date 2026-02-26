@@ -1,13 +1,11 @@
 // Supabase Edge Function: dre-ai-classify
 // Calls GroqCloud API to identify BOTH the classification AND the group
 // for a DRE lancamento, pre-filling the wizard fields for the user.
-//
-// Environment variable required (Supabase Dashboard → Edge Functions → Secrets):
-//   GROQ_API_KEY=gsk_xxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,6 +14,83 @@ const CORS_HEADERS = {
 }
 
 type ClassificacaoItem = { nome: string; tipo: 'receita' | 'despesa' }
+type AiResult = { tipo: 'receita' | 'despesa'; classificacao_nome: string; grupo: string; fonte?: 'ia' | 'fallback' }
+
+const normalize = (value: string) =>
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+const parseAiResponse = (content: string): { tipo: string; classificacao_nome: string; grupo: string } | null => {
+  const jsonMatch = content.match(/\{[\s\S]*?\}/)
+  if (!jsonMatch) return null
+  return JSON.parse(jsonMatch[0]) as { tipo: string; classificacao_nome: string; grupo: string }
+}
+
+const pickFallback = (
+  descricao: string,
+  tipoEntrada: 'receita' | 'despesa',
+  classificacoesDisponiveis: ClassificacaoItem[],
+  gruposExistentes: string[],
+): AiResult => {
+  const text = normalize(descricao)
+
+  const isImobilizado = /(carro|veiculo|automovel|moto|caminhao|maquina|equipamento|computador|notebook|impressora|mobilia|moveis)/.test(text)
+  const isImposto = /(imposto|tributo|icms|iss|pis|cofins|irpj|simples)/.test(text)
+  const isAluguel = /(aluguel|locacao|condominio)/.test(text)
+  const isFolha = /(salario|pro labore|folha|fgts|inss|ferias|decimo terceiro)/.test(text)
+  const isReceita = /(venda|faturamento|recebimento|mensalidade|consulta|servico prestado|honorario)/.test(text)
+
+  const tipo: 'receita' | 'despesa' = isReceita ? 'receita' : tipoEntrada || 'despesa'
+
+  const classesTipo = classificacoesDisponiveis.filter(c => c.tipo === tipo)
+  const chooseByName = (patterns: RegExp[]) =>
+    classesTipo.find(c => patterns.some(pattern => pattern.test(normalize(c.nome))))?.nome
+
+  const classificacaoNome =
+    (isImobilizado && (chooseByName([/ativo imobilizado/, /ativo nao circulante/, /imobilizado/]) || 'Ativo Imobilizado'))
+    || (isImposto && chooseByName([/impost/, /tribut/]))
+    || (isAluguel && chooseByName([/aluguel/, /loca/]))
+    || (isFolha && chooseByName([/pessoal/, /folha/, /salari/]))
+    || (isReceita && chooseByName([/servic/, /receita/, /faturamento/, /consulta/]))
+    || classesTipo[0]?.nome
+    || classificacoesDisponiveis[0]?.nome
+    || (tipo === 'receita' ? 'Receita Operacional' : 'Despesa Operacional')
+
+  const grupoPreferido =
+    isImobilizado ? 'Ativo Imobilizado'
+    : isImposto ? 'Tributos'
+    : isAluguel ? 'Infraestrutura'
+    : isFolha ? 'Pessoal'
+    : isReceita ? 'Receita Operacional'
+    : 'Geral'
+
+  const grupo = gruposExistentes.find(g => normalize(g) === normalize(grupoPreferido)) || grupoPreferido
+
+  return { tipo, classificacao_nome: classificacaoNome, grupo, fonte: 'fallback' }
+}
+
+const toFinalResult = (
+  parsed: { tipo: string; classificacao_nome: string; grupo: string },
+  classificacoesDisponiveis: ClassificacaoItem[],
+): AiResult => {
+  const tipo: 'receita' | 'despesa' = parsed.tipo === 'receita' || parsed.tipo === 'despesa' ? parsed.tipo : 'despesa'
+  const nomeAi = String(parsed.classificacao_nome ?? '').trim()
+  const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
+  const classificacao_nome = matched?.nome
+    || nomeAi
+    || classificacoesDisponiveis.find(c => c.tipo === tipo)?.nome
+    || classificacoesDisponiveis[0]?.nome
+    || ''
+
+  return {
+    tipo,
+    classificacao_nome,
+    grupo: String(parsed.grupo ?? '').trim() || 'Geral',
+    fonte: 'ia',
+  }
+}
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
@@ -28,29 +103,21 @@ serve(async (req: Request) => {
     })
   }
 
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')
-  if (!groqApiKey) {
-    return new Response(JSON.stringify({ error: 'GROQ_API_KEY not configured' }), {
-      status: 500,
-      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
-  }
-
-  let descricao: string
-  let valor: number
-  let modelo: string
-  let classificacoes_disponiveis: ClassificacaoItem[]
-  let grupos_existentes: string[]
+  let descricao = ''
+  let valor = 0
+  let modelo = DEFAULT_MODEL
+  let tipoEntrada: 'receita' | 'despesa' = 'despesa'
+  let classificacoesDisponiveis: ClassificacaoItem[] = []
+  let gruposExistentes: string[] = []
 
   try {
     const body = await req.json()
-    descricao                  = String(body.descricao ?? '')
-    valor                      = Number(body.valor ?? 0)
-    modelo                     = String(body.modelo ?? 'llama-3.3-70b-versatile')
-    classificacoes_disponiveis = Array.isArray(body.classificacoes_disponiveis)
-      ? body.classificacoes_disponiveis : []
-    grupos_existentes          = Array.isArray(body.grupos_existentes)
-      ? body.grupos_existentes : []
+    descricao = String(body.descricao ?? '')
+    valor = Number(body.valor ?? 0)
+    modelo = String(body.modelo ?? DEFAULT_MODEL)
+    tipoEntrada = body.tipo === 'receita' ? 'receita' : 'despesa'
+    classificacoesDisponiveis = Array.isArray(body.classificacoes_disponiveis) ? body.classificacoes_disponiveis : []
+    gruposExistentes = Array.isArray(body.grupos_existentes) ? body.grupos_existentes : []
   } catch {
     return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
       status: 400,
@@ -58,12 +125,12 @@ serve(async (req: Request) => {
     })
   }
 
-  const listaClassificacoes = classificacoes_disponiveis.length > 0
-    ? classificacoes_disponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
+  const listaClassificacoes = classificacoesDisponiveis.length > 0
+    ? classificacoesDisponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
     : '(nenhuma cadastrada)'
 
-  const listaGrupos = grupos_existentes.length > 0
-    ? grupos_existentes.map(g => `"${g}"`).join(', ')
+  const listaGrupos = gruposExistentes.length > 0
+    ? gruposExistentes.map(g => `"${g}"`).join(', ')
     : 'nenhum ainda'
 
   const prompt = `Você é um assistente contábil brasileiro especializado em DRE.
@@ -78,78 +145,95 @@ ${listaClassificacoes}
 Grupos já existentes no sistema: ${listaGrupos}
 
 Sua tarefa:
-1. Determine se este lançamento é "receita" (entrada de dinheiro: venda, serviço prestado, recebimento) ou "despesa" (saída de dinheiro: compra, pagamento, custo, fornecedor).
-2. Escolha a classificação mais adequada para a movimentação. Reutilize uma classificação da lista quando fizer sentido; se não houver boa correspondência, crie um nome novo (1-5 palavras, em português).
-3. Sugira o grupo/categoria MAIS correto para a movimentação (1-4 palavras, em português), mesmo que não exista ainda.
-4. Só reutilize um grupo existente quando ele realmente representar esta movimentação. Não force correspondência.
+1. Determine se este lançamento é "receita" ou "despesa".
+2. Escolha a classificação mais adequada. Se for aquisição de bem durável para uso da empresa (carro, veículo, máquina, equipamento, computador, móveis), priorize "Ativo Imobilizado"/"Ativo Não Circulante".
+3. Sugira o grupo/categoria mais correto (1-4 palavras).
+4. Responda estritamente em JSON.
 
-Responda SOMENTE em JSON válido, sem markdown, sem explicações:
+Formato:
 {
   "tipo": "receita",
   "classificacao_nome": "classificação mais adequada",
   "grupo": "grupo mais adequado"
 }`
 
-  try {
-    const groqRes = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: modelo,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.1,
-        max_tokens: 80,
-      }),
+  const fallback = pickFallback(descricao, tipoEntrada, classificacoesDisponiveis, gruposExistentes)
+  const groqApiKey = Deno.env.get('GROQ_API_KEY')
+
+  if (!groqApiKey) {
+    return new Response(JSON.stringify({ ...fallback, aviso: 'GROQ_API_KEY não configurada; usado fallback local.' }), {
+      status: 200,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
+  }
+
+  try {
+    const model = String(modelo || DEFAULT_MODEL).trim() || DEFAULT_MODEL
+
+    const callGroq = async (modelToUse: string) => {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 15000)
+      try {
+        return await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${groqApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: modelToUse,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.05,
+            max_tokens: 120,
+          }),
+          signal: controller.signal,
+        })
+      } finally {
+        clearTimeout(timeout)
+      }
+    }
+
+    let groqRes = await callGroq(model)
+    if (!groqRes.ok) {
+      const errText = await groqRes.text()
+      const shouldRetryWithDefault = model !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)
+      if (shouldRetryWithDefault) {
+        groqRes = await callGroq(DEFAULT_MODEL)
+      } else {
+        return new Response(JSON.stringify({ ...fallback, aviso: `Groq indisponível (${errText.slice(0, 120)}). Usado fallback.` }), {
+          status: 200,
+          headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+        })
+      }
+    }
 
     if (!groqRes.ok) {
       const errText = await groqRes.text()
-      return new Response(JSON.stringify({ error: `GroqCloud error: ${errText}` }), {
-        status: 502,
+      return new Response(JSON.stringify({ ...fallback, aviso: `Groq indisponível (${errText.slice(0, 120)}). Usado fallback.` }), {
+        status: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
     }
 
     const groqData = await groqRes.json()
     const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+    const parsed = parseAiResponse(content)
 
-    const jsonMatch = content.match(/\{[\s\S]*?\}/)
-    if (!jsonMatch) {
-      return new Response(JSON.stringify({ error: 'Could not parse AI response', raw: content }), {
-        status: 502,
+    if (!parsed) {
+      return new Response(JSON.stringify({ ...fallback, aviso: 'Resposta da IA fora do formato esperado; usado fallback.' }), {
+        status: 200,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
     }
 
-    const result = JSON.parse(jsonMatch[0]) as { tipo: string; classificacao_nome: string; grupo: string }
-
-    // Validate tipo
-    const tipo: 'receita' | 'despesa' =
-      result.tipo === 'receita' || result.tipo === 'despesa' ? result.tipo : 'despesa'
-
-    // Keep AI suggestion (existing or new). If empty, fallback to one of available classifications.
-    const nomeAi = String(result.classificacao_nome ?? '').trim()
-    const matched = classificacoes_disponiveis.find(
-      c => c.nome.toLowerCase() === nomeAi.toLowerCase()
-    )
-    const classificacao_nome = matched?.nome
-      || nomeAi
-      || classificacoes_disponiveis.find(c => c.tipo === tipo)?.nome
-      || classificacoes_disponiveis[0]?.nome
-      || ''
-
-    const grupo = String(result.grupo ?? '').trim() || 'Geral'
-
-    return new Response(JSON.stringify({ tipo, classificacao_nome, grupo }), {
+    const result = toFinalResult(parsed, classificacoesDisponiveis)
+    return new Response(JSON.stringify(result), {
       status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500,
+    return new Response(JSON.stringify({ ...fallback, aviso: `Erro na IA (${String(err)}); usado fallback.` }), {
+      status: 200,
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   }
