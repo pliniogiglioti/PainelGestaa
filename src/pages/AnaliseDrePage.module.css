@@ -1,76 +1,171 @@
 .page {
+  position: relative;
   min-height: 100vh;
-  background: #070707;
+  background: radial-gradient(circle at 20% -10%, #2a210e 0%, #0a0a0a 45%), #050505;
   color: #f2f2f2;
-  padding: 28px;
+  padding: 34px;
+  overflow: hidden;
+}
+
+.glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(201, 162, 42, 0.2) 0%, rgba(201, 162, 42, 0) 70%);
+  top: -130px;
+  right: -110px;
+  pointer-events: none;
 }
 
 .header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  gap: 18px;
+  align-items: flex-start;
+  margin-bottom: 22px;
 }
 
 .eyebrow {
   margin: 0;
-  color: #c9a22a;
+  color: #d5af45;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  margin: 6px 0 8px;
+  font-size: 36px;
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  margin: 0;
+  color: #a9a9a9;
+  max-width: 620px;
 }
 
 .backLink {
-  color: #c9a22a;
+  color: #d5af45;
   text-decoration: none;
+  border: 1px solid rgba(213, 175, 69, 0.35);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: rgba(213, 175, 69, 0.1);
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.statCard {
+  border-radius: 14px;
+  border: 1px solid #2b2b2b;
+  background: rgba(16, 16, 16, 0.9);
+  padding: 14px;
+}
+
+.statCard span {
+  display: block;
+  font-size: 12px;
+  color: #989898;
+  margin-bottom: 6px;
+}
+
+.statCard strong {
+  font-size: 20px;
+}
+
+.positiveCard {
+  border-color: rgba(54, 198, 126, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(54, 198, 126, 0.16);
+}
+
+.negativeCard {
+  border-color: rgba(255, 108, 108, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 108, 108, 0.16);
 }
 
 .layout {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
-  gap: 16px;
+  gap: 14px;
 }
 
-.card {
-  background: #111;
+.panel {
+  border-radius: 16px;
   border: 1px solid #232323;
-  border-radius: 14px;
-  padding: 16px;
+  background: linear-gradient(180deg, rgba(18, 18, 18, 0.95), rgba(11, 11, 11, 0.95));
+  padding: 18px;
+  backdrop-filter: blur(8px);
+}
+
+.panelHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panelHeader h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.stepIndicator {
+  font-size: 12px;
+  color: #9f9f9f;
 }
 
 .step {
   display: flex;
-  gap: 12px;
-  margin: 12px 0;
+  gap: 10px;
+  margin-bottom: 12px;
 }
 
 .badge {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #232323;
-  color: #919191;
+  background: #1f1f1f;
+  border: 1px solid #2d2d2d;
+  color: #8f8f8f;
+  flex-shrink: 0;
+  margin-top: 24px;
 }
 
 .badgeActive {
-  background: #c9a22a;
+  background: #d5af45;
   color: #111;
+  border-color: #d5af45;
 }
 
-.step label {
-  display: block;
-  font-size: 13px;
-  color: #9e9e9e;
-  margin-bottom: 4px;
-}
-
-.step input {
+.inputWrap {
   width: 100%;
-  border-radius: 8px;
-  border: 1px solid #2d2d2d;
-  background: #0b0b0b;
+}
+
+.inputWrap label {
+  display: block;
+  margin-bottom: 6px;
+  color: #9d9d9d;
+  font-size: 13px;
+}
+
+.inputWrap input {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #2e2e2e;
+  background: #090909;
   color: #f2f2f2;
-  padding: 8px 10px;
+  padding: 10px 12px;
 }
 
 .actions {
@@ -79,28 +174,52 @@
 }
 
 .actions button {
-  border: 1px solid #363636;
-  background: #161616;
-  color: #ececec;
-  border-radius: 8px;
-  padding: 8px 12px;
+  border: 1px solid #333;
+  background: #151515;
+  color: #dedede;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
 }
 
 .activeButton {
-  border-color: #c9a22a !important;
-  color: #c9a22a !important;
+  border-color: #d5af45 !important;
+  color: #d5af45 !important;
+  background: rgba(213, 175, 69, 0.08) !important;
 }
 
 .preview {
-  margin-top: 14px;
-  padding: 10px;
-  border-radius: 10px;
-  background: #0b0b0b;
-  border: 1px solid #242424;
+  border-radius: 12px;
+  border: 1px solid #262626;
+  background: #090909;
+  padding: 12px;
+  margin-top: 8px;
 }
 
 .preview h3 {
-  margin-top: 0;
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.previewRows {
+  display: grid;
+  gap: 6px;
+}
+
+.previewRows p {
+  margin: 0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+
+.previewRows span {
+  color: #8e8e8e;
+}
+
+.error {
+  color: #ff8b8b;
+  margin-top: 12px;
 }
 
 .submit {
@@ -108,42 +227,17 @@
   width: 100%;
   border: none;
   border-radius: 10px;
-  background: #c9a22a;
-  color: #161616;
+  background: #d5af45;
+  color: #191919;
   font-weight: 700;
-  padding: 10px 14px;
+  padding: 11px 16px;
+  cursor: pointer;
 }
 
-.error {
-  color: #ff6b6b;
+.submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
-
-.kpis {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.kpis > div {
-  background: #0c0c0c;
-  border: 1px solid #242424;
-  border-radius: 10px;
-  padding: 10px;
-}
-
-.kpis span {
-  font-size: 12px;
-  color: #989898;
-  display: block;
-}
-
-.kpis strong {
-  font-size: 14px;
-}
-
-.positive { color: #46d18e; }
-.negative { color: #ff7b7b; }
 
 .tableWrap {
   overflow-x: auto;
@@ -154,20 +248,52 @@ table {
   border-collapse: collapse;
 }
 
-th, td {
+th,
+td {
   text-align: left;
   font-size: 13px;
-  border-bottom: 1px solid #232323;
-  padding: 8px;
+  padding: 10px 8px;
+  border-bottom: 1px solid #202020;
+  white-space: nowrap;
+}
+
+th {
+  color: #8f8f8f;
+  font-weight: 500;
+}
+
+.tablePill {
+  display: inline-flex;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.receitaPill {
+  color: #4ce09a;
+  background: rgba(76, 224, 154, 0.15);
+}
+
+.despesaPill {
+  color: #ff9f9f;
+  background: rgba(255, 159, 159, 0.15);
 }
 
 .empty {
   text-align: center;
-  color: #8a8a8a;
+  color: #818181;
+  padding: 20px 10px;
 }
 
-@media (max-width: 960px) {
-  .layout {
+@media (max-width: 1000px) {
+  .layout,
+  .statsGrid {
     grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
   }
 }
