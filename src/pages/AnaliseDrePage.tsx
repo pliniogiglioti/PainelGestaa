@@ -19,6 +19,8 @@ const INITIAL_FORM: FormState = {
   descricao: '', valor: '', tipo: '', classificacaoNome: '', grupo: '',
 }
 
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 function StatCard({ title, value, tone = 'default' }: {
@@ -83,8 +85,19 @@ export default function AnaliseDrePage() {
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
 
   const fetchLancamentos = async () => {
+    const { data: authData } = await supabase.auth.getUser()
+    const userId = authData.user?.id
+    if (!userId) {
+      setLancamentos([])
+      return
+    }
+
     const { data, error } = await supabase
-      .from('dre_lancamentos').select('*').order('created_at', { ascending: false })
+      .from('dre_lancamentos')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
     if (error) { setError(error.message); return }
     setLancamentos(data ?? [])
   }
@@ -185,7 +198,7 @@ export default function AnaliseDrePage() {
     try {
       const { data: configData } = await supabase
         .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
+      const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
 
       // Only send classifications matching the tipo the user already chose
       const classesDoTipo = classificacoes

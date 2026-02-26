@@ -8,6 +8,12 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const SUPPORTED_MODELS = new Set([
+  DEFAULT_MODEL,
+  'llama-3.1-8b-instant',
+  'deepseek-r1-distill-llama-70b',
+])
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -46,7 +52,7 @@ serve(async (req: Request) => {
     const body = await req.json()
     descricao                  = String(body.descricao ?? '')
     valor                      = Number(body.valor ?? 0)
-    modelo                     = String(body.modelo ?? 'llama-3.3-70b-versatile')
+    modelo                     = String(body.modelo ?? DEFAULT_MODEL)
     classificacoes_disponiveis = Array.isArray(body.classificacoes_disponiveis)
       ? body.classificacoes_disponiveis : []
     grupos_existentes          = Array.isArray(body.grupos_existentes)
@@ -91,14 +97,15 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 }`
 
   try {
-    const groqRes = await fetch(GROQ_API_URL, {
+    const model = SUPPORTED_MODELS.has(modelo) ? modelo : DEFAULT_MODEL
+    let groqRes = await fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${groqApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: modelo,
+        model,
         messages: [{ role: 'user', content: prompt }],
         temperature: 0.1,
         max_tokens: 80,
@@ -107,6 +114,59 @@ Responda SOMENTE em JSON válido, sem markdown, sem explicações:
 
     if (!groqRes.ok) {
       const errText = await groqRes.text()
+      const shouldRetryWithDefault =
+        model !== DEFAULT_MODEL
+        && /model|decommissioned|not found|invalid/i.test(errText)
+
+      if (shouldRetryWithDefault) {
+        groqRes = await fetch(GROQ_API_URL, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${groqApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: DEFAULT_MODEL,
+            messages: [{ role: 'user', content: prompt }],
+            temperature: 0.1,
+            max_tokens: 80,
+          }),
+        })
+
+        if (groqRes.ok) {
+          const groqData = await groqRes.json()
+          const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+          const jsonMatch = content.match(/\{[\s\S]*?\}/)
+          if (!jsonMatch) {
+            return new Response(JSON.stringify({ error: 'Could not parse AI response', raw: content }), {
+              status: 502,
+              headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+            })
+          }
+
+          const result = JSON.parse(jsonMatch[0]) as { tipo: string; classificacao_nome: string; grupo: string }
+          const tipo: 'receita' | 'despesa' =
+            result.tipo === 'receita' || result.tipo === 'despesa' ? result.tipo : 'despesa'
+
+          const nomeAi = String(result.classificacao_nome ?? '').trim()
+          const matched = classificacoes_disponiveis.find(
+            c => c.nome.toLowerCase() === nomeAi.toLowerCase()
+          )
+          const classificacao_nome = matched?.nome
+            || nomeAi
+            || classificacoes_disponiveis.find(c => c.tipo === tipo)?.nome
+            || classificacoes_disponiveis[0]?.nome
+            || ''
+
+          const grupo = String(result.grupo ?? '').trim() || 'Geral'
+
+          return new Response(JSON.stringify({ tipo, classificacao_nome, grupo }), {
+            status: 200,
+            headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+          })
+        }
+      }
+
       return new Response(JSON.stringify({ error: `GroqCloud error: ${errText}` }), {
         status: 502,
         headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },

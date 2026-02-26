@@ -11,10 +11,10 @@ type Page = 'aplicativos' | 'comunidade' | 'perfil'
 const GROQ_MODELS = [
   { value: 'llama-3.3-70b-versatile',        label: 'Llama 3.3 70B Versatile (Recomendado)' },
   { value: 'llama-3.1-8b-instant',           label: 'Llama 3.1 8B Instant (Rápido)' },
-  { value: 'mixtral-8x7b-32768',             label: 'Mixtral 8x7B (32K contexto)' },
-  { value: 'gemma2-9b-it',                   label: 'Gemma2 9B' },
   { value: 'deepseek-r1-distill-llama-70b',  label: 'DeepSeek R1 70B' },
 ]
+
+const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 interface DashboardPageProps {
   user: User
@@ -161,7 +161,7 @@ function CategoryChip({ label, active, onClick }: { label: string; active: boole
 
 function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   const [tab,            setTab]            = useState<'modelo' | 'classificacoes'>('modelo')
-  const [modeloAtual,    setModeloAtual]    = useState('llama-3.3-70b-versatile')
+  const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_GROQ_MODEL)
   const [savingModelo,   setSavingModelo]   = useState(false)
   const [savedModelo,    setSavedModelo]    = useState(false)
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
@@ -180,7 +180,11 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
 
   useEffect(() => {
     supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      .then(({ data }) => { if (data) setModeloAtual(data.valor) })
+      .then(({ data }) => {
+        if (!data) return
+        const existeNoCatalogo = GROQ_MODELS.some(model => model.value === data.valor)
+        setModeloAtual(existeNoCatalogo ? data.valor : DEFAULT_GROQ_MODEL)
+      })
     fetchClassificacoes()
   }, [])
 
