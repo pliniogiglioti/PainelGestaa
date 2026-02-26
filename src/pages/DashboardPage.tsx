@@ -12,6 +12,10 @@ interface DashboardPageProps {
   onLogout: () => void
 }
 
+interface AppCategoryRow extends AppCategory {
+  apps: App[]
+}
+
 const IS_ADMIN = true  // TODO: pull from profiles.role once auth is wired
 
 // ── Icons ─────────────────────────────────────────────────────────────────
@@ -256,12 +260,12 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 // ── Netflix App Card ──────────────────────────────────────────────────────
 
-function AppCard({ app, categoryLabel, index, isList = false }: { app: App; categoryLabel: string; index: number; isList?: boolean }) {
+function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
   const [hovered, setHovered] = useState(false)
 
   return (
     <div
-      className={`${styles.netflixCard} ${isList ? styles.netflixCardList : ""}`}
+      className={styles.netflixCard}
       style={{
         backgroundImage: app.background_image ? `url(${app.background_image})` : undefined,
         animationDelay: `${index * 60}ms`,
@@ -270,7 +274,7 @@ function AppCard({ app, categoryLabel, index, isList = false }: { app: App; cate
       onMouseLeave={() => setHovered(false)}
     >
       <div className={`${styles.netflixOverlay} ${hovered ? styles.netflixOverlayHovered : ''}`} />
-      <div className={`${styles.netflixCardContent} ${isList ? styles.netflixCardContentList : ""}`}>
+      <div className={styles.netflixCardContent}>
         <span className={styles.netflixCategory}>{categoryLabel}</span>
         <h3 className={styles.netflixTitle}>{app.name}</h3>
         {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
@@ -373,6 +377,25 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
 
   const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
+
+  const appsByCategory: AppCategoryRow[] = categories
+    .map(category => ({
+      ...category,
+      apps: filteredApps.filter(app => app.category === category.slug),
+    }))
+    .filter(category => category.apps.length > 0)
+
+  const uncategorizedApps = filteredApps.filter(app => !categories.some(category => category.slug === app.category))
+
+  if (uncategorizedApps.length > 0) {
+    appsByCategory.push({
+      id: 'uncategorized',
+      name: 'Outros',
+      slug: 'outros',
+      created_at: '',
+      apps: uncategorizedApps,
+    })
+  }
 
   const handleCategoryClick = (slug: string) => {
     setActiveCategory(slug)
@@ -507,10 +530,19 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
                 {IS_ADMIN && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
               </div>
             ) : (
-              // ✅ AQUI: troca de netflixRow (carrossel) para netflixGrid (várias linhas)
-              <div className={styles.appsLineList}>
-                {filteredApps.map((app, i) => (
-                  <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} isList />
+              <div className={styles.categoryRows}>
+                {appsByCategory.map(category => (
+                  <section key={category.id} className={styles.categoryRowSection}>
+                    <div className={styles.categoryRowHeader}>
+                      <h3 className={styles.categoryRowTitle}>{category.name}</h3>
+                      <span className={styles.sectionCount}>{category.apps.length} apps</span>
+                    </div>
+                    <div className={styles.netflixRow}>
+                      {category.apps.map((app, i) => (
+                        <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             )}
