@@ -175,7 +175,6 @@ function TopNavigation({
   return (
     <header className={styles.topNavWrap}>
       <div className={styles.topNavBrand}>
-        <img src="/favicon.png" width="24" height="24" alt="" />
         <img src="/logo.png" height="24" alt="PainelGestaa" />
       </div>
 
@@ -624,38 +623,6 @@ function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: strin
   )
 }
 
-function FeaturedAppsShowcase({
-  featured,
-  sideApps,
-  getCategoryLabel,
-}: {
-  featured: App
-  sideApps: App[]
-  getCategoryLabel: (slug: string) => string
-}) {
-  return (
-    <div className={styles.showcaseLayout}>
-      <div
-        className={styles.featuredHero}
-        style={{ backgroundImage: featured.background_image ? `url(${featured.background_image})` : undefined }}
-      >
-        <div className={styles.featuredHeroOverlay} />
-        <div className={styles.featuredHeroContent}>
-          <span className={styles.featuredHeroCategory}>{getCategoryLabel(featured.category)}</span>
-          <h3 className={styles.featuredHeroTitle}>{featured.name}</h3>
-          {featured.description && <p className={styles.featuredHeroDescription}>{featured.description}</p>}
-        </div>
-      </div>
-
-      <div className={styles.showcaseSideRow}>
-        {sideApps.map((app, index) => (
-          <AppCard key={app.id} app={app} index={index} categoryLabel={getCategoryLabel(app.category)} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
@@ -763,8 +730,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
     .filter(category => category.apps.length > 0)
 
   const uncategorizedApps = filteredApps.filter(app => !categories.some(category => category.slug === app.category))
-  const featuredApp = filteredApps[0]
-  const sideShowcaseApps = filteredApps.slice(1, 5)
 
   if (uncategorizedApps.length > 0) {
     appsByCategory.push({
@@ -822,13 +787,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
         {/* APLICATIVOS */}
         {activePage === 'aplicativos' && (
           <div className={styles.pageContent} key="apps">
-            <div className={styles.welcomeRow}>
-              <div>
-                <p className={styles.welcomeGreeting}>Bem-vindo de volta,</p>
-                <h1 className={styles.welcomeName}>{user.name} 👋</h1>
-              </div>
-            </div>
-
             {/* Categories */}
             <div className={styles.categoriesBar}>
               <div className={styles.categoriesScroll}>
@@ -861,19 +819,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
               </div>
             ) : (
               <>
-                {featuredApp && (
-                  <DesignSection
-                    eyebrow="Explorar"
-                    title="Destaques da Semana"
-                    subtitle="Visual inspirado no layout da referência, mantendo a paleta original do PainelGestaa."
-                  >
-                    <FeaturedAppsShowcase
-                      featured={featuredApp}
-                      sideApps={sideShowcaseApps}
-                      getCategoryLabel={getCategoryLabel}
-                    />
-                  </DesignSection>
-                )}
 
                 <DesignSection
                   eyebrow="Biblioteca"
