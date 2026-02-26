@@ -513,6 +513,75 @@ th { color: #8f8f8f; font-weight: 500; }
   font-weight: 700;
 }
 
+.chipCheckmark {
+  opacity: 0.8;
+}
+
+/* ── AI Selected Box ── */
+
+.aiSelectedBox {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(201, 162, 42, 0.1);
+  border: 1px solid rgba(201, 162, 42, 0.35);
+  border-radius: 10px;
+  padding: 12px 16px;
+  margin-bottom: 12px;
+}
+
+.aiSelectedLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #c9a22a;
+}
+
+.aiSelectedValue {
+  font-size: 16px;
+  color: #f2f2f2;
+  font-weight: 700;
+}
+
+/* ── Grupo Quick Chips ── */
+
+.grupoQuickList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.grupoQuickChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.grupoChip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--border, #2a2a2a);
+  background: rgba(255,255,255,0.04);
+  color: #a0a0a0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.grupoChip:hover {
+  background: rgba(255,255,255,0.08);
+  color: #f2f2f2;
+}
+
+.grupoChipSelected {
+  background: rgba(201, 162, 42, 0.15);
+  border-color: rgba(201, 162, 42, 0.5);
+  color: #e8c84e;
+  font-weight: 600;
+}
+
 /* ── Responsive ── */
 
 @media (max-width: 700px) {
