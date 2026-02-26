@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
 import type { App, AppCategory, DreClassificacao, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
+import StreamingAppsView from '../components/dashboard/StreamingAppsView'
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
@@ -53,18 +54,6 @@ const IconLogout = () => (
 const IconPlus = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-  </svg>
-)
-const IconExternal = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-    <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
-  </svg>
-)
-const IconTag = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
-    <line x1="7" y1="7" x2="7.01" y2="7"/>
   </svg>
 )
 const IconMessageSquare = () => (
@@ -469,46 +458,6 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
   )
 }
 
-// ── Netflix App Card ──────────────────────────────────────────────────────
-
-function AppCard({ app, categoryLabel, index }: { app: App; categoryLabel: string; index: number }) {
-  const [hovered, setHovered] = useState(false)
-
-  // Resolve link based on link_type (with backwards-compat fallback)
-  const isExternal = app.link_type === 'externo' || (!app.link_type && !!app.external_link)
-  const href = isExternal ? (app.external_link ?? '#') : (app.internal_link ?? '#')
-
-  return (
-    <div
-      className={styles.netflixCard}
-      style={{
-        backgroundImage: app.background_image ? `url(${app.background_image})` : undefined,
-        animationDelay: `${index * 60}ms`,
-      }}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div className={`${styles.netflixOverlay} ${hovered ? styles.netflixOverlayHovered : ''}`} />
-      <div className={styles.netflixCardContent}>
-        <span className={styles.netflixCategory}>{categoryLabel}</span>
-        <h3 className={styles.netflixTitle}>{app.name}</h3>
-        {app.description && <p className={styles.netflixDescription}>{app.description}</p>}
-        <div className={`${styles.netflixExpandable} ${hovered ? styles.netflixExpandableOpen : ''}`}>
-          <div className={styles.netflixActions}>
-            <a
-              href={href}
-              className={styles.netflixBtnPrimary}
-              {...(isExternal ? { target: '_blank', rel: 'noreferrer' } : {})}
-            >
-              Acessar {isExternal && <IconExternal />}
-            </a>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
@@ -530,7 +479,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
   const [showCreateCat,   setShowCreateCat]   = useState(false)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
   const [showSettings,    setShowSettings]    = useState(false)
-  const appsListRef = useRef<HTMLDivElement | null>(null)
 
   // Check if current user is admin
   useEffect(() => {
@@ -629,7 +577,6 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
 
   const handleCategoryClick = (slug: string) => {
     setActiveCategory(slug)
-    appsListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 
   const navItems = [
@@ -719,69 +666,19 @@ export default function DashboardPage({ user, onLogout }: DashboardPageProps) {
         {/* APLICATIVOS */}
         {activePage === 'aplicativos' && (
           <div className={styles.pageContent} key="apps">
-            <div className={styles.welcomeRow}>
-              <div>
-                <p className={styles.welcomeGreeting}>Bem-vindo de volta,</p>
-                <h1 className={styles.welcomeName}>{user.name} 👋</h1>
-              </div>
-            </div>
-
-            {/* Categories */}
-            <div className={styles.categoriesBar}>
-              <div className={styles.categoriesScroll}>
-                {allCategories.map(cat => (
-                  <button key={cat.slug}
-                    className={`${styles.categoryChip} ${activeCategory === cat.slug ? styles.categoryChipActive : ''}`}
-                    onClick={() => handleCategoryClick(cat.slug)}>
-                    {cat.name}
-                  </button>
-                ))}
-              </div>
-              {isAdmin && (
-                <button className={styles.btnIconGhost} onClick={() => setShowCreateCat(true)} title="Nova categoria">
-                  <IconTag />
-                </button>
-              )}
-            </div>
-
-            <div className={styles.sectionHeader} ref={appsListRef}>
-              <div className={styles.sectionLeft}>
-                <h2 className={styles.sectionTitle}>
-                  {activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
-                </h2>
-                <span className={styles.sectionCount}>{filteredApps.length} apps</span>
-              </div>
-              {isAdmin && (
-                <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}>
-                  <IconPlus /> Novo App
-                </button>
-              )}
-            </div>
-
-            {loadingApps ? (
-              <div className={styles.centeredSpinner}><Spinner /></div>
-            ) : filteredApps.length === 0 ? (
-              <div className={styles.emptyState}>
-                <p>Nenhum app encontrado nesta categoria.</p>
-                {isAdmin && <button className={styles.adminCreateBtn} onClick={() => setShowCreateApp(true)}><IconPlus /> Criar primeiro app</button>}
-              </div>
-            ) : (
-              <div className={styles.categoryRows}>
-                {appsByCategory.map(category => (
-                  <section key={category.id} className={styles.categoryRowSection}>
-                    <div className={styles.categoryRowHeader}>
-                      <h3 className={styles.categoryRowTitle}>{category.name}</h3>
-                      <span className={styles.sectionCount}>{category.apps.length} apps</span>
-                    </div>
-                    <div className={styles.netflixRow}>
-                      {category.apps.map((app, i) => (
-                        <AppCard key={app.id} app={app} index={i} categoryLabel={getCategoryLabel(app.category)} />
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
+            <StreamingAppsView
+              userName={user.name}
+              isAdmin={isAdmin}
+              allCategories={allCategories}
+              activeCategory={activeCategory}
+              loadingApps={loadingApps}
+              filteredApps={filteredApps}
+              appsByCategory={appsByCategory}
+              getCategoryLabel={getCategoryLabel}
+              onCategoryChange={handleCategoryClick}
+              onCreateCategory={() => setShowCreateCat(true)}
+              onCreateApp={() => setShowCreateApp(true)}
+            />
           </div>
         )}
 
