@@ -232,13 +232,9 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
     return () => { window.speechSynthesis?.cancel() }
   }, [])
 
-  // Auto-analyze whenever the number of lancamentos changes
+  // Keep ref in sync so re-analysis button is always available
   useEffect(() => {
-    if (lancamentos.length === 0) return
-    if (lancamentos.length === lastCountRef.current) return
     lastCountRef.current = lancamentos.length
-    analisarDre()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lancamentos.length])
 
   const rendered = useMemo(() => renderMarkdownSafe(analysis), [analysis])
@@ -253,7 +249,7 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
           <span className={styles.panelEyebrow}>IA • Groq</span>
           <h2 className={styles.panelTitle}>Assistente de DRE</h2>
           <p className={styles.panelDesc}>
-            Análise automática dos seus lançamentos com inteligência artificial.
+            Análise dos seus lançamentos com inteligência artificial. Clique em "Gerar Análise" quando quiser.
           </p>
         </div>
 
@@ -271,6 +267,14 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
                 </strong>
               </div>
             </div>
+
+            <button
+              className={styles.generateBtn}
+              onClick={analisarDre}
+              disabled={loading}
+            >
+              {loading ? '…' : '✦ Gerar Análise'}
+            </button>
 
             {analysis && !loading && (
               <div className={styles.audioControls}>
@@ -338,7 +342,16 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       {!loading && !error && !analysis && (
         <div className={styles.emptyWrap}>
           <span className={styles.emptyIcon}>📊</span>
-          <p>Adicione lançamentos para a IA analisar automaticamente.</p>
+          <p>
+            {hasData
+              ? 'Clique no botão abaixo para a IA analisar seus lançamentos.'
+              : 'Adicione lançamentos e clique em "Gerar Análise" para começar.'}
+          </p>
+          {hasData && (
+            <button className={styles.generateBtn} onClick={analisarDre} disabled={loading}>
+              ✦ Gerar Análise com IA
+            </button>
+          )}
         </div>
       )}
 

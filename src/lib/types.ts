@@ -97,36 +97,39 @@ export interface Database {
       }
       dre_lancamentos: {
         Row: {
-          id:            string
-          user_id:       string | null
-          descricao:     string | null
-          valor:         number
-          tipo:          'receita' | 'despesa'
-          classificacao: string
-          grupo:         string
-          created_at:    string
-          updated_at:    string
+          id:                string
+          user_id:           string | null
+          descricao:         string | null
+          valor:             number
+          tipo:              'receita' | 'despesa'
+          classificacao:     string
+          grupo:             string
+          data_lancamento:   string | null
+          created_at:        string
+          updated_at:        string
         }
         Insert: {
-          id?:            string
-          user_id?:       string | null
-          descricao?:     string | null
-          valor:          number
-          tipo:           'receita' | 'despesa'
-          classificacao:  string
-          grupo:          string
-          created_at?:    string
-          updated_at?:    string
+          id?:               string
+          user_id?:          string | null
+          descricao?:        string | null
+          valor:             number
+          tipo:              'receita' | 'despesa'
+          classificacao:     string
+          grupo:             string
+          data_lancamento?:  string | null
+          created_at?:       string
+          updated_at?:       string
         }
         Update: {
-          id?:            string
-          user_id?:       string | null
-          descricao?:     string | null
-          valor?:         number
-          tipo?:          'receita' | 'despesa'
-          classificacao?: string
-          grupo?:         string
-          updated_at?:    string
+          id?:               string
+          user_id?:          string | null
+          descricao?:        string | null
+          valor?:            number
+          tipo?:             'receita' | 'despesa'
+          classificacao?:    string
+          grupo?:            string
+          data_lancamento?:  string | null
+          updated_at?:       string
         }
         Relationships: []
       }

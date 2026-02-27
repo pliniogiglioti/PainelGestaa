@@ -6,23 +6,74 @@ import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePa
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
-type Step = 1 | 2 | 3 | 4 | 5
+type Step = 1 | 2 | 3 | 4 | 5 | 6
 
 type FormState = {
-  descricao:         string
-  valor:             string
-  tipo:              '' | 'receita' | 'despesa'  // Step 3: entrada ou saída
-  classificacaoNome: string                        // Step 4: categoria específica
-  grupo:             string                        // Step 5: grupo livre
+  tipo:              '' | 'receita' | 'despesa'  // Step 1: entrada ou saída
+  data:              string                        // Step 2: data do lançamento
+  descricao:         string                        // Step 3: descrição
+  valor:             string                        // Step 4: valor
+  classificacaoNome: string                        // Step 5: categoria específica
+  grupo:             string                        // Step 6: grupo livre
 }
 
+const today = () => new Date().toISOString().split('T')[0]
+
 const INITIAL_FORM: FormState = {
-  descricao: '', valor: '', tipo: '', classificacaoNome: '', grupo: '',
+  tipo: '', data: today(), descricao: '', valor: '', classificacaoNome: '', grupo: '',
 }
 
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const pct   = (v: number) => `${v.toFixed(1)}%`
+
+// ── Simple helpers to categorise expenses by grupo / classificacao keywords ──
+
+function somaDesp(lancamentos: DreLancamento[], keywords: string[]): number {
+  return lancamentos
+    .filter(l => {
+      if (l.tipo !== 'despesa') return false
+      const haystack = `${l.grupo ?? ''} ${l.classificacao ?? ''}`.toLowerCase()
+      return keywords.some(k => haystack.includes(k))
+    })
+    .reduce((s, l) => s + Number(l.valor), 0)
+}
+
+// ── KPI calculations ──
+
+function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
+  const deducoes = somaDesp(lancamentos, ['deduç', 'cancelamento', 'tarifa de cartão'])
+  const receitaLiquida = totalReceitas - deducoes
+
+  const custos = somaDesp(lancamentos, ['custo', 'cmv', 'produto', 'serviço prestado', 'frete de venda'])
+
+  const despesasOper = somaDesp(lancamentos, [
+    'pessoal', 'salário', 'pró-labore', 'administrativ', 'comercial',
+    'marketing', 'publicidade', 'ti', 'softwares', 'aluguel', 'energia', 'internet',
+  ])
+
+  const impostos = somaDesp(lancamentos, ['imposto', 'simples', 'presumido', 'tributo'])
+
+  const margemContrib = receitaLiquida - custos
+  const ebitda        = margemContrib - despesasOper
+  const ebit          = ebitda  // no D&A data in this system
+  const nopat         = ebit - impostos
+
+  const base = receitaLiquida > 0 ? receitaLiquida : 1 // avoid div/0
+
+  return {
+    receitaOperacional: totalReceitas,
+    margemContribPct:   (margemContrib / base) * 100,
+    ebitdaPct:          (ebitda / base) * 100,
+    ebitPct:            (ebit / base) * 100,
+    nopatPct:           (nopat / base) * 100,
+    receitaLiquida,
+    semDados:           receitaLiquida === 0 && totalReceitas === 0,
+  }
+}
+
+// ── Components ──
 
 function StatCard({ title, value, tone = 'default' }: {
   title: string; value: string; tone?: 'default' | 'positive' | 'negative'
@@ -35,12 +86,24 @@ function StatCard({ title, value, tone = 'default' }: {
   )
 }
 
+function KpiCard({ title, value, hint, tone = 'default' }: {
+  title: string; value: string; hint: string; tone?: 'default' | 'positive' | 'negative' | 'neutral'
+}) {
+  return (
+    <article className={`${styles.kpiCard} ${tone === 'positive' ? styles.kpiPositive : ''} ${tone === 'negative' ? styles.kpiNegative : ''} ${tone === 'neutral' ? styles.kpiNeutral : ''}`}>
+      <span className={styles.kpiTitle}>{title}</span>
+      <strong className={styles.kpiValue}>{value}</strong>
+      <p className={styles.kpiHint}>{hint}</p>
+    </article>
+  )
+}
+
 const STEP_LABELS: Record<Step, string> = {
-  1: 'Tipo', 2: 'Descrição', 3: 'Valor', 4: 'Classificação', 5: 'Grupo',
+  1: 'Tipo', 2: 'Data', 3: 'Descrição', 4: 'Valor', 5: 'Classificação', 6: 'Grupo',
 }
 
 function StepProgress({ current }: { current: Step }) {
-  const steps: Step[] = [1, 2, 3, 4, 5]
+  const steps: Step[] = [1, 2, 3, 4, 5, 6]
   return (
     <div className={styles.stepProgress}>
       {steps.map((s, i) => {
@@ -99,6 +162,7 @@ export default function AnaliseDrePage() {
       .from('dre_lancamentos')
       .select('*')
       .eq('user_id', userId)
+      .order('data_lancamento', { ascending: false })
       .order('created_at', { ascending: false })
 
     if (error) { setError(error.message); return }
@@ -117,6 +181,7 @@ export default function AnaliseDrePage() {
     setGrupos(data ?? [])
   }
 
+  // Load data on mount
   useEffect(() => { fetchLancamentos(); fetchClassificacoes(); fetchGrupos() }, [])
 
   const valorNumerico = useMemo(() => {
@@ -124,7 +189,6 @@ export default function AnaliseDrePage() {
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
   }, [form.valor])
 
-  // Map classificacao nome → tipo for the totals (handles both legacy 'receita'/'despesa' and new names)
   const tipoMap = useMemo(() =>
     Object.fromEntries(classificacoes.map(c => [c.nome, c.tipo])),
   [classificacoes])
@@ -142,6 +206,11 @@ export default function AnaliseDrePage() {
 
   const resultado = totais.receitas - totais.despesas
 
+  const kpis = useMemo(
+    () => calcularKpis(lancamentos, totais.receitas),
+    [lancamentos, totais.receitas],
+  )
+
   const gruposExistentes = useMemo(() =>
     [...new Set([
       ...grupos.map(g => g.nome).filter(Boolean),
@@ -149,7 +218,6 @@ export default function AnaliseDrePage() {
     ])].slice(0, 12),
   [grupos, lancamentos])
 
-  // Classifications filtered by the tipo chosen in step 3
   const classificacoesFiltradas = useMemo(() =>
     form.tipo ? classificacoes.filter(c => c.tipo === form.tipo) : classificacoes,
   [classificacoes, form.tipo])
@@ -173,11 +241,12 @@ export default function AnaliseDrePage() {
   const openEditWizard = (item: DreLancamento) => {
     setEditingId(item.id)
     setForm({
-      descricao: item.descricao ?? '',
-      valor: String(item.valor),
-      tipo: item.tipo,
+      tipo:              item.tipo,
+      data:              item.data_lancamento ?? today(),
+      descricao:         item.descricao ?? '',
+      valor:             String(item.valor),
       classificacaoNome: item.classificacao,
-      grupo: item.grupo,
+      grupo:             item.grupo,
     })
     setStep(1)
     setError('')
@@ -185,6 +254,7 @@ export default function AnaliseDrePage() {
     setAiWarning('')
     setShowWizard(true)
   }
+
   const closeWizard = () => {
     setShowWizard(false)
     setEditingId(null)
@@ -207,7 +277,6 @@ export default function AnaliseDrePage() {
 
     if (!error) return { ok: true as const }
 
-    // Fallback defensivo para ambientes em que o upsert conflita com schema legado.
     const { error: insertError } = await supabase
       .from('dre_grupos')
       .insert({ nome: grupoNome, tipo: tipoGrupo, ativo: true })
@@ -219,10 +288,10 @@ export default function AnaliseDrePage() {
     return { ok: true as const }
   }
 
-  // After step 3 (valor): AI identifies classificacao + grupo (tipo already chosen in step 1)
-  const goToStep4 = async () => {
+  // After step 4 (valor): AI identifies classificacao + grupo
+  const goToStep5 = async () => {
     if (valorNumerico <= 0) return
-    setStep(4)
+    setStep(5)
     setAiLoading(true)
     setAiError('')
     setAiWarning('')
@@ -233,7 +302,6 @@ export default function AnaliseDrePage() {
         .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
       const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
 
-      // Only send classifications matching the tipo the user already chose
       const classesDoTipo = classificacoes
         .filter(c => c.tipo === form.tipo)
         .map(c => ({ nome: c.nome, tipo: c.tipo }))
@@ -257,15 +325,9 @@ export default function AnaliseDrePage() {
         const grupoIa = String(data.grupo ?? '').trim()
         const classificacaoIa = String(data.classificacao_nome ?? '').trim()
 
-        setForm(p => ({
-          ...p,
-          classificacaoNome: classificacaoIa,
-          grupo:             grupoIa,
-        }))
+        setForm(p => ({ ...p, classificacaoNome: classificacaoIa, grupo: grupoIa }))
 
-        if (data?.aviso) {
-          setAiWarning(String(data.aviso))
-        }
+        if (data?.aviso) setAiWarning(String(data.aviso))
 
         if (grupoIa) {
           const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
@@ -292,9 +354,10 @@ export default function AnaliseDrePage() {
     setSaving(true)
     const { data: authData } = await supabase.auth.getUser()
 
-    const classificacaoNome = form.classificacaoNome.trim()
-    const grupoNome = form.grupo.trim()
-    const tipoClassificacao = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
+    const classificacaoNome  = form.classificacaoNome.trim()
+    const grupoNome          = form.grupo.trim()
+    const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
+    const dataLancamento     = form.data || today()
 
     const { error: classError } = await supabase
       .from('dre_classificacoes')
@@ -314,24 +377,17 @@ export default function AnaliseDrePage() {
     }
 
     const payload = {
-      descricao:     form.descricao.trim() || null,
-      valor:         valorNumerico,
-      tipo:          tipoClassificacao,
-      classificacao: classificacaoNome,
-      grupo:         grupoNome,
+      descricao:        form.descricao.trim() || null,
+      valor:            valorNumerico,
+      tipo:             tipoClassificacao,
+      classificacao:    classificacaoNome,
+      grupo:            grupoNome,
+      data_lancamento:  dataLancamento,
     }
 
     const { error } = editingId
-      ? await supabase
-          .from('dre_lancamentos')
-          .update(payload)
-          .eq('id', editingId)
-      : await supabase
-          .from('dre_lancamentos')
-          .insert({
-            ...payload,
-            user_id: authData.user?.id ?? null,
-          })
+      ? await supabase.from('dre_lancamentos').update(payload).eq('id', editingId)
+      : await supabase.from('dre_lancamentos').insert({ ...payload, user_id: authData.user?.id ?? null })
 
     setSaving(false)
     if (error) { setError(error.message); return }
@@ -344,6 +400,14 @@ export default function AnaliseDrePage() {
       ?? (classificacao === 'receita' ? 'receita' : classificacao === 'despesa' ? 'despesa' : null)
     return tipo === 'receita' ? styles.receitaPill : styles.despesaPill
   }
+
+  const formatDate = (item: DreLancamento) => {
+    const src = item.data_lancamento ?? item.created_at
+    return new Date(src).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+  }
+
+  const kpiTone = (v: number): 'positive' | 'negative' | 'neutral' =>
+    v > 0 ? 'positive' : v < 0 ? 'negative' : 'neutral'
 
   return (
     <div className={styles.page}>
@@ -358,14 +422,59 @@ export default function AnaliseDrePage() {
         <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
       </header>
 
+      {/* ── Stats ── */}
       <section className={styles.statsGrid}>
         <StatCard title="Receitas"  value={moeda(totais.receitas)} tone="positive" />
         <StatCard title="Despesas"  value={moeda(totais.despesas)} tone="negative" />
         <StatCard title="Resultado" value={moeda(resultado)} tone={resultado >= 0 ? 'positive' : 'negative'} />
       </section>
 
+      {/* ── KPI Cards ── */}
+      {lancamentos.length > 0 && (
+        <section className={styles.kpiSection}>
+          <h3 className={styles.kpiSectionTitle}>Indicadores DRE</h3>
+          <div className={styles.kpiGrid}>
+            <KpiCard
+              title="Receitas Operacionais"
+              value={moeda(kpis.receitaOperacional)}
+              hint="Total que entrou no período (vendas + serviços)."
+              tone="positive"
+            />
+            <KpiCard
+              title="Margem de Contribuição"
+              value={pct(kpis.margemContribPct)}
+              hint="Quanto sobra das receitas após pagar os custos diretos (produto/serviço)."
+              tone={kpiTone(kpis.margemContribPct)}
+            />
+            <KpiCard
+              title="EBITDA"
+              value={pct(kpis.ebitdaPct)}
+              hint="Resultado antes de impostos e financiamentos — mostra a eficiência do negócio."
+              tone={kpiTone(kpis.ebitdaPct)}
+            />
+            <KpiCard
+              title="EBIT"
+              value={pct(kpis.ebitPct)}
+              hint="Resultado operacional (sem depreciação/amortização cadastrada, igual ao EBITDA)."
+              tone={kpiTone(kpis.ebitPct)}
+            />
+            <KpiCard
+              title="NOPAT (Resultado Op.)"
+              value={pct(kpis.nopatPct)}
+              hint="Resultado operacional após impostos — o que o negócio gera de verdade."
+              tone={kpiTone(kpis.nopatPct)}
+            />
+          </div>
+          <p className={styles.kpiDisclaimer}>
+            * Indicadores calculados com base nos lançamentos cadastrados e seus grupos. Quanto mais detalhado seu lançamento, mais preciso o cálculo.
+          </p>
+        </section>
+      )}
+
+      {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentos} />
 
+      {/* ── Lançamentos ── */}
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
           <div>
@@ -382,7 +491,7 @@ export default function AnaliseDrePage() {
             <tbody>
               {lancamentos.map(item => (
                 <tr key={item.id}>
-                  <td>{new Date(item.created_at).toLocaleDateString('pt-BR')}</td>
+                  <td>{formatDate(item)}</td>
                   <td>{item.descricao ?? '—'}</td>
                   <td>
                     <span className={`${styles.tablePill} ${getPillClass(item.classificacao, item.tipo)}`}>
@@ -411,6 +520,7 @@ export default function AnaliseDrePage() {
         </div>
       </section>
 
+      {/* ── Wizard modal ── */}
       {showWizard && (
         <div className={styles.modalOverlay} onClick={closeWizard}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
@@ -422,7 +532,7 @@ export default function AnaliseDrePage() {
 
             <StepProgress current={step} />
 
-            {/* ── STEP 1: Tipo (Venda ou Compra?) ── */}
+            {/* ── STEP 1: Tipo ── */}
             {step === 1 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>O que foi isso?</label>
@@ -457,8 +567,30 @@ export default function AnaliseDrePage() {
               </div>
             )}
 
-            {/* ── STEP 2: Descrição ── */}
+            {/* ── STEP 2: Data ── */}
             {step === 2 && (
+              <div className={styles.wizardStep}>
+                <label className={styles.wizardLabel}>Em qual data?</label>
+                <p className={styles.wizardHint}>
+                  Informe quando aconteceu esse {form.tipo === 'receita' ? 'recebimento' : 'pagamento'}.
+                </p>
+                <input
+                  type="date"
+                  className={styles.wizardInput}
+                  value={form.data}
+                  onChange={e => setForm(p => ({ ...p, data: e.target.value }))}
+                  max={today()}
+                  autoFocus
+                />
+                <button className={styles.submit} disabled={!form.data} onClick={() => setStep(3)}>
+                  Próximo →
+                </button>
+                <button className={styles.backBtn} onClick={() => setStep(1)}>← Voltar</button>
+              </div>
+            )}
+
+            {/* ── STEP 3: Descrição ── */}
+            {step === 3 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>
                   {form.tipo === 'receita' ? 'O que você vendeu ou recebeu?' : 'O que você comprou ou pagou?'}
@@ -470,15 +602,15 @@ export default function AnaliseDrePage() {
                   placeholder={form.tipo === 'receita' ? 'Ex: Pagamento pelo serviço de design' : 'Ex: Compra de material de escritório'}
                   autoFocus
                 />
-                <button className={styles.submit} disabled={!form.descricao.trim()} onClick={() => setStep(3)}>
+                <button className={styles.submit} disabled={!form.descricao.trim()} onClick={() => setStep(4)}>
                   Próximo →
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(1)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
               </div>
             )}
 
-            {/* ── STEP 3: Valor ── */}
-            {step === 3 && (
+            {/* ── STEP 4: Valor ── */}
+            {step === 4 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>Qual é o valor?</label>
                 <input
@@ -489,15 +621,15 @@ export default function AnaliseDrePage() {
                   inputMode="decimal"
                   autoFocus
                 />
-                <button className={styles.submit} disabled={valorNumerico <= 0} onClick={goToStep4}>
+                <button className={styles.submit} disabled={valorNumerico <= 0} onClick={goToStep5}>
                   Próximo →
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(2)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(3)}>← Voltar</button>
               </div>
             )}
 
-            {/* ── STEP 4: Classificação (listbox filtrado pelo tipo) ── */}
-            {step === 4 && (
+            {/* ── STEP 5: Classificação ── */}
+            {step === 5 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>Como classificar?</label>
 
@@ -560,16 +692,16 @@ export default function AnaliseDrePage() {
                 <button
                   className={styles.submit}
                   disabled={!form.classificacaoNome || aiLoading}
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(6)}
                 >
                   Próximo →
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(3)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(4)}>← Voltar</button>
               </div>
             )}
 
-            {/* ── STEP 5: Grupo ── */}
-            {step === 5 && (
+            {/* ── STEP 6: Grupo ── */}
+            {step === 6 && (
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>Grupo / Categoria</label>
 
@@ -606,6 +738,7 @@ export default function AnaliseDrePage() {
                 )}
 
                 <div className={styles.summary}>
+                  <div className={styles.summaryRow}><span>Data</span><strong>{new Date(form.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></div>
                   <div className={styles.summaryRow}><span>Descrição</span><strong>{form.descricao}</strong></div>
                   <div className={styles.summaryRow}><span>Valor</span><strong>{moeda(valorNumerico)}</strong></div>
                   <div className={styles.summaryRow}><span>Classificação</span><strong>{form.classificacaoNome}</strong></div>
@@ -620,7 +753,7 @@ export default function AnaliseDrePage() {
                 >
                   {saving ? 'Salvando…' : editingId ? 'Salvar alterações' : 'Salvar lançamento'}
                 </button>
-                <button className={styles.backBtn} onClick={() => setStep(4)}>← Voltar</button>
+                <button className={styles.backBtn} onClick={() => setStep(5)}>← Voltar</button>
               </div>
             )}
 
