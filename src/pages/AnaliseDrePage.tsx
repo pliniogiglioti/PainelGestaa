@@ -480,19 +480,9 @@ export default function AnaliseDrePage() {
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
-          <div className={styles.panelHeaderLeft}>
-            <div>
-              <h2>Lançamentos</h2>
-              <span className={styles.stepIndicator}>{lancamentos.length} registros</span>
-            </div>
-            {lancamentos.length > 0 && (
-              <button
-                className={styles.gerarAnaliseBtn}
-                onClick={() => dreRef.current?.analisarDre()}
-              >
-                ✦ Gerar Análise
-              </button>
-            )}
+          <div>
+            <h2>Lançamentos</h2>
+            <span className={styles.stepIndicator}>{lancamentos.length} registros</span>
           </div>
           <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
         </div>

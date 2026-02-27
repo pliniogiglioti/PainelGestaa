@@ -263,6 +263,14 @@ function DreAssistentePanel({ lancamentos }, ref) {
 
         {hasData && (
           <div className={styles.headerRight}>
+            <button
+              className={styles.generateBtn}
+              onClick={analisarDre}
+              disabled={loading}
+            >
+              {loading ? '…' : '✦ Gerar Análise'}
+            </button>
+
             <div className={styles.miniStats}>
               <div className={styles.miniStat}>
                 <span className={styles.miniStatLabel}>Lançamentos</span>
