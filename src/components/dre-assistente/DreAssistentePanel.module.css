@@ -493,6 +493,11 @@
     gap: 1rem;
   }
 
+  .headerRight {
+    width: 100%;
+    align-items: stretch;
+  }
+
   .miniStats {
     width: 100%;
     justify-content: flex-start;
@@ -501,5 +506,12 @@
   .miniStat {
     align-items: flex-start;
     flex: 1;
+  }
+
+  .generateBtn {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+    text-align: center;
   }
 }
