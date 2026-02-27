@@ -210,6 +210,41 @@
 
 .stepIndicator { font-size: 12px; color: #9f9f9f; }
 
+/* ── Panel header left group ── */
+
+.panelHeaderLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+/* ── Gerar Análise button (Lançamentos header) ── */
+
+.gerarAnaliseBtn {
+  border: 1px solid rgba(213, 175, 69, 0.45);
+  border-radius: 10px;
+  background: rgba(213, 175, 69, 0.1);
+  color: #d5af45;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 7px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, opacity 0.15s ease;
+}
+
+.gerarAnaliseBtn:hover { background: rgba(213, 175, 69, 0.18); }
+
+@media (max-width: 600px) {
+  .gerarAnaliseBtn {
+    width: 100%;
+    padding: 11px 14px;
+    font-size: 13px;
+    text-align: center;
+  }
+}
+
 /* ── Botão novo lançamento ── */
 
 .newBtn {

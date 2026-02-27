@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import type { DreLancamento } from '../../lib/types'
 import { supabase } from '../../lib/supabase'
 import styles from './DreAssistentePanel.module.css'
 
 type DreAssistentePanelProps = {
   lancamentos: DreLancamento[]
+}
+
+export type DreAssistentePanelHandle = {
+  analisarDre: () => void
+  isLoading: boolean
 }
 
 // Validates that a URL is safe (http/https only)
@@ -116,7 +121,8 @@ function stripMarkdownForSpeech(text: string): string {
     .trim()
 }
 
-export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
+export const DreAssistentePanel = forwardRef<DreAssistentePanelHandle, DreAssistentePanelProps>(
+function DreAssistentePanel({ lancamentos }, ref) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [analysis, setAnalysis] = useState('')
@@ -175,6 +181,8 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       setLoading(false)
     }
   }
+
+  useImperativeHandle(ref, () => ({ analisarDre, isLoading: loading }), [loading, analisarDre])
 
   const startSpeech = (rate: number) => {
     if (!analysis || typeof window === 'undefined' || !window.speechSynthesis) return
@@ -268,14 +276,6 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
               </div>
             </div>
 
-            <button
-              className={styles.generateBtn}
-              onClick={analisarDre}
-              disabled={loading}
-            >
-              {loading ? '…' : '✦ Gerar Análise'}
-            </button>
-
             {analysis && !loading && (
               <div className={styles.audioControls}>
                 <button
@@ -363,4 +363,6 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       )}
     </section>
   )
-}
+})
+
+DreAssistentePanel.displayName = 'DreAssistentePanel'

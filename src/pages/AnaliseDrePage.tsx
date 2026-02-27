@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
 import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
+import type { DreAssistentePanelHandle } from '../components/dre-assistente/DreAssistentePanel'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -137,6 +138,8 @@ function AiSpinner() {
 }
 
 export default function AnaliseDrePage() {
+  const dreRef = useRef<DreAssistentePanelHandle>(null)
+
   const [showWizard,     setShowWizard]     = useState(false)
   const [editingId,      setEditingId]      = useState<string | null>(null)
   const [step,           setStep]           = useState<Step>(1)
@@ -472,14 +475,24 @@ export default function AnaliseDrePage() {
       )}
 
       {/* ── AI Assistant ── */}
-      <DreAssistentePanel lancamentos={lancamentos} />
+      <DreAssistentePanel ref={dreRef} lancamentos={lancamentos} />
 
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
-          <div>
-            <h2>Lançamentos</h2>
-            <span className={styles.stepIndicator}>{lancamentos.length} registros</span>
+          <div className={styles.panelHeaderLeft}>
+            <div>
+              <h2>Lançamentos</h2>
+              <span className={styles.stepIndicator}>{lancamentos.length} registros</span>
+            </div>
+            {lancamentos.length > 0 && (
+              <button
+                className={styles.gerarAnaliseBtn}
+                onClick={() => dreRef.current?.analisarDre()}
+              >
+                ✦ Gerar Análise
+              </button>
+            )}
           </div>
           <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
         </div>
