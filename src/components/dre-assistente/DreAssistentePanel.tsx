@@ -344,14 +344,9 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
           <span className={styles.emptyIcon}>📊</span>
           <p>
             {hasData
-              ? 'Clique no botão abaixo para a IA analisar seus lançamentos.'
-              : 'Adicione lançamentos e clique em "Gerar Análise" para começar.'}
+              ? 'Clique em "✦ Gerar Análise" para a IA analisar seus lançamentos.'
+              : 'Adicione lançamentos e clique em "✦ Gerar Análise" para começar.'}
           </p>
-          {hasData && (
-            <button className={styles.generateBtn} onClick={analisarDre} disabled={loading}>
-              ✦ Gerar Análise com IA
-            </button>
-          )}
         </div>
       )}
 
