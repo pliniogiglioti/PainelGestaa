@@ -247,7 +247,7 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       <div className={styles.panelHeader}>
         <div className={styles.panelMeta}>
           <span className={styles.panelEyebrow}>IA • Groq</span>
-          <h2 className={styles.panelTitle}>Assistente de DRE</h2>
+          <h2 className={styles.panelTitle}>Assistente de DFC</h2>
           <p className={styles.panelDesc}>
             Análise dos seus lançamentos com inteligência artificial. Clique em "Gerar Análise" quando quiser.
           </p>
