@@ -64,6 +64,10 @@ function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
 
   return {
     receitaOperacional: totalReceitas,
+    margemContrib,
+    ebitda,
+    ebit,
+    nopat,
     margemContribPct:   (margemContrib / base) * 100,
     ebitdaPct:          (ebitda / base) * 100,
     ebitPct:            (ebit / base) * 100,
@@ -86,13 +90,18 @@ function StatCard({ title, value, tone = 'default' }: {
   )
 }
 
-function KpiCard({ title, value, hint, tone = 'default' }: {
-  title: string; value: string; hint: string; tone?: 'default' | 'positive' | 'negative' | 'neutral'
+function KpiCard({ title, value, secondaryValue, hint, tone = 'default' }: {
+  title: string
+  value: string
+  secondaryValue?: string
+  hint: string
+  tone?: 'default' | 'positive' | 'negative' | 'neutral'
 }) {
   return (
     <article className={`${styles.kpiCard} ${tone === 'positive' ? styles.kpiPositive : ''} ${tone === 'negative' ? styles.kpiNegative : ''} ${tone === 'neutral' ? styles.kpiNeutral : ''}`}>
       <span className={styles.kpiTitle}>{title}</span>
       <strong className={styles.kpiValue}>{value}</strong>
+      {secondaryValue && <span className={styles.kpiSecondaryValue}>{secondaryValue}</span>}
       <p className={styles.kpiHint}>{hint}</p>
     </article>
   )
@@ -149,6 +158,8 @@ export default function AnaliseDrePage() {
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
+  const [mesFiltro,      setMesFiltro]      = useState('todos')
+  const [tipoFiltro,     setTipoFiltro]     = useState<'todos' | 'receita' | 'despesa'>('todos')
 
   const fetchLancamentos = async () => {
     const { data: authData } = await supabase.auth.getUser()
@@ -193,8 +204,33 @@ export default function AnaliseDrePage() {
     Object.fromEntries(classificacoes.map(c => [c.nome, c.tipo])),
   [classificacoes])
 
+  const mesOptions = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    return [...new Set(lancamentos.map(item => {
+      const src = item.data_lancamento ?? item.created_at
+      return src ? src.slice(0, 7) : ''
+    }).filter(Boolean))]
+      .sort((a, b) => b.localeCompare(a))
+      .map(value => ({ value, label: formatter.format(new Date(`${value}-01T00:00:00Z`)) }))
+  }, [lancamentos])
+
+  const lancamentosFiltrados = useMemo(() => {
+    return lancamentos.filter(item => {
+      const tipoItem = item.tipo
+        ?? tipoMap[item.classificacao]
+        ?? (item.classificacao === 'receita' ? 'receita' : 'despesa')
+      if (tipoFiltro !== 'todos' && tipoItem !== tipoFiltro) return false
+
+      if (mesFiltro !== 'todos') {
+        const src = item.data_lancamento ?? item.created_at
+        if (!src || src.slice(0, 7) !== mesFiltro) return false
+      }
+      return true
+    })
+  }, [lancamentos, mesFiltro, tipoFiltro, tipoMap])
+
   const totais = useMemo(() =>
-    lancamentos.reduce((acc, item) => {
+    lancamentosFiltrados.reduce((acc, item) => {
       const tipo = item.tipo
         ?? tipoMap[item.classificacao]
         ?? (item.classificacao === 'receita' ? 'receita' : 'despesa')
@@ -202,13 +238,13 @@ export default function AnaliseDrePage() {
       else                   acc.despesas += Number(item.valor)
       return acc
     }, { receitas: 0, despesas: 0 }),
-  [lancamentos, tipoMap])
+  [lancamentosFiltrados, tipoMap])
 
   const resultado = totais.receitas - totais.despesas
 
   const kpis = useMemo(
-    () => calcularKpis(lancamentos, totais.receitas),
-    [lancamentos, totais.receitas],
+    () => calcularKpis(lancamentosFiltrados, totais.receitas),
+    [lancamentosFiltrados, totais.receitas],
   )
 
   const gruposExistentes = useMemo(() =>
@@ -416,7 +452,7 @@ export default function AnaliseDrePage() {
       <header className={styles.header}>
         <div>
           <p className={styles.eyebrow}>Financeiro • Aplicativo interno</p>
-          <h1>Análise DRE</h1>
+          <h1>Análise DFC</h1>
           <p className={styles.subtitle}>Acompanhe receitas, despesas e o resultado do período em tempo real.</p>
         </div>
         <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
@@ -430,9 +466,9 @@ export default function AnaliseDrePage() {
       </section>
 
       {/* ── KPI Cards ── */}
-      {lancamentos.length > 0 && (
+      {lancamentosFiltrados.length > 0 && (
         <section className={styles.kpiSection}>
-          <h3 className={styles.kpiSectionTitle}>Indicadores DRE</h3>
+          <h3 className={styles.kpiSectionTitle}>Indicadores DFC</h3>
           <div className={styles.kpiGrid}>
             <KpiCard
               title="Receitas Operacionais"
@@ -443,24 +479,28 @@ export default function AnaliseDrePage() {
             <KpiCard
               title="Margem de Contribuição"
               value={pct(kpis.margemContribPct)}
+              secondaryValue={moeda(kpis.margemContrib)}
               hint="Quanto sobra das receitas após pagar os custos diretos (produto/serviço)."
               tone={kpiTone(kpis.margemContribPct)}
             />
             <KpiCard
               title="EBITDA"
               value={pct(kpis.ebitdaPct)}
+              secondaryValue={moeda(kpis.ebitda)}
               hint="Resultado antes de impostos e financiamentos — mostra a eficiência do negócio."
               tone={kpiTone(kpis.ebitdaPct)}
             />
             <KpiCard
               title="EBIT"
               value={pct(kpis.ebitPct)}
+              secondaryValue={moeda(kpis.ebit)}
               hint="Resultado operacional (sem depreciação/amortização cadastrada, igual ao EBITDA)."
               tone={kpiTone(kpis.ebitPct)}
             />
             <KpiCard
               title="NOPAT (Resultado Op.)"
               value={pct(kpis.nopatPct)}
+              secondaryValue={moeda(kpis.nopat)}
               hint="Resultado operacional após impostos — o que o negócio gera de verdade."
               tone={kpiTone(kpis.nopatPct)}
             />
@@ -472,16 +512,41 @@ export default function AnaliseDrePage() {
       )}
 
       {/* ── AI Assistant ── */}
-      <DreAssistentePanel lancamentos={lancamentos} />
+      <DreAssistentePanel lancamentos={lancamentosFiltrados} />
 
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
           <div>
             <h2>Lançamentos</h2>
-            <span className={styles.stepIndicator}>{lancamentos.length} registros</span>
+            <span className={styles.stepIndicator}>{lancamentosFiltrados.length} registros</span>
           </div>
-          <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
+          <div className={styles.filtersRow}>
+            <label className={styles.filterLabel}>
+              Mês
+              <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={styles.filterSelect}>
+                <option value="todos">Todos os meses</option>
+                {mesOptions.map(option => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>
+              Tipo
+              <select
+                value={tipoFiltro}
+                onChange={e => setTipoFiltro(e.target.value as 'todos' | 'receita' | 'despesa')}
+                className={styles.filterSelect}
+              >
+                <option value="todos">Despesas e Resultado</option>
+                <option value="despesa">Somente despesas</option>
+                <option value="receita">Somente resultado (receitas)</option>
+              </select>
+            </label>
+
+            <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
+          </div>
         </div>
         <div className={styles.tableWrap}>
           <table>
@@ -489,7 +554,7 @@ export default function AnaliseDrePage() {
               <tr><th>Data</th><th>Descrição</th><th>Classificação</th><th>Grupo</th><th>Valor</th><th>Ações</th></tr>
             </thead>
             <tbody>
-              {lancamentos.map(item => (
+              {lancamentosFiltrados.map(item => (
                 <tr key={item.id}>
                   <td>{formatDate(item)}</td>
                   <td>{item.descricao ?? '—'}</td>
@@ -507,7 +572,7 @@ export default function AnaliseDrePage() {
                   </td>
                 </tr>
               ))}
-              {lancamentos.length === 0 && (
+              {lancamentosFiltrados.length === 0 && (
                 <tr>
                   <td colSpan={6} className={styles.empty}>
                     Nenhum lançamento ainda.{' '}
