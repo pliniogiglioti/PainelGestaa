@@ -260,6 +260,13 @@
   min-width: 170px;
 }
 
+.filterSelectAdmin {
+  border-color: rgba(213, 175, 69, 0.4);
+  background: rgba(213, 175, 69, 0.07);
+  color: #d5af45;
+  min-width: 200px;
+}
+
 /* ── Table ── */
 
 .tableWrap { overflow-x: auto; }
