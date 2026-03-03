@@ -18,18 +18,7 @@ interface LinhaClassificada extends LinhaExtrato {
   status: 'ok' | 'erro'
 }
 
-interface ClassificacaoItem {
-  nome: string
-  total: number
-  lancamentos: LinhaClassificada[]
-}
-
-interface GrupoResult {
-  nome: string
-  tipo: 'receita' | 'despesa'
-  total: number
-  classificacoes: ClassificacaoItem[]
-}
+type Fase = 'idle' | 'processando' | 'revisao' | 'salvando' | 'concluido'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -96,9 +85,7 @@ const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
 /** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
-function classificarLocal(
-  descricao: string,
-): { classificacao: string; grupo: string } | null {
+function classificarLocal(descricao: string): { classificacao: string; grupo: string } | null {
   const text = normalize(descricao)
   for (const rule of FALLBACK_RULES) {
     if (rule.pattern.test(text)) {
@@ -110,6 +97,13 @@ function classificarLocal(
 
 const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+/** Converte DD/MM/AAAA → AAAA-MM-DD para salvar no banco */
+function toISO(dataBR: string): string {
+  const parts = dataBR.split('/')
+  if (parts.length === 3 && parts[2].length === 4) return `${parts[2]}-${parts[1]}-${parts[0]}`
+  return dataBR
+}
 
 /** Tenta detectar colunas pelo cabeçalho (case-insensitive). */
 function detectarColunas(headers: string[]): {
@@ -130,21 +124,18 @@ function detectarColunas(headers: string[]): {
 function parseValor(raw: unknown): number {
   if (typeof raw === 'number') return Math.abs(raw)
   const s = String(raw ?? '').trim().replace(/\s/g, '')
-  // Remove símbolo de moeda
   const clean = s.replace(/[R$]/g, '').trim()
-  // Formato brasileiro: 1.234,56
   if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(clean)) {
     return Math.abs(parseFloat(clean.replace(/\./g, '').replace(',', '.')))
   }
-  // Formato americano: 1,234.56
   return Math.abs(parseFloat(clean.replace(/,/g, '')) || 0)
 }
 
 /** Detecta se é entrada ou saída */
 function parseTipo(raw: unknown, valor: number): 'receita' | 'despesa' {
-  if (valor < 0) return 'despesa'  // número negativo → saída
+  if (valor < 0) return 'despesa'
   const s = String(raw ?? '').toLowerCase().trim()
-  if (!s) return 'receita'         // sem coluna tipo e valor positivo → entrada
+  if (!s) return 'receita'
   if (
     s.includes('entra') || s.includes('créd') || s.includes('cred') ||
     s.includes('c ') || s === 'c' || s.includes('receita') || s === '+'
@@ -155,15 +146,12 @@ function parseTipo(raw: unknown, valor: number): 'receita' | 'despesa' {
 /** Formata data de vários formatos para DD/MM/AAAA */
 function formatarData(raw: unknown): string {
   if (!raw) return new Date().toLocaleDateString('pt-BR')
-  // Número serial do Excel
   if (typeof raw === 'number') {
     const d = new Date(Math.round((raw - 25569) * 86400 * 1000))
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
   }
   const s = String(raw).trim()
-  // Já está no formato DD/MM/AAAA
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s
-  // AAAA-MM-DD
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
     const [y, m, d] = s.split('-')
     return `${d.slice(0,2)}/${m}/${y}`
@@ -205,33 +193,7 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   return linhas
 }
 
-/** Agrupa linhas classificadas por grupo e classificação */
-function agrupar(linhas: LinhaClassificada[]): GrupoResult[] {
-  const map = new Map<string, GrupoResult>()
-
-  for (const l of linhas) {
-    const key = l.grupo || 'Sem grupo'
-    if (!map.has(key)) {
-      map.set(key, { nome: key, tipo: l.tipo, total: 0, classificacoes: [] })
-    }
-    const g = map.get(key)!
-    g.total += l.valor
-
-    let clf = g.classificacoes.find(c => c.nome === l.classificacao)
-    if (!clf) {
-      clf = { nome: l.classificacao || 'Sem classificação', total: 0, lancamentos: [] }
-      g.classificacoes.push(clf)
-    }
-    clf.total += l.valor
-    clf.lancamentos.push(l)
-  }
-
-  // Ordenar: receitas antes, depois despesas, cada um por total desc
-  return [...map.values()].sort((a, b) => {
-    if (a.tipo !== b.tipo) return a.tipo === 'receita' ? -1 : 1
-    return b.total - a.total
-  })
-}
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
@@ -240,33 +202,52 @@ export function ExtratoUpload() {
   const [dragging, setDragging]           = useState(false)
   const [arquivo, setArquivo]             = useState<string>('')
   const [progresso, setProgresso]         = useState<{ atual: number; total: number } | null>(null)
-  const [grupos, setGrupos]               = useState<GrupoResult[]>([])
-  const [erros, setErros]                 = useState<string[]>([])
-  const [expandidos, setExpandidos]       = useState<Set<string>>(new Set())
-  const [expandidosClf, setExpandidosClf] = useState<Set<string>>(new Set())
-  const [processando, setProcessando]     = useState(false)
+  const [fase, setFase]                   = useState<Fase>('idle')
+  const [linhasClass, setLinhasClass]     = useState<LinhaClassificada[]>([])
+  const [selecionados, setSelecionados]   = useState<Set<number>>(new Set())
+  const [erroSalvar, setErroSalvar]       = useState<string>('')
+  const [sucessoSalvo, setSucessoSalvo]   = useState(0)
+  const [msgErroUpload, setMsgErroUpload] = useState<string>('')
 
-  const toggleGrupo = (key: string) =>
-    setExpandidos(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
+  const qtdErros       = linhasClass.filter(l => l.status === 'erro').length
+  const todosChecked   = selecionados.size === linhasClass.length && linhasClass.length > 0
+  const someChecked    = selecionados.size > 0 && !todosChecked
+  const totalSelecionado = [...selecionados].reduce((s, i) => s + linhasClass[i].valor, 0)
 
-  const toggleClf = (key: string) =>
-    setExpandidosClf(prev => {
-      const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
-      return next
-    })
+  const toggleItem = (i: number) => setSelecionados(prev => {
+    const next = new Set(prev)
+    next.has(i) ? next.delete(i) : next.add(i)
+    return next
+  })
+
+  const toggleTodos = () => {
+    if (todosChecked || someChecked) {
+      setSelecionados(new Set())
+    } else {
+      setSelecionados(new Set(linhasClass.map((_, i) => i)))
+    }
+  }
+
+  const desmarcarErros = () =>
+    setSelecionados(new Set(linhasClass.map((_, i) => i).filter(i => linhasClass[i].status === 'ok')))
+
+  const reiniciar = () => {
+    setFase('idle')
+    setArquivo('')
+    setLinhasClass([])
+    setSelecionados(new Set())
+    setErroSalvar('')
+    setSucessoSalvo(0)
+    setMsgErroUpload('')
+  }
 
   const processarArquivo = useCallback(async (file: File) => {
     setArquivo(file.name)
-    setGrupos([])
-    setErros([])
-    setExpandidos(new Set())
-    setExpandidosClf(new Set())
-    setProcessando(true)
+    setLinhasClass([])
+    setSelecionados(new Set())
+    setErroSalvar('')
+    setMsgErroUpload('')
+    setFase('processando')
     setProgresso(null)
 
     let linhas: LinhaExtrato[] = []
@@ -274,18 +255,17 @@ export function ExtratoUpload() {
       const buffer = await file.arrayBuffer()
       linhas = parsePlanilha(buffer)
     } catch {
-      setErros(['Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls) ou CSV válido.'])
-      setProcessando(false)
+      setMsgErroUpload('Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls) ou CSV válido.')
+      setFase('idle')
       return
     }
 
     if (linhas.length === 0) {
-      setErros(['Nenhuma linha com valor encontrada. Verifique o formato do arquivo.'])
-      setProcessando(false)
+      setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo.')
+      setFase('idle')
       return
     }
 
-    // Buscar modelo e classificações disponíveis do Supabase
     const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single(),
       supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
@@ -293,7 +273,7 @@ export function ExtratoUpload() {
     const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
 
-    // ── Passo 1: classificar localmente tudo que tiver match de regra ──────────
+    // ── Passo 1: classificar localmente ───────────────────────────────────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
     const indicesParaIA: number[] = []
 
@@ -308,13 +288,15 @@ export function ExtratoUpload() {
 
     setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length })
 
-    // ── Passo 2: enviar restantes em batch para a IA ──────────────────────────
-    const novosErros: string[] = []
-    const BATCH_IA = 15  // ~3-4K tokens por chamada, dentro do rate limit do Groq (12K/min)
+    // ── Passo 2: enviar em batch para IA (com delay para evitar rate limit) ───
+    const BATCH_IA = 15  // ~3-4K tokens por chamada, dentro do limite do Groq (12K/min)
+    const DELAY_ENTRE_BATCHES = 800  // ms — evita estourar o rate limit de tokens/min
 
     for (let b = 0; b < indicesParaIA.length; b += BATCH_IA) {
+      if (b > 0) await sleep(DELAY_ENTRE_BATCHES)
+
       const fatia = indicesParaIA.slice(b, b + BATCH_IA)
-      const lote = fatia.map(i => linhas[i])
+      const lote  = fatia.map(i => linhas[i])
 
       try {
         const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
@@ -327,7 +309,7 @@ export function ExtratoUpload() {
 
         if (error || !data?.resultados) throw new Error(error?.message ?? 'Sem resposta da IA')
 
-        const resultados: { classificacao_nome?: string; grupo?: string }[] = data.resultados
+        const resultados = data.resultados as { classificacao_nome?: string; grupo?: string }[]
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
           classificadas[linhaIdx] = {
@@ -339,19 +321,52 @@ export function ExtratoUpload() {
         })
       } catch {
         fatia.forEach(linhaIdx => {
-          classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não classificado', grupo: 'Outros', status: 'erro' }
-          novosErros.push(`"${linhas[linhaIdx].descricao}" — falha na classificação`)
+          classificadas[linhaIdx] = {
+            ...linhas[linhaIdx],
+            classificacao: 'Não classificado',
+            grupo: 'Outros',
+            status: 'erro',
+          }
         })
       }
 
-      setProgresso({ atual: (linhas.length - indicesParaIA.length) + Math.min(b + BATCH_IA, indicesParaIA.length), total: linhas.length })
+      setProgresso({
+        atual: (linhas.length - indicesParaIA.length) + Math.min(b + BATCH_IA, indicesParaIA.length),
+        total: linhas.length,
+      })
     }
 
-    setGrupos(agrupar(classificadas))
-    setErros(novosErros)
-    setProcessando(false)
+    const final = Array.from(classificadas)
+    setLinhasClass(final)
+    // Pré-seleciona só os classificados com sucesso; erros ficam desmarcados
+    setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok')))
+    setFase('revisao')
     setProgresso(null)
   }, [])
+
+  const salvarLancamentos = async () => {
+    setFase('salvando')
+    setErroSalvar('')
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      const toInsert = [...selecionados].sort((a, b) => a - b).map(i => ({
+        user_id:          user?.id ?? null,
+        descricao:        linhasClass[i].descricao,
+        valor:            linhasClass[i].valor,
+        tipo:             linhasClass[i].tipo,
+        classificacao:    linhasClass[i].classificacao,
+        grupo:            linhasClass[i].grupo,
+        data_lancamento:  toISO(linhasClass[i].data),
+      }))
+      const { error } = await supabase.from('dre_lancamentos').insert(toInsert)
+      if (error) throw new Error(error.message)
+      setSucessoSalvo(toInsert.length)
+      setFase('concluido')
+    } catch (e) {
+      setErroSalvar(`Erro ao salvar: ${e instanceof Error ? e.message : 'Desconhecido'}`)
+      setFase('revisao')
+    }
+  }
 
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -366,10 +381,6 @@ export function ExtratoUpload() {
     if (file) processarArquivo(file)
   }, [processarArquivo])
 
-  const totalReceitas  = grupos.filter(g => g.tipo === 'receita').reduce((s, g) => s + g.total, 0)
-  const totalDespesas  = grupos.filter(g => g.tipo === 'despesa').reduce((s, g) => s + g.total, 0)
-  const totalResultado = totalReceitas - totalDespesas
-
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
@@ -379,156 +390,188 @@ export function ExtratoUpload() {
             Envie um extrato de banco ou planilha Excel — a IA classifica cada lançamento automaticamente.
           </p>
         </div>
-        <a
-          href="/exemplos/exemplo.xlsx"
-          download
-          className={styles.downloadBtn}
-        >
+        <a href="/exemplos/exemplo.xlsx" download className={styles.downloadBtn}>
           ↓ Baixar exemplo .xlsx
         </a>
       </div>
 
-      {/* Drop zone */}
-      <div
-        className={`${styles.dropZone} ${dragging ? styles.dropZoneDragging : ''} ${processando ? styles.dropZoneLoading : ''}`}
-        onDragOver={e => { e.preventDefault(); setDragging(true) }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-        onClick={() => !processando && fileRef.current?.click()}
-      >
-        <input
-          ref={fileRef}
-          type="file"
-          accept=".xlsx,.xls,.csv"
-          style={{ display: 'none' }}
-          onChange={onFileChange}
-        />
-        {processando && progresso ? (
-          <div className={styles.progressWrap}>
-            <div className={styles.progressSpinner} />
-            <p className={styles.progressText}>
-              Classificando com IA… {progresso.atual} de {progresso.total}
-            </p>
-            <div className={styles.progressBar}>
-              <div
-                className={styles.progressFill}
-                style={{ width: `${(progresso.atual / progresso.total) * 100}%` }}
-              />
+      {/* ── Drop zone (idle / processando) ──────────────────────────────────── */}
+      {(fase === 'idle' || fase === 'processando') && (
+        <>
+          <div
+            className={`${styles.dropZone} ${dragging ? styles.dropZoneDragging : ''} ${fase === 'processando' ? styles.dropZoneLoading : ''}`}
+            onDragOver={e => { e.preventDefault(); setDragging(true) }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+            onClick={() => fase === 'idle' && fileRef.current?.click()}
+          >
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls,.csv"
+              style={{ display: 'none' }}
+              onChange={onFileChange}
+            />
+            {fase === 'processando' && progresso ? (
+              <div className={styles.progressWrap}>
+                <div className={styles.progressSpinner} />
+                <p className={styles.progressText}>
+                  Classificando com IA… {progresso.atual} de {progresso.total}
+                </p>
+                <div className={styles.progressBar}>
+                  <div
+                    className={styles.progressFill}
+                    style={{ width: `${(progresso.atual / progresso.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <>
+                <span className={styles.dropIcon}>📂</span>
+                <p className={styles.dropTitle}>
+                  {arquivo
+                    ? `Enviar outro arquivo (atual: ${arquivo})`
+                    : 'Arraste o arquivo aqui ou clique para selecionar'}
+                </p>
+                <p className={styles.dropHint}>Aceita .xlsx, .xls e .csv</p>
+              </>
+            )}
+          </div>
+          {msgErroUpload && (
+            <div className={styles.errosBox}>
+              <strong>⚠️ {msgErroUpload}</strong>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ── Revisão ─────────────────────────────────────────────────────────── */}
+      {(fase === 'revisao' || fase === 'salvando') && linhasClass.length > 0 && (
+        <div className={styles.reviewWrap}>
+
+          {/* Cabeçalho da revisão */}
+          <div className={styles.reviewHeader}>
+            <div className={styles.reviewTitleWrap}>
+              <strong className={styles.reviewTitle}>
+                Revise os {linhasClass.length} lançamentos classificados
+              </strong>
+              {qtdErros > 0 && (
+                <span className={styles.reviewErroBadge}>
+                  ⚠ {qtdErros} com atenção — desmarcados automaticamente
+                </span>
+              )}
+            </div>
+            <div className={styles.reviewActions}>
+              {qtdErros > 0 && (
+                <button
+                  className={styles.btnSecondary}
+                  onClick={desmarcarErros}
+                  disabled={fase === 'salvando'}
+                >
+                  Desmarcar com erro
+                </button>
+              )}
+              <button
+                className={styles.btnSecondary}
+                onClick={reiniciar}
+                disabled={fase === 'salvando'}
+              >
+                ↺ Novo arquivo
+              </button>
             </div>
           </div>
-        ) : (
-          <>
-            <span className={styles.dropIcon}>📂</span>
-            <p className={styles.dropTitle}>
-              {arquivo
-                ? `Enviar outro arquivo (atual: ${arquivo})`
-                : 'Arraste o arquivo aqui ou clique para selecionar'}
-            </p>
-            <p className={styles.dropHint}>Aceita .xlsx, .xls e .csv</p>
-          </>
-        )}
-      </div>
 
-      {/* Erros de classificação */}
-      {erros.length > 0 && (
-        <div className={styles.errosBox}>
-          <strong>⚠️ {erros.length} item(s) com problema na classificação</strong>
-          <ul>
-            {erros.slice(0, 5).map((e, i) => <li key={i}>{e}</li>)}
-            {erros.length > 5 && <li>…e mais {erros.length - 5}</li>}
-          </ul>
+          {erroSalvar && (
+            <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
+          )}
+
+          {/* Tabela de revisão */}
+          <div className={styles.reviewTableWrap}>
+            <table className={styles.reviewTable}>
+              <thead>
+                <tr>
+                  <th className={styles.checkCell}>
+                    <input
+                      type="checkbox"
+                      checked={todosChecked}
+                      ref={el => { if (el) el.indeterminate = someChecked }}
+                      onChange={toggleTodos}
+                      title="Selecionar / Desselecionar todos"
+                    />
+                  </th>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Tipo</th>
+                  <th>Classificação</th>
+                  <th>Grupo</th>
+                  <th className={styles.thValor}>Valor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {linhasClass.map((l, i) => (
+                  <tr
+                    key={i}
+                    className={[
+                      l.status === 'erro' ? styles.rowErro : '',
+                      selecionados.has(i) ? styles.rowSelecionada : styles.rowDesmarcada,
+                    ].join(' ')}
+                    onClick={() => toggleItem(i)}
+                  >
+                    <td className={styles.checkCell}>
+                      <input
+                        type="checkbox"
+                        checked={selecionados.has(i)}
+                        onChange={() => toggleItem(i)}
+                        onClick={e => e.stopPropagation()}
+                      />
+                    </td>
+                    <td className={styles.tdData}>{l.data}</td>
+                    <td className={styles.tdDesc} title={l.descricao}>{l.descricao}</td>
+                    <td>
+                      <span className={`${styles.tipoPill} ${l.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
+                        {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
+                      </span>
+                    </td>
+                    <td className={styles.tdClf}>{l.classificacao}</td>
+                    <td className={styles.tdGrupo}>{l.grupo}</td>
+                    <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
+                      {moeda(l.valor)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Rodapé com botão de salvar */}
+          <div className={styles.reviewFooter}>
+            <span className={styles.footerInfo}>
+              <strong>{selecionados.size}</strong> de {linhasClass.length} selecionados
+              {' · '}
+              Total: <strong>{moeda(totalSelecionado)}</strong>
+            </span>
+            <button
+              className={styles.btnPrimary}
+              onClick={salvarLancamentos}
+              disabled={selecionados.size === 0 || fase === 'salvando'}
+            >
+              {fase === 'salvando'
+                ? 'Salvando…'
+                : `Enviar ${selecionados.size} para Lançamentos →`}
+            </button>
+          </div>
         </div>
       )}
 
-      {/* Resultados agrupados */}
-      {grupos.length > 0 && (
-        <>
-          {/* Totalizador geral */}
-          <div className={styles.resumoRow}>
-            <div className={styles.resumoCard} data-tone="positive">
-              <span>Total Receitas</span>
-              <strong>{moeda(totalReceitas)}</strong>
-            </div>
-            <div className={styles.resumoCard} data-tone="negative">
-              <span>Total Despesas</span>
-              <strong>{moeda(totalDespesas)}</strong>
-            </div>
-            <div className={styles.resumoCard} data-tone={totalResultado >= 0 ? 'positive' : 'negative'}>
-              <span>Resultado</span>
-              <strong>{moeda(totalResultado)}</strong>
-            </div>
-          </div>
-
-          {/* Grupos accordion */}
-          <div className={styles.gruposList}>
-            {grupos.map(grupo => {
-              const gKey = grupo.nome
-              const aberto = expandidos.has(gKey)
-              return (
-                <div key={gKey} className={`${styles.grupoCard} ${grupo.tipo === 'receita' ? styles.grupoReceita : styles.grupoDespesa}`}>
-                  {/* Header do grupo */}
-                  <button className={styles.grupoHeader} onClick={() => toggleGrupo(gKey)}>
-                    <div className={styles.grupoInfo}>
-                      <span className={`${styles.grupoPill} ${grupo.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
-                        {grupo.tipo === 'receita' ? '↑ Receita' : '↓ Despesa'}
-                      </span>
-                      <strong className={styles.grupoNome}>{grupo.nome}</strong>
-                      <span className={styles.grupoCount}>{grupo.classificacoes.reduce((s, c) => s + c.lancamentos.length, 0)} lançamentos</span>
-                    </div>
-                    <div className={styles.grupoRight}>
-                      <strong className={`${styles.grupoTotal} ${grupo.tipo === 'receita' ? styles.totalPositive : styles.totalNegative}`}>
-                        {moeda(grupo.total)}
-                      </strong>
-                      <span className={styles.chevron}>{aberto ? '▲' : '▼'}</span>
-                    </div>
-                  </button>
-
-                  {/* Classificações */}
-                  {aberto && (
-                    <div className={styles.classificacoesList}>
-                      {grupo.classificacoes.map(clf => {
-                        const cKey = `${gKey}::${clf.nome}`
-                        const cAberto = expandidosClf.has(cKey)
-                        return (
-                          <div key={cKey} className={styles.clfItem}>
-                            <button className={styles.clfHeader} onClick={() => toggleClf(cKey)}>
-                              <span className={styles.clfNome}>{clf.nome}</span>
-                              <div className={styles.clfRight}>
-                                <span className={styles.clfCount}>{clf.lancamentos.length} lançamento(s)</span>
-                                <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
-                                <span className={styles.chevronSm}>{cAberto ? '▲' : '▼'}</span>
-                              </div>
-                            </button>
-
-                            {/* Lançamentos individuais */}
-                            {cAberto && (
-                              <table className={styles.lancTable}>
-                                <thead>
-                                  <tr><th>Data</th><th>Descrição</th><th>Valor</th></tr>
-                                </thead>
-                                <tbody>
-                                  {clf.lancamentos.map((l, idx) => (
-                                    <tr key={idx}>
-                                      <td>{l.data}</td>
-                                      <td>{l.descricao}</td>
-                                      <td className={l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}>
-                                        {moeda(l.valor)}
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-        </>
+      {/* ── Sucesso ─────────────────────────────────────────────────────────── */}
+      {fase === 'concluido' && (
+        <div className={styles.sucessoBox}>
+          <span className={styles.sucessoIcon}>✓</span>
+          <p><strong>{sucessoSalvo} lançamentos</strong> enviados com sucesso!</p>
+          <button className={styles.btnPrimary} onClick={reiniciar}>
+            Importar outro arquivo
+          </button>
+        </div>
       )}
     </section>
   )
