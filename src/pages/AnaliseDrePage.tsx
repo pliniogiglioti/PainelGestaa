@@ -3,6 +3,7 @@ import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
 import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
+import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -594,6 +595,9 @@ export default function AnaliseDrePage() {
           </p>
         </section>
       )}
+
+      {/* ── Extrato Upload ── */}
+      <ExtratoUpload />
 
       {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentosFiltrados} />
