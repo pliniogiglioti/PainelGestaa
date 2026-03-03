@@ -244,12 +244,18 @@ export default function AnaliseDrePage() {
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
-  const [mesFiltro,      setMesFiltro]      = useState('todos')
-  const [tipoFiltro,     setTipoFiltro]     = useState<'todos' | 'receita' | 'despesa'>('todos')
+  const [anoFiltro,        setAnoFiltro]        = useState('todos')
+  const [mesFiltroNum,     setMesFiltroNum]     = useState('todos')
+  const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
   // Admin
-  const [isAdmin,        setIsAdmin]        = useState(false)
-  const [usuarios,       setUsuarios]       = useState<PerfilUsuario[]>([])
-  const [usuarioFiltro,  setUsuarioFiltro]  = useState<string>('')  // '' = dados do próprio usuário
+  const [isAdmin,          setIsAdmin]          = useState(false)
+  const [usuarios,         setUsuarios]         = useState<PerfilUsuario[]>([])
+  const [usuarioFiltro,    setUsuarioFiltro]    = useState<string>('')
+  const [buscaUsuario,     setBuscaUsuario]     = useState('')
+  const [showUserDropdown, setShowUserDropdown] = useState(false)
+  // Accordion lançamentos
+  const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())
+  const [expandedClfs,     setExpandedClfs]     = useState<Set<string>>(new Set())
 
   const fetchLancamentos = async (targetUserId?: string) => {
     const { data: authData } = await supabase.auth.getUser()
@@ -315,15 +321,31 @@ export default function AnaliseDrePage() {
     Object.fromEntries(classificacoes.map(c => [c.nome, c.tipo])),
   [classificacoes])
 
-  const mesOptions = useMemo(() => {
-    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
-    return [...new Set(lancamentos.map(item => {
+  const anosOptions = useMemo(() =>
+    [...new Set(lancamentos.map(item => {
       const src = item.data_lancamento ?? item.created_at
-      return src ? src.slice(0, 7) : ''
-    }).filter(Boolean))]
-      .sort((a, b) => b.localeCompare(a))
-      .map(value => ({ value, label: formatter.format(new Date(`${value}-01T00:00:00Z`)) }))
-  }, [lancamentos])
+      return src ? src.slice(0, 4) : ''
+    }).filter(Boolean))].sort((a, b) => b.localeCompare(a))
+  , [lancamentos])
+
+  const mesesOptions = useMemo(() => {
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+    const meses = [...new Set(lancamentos
+      .filter(item => {
+        if (anoFiltro === 'todos') return true
+        const src = item.data_lancamento ?? item.created_at
+        return src?.slice(0, 4) === anoFiltro
+      })
+      .map(item => {
+        const src = item.data_lancamento ?? item.created_at
+        return src ? src.slice(5, 7) : ''
+      }).filter(Boolean)
+    )].sort()
+    return meses.map(mm => ({
+      value: mm,
+      label: formatter.format(new Date(`2000-${mm}-01T00:00:00Z`)),
+    }))
+  }, [lancamentos, anoFiltro])
 
   const lancamentosFiltrados = useMemo(() => {
     return lancamentos.filter(item => {
@@ -331,14 +353,12 @@ export default function AnaliseDrePage() {
         ?? tipoMap[item.classificacao]
         ?? (item.classificacao === 'receita' ? 'receita' : 'despesa')
       if (tipoFiltro !== 'todos' && tipoItem !== tipoFiltro) return false
-
-      if (mesFiltro !== 'todos') {
-        const src = item.data_lancamento ?? item.created_at
-        if (!src || src.slice(0, 7) !== mesFiltro) return false
-      }
+      const src = item.data_lancamento ?? item.created_at
+      if (anoFiltro !== 'todos' && (!src || src.slice(0, 4) !== anoFiltro)) return false
+      if (mesFiltroNum !== 'todos' && (!src || src.slice(5, 7) !== mesFiltroNum)) return false
       return true
     })
-  }, [lancamentos, mesFiltro, tipoFiltro, tipoMap])
+  }, [lancamentos, anoFiltro, mesFiltroNum, tipoFiltro, tipoMap])
 
   const totais = useMemo(() =>
     lancamentosFiltrados.reduce((acc, item) => {
@@ -357,6 +377,43 @@ export default function AnaliseDrePage() {
     () => calcularKpis(lancamentosFiltrados, totais.receitas),
     [lancamentosFiltrados, totais.receitas],
   )
+
+  const lancamentosAgrupados = useMemo(() => {
+    const grupoMap = new Map<string, {
+      total: number; tipo: 'receita' | 'despesa'
+      classificacoes: Map<string, { total: number; items: DreLancamento[] }>
+    }>()
+    for (const l of lancamentosFiltrados) {
+      const gKey = l.grupo || 'Sem grupo'
+      const cKey = l.classificacao || 'Sem classificação'
+      const tipo = (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') as 'receita' | 'despesa'
+      if (!grupoMap.has(gKey)) grupoMap.set(gKey, { total: 0, tipo, classificacoes: new Map() })
+      const g = grupoMap.get(gKey)!
+      g.total += Number(l.valor)
+      if (!g.classificacoes.has(cKey)) g.classificacoes.set(cKey, { total: 0, items: [] })
+      const c = g.classificacoes.get(cKey)!
+      c.total += Number(l.valor)
+      c.items.push(l)
+    }
+    return [...grupoMap.entries()]
+      .map(([nome, d]) => ({
+        nome, total: d.total, tipo: d.tipo,
+        classificacoes: [...d.classificacoes.entries()]
+          .map(([cNome, cd]) => ({ nome: cNome, total: cd.total, items: cd.items }))
+          .sort((a, b) => b.total - a.total),
+      }))
+      .sort((a, b) => {
+        if (a.tipo !== b.tipo) return a.tipo === 'receita' ? -1 : 1
+        return b.total - a.total
+      })
+  }, [lancamentosFiltrados, tipoMap])
+
+  const toggleGrupo = (key: string) => setExpandedGrupos(prev => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
+  })
+  const toggleClf = (key: string) => setExpandedClfs(prev => {
+    const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
+  })
 
   const gruposExistentes = useMemo(() =>
     [...new Set([
@@ -541,13 +598,6 @@ export default function AnaliseDrePage() {
     closeWizard(); fetchLancamentos(usuarioFiltro || undefined); fetchGrupos(); fetchClassificacoes()
   }
 
-  const getPillClass = (classificacao: string, tipoLancamento?: 'receita' | 'despesa') => {
-    const tipo = tipoLancamento
-      ?? tipoMap[classificacao]
-      ?? (classificacao === 'receita' ? 'receita' : classificacao === 'despesa' ? 'despesa' : null)
-    return tipo === 'receita' ? styles.receitaPill : styles.despesaPill
-  }
-
   const formatDate = (item: DreLancamento) => {
     const src = item.data_lancamento ?? item.created_at
     return new Date(src).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
@@ -637,36 +687,79 @@ export default function AnaliseDrePage() {
             <span className={styles.stepIndicator}>{lancamentosFiltrados.length} registros</span>
           </div>
           <div className={styles.filtersRow}>
-            {/* Seletor de usuário — visível apenas para admin */}
+            {/* Admin: busca de usuário */}
             {isAdmin && (
-              <label className={styles.filterLabel}>
-                Usuário
-                <select
-                  value={usuarioFiltro}
-                  onChange={e => {
-                    const uid = e.target.value
-                    setUsuarioFiltro(uid)
-                    setMesFiltro('todos')
-                    fetchLancamentos(uid || undefined)
-                  }}
-                  className={`${styles.filterSelect} ${styles.filterSelectAdmin}`}
-                >
-                  <option value="">Meus lançamentos</option>
-                  {usuarios.map(u => (
-                    <option key={u.id} value={u.id}>
-                      {u.name ?? u.email ?? u.id.slice(0, 8)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <div className={styles.userSearchWrap}>
+                <label className={styles.filterLabel}>
+                  Buscar usuário
+                  <input
+                    type="text"
+                    className={styles.userSearchInput}
+                    placeholder="Nome ou e-mail..."
+                    value={buscaUsuario}
+                    onChange={e => { setBuscaUsuario(e.target.value); setShowUserDropdown(true) }}
+                    onFocus={() => setShowUserDropdown(true)}
+                    onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
+                  />
+                </label>
+                {showUserDropdown && (
+                  <div className={styles.userDropdown}>
+                    <button
+                      className={`${styles.userDropdownItem} ${!usuarioFiltro ? styles.userDropdownItemActive : ''}`}
+                      onMouseDown={() => {
+                        setUsuarioFiltro(''); setBuscaUsuario('')
+                        setShowUserDropdown(false); fetchLancamentos(undefined)
+                      }}
+                    >
+                      Meus lançamentos
+                    </button>
+                    {usuarios
+                      .filter(u =>
+                        !buscaUsuario ||
+                        (u.name ?? '').toLowerCase().includes(buscaUsuario.toLowerCase()) ||
+                        (u.email ?? '').toLowerCase().includes(buscaUsuario.toLowerCase())
+                      )
+                      .slice(0, 8)
+                      .map(u => (
+                        <button
+                          key={u.id}
+                          className={`${styles.userDropdownItem} ${usuarioFiltro === u.id ? styles.userDropdownItemActive : ''}`}
+                          onMouseDown={() => {
+                            setUsuarioFiltro(u.id)
+                            setBuscaUsuario(u.name ?? u.email ?? '')
+                            setShowUserDropdown(false)
+                            setAnoFiltro('todos'); setMesFiltroNum('todos')
+                            fetchLancamentos(u.id)
+                          }}
+                        >
+                          <span className={styles.userDropdownName}>{u.name ?? u.email}</span>
+                          {u.name && u.email && <span className={styles.userDropdownEmail}>{u.email}</span>}
+                        </button>
+                      ))
+                    }
+                  </div>
+                )}
+              </div>
             )}
 
             <label className={styles.filterLabel}>
+              Ano
+              <select
+                value={anoFiltro}
+                onChange={e => { setAnoFiltro(e.target.value); setMesFiltroNum('todos') }}
+                className={styles.filterSelect}
+              >
+                <option value="todos">Todos os anos</option>
+                {anosOptions.map(ano => <option key={ano} value={ano}>{ano}</option>)}
+              </select>
+            </label>
+
+            <label className={styles.filterLabel}>
               Mês
-              <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={styles.filterSelect}>
+              <select value={mesFiltroNum} onChange={e => setMesFiltroNum(e.target.value)} className={styles.filterSelect}>
                 <option value="todos">Todos os meses</option>
-                {mesOptions.map(option => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+                {mesesOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
                 ))}
               </select>
             </label>
@@ -678,50 +771,95 @@ export default function AnaliseDrePage() {
                 onChange={e => setTipoFiltro(e.target.value as 'todos' | 'receita' | 'despesa')}
                 className={styles.filterSelect}
               >
-                <option value="todos">Despesas e Resultado</option>
-                <option value="despesa">Somente despesas</option>
-                <option value="receita">Somente resultado (receitas)</option>
+                <option value="todos">Tudo</option>
+                <option value="receita">Receitas</option>
+                <option value="despesa">Despesas</option>
               </select>
             </label>
 
             <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
           </div>
         </div>
-        <div className={styles.tableWrap}>
-          <table>
-            <thead>
-              <tr><th>Data</th><th>Descrição</th><th>Classificação</th><th>Grupo</th><th>Valor</th><th>Ações</th></tr>
-            </thead>
-            <tbody>
-              {lancamentosFiltrados.map(item => (
-                <tr key={item.id}>
-                  <td>{formatDate(item)}</td>
-                  <td>{item.descricao ?? '—'}</td>
-                  <td>
-                    <span className={`${styles.tablePill} ${getPillClass(item.classificacao, item.tipo)}`}>
-                      {item.classificacao}
-                    </span>
-                  </td>
-                  <td>{item.grupo}</td>
-                  <td>{moeda(Number(item.valor))}</td>
-                  <td className={styles.actionsCell}>
-                    <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
-                      Editar
-                    </button>
-                  </td>
-                </tr>
-              ))}
-              {lancamentosFiltrados.length === 0 && (
-                <tr>
-                  <td colSpan={6} className={styles.empty}>
-                    Nenhum lançamento ainda.{' '}
-                    <button className={styles.emptyAction} onClick={openWizard}>Adicionar agora</button>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        {/* ── Accordion de grupos ── */}
+        {lancamentosAgrupados.length === 0 ? (
+          <div className={styles.emptyAccordion}>
+            Nenhum lançamento encontrado.{' '}
+            <button className={styles.emptyAction} onClick={openWizard}>Adicionar agora</button>
+          </div>
+        ) : (
+          <div className={styles.accordionList}>
+            {lancamentosAgrupados.map(grupo => {
+              const gKey = grupo.nome
+              const gAberto = expandedGrupos.has(gKey)
+              return (
+                <div key={gKey} className={`${styles.grupoBlock} ${grupo.tipo === 'receita' ? styles.grupoBlockReceita : styles.grupoBlockDespesa}`}>
+                  <button className={styles.grupoBlockHeader} onClick={() => toggleGrupo(gKey)}>
+                    <div className={styles.grupoBlockLeft}>
+                      <span className={`${styles.grupoBadge} ${grupo.tipo === 'receita' ? styles.grupoBadgeReceita : styles.grupoBadgeDespesa}`}>
+                        {grupo.tipo === 'receita' ? '↑' : '↓'}
+                      </span>
+                      <strong className={styles.grupoBlockNome}>{grupo.nome}</strong>
+                      <span className={styles.grupoBlockCount}>
+                        {grupo.classificacoes.reduce((s, c) => s + c.items.length, 0)} lançamentos
+                      </span>
+                    </div>
+                    <div className={styles.grupoBlockRight}>
+                      <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                        {moeda(grupo.total)}
+                      </strong>
+                      <span className={styles.chevronIcon}>{gAberto ? '▲' : '▼'}</span>
+                    </div>
+                  </button>
+
+                  {gAberto && (
+                    <div className={styles.clfList}>
+                      {grupo.classificacoes.map(clf => {
+                        const cKey = `${gKey}::${clf.nome}`
+                        const cAberto = expandedClfs.has(cKey)
+                        return (
+                          <div key={cKey} className={styles.clfBlock}>
+                            <button className={styles.clfBlockHeader} onClick={() => toggleClf(cKey)}>
+                              <span className={styles.clfNome}>{clf.nome}</span>
+                              <div className={styles.clfRight}>
+                                <span className={styles.clfCount}>{clf.items.length} lançamento(s)</span>
+                                <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                <span className={styles.chevronSm}>{cAberto ? '▲' : '▼'}</span>
+                              </div>
+                            </button>
+                            {cAberto && (
+                              <table className={styles.lancTable}>
+                                <thead>
+                                  <tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr>
+                                </thead>
+                                <tbody>
+                                  {clf.items.map(item => (
+                                    <tr key={item.id}>
+                                      <td>{formatDate(item)}</td>
+                                      <td>{item.descricao ?? '—'}</td>
+                                      <td className={item.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}>
+                                        {moeda(Number(item.valor))}
+                                      </td>
+                                      <td>
+                                        <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
+                                          Editar
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {/* ── Wizard modal ── */}

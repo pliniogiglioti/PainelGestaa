@@ -260,12 +260,159 @@
   min-width: 170px;
 }
 
-.filterSelectAdmin {
-  border-color: rgba(213, 175, 69, 0.4);
+/* ── Admin user search ── */
+
+.userSearchWrap {
+  position: relative;
+}
+
+.userSearchInput {
+  display: block;
+  border: 1px solid rgba(213, 175, 69, 0.4);
+  border-radius: 10px;
   background: rgba(213, 175, 69, 0.07);
   color: #d5af45;
+  font-size: 12px;
+  padding: 9px 10px;
   min-width: 200px;
+  outline: none;
 }
+.userSearchInput::placeholder { color: rgba(213, 175, 69, 0.45); }
+.userSearchInput:focus { border-color: #d5af45; }
+
+.userDropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 240px;
+  background: #161616;
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.userDropdownItem {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 9px 14px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid #1e1e1e;
+  cursor: pointer;
+  text-align: left;
+  color: #ccc;
+  font-size: 13px;
+  transition: background 0.12s;
+}
+.userDropdownItem:last-child { border-bottom: none; }
+.userDropdownItem:hover { background: rgba(255,255,255,0.05); }
+.userDropdownItemActive { background: rgba(213, 175, 69, 0.1); color: #d5af45; }
+
+.userDropdownName { font-weight: 600; }
+.userDropdownEmail { font-size: 11px; color: #666; margin-top: 2px; }
+
+/* ── Accordion lançamentos ── */
+
+.emptyAccordion {
+  padding: 24px;
+  text-align: center;
+  color: #666;
+  font-size: 14px;
+}
+
+.accordionList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 8px;
+}
+
+.grupoBlock {
+  border-radius: 10px;
+  border: 1px solid #232323;
+  overflow: hidden;
+}
+.grupoBlockReceita { border-color: rgba(74,180,100,0.22); }
+.grupoBlockDespesa { border-color: rgba(220,80,80,0.18); }
+
+.grupoBlockHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: rgba(16,16,16,0.9);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  gap: 10px;
+  transition: background 0.12s;
+}
+.grupoBlockHeader:hover { background: rgba(28,28,28,0.9); }
+
+.grupoBlockLeft { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+
+.grupoBadge {
+  flex-shrink: 0;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700;
+}
+.grupoBadgeReceita { background: rgba(74,180,100,0.18); color: #5aba74; }
+.grupoBadgeDespesa { background: rgba(220,80,80,0.18); color: #e06060; }
+
+.grupoBlockNome {
+  font-size: 14px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.grupoBlockCount { font-size: 11px; color: #555; white-space: nowrap; }
+.grupoBlockRight { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+.valorPositivo { font-size: 15px; font-weight: 700; color: #5aba74; }
+.valorNegativo { font-size: 15px; font-weight: 700; color: #e06060; }
+
+.chevronIcon { font-size: 11px; color: #555; }
+
+/* ── Classificações ── */
+
+.clfList { border-top: 1px solid #1e1e1e; background: rgba(8,8,8,0.6); }
+
+.clfBlock { border-bottom: 1px solid #1a1a1a; }
+.clfBlock:last-child { border-bottom: none; }
+
+.clfBlockHeader {
+  width: 100%;
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 20px;
+  background: none; border: none; cursor: pointer; color: inherit;
+  transition: background 0.1s;
+}
+.clfBlockHeader:hover { background: rgba(255,255,255,0.03); }
+
+.clfNome { font-size: 13px; color: #bbb; text-align: left; flex: 1; }
+.clfRight { display: flex; align-items: center; gap: 10px; }
+.clfCount { font-size: 11px; color: #484848; }
+.clfTotal { font-size: 13px; font-weight: 600; color: #d5af45; }
+.chevronSm { font-size: 10px; color: #484848; }
+
+/* ── Tabela de lançamentos dentro de classificação ── */
+
+.lancTable { width: 100%; border-collapse: collapse; font-size: 12px; }
+.lancTable th {
+  padding: 6px 20px; text-align: left; color: #484848;
+  font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+  background: rgba(255,255,255,0.015);
+}
+.lancTable td { padding: 7px 20px; border-top: 1px solid #161616; color: #aaa; }
+.lancTable tr:hover td { background: rgba(255,255,255,0.02); }
+
+.tdReceita { color: #5aba74 !important; font-weight: 600; }
+.tdDespesa { color: #e06060 !important; font-weight: 600; }
 
 /* ── Table ── */
 
