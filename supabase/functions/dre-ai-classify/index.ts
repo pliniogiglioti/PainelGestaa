@@ -1,7 +1,7 @@
 // Supabase Edge Function: dre-ai-classify
 // Calls GroqCloud API to identify BOTH the classification AND the group
 // for a DRE lancamento, pre-filling the wizard fields for the user.
-// Context: plano de contas embedded directly (edge functions cannot read filesystem).
+// Supports single-item and batch modes.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -16,7 +16,6 @@ const CORS_HEADERS = {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Plano de Contas DRE — conteúdo de public/ia/plano_de_contas_dre.md
-// Usado como referência canônica para classificação e grupo.
 // ─────────────────────────────────────────────────────────────────────────────
 const PLANO_DE_CONTAS_RESUMIDO = `
 GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
@@ -123,6 +122,7 @@ GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
 
 type ClassificacaoItem = { nome: string; tipo: 'receita' | 'despesa' }
 type AiResult = { tipo: 'receita' | 'despesa'; classificacao_nome: string; grupo: string; fonte?: 'ia' | 'fallback' }
+type LancamentoInput = { descricao: string; valor: number; tipo: 'receita' | 'despesa' }
 
 const normalize = (value: string) =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
@@ -137,7 +137,19 @@ const parseAiResponse = (content: string): { tipo: string; classificacao_nome: s
   }
 }
 
-// Fallback baseado no plano de contas (não depende do banco)
+/** Parse an array JSON response from the batch prompt */
+const parseBatchResponse = (content: string): Array<{ tipo: string; classificacao_nome: string; grupo: string }> | null => {
+  try {
+    const arrMatch = content.match(/\[[\s\S]*\]/)
+    if (!arrMatch) return null
+    const arr = JSON.parse(arrMatch[0])
+    if (!Array.isArray(arr)) return null
+    return arr as Array<{ tipo: string; classificacao_nome: string; grupo: string }>
+  } catch {
+    return null
+  }
+}
+
 const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; classificacao: string; grupo: string }> = [
   { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   { pattern: /(pix|transferencia)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
@@ -203,7 +215,6 @@ const pickFallback = (
 
   for (const rule of FALLBACK_RULES) {
     if (rule.pattern.test(text)) {
-      // Se o banco já tem essa classificação, usa o nome exato do banco
       const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(rule.classificacao))
       return {
         tipo: rule.tipo,
@@ -214,7 +225,6 @@ const pickFallback = (
     }
   }
 
-  // Default genérico baseado no tipo
   const defaultReceita = classificacoesDisponiveis.find(c => c.tipo === 'receita')
   const defaultDespesa = classificacoesDisponiveis.find(c => c.tipo === 'despesa')
 
@@ -245,47 +255,105 @@ const toFinalResult = (
   }
 }
 
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { status: 204, headers: CORS_HEADERS })
-  }
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
-  }
-
-  let descricao = ''
-  let valor = 0
-  let modelo = DEFAULT_MODEL
-  let tipoEntrada: 'receita' | 'despesa' = 'despesa'
-  let classificacoesDisponiveis: ClassificacaoItem[] = []
-  let gruposExistentes: string[] = []
-
+const callGroq = async (groqApiKey: string, model: string, prompt: string): Promise<Response> => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 30000)
   try {
-    const body = await req.json()
-    descricao             = String(body.descricao ?? '')
-    valor                 = Number(body.valor ?? 0)
-    modelo                = String(body.modelo ?? DEFAULT_MODEL)
-    tipoEntrada           = body.tipo === 'receita' ? 'receita' : 'despesa'
-    classificacoesDisponiveis = Array.isArray(body.classificacoes_disponiveis) ? body.classificacoes_disponiveis : []
-    gruposExistentes      = Array.isArray(body.grupos_existentes) ? body.grupos_existentes : []
-  } catch {
-    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
-      status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    return await fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.05,
+        max_tokens: 4096,
+      }),
+      signal: controller.signal,
     })
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
-  const fallback = pickFallback(descricao, tipoEntrada, classificacoesDisponiveis)
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')
+// ── Batch handler ─────────────────────────────────────────────────────────────
 
+async function handleBatch(
+  lancamentos: LancamentoInput[],
+  classificacoesDisponiveis: ClassificacaoItem[],
+  modelo: string,
+  groqApiKey: string | undefined,
+): Promise<AiResult[]> {
   if (!groqApiKey) {
-    return new Response(JSON.stringify({ ...fallback, aviso: 'GROQ_API_KEY não configurada; usado fallback local.' }), {
-      status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
   }
 
-  // Lista de classificações do banco (se existir) + plano de contas como referência
+  const listaClf = classificacoesDisponiveis.length > 0
+    ? `\nClassificações já cadastradas (prefira estas):\n` +
+      classificacoesDisponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
+    : ''
+
+  const itensTexto = lancamentos
+    .map((l, i) => `${i + 1}. "${l.descricao}" | R$ ${l.valor.toFixed(2)} | ${l.tipo}`)
+    .join('\n')
+
+  const prompt = `Você é um assistente contábil especializado em DRE para clínicas e pequenas empresas brasileiras.
+
+Classifique cada lançamento financeiro abaixo usando o plano de contas DRE.
+
+═══════════ PLANO DE CONTAS ═══════════
+${PLANO_DE_CONTAS_RESUMIDO}
+═══════════════════════════════════════${listaClf}
+
+LANÇAMENTOS PARA CLASSIFICAR:
+${itensTexto}
+
+RETORNE SOMENTE um array JSON com exatamente ${lancamentos.length} objetos, na mesma ordem, sem texto adicional:
+[{"tipo":"despesa","classificacao_nome":"Nome exato","grupo":"Grupo exato"}, ...]`
+
+  let res = await callGroq(groqApiKey, modelo, prompt)
+
+  if (!res.ok && modelo !== DEFAULT_MODEL) {
+    const errText = await res.text()
+    if (/model|decommissioned|not found|invalid/i.test(errText)) {
+      res = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+    }
+  }
+
+  if (!res.ok) {
+    return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
+  }
+
+  const groqData = await res.json()
+  const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+  const parsed = parseBatchResponse(content)
+
+  if (!parsed || parsed.length !== lancamentos.length) {
+    // Fallback para todos se o parse falhar
+    return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
+  }
+
+  return parsed.map((p, i) => {
+    try {
+      return toFinalResult(p, classificacoesDisponiveis)
+    } catch {
+      return pickFallback(lancamentos[i].descricao, lancamentos[i].tipo, classificacoesDisponiveis)
+    }
+  })
+}
+
+// ── Single handler (backwards compat) ────────────────────────────────────────
+
+async function handleSingle(
+  descricao: string,
+  valor: number,
+  tipoEntrada: 'receita' | 'despesa',
+  classificacoesDisponiveis: ClassificacaoItem[],
+  modelo: string,
+  groqApiKey: string | undefined,
+): Promise<AiResult> {
+  const fallback = pickFallback(descricao, tipoEntrada, classificacoesDisponiveis)
+  if (!groqApiKey) return { ...fallback, aviso: 'GROQ_API_KEY não configurada; usado fallback local.' } as AiResult & { aviso: string }
+
   const listaClassificacoesBanco = classificacoesDisponiveis.length > 0
     ? `\nClassificações já cadastradas no sistema (prefira estas quando aplicável):\n` +
       classificacoesDisponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
@@ -305,71 +373,86 @@ ${PLANO_DE_CONTAS_RESUMIDO}
 TAREFA:
 1. Determine se é "receita" ou "despesa" com base no plano de contas.
 2. Escolha a classificação MAIS ESPECÍFICA do plano de contas que se encaixa na descrição.
-3. Retorne o grupo correspondente conforme o plano de contas (ex: "Despesas Administrativas", "Despesas com Pessoal", etc.).
+3. Retorne o grupo correspondente conforme o plano de contas.
 4. Responda SOMENTE com JSON válido, sem explicações.
 
 Formato obrigatório:
 {"tipo": "despesa", "classificacao_nome": "Nome exato do plano de contas", "grupo": "Grupo exato do plano de contas"}`
 
   try {
-    const model = String(modelo || DEFAULT_MODEL).trim() || DEFAULT_MODEL
-
-    const callGroq = async (modelToUse: string) => {
-      const controller = new AbortController()
-      const timeout    = setTimeout(() => controller.abort(), 15000)
-      try {
-        return await fetch(GROQ_API_URL, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model:       modelToUse,
-            messages:    [{ role: 'user', content: prompt }],
-            temperature: 0.05,
-            max_tokens:  120,
-          }),
-          signal: controller.signal,
-        })
-      } finally {
-        clearTimeout(timeout)
-      }
-    }
-
-    let groqRes = await callGroq(model)
+    let groqRes = await callGroq(groqApiKey, modelo, prompt)
     if (!groqRes.ok) {
       const errText = await groqRes.text()
-      const shouldRetry = model !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)
-      if (shouldRetry) {
-        groqRes = await callGroq(DEFAULT_MODEL)
-      } else {
-        return new Response(JSON.stringify({ ...fallback, aviso: `Groq indisponível; usado fallback.` }), {
-          status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-        })
-      }
+      const shouldRetry = modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)
+      if (shouldRetry) groqRes = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+      else return { ...fallback, aviso: 'Groq indisponível; usado fallback.' } as AiResult & { aviso: string }
     }
-
-    if (!groqRes.ok) {
-      return new Response(JSON.stringify({ ...fallback, aviso: `Groq indisponível; usado fallback.` }), {
-        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
-    }
+    if (!groqRes.ok) return { ...fallback, aviso: 'Groq indisponível; usado fallback.' } as AiResult & { aviso: string }
 
     const groqData = await groqRes.json()
     const content: string = groqData?.choices?.[0]?.message?.content ?? ''
     const parsed = parseAiResponse(content)
+    if (!parsed) return { ...fallback, aviso: 'Resposta fora do formato esperado; usado fallback.' } as AiResult & { aviso: string }
+    return toFinalResult(parsed, classificacoesDisponiveis)
+  } catch (err) {
+    return { ...fallback, aviso: `Erro na IA (${String(err)}); usado fallback.` } as AiResult & { aviso: string }
+  }
+}
 
-    if (!parsed) {
-      return new Response(JSON.stringify({ ...fallback, aviso: 'Resposta fora do formato esperado; usado fallback.' }), {
+// ── Main handler ──────────────────────────────────────────────────────────────
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: CORS_HEADERS })
+  }
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
+      status: 405, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    })
+  }
+
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return new Response(JSON.stringify({ error: 'Invalid JSON body' }), {
+      status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    })
+  }
+
+  const modelo = String(body.modelo ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL
+  const classificacoesDisponiveis: ClassificacaoItem[] = Array.isArray(body.classificacoes_disponiveis)
+    ? body.classificacoes_disponiveis as ClassificacaoItem[]
+    : []
+  const groqApiKey = Deno.env.get('GROQ_API_KEY')
+
+  // ── Batch mode ──
+  if (Array.isArray(body.lancamentos)) {
+    const lancamentos = (body.lancamentos as LancamentoInput[]).map(l => ({
+      descricao: String(l.descricao ?? ''),
+      valor: Number(l.valor ?? 0),
+      tipo: l.tipo === 'receita' ? 'receita' : 'despesa' as 'receita' | 'despesa',
+    }))
+
+    if (lancamentos.length === 0) {
+      return new Response(JSON.stringify({ resultados: [] }), {
         status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
     }
 
-    const result = toFinalResult(parsed, classificacoesDisponiveis)
-    return new Response(JSON.stringify(result), {
-      status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
-  } catch (err) {
-    return new Response(JSON.stringify({ ...fallback, aviso: `Erro na IA (${String(err)}); usado fallback.` }), {
+    const resultados = await handleBatch(lancamentos, classificacoesDisponiveis, modelo, groqApiKey)
+    return new Response(JSON.stringify({ resultados }), {
       status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   }
+
+  // ── Single mode (backwards compat) ──
+  const descricao = String(body.descricao ?? '')
+  const valor = Number(body.valor ?? 0)
+  const tipoEntrada: 'receita' | 'despesa' = body.tipo === 'receita' ? 'receita' : 'despesa'
+
+  const result = await handleSingle(descricao, valor, tipoEntrada, classificacoesDisponiveis, modelo, groqApiKey)
+  return new Response(JSON.stringify(result), {
+    status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  })
 })

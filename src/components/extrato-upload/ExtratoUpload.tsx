@@ -35,6 +35,79 @@ interface GrupoResult {
 
 const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
+/** Regras locais de fallback — mesmas da edge function, evitam chamada de rede */
+const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; classificacao: string; grupo: string }> = [
+  { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
+  { pattern: /(pix|transferencia)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
+  { pattern: /(cartao|card)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
+  { pattern: /(rendimento|aplicacao|investimento financeiro)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
+  { pattern: /(cancelamento|devolucao|estorno)/i, tipo: 'despesa', classificacao: 'Vendas Canceladas / Devoluções', grupo: 'Deduções de Receita' },
+  { pattern: /(taxa cartao|tarifa cartao|pos|maquininha|antecipacao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Padrão', grupo: 'Deduções de Receita' },
+  { pattern: /(simples nacional|imposto|iss|icms|pis|cofins|irpj|tributo|das )/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Simples Nacional', grupo: 'Impostos sobre Faturamento' },
+  { pattern: /(material|insumo|implante|componente)/i, tipo: 'despesa', classificacao: 'Custo de Materiais e Insumos', grupo: 'Despesas Operacionais' },
+  { pattern: /(laboratorio|tecnico dental)/i, tipo: 'despesa', classificacao: 'Serviços Técnicos para Laboratórios', grupo: 'Despesas Operacionais' },
+  { pattern: /(dentista|terceiro pf|prestador|autonomo)/i, tipo: 'despesa', classificacao: 'Serviços Terceiros PF (dentistas)', grupo: 'Despesas Operacionais' },
+  { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties e Assistência Técnica', grupo: 'Despesas Operacionais' },
+  { pattern: /(marketing|midia|anuncio|google ads|meta ads|instagram|facebook ads)/i, tipo: 'despesa', classificacao: 'Marketing Digital', grupo: 'Despesas Comerciais e Marketing' },
+  { pattern: /(agencia|assessoria)/i, tipo: 'despesa', classificacao: 'Agência e Assessoria', grupo: 'Despesas Comerciais e Marketing' },
+  { pattern: /(pro.?labore)/i, tipo: 'despesa', classificacao: 'Pró-labore', grupo: 'Despesas com Pessoal' },
+  { pattern: /(salario|ordenado|folha de pagamento)/i, tipo: 'despesa', classificacao: 'Salários e Ordenados', grupo: 'Despesas com Pessoal' },
+  { pattern: /(13.? salario|decimo terceiro)/i, tipo: 'despesa', classificacao: '13° Salário', grupo: 'Despesas com Pessoal' },
+  { pattern: /(rescisao|aviso previo|demissao)/i, tipo: 'despesa', classificacao: 'Rescisões', grupo: 'Despesas com Pessoal' },
+  { pattern: /\binss\b/i, tipo: 'despesa', classificacao: 'INSS', grupo: 'Despesas com Pessoal' },
+  { pattern: /\bfgts\b/i, tipo: 'despesa', classificacao: 'FGTS', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale transporte|vt\b)/i, tipo: 'despesa', classificacao: 'Vale Transporte', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale refeicao|vale alimentacao|vr\b|va\b)/i, tipo: 'despesa', classificacao: 'Vale Refeição', grupo: 'Despesas com Pessoal' },
+  { pattern: /(combustivel|gasolina|etanol|abastecimento)/i, tipo: 'despesa', classificacao: 'Combustível', grupo: 'Despesas com Pessoal' },
+  { pattern: /(aluguel|locacao|condominio)/i, tipo: 'despesa', classificacao: 'Aluguel', grupo: 'Despesas Administrativas' },
+  { pattern: /(energia|luz\b|eletricidade)/i, tipo: 'despesa', classificacao: 'Energia Elétrica', grupo: 'Despesas Administrativas' },
+  { pattern: /(agua\b|esgoto|sabesp|saneamento)/i, tipo: 'despesa', classificacao: 'Água e Esgoto', grupo: 'Despesas Administrativas' },
+  { pattern: /(telefone|telefonia|celular|plano|vivo|claro|tim|oi\b)/i, tipo: 'despesa', classificacao: 'Telefonia', grupo: 'Despesas Administrativas' },
+  { pattern: /(internet\b|banda larga|fibra)/i, tipo: 'despesa', classificacao: 'Internet', grupo: 'Despesas com TI' },
+  { pattern: /(software|sistema|licenca|saas|assinatura)/i, tipo: 'despesa', classificacao: 'Sistema de Gestão', grupo: 'Despesas com TI' },
+  { pattern: /(hospedagem|servidor|cloud|aws|gcp|azure)/i, tipo: 'despesa', classificacao: 'Hospedagem de Dados', grupo: 'Despesas com TI' },
+  { pattern: /(computador|notebook|impressora|periférico|hardware)/i, tipo: 'despesa', classificacao: 'Investimento - Computadores e Periféricos', grupo: 'Investimentos' },
+  { pattern: /(maquina|equipamento|autoclave|cadeira odonto)/i, tipo: 'despesa', classificacao: 'Investimento - Máquinas e Equipamentos', grupo: 'Investimentos' },
+  { pattern: /(movel|mobilia|mesa|cadeira\b)/i, tipo: 'despesa', classificacao: 'Investimento - Móveis e Utensílios', grupo: 'Investimentos' },
+  { pattern: /(reforma|instalacao|obra|construcao)/i, tipo: 'despesa', classificacao: 'Investimento - Instalações de Terceiros', grupo: 'Investimentos' },
+  { pattern: /(contabilidade|contador|escritorio contabil)/i, tipo: 'despesa', classificacao: 'Contabilidade', grupo: 'Despesas Administrativas' },
+  { pattern: /(advogado|juridico|advocacia)/i, tipo: 'despesa', classificacao: 'Jurídico', grupo: 'Despesas Administrativas' },
+  { pattern: /(limpeza|higienizacao|faxina)/i, tipo: 'despesa', classificacao: 'Limpeza', grupo: 'Despesas Administrativas' },
+  { pattern: /(seguranca|vigilancia|monitoramento)/i, tipo: 'despesa', classificacao: 'Segurança e Vigilância', grupo: 'Despesas Administrativas' },
+  { pattern: /(seguro\b)/i, tipo: 'despesa', classificacao: 'Seguros', grupo: 'Despesas Administrativas' },
+  { pattern: /(manutencao|reparo|conserto)/i, tipo: 'despesa', classificacao: 'Manutenção e Reparos', grupo: 'Despesas Administrativas' },
+  { pattern: /(iof\b)/i, tipo: 'despesa', classificacao: 'IOF', grupo: 'Despesas Administrativas' },
+  { pattern: /(juros|multa\b|mora\b)/i, tipo: 'despesa', classificacao: 'Multa e Juros s/ Contas Pagas em Atraso', grupo: 'Despesas Administrativas' },
+  { pattern: /(financiamento|emprestimo|credito)/i, tipo: 'despesa', classificacao: 'Financiamentos / Empréstimos', grupo: 'Despesas Financeiras' },
+  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
+  { pattern: /(depreciacao|amortizacao)/i, tipo: 'despesa', classificacao: 'Depreciação e Amortização', grupo: 'Despesas Financeiras' },
+  { pattern: /(dividendo|distribuicao lucro|retirada socio)/i, tipo: 'despesa', classificacao: 'Dividendos e Despesas dos Sócios', grupo: 'Investimentos' },
+  { pattern: /(consultoria\b)/i, tipo: 'despesa', classificacao: 'Consultoria', grupo: 'Despesas Administrativas' },
+  { pattern: /(refeicao|almoco|lanche|restaurante)/i, tipo: 'despesa', classificacao: 'Refeições e Lanches', grupo: 'Despesas Comerciais e Marketing' },
+  { pattern: /(viagem|estadia|hotel|passagem)/i, tipo: 'despesa', classificacao: 'Viagens e Estadias', grupo: 'Despesas Administrativas' },
+  { pattern: /(uber\b|taxi|99\b|ifood)/i, tipo: 'despesa', classificacao: 'Uber e Táxi', grupo: 'Despesas Administrativas' },
+  { pattern: /(material escritorio|papel|caneta|toner)/i, tipo: 'despesa', classificacao: 'Material de Escritório', grupo: 'Despesas Administrativas' },
+  { pattern: /(uniforme|epj|epi\b)/i, tipo: 'despesa', classificacao: 'Uniformes', grupo: 'Despesas Administrativas' },
+  { pattern: /(estacionamento|parking)/i, tipo: 'despesa', classificacao: 'Estacionamento', grupo: 'Despesas Administrativas' },
+  { pattern: /(limpeza\b|desinfetante|produto limpeza)/i, tipo: 'despesa', classificacao: 'Material de Limpeza', grupo: 'Despesas Administrativas' },
+]
+
+const normalize = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+/** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
+function classificarLocal(
+  descricao: string,
+): { classificacao: string; grupo: string } | null {
+  const text = normalize(descricao)
+  for (const rule of FALLBACK_RULES) {
+    if (rule.pattern.test(text)) {
+      return { classificacao: rule.classificacao, grupo: rule.grupo }
+    }
+  }
+  return null
+}
+
 const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -220,51 +293,58 @@ export function ExtratoUpload() {
     const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
 
-    // Classificar em lotes de 5 chamadas paralelas
-    const classificadas: LinhaClassificada[] = []
+    // ── Passo 1: classificar localmente tudo que tiver match de regra ──────────
+    const classificadas: LinhaClassificada[] = new Array(linhas.length)
+    const indicesParaIA: number[] = []
+
+    for (let i = 0; i < linhas.length; i++) {
+      const local = classificarLocal(linhas[i].descricao)
+      if (local) {
+        classificadas[i] = { ...linhas[i], classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
+      } else {
+        indicesParaIA.push(i)
+      }
+    }
+
+    setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length })
+
+    // ── Passo 2: enviar restantes em batch para a IA ──────────────────────────
     const novosErros: string[] = []
-    const BATCH = 5
+    const BATCH_IA = 50  // Groq suporta contexto grande; 50 itens por chamada é seguro
 
-    setProgresso({ atual: 0, total: linhas.length })
+    for (let b = 0; b < indicesParaIA.length; b += BATCH_IA) {
+      const fatia = indicesParaIA.slice(b, b + BATCH_IA)
+      const lote = fatia.map(i => linhas[i])
 
-    for (let i = 0; i < linhas.length; i += BATCH) {
-      const lote = linhas.slice(i, i + BATCH)
-      const classesDoTipo = (tipo: 'receita' | 'despesa') =>
-        classificacoes.filter(c => c.tipo === tipo).map(c => ({ nome: c.nome, tipo: c.tipo }))
+      try {
+        const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
+          body: {
+            lancamentos: lote.map(l => ({ descricao: l.descricao, valor: l.valor, tipo: l.tipo })),
+            modelo,
+            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
+          },
+        })
 
-      const resultados = await Promise.all(
-        lote.map(async (l): Promise<LinhaClassificada> => {
-          try {
-            const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
-              body: {
-                descricao: l.descricao,
-                valor: l.valor,
-                tipo: l.tipo,
-                modelo,
-                classificacoes_disponiveis: classesDoTipo(l.tipo),
-                grupos_existentes: [],
-              },
-            })
-            if (error || !data) throw new Error(error?.message ?? 'Sem resposta da IA')
-            return {
-              ...l,
-              classificacao: String(data.classificacao_nome ?? '').trim() || 'Outros',
-              grupo:         String(data.grupo ?? '').trim() || 'Outros',
-              status: 'ok',
-            }
-          } catch {
-            return { ...l, classificacao: 'Não classificado', grupo: 'Outros', status: 'erro' }
+        if (error || !data?.resultados) throw new Error(error?.message ?? 'Sem resposta da IA')
+
+        const resultados: { classificacao_nome?: string; grupo?: string }[] = data.resultados
+        fatia.forEach((linhaIdx, ri) => {
+          const r = resultados[ri]
+          classificadas[linhaIdx] = {
+            ...linhas[linhaIdx],
+            classificacao: String(r?.classificacao_nome ?? '').trim() || 'Outros',
+            grupo:         String(r?.grupo ?? '').trim() || 'Outros',
+            status: 'ok',
           }
-        }),
-      )
+        })
+      } catch {
+        fatia.forEach(linhaIdx => {
+          classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não classificado', grupo: 'Outros', status: 'erro' }
+          novosErros.push(`"${linhas[linhaIdx].descricao}" — falha na classificação`)
+        })
+      }
 
-      classificadas.push(...resultados)
-      novosErros.push(
-        ...resultados
-          .filter(r => r.status === 'erro')
-          .map(r => `"${r.descricao}" — falha na classificação`),
-      )
-      setProgresso({ atual: Math.min(i + BATCH, linhas.length), total: linhas.length })
+      setProgresso({ atual: (linhas.length - indicesParaIA.length) + Math.min(b + BATCH_IA, indicesParaIA.length), total: linhas.length })
     }
 
     setGrupos(agrupar(classificadas))
