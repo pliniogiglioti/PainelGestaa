@@ -28,52 +28,135 @@ const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
 
-// ── Simple helpers to categorise expenses by grupo / classificacao keywords ──
+// ── Helpers: soma por grupo exato (primary) + keywords (fallback) ─────────────
 
-function somaDesp(lancamentos: DreLancamento[], keywords: string[]): number {
+function somaGrupos(
+  lancamentos: DreLancamento[],
+  gruposAlvo: string[],
+  keywordsFallback: string[] = [],
+): number {
+  const alvoLower = gruposAlvo.map(g => g.toLowerCase().trim())
   return lancamentos
     .filter(l => {
       if (l.tipo !== 'despesa') return false
-      const haystack = `${l.grupo ?? ''} ${l.classificacao ?? ''}`.toLowerCase()
-      return keywords.some(k => haystack.includes(k))
+      const g = (l.grupo ?? '').toLowerCase().trim()
+      if (alvoLower.some(a => g === a)) return true
+      if (keywordsFallback.length > 0) {
+        const haystack = `${g} ${(l.classificacao ?? '').toLowerCase()}`
+        return keywordsFallback.some(k => haystack.includes(k))
+      }
+      return false
     })
     .reduce((s, l) => s + Number(l.valor), 0)
 }
 
-// ── KPI calculations ──
+function somaGruposReceita(
+  lancamentos: DreLancamento[],
+  gruposAlvo: string[],
+): number {
+  const alvoLower = gruposAlvo.map(g => g.toLowerCase().trim())
+  return lancamentos
+    .filter(l => {
+      if (l.tipo !== 'receita') return false
+      const g = (l.grupo ?? '').toLowerCase().trim()
+      return alvoLower.some(a => g === a)
+    })
+    .reduce((s, l) => s + Number(l.valor), 0)
+}
+
+// ── KPI calculations (seguindo plano_de_contas_dre.md seções 1–15) ────────────
 
 function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
-  const deducoes = somaDesp(lancamentos, ['deduç', 'cancelamento', 'tarifa de cartão'])
-  const receitaLiquida = totalReceitas - deducoes
-
-  const custos = somaDesp(lancamentos, ['custo', 'cmv', 'produto', 'serviço prestado', 'frete de venda'])
-
-  const despesasOper = somaDesp(lancamentos, [
-    'pessoal', 'salário', 'pró-labore', 'administrativ', 'comercial',
-    'marketing', 'publicidade', 'ti', 'softwares', 'aluguel', 'energia', 'internet',
+  // ── Seção 2: Deduções de Receita ───────────────────────────────────────────
+  const deducoes = somaGrupos(lancamentos, ['Deduções de Receita'], [
+    'deduç', 'cancelamento', 'devolução', 'tarifa de cartão', 'tarifa de cartao',
   ])
 
-  const impostos = somaDesp(lancamentos, ['imposto', 'simples', 'presumido', 'tributo'])
+  // ── Seção 3: Impostos sobre Faturamento (Simples, Presumido) ──────────────
+  // Incidem sobre receita → deduzem da Receita Bruta, NÃO do resultado
+  const impostosReceita = somaGrupos(lancamentos, ['Impostos sobre Faturamento'], [
+    'imposto sobre receita', 'simples nacional', 'lucro presumido', 'issqn',
+  ])
 
-  const margemContrib = receitaLiquida - custos
-  const ebitda        = margemContrib - despesasOper
-  const ebit          = ebitda  // no D&A data in this system
-  const nopat         = ebit - impostos
+  // ── Receita Líquida ────────────────────────────────────────────────────────
+  const receitaLiquida = totalReceitas - deducoes - impostosReceita
 
-  const base = receitaLiquida > 0 ? receitaLiquida : 1 // avoid div/0
+  // ── Seção 4: Despesas Operacionais (custos diretos de entrega) ─────────────
+  const custosDir = somaGrupos(lancamentos, ['Despesas Operacionais'], [
+    'custo de materiais', 'insumos', 'serviços terceiros pf', 'servicos terceiros pf',
+    'serviços técnicos', 'royalties', 'fundo nacional de marketing',
+    'op gratificações', 'op gratificacoes', 'cmv', 'frete de venda',
+  ])
+
+  // ── Seção 5: Margem de Contribuição ───────────────────────────────────────
+  const margemContrib = receitaLiquida - custosDir
+
+  // ── Seções 6–9: Despesas Operacionais Indiretas ────────────────────────────
+  const despPessoal = somaGrupos(lancamentos, ['Despesas com Pessoal'], [
+    'pró-labore', 'pro-labore', 'salário', 'salario', '13°', 'rescisão',
+    'rescisao', 'inss', 'fgts', 'vale transporte', 'vale refeição', 'vale refeicao',
+    'combustível', 'combustivel', 'pessoal',
+  ])
+  const despAdmin = somaGrupos(lancamentos, ['Despesas Administrativas'], [
+    'adiantamento a fornecedor', 'energia elétrica', 'energia eletrica',
+    'água', 'agua e esgoto', 'aluguel', 'manutenção predial', 'telefonia',
+    'uniformes', 'seguros', 'uber', 'copa e cozinha', 'cartório', 'cartorio',
+    'viagens', 'material de escritório', 'material de escritorio',
+    'estacionamento', 'material de limpeza', 'bens de pequeno valor',
+    'custas processuais', 'consultoria', 'contabilidade', 'jurídico', 'juridico',
+    'limpeza', 'segurança', 'seguranca', 'motoboy', 'iof',
+    'taxas e emolumentos', 'multa e juros', 'exames ocupacionais', 'administrativ',
+  ])
+  const despComercial = somaGrupos(lancamentos, ['Despesas Comerciais e Marketing'], [
+    'refeições', 'refeicoes', 'agência', 'agencia', 'assessoria',
+    'produção de material', 'marketing digital', 'feiras', 'eventos',
+    'marketing', 'comercial', 'publicidade',
+  ])
+  const despTI = somaGrupos(lancamentos, ['Despesas com TI'], [
+    'internet', 'informática', 'informatica', 'software', 'hospedagem de dados',
+    'sistema de gestão', 'sistema de gestao',
+  ])
+
+  // ── Seção 10: EBITDA ───────────────────────────────────────────────────────
+  const ebitda = margemContrib - despPessoal - despAdmin - despComercial - despTI
+
+  // ── Seção 11: Receitas Financeiras (rendimentos, descontos obtidos) ────────
+  const recFinanc = somaGruposReceita(lancamentos, ['Receitas Financeiras'])
+
+  // ── Seção 12: Despesas Financeiras (D&A, juros, bancárias) ────────────────
+  const despFinanc = somaGrupos(lancamentos, ['Despesas Financeiras'], [
+    'despesas bancárias', 'despesas bancarias', 'juros passivos',
+    'financiamentos', 'empréstimos', 'emprestimos',
+    'depreciação', 'depreciacao', 'amortização', 'amortizacao',
+  ])
+
+  // ── Seção 13: EBIT ─────────────────────────────────────────────────────────
+  const ebit = ebitda + recFinanc - despFinanc
+
+  // ── Seção 14: Investimentos ────────────────────────────────────────────────
+  const investimentos = somaGrupos(lancamentos, ['Investimentos'], [
+    'investimento -', 'máquinas e equipamentos', 'maquinas e equipamentos',
+    'computadores e periféricos', 'móveis e utensílios', 'moveis e utensilios',
+    'instalações de terceiros', 'instalacoes de terceiros', 'dividendos',
+  ])
+
+  // ── Seção 15: NOPAT / Resultado Operacional ────────────────────────────────
+  const nopat = ebit - investimentos
+
+  const base = receitaLiquida > 0 ? receitaLiquida : (totalReceitas > 0 ? totalReceitas : 1)
 
   return {
     receitaOperacional: totalReceitas,
+    receitaLiquida,
     margemContrib,
     ebitda,
     ebit,
     nopat,
-    margemContribPct:   (margemContrib / base) * 100,
-    ebitdaPct:          (ebitda / base) * 100,
-    ebitPct:            (ebit / base) * 100,
-    nopatPct:           (nopat / base) * 100,
-    receitaLiquida,
-    semDados:           receitaLiquida === 0 && totalReceitas === 0,
+    margemContribPct: (margemContrib / base) * 100,
+    ebitdaPct:        (ebitda / base) * 100,
+    ebitPct:          (ebit / base) * 100,
+    nopatPct:         (nopat / base) * 100,
+    semDados:         receitaLiquida === 0 && totalReceitas === 0,
   }
 }
 
@@ -473,35 +556,36 @@ export default function AnaliseDrePage() {
             <KpiCard
               title="Receitas Operacionais"
               value={moeda(kpis.receitaOperacional)}
-              hint="Total que entrou no período (vendas + serviços)."
+              secondaryValue={`Líq. ${moeda(kpis.receitaLiquida)}`}
+              hint="Receita bruta do período. Líquida = após deduções e impostos sobre faturamento (Simples/Presumido)."
               tone="positive"
             />
             <KpiCard
               title="Margem de Contribuição"
               value={pct(kpis.margemContribPct)}
               secondaryValue={moeda(kpis.margemContrib)}
-              hint="Quanto sobra das receitas após pagar os custos diretos (produto/serviço)."
+              hint="Receita Líquida menos custos diretos de entrega (materiais, insumos, serviços operacionais)."
               tone={kpiTone(kpis.margemContribPct)}
             />
             <KpiCard
               title="EBITDA"
               value={pct(kpis.ebitdaPct)}
               secondaryValue={moeda(kpis.ebitda)}
-              hint="Resultado antes de impostos e financiamentos — mostra a eficiência do negócio."
+              hint="Margem de Contribuição menos despesas com pessoal, administrativas, comerciais e TI."
               tone={kpiTone(kpis.ebitdaPct)}
             />
             <KpiCard
               title="EBIT"
               value={pct(kpis.ebitPct)}
               secondaryValue={moeda(kpis.ebit)}
-              hint="Resultado operacional (sem depreciação/amortização cadastrada, igual ao EBITDA)."
+              hint="EBITDA + receitas financeiras − despesas financeiras (D&A, juros, bancárias)."
               tone={kpiTone(kpis.ebitPct)}
             />
             <KpiCard
               title="NOPAT (Resultado Op.)"
               value={pct(kpis.nopatPct)}
               secondaryValue={moeda(kpis.nopat)}
-              hint="Resultado operacional após impostos — o que o negócio gera de verdade."
+              hint="EBIT menos investimentos em ativos — resultado operacional final do período."
               tone={kpiTone(kpis.nopatPct)}
             />
           </div>
