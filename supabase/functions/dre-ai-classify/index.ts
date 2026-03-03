@@ -287,27 +287,24 @@ async function handleBatch(
     return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
   }
 
-  const listaClf = classificacoesDisponiveis.length > 0
-    ? `\nClassificações já cadastradas (prefira estas):\n` +
-      classificacoesDisponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
-    : ''
+  // Prompt compacto para o batch — omite o plano detalhado para economizar tokens.
+  // Os itens óbvios já foram resolvidos pelo fallback local no cliente; só chegam
+  // aqui os casos ambíguos, então uma referência resumida é suficiente.
+  const GRUPOS_COMPACTOS = `receita→ Receitas Operacionais(Receita Dinheiro,Receita Cartão,Receita PIX/Transferências) | Receitas Financeiras(Rendimento de Aplicação,Descontos Obtidos)
+despesa→ Deduções de Receita | Impostos sobre Faturamento | Despesas Operacionais | Despesas com Pessoal(Pró-labore,Salários,INSS,FGTS,VT,VR,Combustível) | Despesas Administrativas(Aluguel,Energia,Água,Telefonia,Seguros,Manutenção,Consultoria,Contabilidade,Jurídico,Limpeza,IOF,Juros/Multas,Material Escritório,Uniformes) | Despesas Comerciais e Marketing(Marketing Digital,Refeições,Agência) | Despesas com TI(Internet,Software,Hospedagem) | Despesas Financeiras(Despesas Bancárias,Financiamentos,Juros Passivos) | Investimentos(Máquinas,Computadores,Móveis,Instalações,Dividendos)`
 
   const itensTexto = lancamentos
-    .map((l, i) => `${i + 1}. "${l.descricao}" | R$ ${l.valor.toFixed(2)} | ${l.tipo}`)
+    .map((l, i) => `${i + 1}. "${l.descricao}" | ${l.tipo}`)
     .join('\n')
 
-  const prompt = `Você é um assistente contábil especializado em DRE para clínicas e pequenas empresas brasileiras.
+  const prompt = `Assistente contábil DRE Brasil. Classifique cada lançamento.
 
-Classifique cada lançamento financeiro abaixo usando o plano de contas DRE.
+GRUPOS: ${GRUPOS_COMPACTOS}
 
-═══════════ PLANO DE CONTAS ═══════════
-${PLANO_DE_CONTAS_RESUMIDO}
-═══════════════════════════════════════${listaClf}
-
-LANÇAMENTOS PARA CLASSIFICAR:
+LANÇAMENTOS:
 ${itensTexto}
 
-RETORNE SOMENTE um array JSON com exatamente ${lancamentos.length} objetos, na mesma ordem, sem texto adicional:
+RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
 [{"tipo":"despesa","classificacao_nome":"Nome exato","grupo":"Grupo exato"}, ...]`
 
   let res = await callGroq(groqApiKey, modelo, prompt)
