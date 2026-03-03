@@ -598,13 +598,6 @@ export default function AnaliseDrePage() {
     closeWizard(); fetchLancamentos(usuarioFiltro || undefined); fetchGrupos(); fetchClassificacoes()
   }
 
-  const getPillClass = (classificacao: string, tipoLancamento?: 'receita' | 'despesa') => {
-    const tipo = tipoLancamento
-      ?? tipoMap[classificacao]
-      ?? (classificacao === 'receita' ? 'receita' : classificacao === 'despesa' ? 'despesa' : null)
-    return tipo === 'receita' ? styles.receitaPill : styles.despesaPill
-  }
-
   const formatDate = (item: DreLancamento) => {
     const src = item.data_lancamento ?? item.created_at
     return new Date(src).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
