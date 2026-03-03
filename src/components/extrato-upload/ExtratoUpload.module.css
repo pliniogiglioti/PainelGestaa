@@ -1,0 +1,298 @@
+/* ── Section ─────────────────────────────────────────────────────────────────── */
+
+.section {
+  background: rgba(12, 12, 12, 0.85);
+  border: 1px solid #252525;
+  border-radius: 18px;
+  padding: 26px 28px;
+  margin-bottom: 22px;
+}
+
+.sectionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.sectionHeader h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sectionSubtitle {
+  margin: 0;
+  color: #888;
+  font-size: 13px;
+}
+
+.downloadBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(213, 175, 69, 0.12);
+  border: 1px solid rgba(213, 175, 69, 0.35);
+  border-radius: 999px;
+  color: #d5af45;
+  font-size: 13px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.downloadBtn:hover { background: rgba(213, 175, 69, 0.22); }
+
+/* ── Drop Zone ───────────────────────────────────────────────────────────────── */
+
+.dropZone {
+  border: 2px dashed #333;
+  border-radius: 14px;
+  padding: 36px 24px;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  margin-bottom: 18px;
+}
+.dropZone:hover:not(.dropZoneLoading) {
+  border-color: #d5af45;
+  background: rgba(213, 175, 69, 0.05);
+}
+.dropZoneDragging {
+  border-color: #d5af45;
+  background: rgba(213, 175, 69, 0.1);
+}
+.dropZoneLoading { cursor: default; }
+
+.dropIcon { font-size: 32px; display: block; margin-bottom: 8px; }
+
+.dropTitle {
+  margin: 0 0 4px;
+  font-size: 15px;
+  color: #ddd;
+}
+.dropHint {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+}
+
+/* ── Progress ────────────────────────────────────────────────────────────────── */
+
+.progressWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.progressSpinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid #2a2a2a;
+  border-top-color: #d5af45;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.progressText {
+  margin: 0;
+  font-size: 14px;
+  color: #aaa;
+}
+
+.progressBar {
+  width: 240px;
+  height: 4px;
+  background: #2a2a2a;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: #d5af45;
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* ── Erros ───────────────────────────────────────────────────────────────────── */
+
+.errosBox {
+  background: rgba(180, 60, 60, 0.12);
+  border: 1px solid rgba(220, 80, 80, 0.3);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: #e07070;
+  margin-bottom: 18px;
+}
+.errosBox ul { margin: 6px 0 0; padding-left: 18px; }
+.errosBox li { margin-bottom: 2px; }
+
+/* ── Resumo geral ────────────────────────────────────────────────────────────── */
+
+.resumoRow {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.resumoCard {
+  background: rgba(20, 20, 20, 0.8);
+  border: 1px solid #2b2b2b;
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.resumoCard[data-tone='positive'] { border-color: rgba(74, 180, 100, 0.3); }
+.resumoCard[data-tone='negative'] { border-color: rgba(220, 80, 80, 0.3); }
+
+.resumoCard span {
+  display: block;
+  font-size: 11px;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.resumoCard strong {
+  font-size: 18px;
+  font-weight: 700;
+}
+.resumoCard[data-tone='positive'] strong { color: #5aba74; }
+.resumoCard[data-tone='negative'] strong { color: #e06060; }
+
+/* ── Grupos ──────────────────────────────────────────────────────────────────── */
+
+.gruposList { display: flex; flex-direction: column; gap: 8px; }
+
+.grupoCard {
+  border-radius: 12px;
+  border: 1px solid #2b2b2b;
+  overflow: hidden;
+}
+.grupoReceita { border-color: rgba(74, 180, 100, 0.25); }
+.grupoDespesa { border-color: rgba(220, 80, 80, 0.2); }
+
+.grupoHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: rgba(18, 18, 18, 0.9);
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  gap: 12px;
+  transition: background 0.15s;
+  color: inherit;
+}
+.grupoHeader:hover { background: rgba(30, 30, 30, 0.9); }
+
+.grupoInfo { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; }
+
+.grupoPill {
+  flex-shrink: 0;
+  font-size: 11px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-weight: 600;
+}
+.pillReceita { background: rgba(74, 180, 100, 0.18); color: #5aba74; }
+.pillDespesa { background: rgba(220, 80, 80, 0.18); color: #e06060; }
+
+.grupoNome {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grupoCount {
+  font-size: 11px;
+  color: #666;
+  white-space: nowrap;
+}
+
+.grupoRight { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+
+.grupoTotal { font-size: 16px; font-weight: 700; }
+.totalPositive { color: #5aba74; }
+.totalNegative { color: #e06060; }
+
+.chevron { font-size: 11px; color: #666; }
+
+/* ── Classificações ──────────────────────────────────────────────────────────── */
+
+.classificacoesList {
+  border-top: 1px solid #222;
+  background: rgba(10, 10, 10, 0.5);
+}
+
+.clfItem { border-bottom: 1px solid #1e1e1e; }
+.clfItem:last-child { border-bottom: none; }
+
+.clfHeader {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+  transition: background 0.12s;
+}
+.clfHeader:hover { background: rgba(255, 255, 255, 0.03); }
+
+.clfNome { font-size: 13px; color: #ccc; text-align: left; flex: 1; }
+
+.clfRight { display: flex; align-items: center; gap: 10px; }
+
+.clfCount { font-size: 11px; color: #555; }
+
+.clfTotal { font-size: 13px; font-weight: 600; color: #d5af45; }
+
+.chevronSm { font-size: 10px; color: #555; }
+
+/* ── Tabela de lançamentos ───────────────────────────────────────────────────── */
+
+.lancTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.lancTable th {
+  padding: 6px 20px;
+  text-align: left;
+  color: #555;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.lancTable td {
+  padding: 7px 20px;
+  border-top: 1px solid #1a1a1a;
+  color: #bbb;
+}
+
+.lancTable tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+.tdReceita { color: #5aba74 !important; font-weight: 600; }
+.tdDespesa { color: #e06060 !important; font-weight: 600; }
+
+@media (max-width: 600px) {
+  .resumoRow { grid-template-columns: 1fr; }
+  .sectionHeader { flex-direction: column; }
+  .lancTable th:first-child,
+  .lancTable td:first-child { display: none; }
+}
