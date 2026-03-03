@@ -229,6 +229,8 @@ function AiSpinner() {
   )
 }
 
+type PerfilUsuario = { id: string; name: string | null; email: string | null }
+
 export default function AnaliseDrePage() {
   const [showWizard,     setShowWizard]     = useState(false)
   const [editingId,      setEditingId]      = useState<string | null>(null)
@@ -244,14 +246,17 @@ export default function AnaliseDrePage() {
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
   const [mesFiltro,      setMesFiltro]      = useState('todos')
   const [tipoFiltro,     setTipoFiltro]     = useState<'todos' | 'receita' | 'despesa'>('todos')
+  // Admin
+  const [isAdmin,        setIsAdmin]        = useState(false)
+  const [usuarios,       setUsuarios]       = useState<PerfilUsuario[]>([])
+  const [usuarioFiltro,  setUsuarioFiltro]  = useState<string>('')  // '' = dados do próprio usuário
 
-  const fetchLancamentos = async () => {
+  const fetchLancamentos = async (targetUserId?: string) => {
     const { data: authData } = await supabase.auth.getUser()
-    const userId = authData.user?.id
-    if (!userId) {
-      setLancamentos([])
-      return
-    }
+    const myId = authData.user?.id
+    if (!myId) { setLancamentos([]); return }
+
+    const userId = targetUserId ?? myId
 
     const { data, error } = await supabase
       .from('dre_lancamentos')
@@ -276,8 +281,30 @@ export default function AnaliseDrePage() {
     setGrupos(data ?? [])
   }
 
-  // Load data on mount
-  useEffect(() => { fetchLancamentos(); fetchClassificacoes(); fetchGrupos() }, [])
+  // Load data on mount + check admin
+  useEffect(() => {
+    fetchClassificacoes()
+    fetchGrupos()
+
+    supabase.auth.getUser().then(({ data }) => {
+      const myId = data.user?.id
+      if (!myId) { fetchLancamentos(); return }
+
+      supabase.from('profiles').select('role').eq('id', myId).single()
+        .then(({ data: profile }) => {
+          const admin = profile?.role === 'admin'
+          setIsAdmin(admin)
+          if (admin) {
+            supabase.from('profiles')
+              .select('id, name, email')
+              .order('name', { ascending: true })
+              .then(({ data: users }) => setUsuarios(users ?? []))
+          }
+          fetchLancamentos()
+        })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const valorNumerico = useMemo(() => {
     const parsed = Number(form.valor.replace(',', '.'))
@@ -511,7 +538,7 @@ export default function AnaliseDrePage() {
 
     setSaving(false)
     if (error) { setError(error.message); return }
-    closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
+    closeWizard(); fetchLancamentos(usuarioFiltro || undefined); fetchGrupos(); fetchClassificacoes()
   }
 
   const getPillClass = (classificacao: string, tipoLancamento?: 'receita' | 'despesa') => {
@@ -610,6 +637,30 @@ export default function AnaliseDrePage() {
             <span className={styles.stepIndicator}>{lancamentosFiltrados.length} registros</span>
           </div>
           <div className={styles.filtersRow}>
+            {/* Seletor de usuário — visível apenas para admin */}
+            {isAdmin && (
+              <label className={styles.filterLabel}>
+                Usuário
+                <select
+                  value={usuarioFiltro}
+                  onChange={e => {
+                    const uid = e.target.value
+                    setUsuarioFiltro(uid)
+                    setMesFiltro('todos')
+                    fetchLancamentos(uid || undefined)
+                  }}
+                  className={`${styles.filterSelect} ${styles.filterSelectAdmin}`}
+                >
+                  <option value="">Meus lançamentos</option>
+                  {usuarios.map(u => (
+                    <option key={u.id} value={u.id}>
+                      {u.name ?? u.email ?? u.id.slice(0, 8)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+
             <label className={styles.filterLabel}>
               Mês
               <select value={mesFiltro} onChange={e => setMesFiltro(e.target.value)} className={styles.filterSelect}>
