@@ -344,12 +344,21 @@ export function ExtratoUpload() {
     setProgresso(null)
   }, [])
 
+  const salvarTudo = async () => {
+    setSelecionados(new Set(linhasClass.map((_, i) => i)))
+    await salvarComIndices(new Set(linhasClass.map((_, i) => i)))
+  }
+
   const salvarLancamentos = async () => {
+    await salvarComIndices(selecionados)
+  }
+
+  const salvarComIndices = async (indices: Set<number>) => {
     setFase('salvando')
     setErroSalvar('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const toInsert = [...selecionados].sort((a, b) => a - b).map(i => ({
+      const toInsert = [...indices].sort((a, b) => a - b).map(i => ({
         user_id:          user?.id ?? null,
         descricao:        linhasClass[i].descricao,
         valor:            linhasClass[i].valor,
@@ -543,22 +552,31 @@ export function ExtratoUpload() {
             </table>
           </div>
 
-          {/* Rodapé com botão de salvar */}
+          {/* Rodapé com botões de salvar */}
           <div className={styles.reviewFooter}>
             <span className={styles.footerInfo}>
               <strong>{selecionados.size}</strong> de {linhasClass.length} selecionados
               {' · '}
               Total: <strong>{moeda(totalSelecionado)}</strong>
             </span>
-            <button
-              className={styles.btnPrimary}
-              onClick={salvarLancamentos}
-              disabled={selecionados.size === 0 || fase === 'salvando'}
-            >
-              {fase === 'salvando'
-                ? 'Salvando…'
-                : `Enviar ${selecionados.size} para Lançamentos →`}
-            </button>
+            <div className={styles.footerBtns}>
+              <button
+                className={styles.btnSecondary}
+                onClick={salvarLancamentos}
+                disabled={selecionados.size === 0 || fase === 'salvando'}
+                title="Envia apenas os itens marcados na tabela"
+              >
+                {fase === 'salvando' ? 'Salvando…' : `Enviar selecionados (${selecionados.size})`}
+              </button>
+              <button
+                className={styles.btnPrimary}
+                onClick={salvarTudo}
+                disabled={fase === 'salvando'}
+                title="Envia todos os lançamentos do arquivo de uma vez"
+              >
+                {fase === 'salvando' ? 'Salvando…' : `Lançar Tudo (${linhasClass.length}) →`}
+              </button>
+            </div>
           </div>
         </div>
       )}
