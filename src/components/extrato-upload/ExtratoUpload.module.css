@@ -294,6 +294,12 @@
 }
 .footerInfo strong { color: #ddd; }
 
+.footerBtns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 /* ── Sucesso ─────────────────────────────────────────────────────────────────── */
 
 .sucessoBox {
