@@ -310,7 +310,7 @@ export function ExtratoUpload() {
 
     // ── Passo 2: enviar restantes em batch para a IA ──────────────────────────
     const novosErros: string[] = []
-    const BATCH_IA = 50  // Groq suporta contexto grande; 50 itens por chamada é seguro
+    const BATCH_IA = 15  // ~3-4K tokens por chamada, dentro do rate limit do Groq (12K/min)
 
     for (let b = 0; b < indicesParaIA.length; b += BATCH_IA) {
       const fatia = indicesParaIA.slice(b, b + BATCH_IA)
