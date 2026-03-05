@@ -168,7 +168,7 @@ function detectarColunas(headers: string[]): {
     tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
     credito:       idx(['crédit', 'credit']),
     debito:        idx(['débit', 'debit']),
-    classificacao: idx(['classific', 'categoria', 'category']),
+    classificacao: idx(['classificaç', 'classificac']),
     grupo:         idx(['grupo', 'group', 'agrupamento']),
   }
 }
@@ -266,6 +266,11 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
 
     const rawClassif = cols.classificacao >= 0 ? String(row[cols.classificacao] ?? '').trim() : ''
     const rawGrupo   = cols.grupo          >= 0 ? String(row[cols.grupo]          ?? '').trim() : ''
+
+    // Ignora linhas de totalizadores / saldos / cabeçalhos internos
+    const descNorm = String(rawDesc ?? '').trim().toLowerCase()
+    const isTotalizador = /^(total|subtotal|saldo|s\.a\.|saldo anterior|saldo final|saldo do dia|resultado|resumo|consolidado)/.test(descNorm)
+    if (isTotalizador) continue
 
     linhas.push({
       data:      formatarData(rawData),
@@ -507,11 +512,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação já presente no arquivo importado
-      if (linha.classificacaoArquivo) {
+      // Só usa dados do arquivo se ambos classificação E grupo estiverem presentes,
+      // para não sobrescrever a IA com dados incompletos.
+      if (linha.classificacaoArquivo && linha.grupoArquivo) {
         classificadas[i] = {
           ...linha,
           classificacao: linha.classificacaoArquivo,
-          grupo: linha.grupoArquivo || 'Outros',
+          grupo: linha.grupoArquivo,
           status: 'ok',
         }
         continue
