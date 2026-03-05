@@ -262,29 +262,40 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())
   const [expandedClfs,     setExpandedClfs]     = useState<Set<string>>(new Set())
 
-  const fetchLancamentos = async (targetUserId?: string) => {
-    const { data: authData } = await supabase.auth.getUser()
-    const myId = authData.user?.id
-    if (!myId) { setLancamentos([]); return }
+ const fetchLancamentos = async (targetUserId?: string) => {
+  const { data: authData } = await supabase.auth.getUser()
+  const myId = authData.user?.id
+  if (!myId) { setLancamentos([]); return }
 
-    // Filtra por empresa_id — RLS garante acesso apenas a membros
+  const PAGE_SIZE = 1000
+  let from = 0
+  let all: DreLancamento[] = []
+
+  while (true) {
     let query = supabase
       .from('dre_lancamentos')
       .select('*')
       .eq('empresa_id', empresa.id)
       .order('data_lancamento', { ascending: false })
       .order('created_at', { ascending: false })
+      .range(from, from + PAGE_SIZE - 1)
 
-    // Admin pode filtrar por usuário específico (para diagnóstico)
     if (isAdmin && targetUserId) {
       query = query.eq('user_id', targetUserId)
     }
 
     const { data, error } = await query
-
     if (error) { setError(error.message); return }
-    setLancamentos(data ?? [])
+
+    const chunk = (data ?? []) as DreLancamento[]
+    all = all.concat(chunk)
+
+    if (chunk.length < PAGE_SIZE) break
+    from += PAGE_SIZE
   }
+
+  setLancamentos(all)
+}
 
   const fetchClassificacoes = async () => {
     const { data } = await supabase
