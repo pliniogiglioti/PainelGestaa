@@ -567,6 +567,11 @@ export default function AnaliseDrePage() {
     const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const dataLancamento     = form.data || today()
 
+    // Garante a classificação no banco (vindas da IA/plano de contas)
+    await supabase
+      .from('dre_classificacoes')
+      .upsert({ nome: classificacaoNome, tipo: tipoClassificacao, ativo: true }, { onConflict: 'nome' })
+
     const resGrupo = await ensureGrupoCatalogado(grupoNome, form.tipo)
     if (!resGrupo.ok) {
       setSaving(false)
