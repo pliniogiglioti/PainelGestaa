@@ -95,10 +95,62 @@ export interface Database {
         }
         Relationships: []
       }
+      empresas: {
+        Row: {
+          id:         string
+          nome:       string
+          cnpj:       string | null
+          logo_url:   string | null
+          created_by: string
+          ativo:      boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?:        string
+          nome:       string
+          cnpj?:      string | null
+          logo_url?:  string | null
+          created_by: string
+          ativo?:     boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?:        string
+          nome?:      string
+          cnpj?:      string | null
+          logo_url?:  string | null
+          ativo?:     boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      empresa_membros: {
+        Row: {
+          id:         string
+          empresa_id: string
+          user_id:    string
+          role:       'admin' | 'membro'
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          empresa_id:  string
+          user_id:     string
+          role?:       'admin' | 'membro'
+          created_at?: string
+        }
+        Update: {
+          role?: 'admin' | 'membro'
+        }
+        Relationships: []
+      }
       dre_lancamentos: {
         Row: {
           id:                string
           user_id:           string | null
+          empresa_id:        string | null
           descricao:         string | null
           valor:             number
           tipo:              'receita' | 'despesa'
@@ -111,6 +163,7 @@ export interface Database {
         Insert: {
           id?:               string
           user_id?:          string | null
+          empresa_id?:       string | null
           descricao?:        string | null
           valor:             number
           tipo:              'receita' | 'despesa'
@@ -123,6 +176,7 @@ export interface Database {
         Update: {
           id?:               string
           user_id?:          string | null
+          empresa_id?:       string | null
           descricao?:        string | null
           valor?:            number
           tipo?:             'receita' | 'despesa'
@@ -300,6 +354,8 @@ export interface Database {
 export type Profile            = Database['public']['Tables']['profiles']['Row']
 export type AppCategory        = Database['public']['Tables']['app_categories']['Row']
 export type App                = Database['public']['Tables']['apps']['Row']
+export type Empresa            = Database['public']['Tables']['empresas']['Row']
+export type EmpresaMembro      = Database['public']['Tables']['empresa_membros']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
 export type Configuracao       = Database['public']['Tables']['configuracoes']['Row']

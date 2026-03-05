@@ -390,7 +390,12 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 // ── Componente principal ──────────────────────────────────────────────────────
 
-export function ExtratoUpload() {
+interface ExtratoUploadProps {
+  /** ID da empresa para vincular os lançamentos importados */
+  empresaId: string
+}
+
+export function ExtratoUpload({ empresaId }: ExtratoUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging]                     = useState(false)
   const [arquivo, setArquivo]                       = useState<string>('')
@@ -566,6 +571,7 @@ export function ExtratoUpload() {
       const { data: { user } } = await supabase.auth.getUser()
       const toInsert = [...indices].sort((a, b) => a - b).map(i => ({
         user_id:          user?.id ?? null,
+        empresa_id:       empresaId,
         descricao:        linhasClass[i].descricao,
         valor:            linhasClass[i].valor,
         tipo:             linhasClass[i].tipo,
