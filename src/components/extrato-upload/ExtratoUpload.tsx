@@ -39,6 +39,8 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(tarifa.*venda|tarifa.*credito|tarifa.*debito|tarifa.*adquir|getnet.*tarifa|getnet.*cobranca|cobranca.*getnet|adquirencia.*tarifa)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Padrão', grupo: 'Deduções de Receita' },
   { pattern: /(taxa cartao|tarifa cartao|pos\b|maquininha|antecipacao.*cartao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Padrão', grupo: 'Deduções de Receita' },
   { pattern: /(cancelamento|devolucao|estorno)/i, tipo: 'despesa', classificacao: 'Vendas Canceladas / Devoluções', grupo: 'Deduções de Receita' },
+  // ── Despesas bancárias — ANTES dos padrões amplos de pix/transferencia para evitar falso match ──
+  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
   // ── Receitas ──
   { pattern: /(getnet|cielo|rede\b|stone\b|pagseguro|sumup|pagbank|mercadopago|visa.*credito|master.*credito|elo.*credito|amex.*credito|credito.*adquir)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
   { pattern: /(cartao|card)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
@@ -86,7 +88,6 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(iof\b)/i, tipo: 'despesa', classificacao: 'IOF', grupo: 'Despesas Administrativas' },
   { pattern: /(juros|multa\b|mora\b)/i, tipo: 'despesa', classificacao: 'Multa e Juros s/ Contas Pagas em Atraso', grupo: 'Despesas Administrativas' },
   { pattern: /(financiamento|emprestimo)/i, tipo: 'despesa', classificacao: 'Financiamentos / Empréstimos', grupo: 'Despesas Financeiras' },
-  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|liquidacao qrcode|liquidacao pix)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
   { pattern: /(depreciacao|amortizacao)/i, tipo: 'despesa', classificacao: 'Depreciação e Amortização', grupo: 'Despesas Financeiras' },
   { pattern: /(dividendo|distribuicao lucro|retirada socio)/i, tipo: 'despesa', classificacao: 'Dividendos e Despesas dos Sócios', grupo: 'Investimentos' },
   { pattern: /(consultoria\b)/i, tipo: 'despesa', classificacao: 'Consultoria', grupo: 'Despesas Administrativas' },
@@ -103,11 +104,11 @@ const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
 /** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
-function classificarLocal(descricao: string): { classificacao: string; grupo: string } | null {
+function classificarLocal(descricao: string): { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' } | null {
   const text = normalize(descricao)
   for (const rule of FALLBACK_RULES) {
     if (rule.pattern.test(text)) {
-      return { classificacao: rule.classificacao, grupo: rule.grupo }
+      return { classificacao: rule.classificacao, grupo: rule.grupo, tipo: rule.tipo }
     }
   }
   return null
@@ -490,7 +491,7 @@ export function ExtratoUpload({ empresaId }: ExtratoUploadProps) {
     for (let i = 0; i < linhas.length; i++) {
       const local = classificarLocal(linhas[i].descricao)
       if (local) {
-        classificadas[i] = { ...linhas[i], classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
+        classificadas[i] = { ...linhas[i], tipo: local.tipo, classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
       } else {
         indicesParaIA.push(i)
       }
