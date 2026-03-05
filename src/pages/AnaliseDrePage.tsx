@@ -426,12 +426,6 @@ export default function AnaliseDrePage() {
     form.tipo ? classificacoes.filter(c => c.tipo === form.tipo) : classificacoes,
   [classificacoes, form.tipo])
 
-  const classificacaoEhNova = useMemo(() => {
-    const nome = form.classificacaoNome.trim().toLowerCase()
-    if (!nome) return false
-    return !classificacoes.some(c => c.nome.trim().toLowerCase() === nome)
-  }, [classificacoes, form.classificacaoNome])
-
   const openWizard = () => {
     setEditingId(null)
     setForm(INITIAL_FORM)
@@ -467,6 +461,16 @@ export default function AnaliseDrePage() {
     setError('')
     setAiError('')
     setAiWarning('')
+  }
+
+  const deleteLancamento = async (item: DreLancamento) => {
+    const confirmado = window.confirm(
+      `Excluir lançamento "${item.descricao ?? '(sem descrição)'}" de ${moeda(Number(item.valor))}?`
+    )
+    if (!confirmado) return
+    const { error } = await supabase.from('dre_lancamentos').delete().eq('id', item.id)
+    if (error) { alert(`Erro ao excluir: ${error.message}`); return }
+    fetchLancamentos(usuarioFiltro || undefined)
   }
 
   const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
@@ -562,16 +566,6 @@ export default function AnaliseDrePage() {
     const grupoNome          = form.grupo.trim()
     const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const dataLancamento     = form.data || today()
-
-    const { error: classError } = await supabase
-      .from('dre_classificacoes')
-      .upsert({ nome: classificacaoNome, tipo: tipoClassificacao, ativo: true }, { onConflict: 'nome' })
-
-    if (classError) {
-      setSaving(false)
-      setError(`Não foi possível cadastrar a classificação: ${classError.message}`)
-      return
-    }
 
     const resGrupo = await ensureGrupoCatalogado(grupoNome, form.tipo)
     if (!resGrupo.ok) {
@@ -840,9 +834,12 @@ export default function AnaliseDrePage() {
                                       <td className={item.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}>
                                         {moeda(Number(item.valor))}
                                       </td>
-                                      <td>
+                                      <td className={styles.actionCell}>
                                         <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
                                           Editar
+                                        </button>
+                                        <button className={styles.deleteBtn} onClick={() => deleteLancamento(item)}>
+                                          Excluir
                                         </button>
                                       </td>
                                     </tr>
@@ -1002,9 +999,6 @@ export default function AnaliseDrePage() {
                       <div className={styles.aiSelectedBox}>
                         <span className={styles.aiSelectedLabel}>IA identificou</span>
                         <strong className={styles.aiSelectedValue}>{form.classificacaoNome}</strong>
-                        {classificacaoEhNova && (
-                          <span className={styles.aiSelectedLabel}>Será cadastrada como nova classificação ao salvar.</span>
-                        )}
                       </div>
                     )}
 

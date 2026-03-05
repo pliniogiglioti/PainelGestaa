@@ -1,7 +1,14 @@
 import { useCallback, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
+import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../../lib/supabase'
 import styles from './ExtratoUpload.module.css'
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString()
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -193,6 +200,126 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   return linhas
 }
 
+/** Extrai texto de todas as páginas de um PDF */
+async function extrairTextoPDF(buffer: ArrayBuffer): Promise<string[]> {
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
+  const paginas: string[] = []
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i)
+    const content = await page.getTextContent()
+    const texto = content.items
+      .map(item => ('str' in item ? (item.str ?? '') : ''))
+      .join(' ')
+    paginas.push(texto)
+  }
+  return paginas
+}
+
+/** Converte valor monetário em string para número positivo */
+function parseValorPDF(s: string): number {
+  const clean = s.replace(/[R$\s]/g, '').replace(/\./g, '').replace(',', '.')
+  const v = parseFloat(clean)
+  return Number.isFinite(v) ? Math.abs(v) : 0
+}
+
+/** Detecta se uma linha de texto é uma data no formato DD/MM/AAAA */
+function isData(s: string): boolean {
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(s.trim())
+}
+
+/**
+ * Parse extrato bancário PDF (Bradesco e outros formatos tabulares).
+ * Estratégia: detectar datas DD/MM/AAAA → capturar descrição e valores crédito/débito.
+ */
+async function parsePDF(buffer: ArrayBuffer): Promise<LinhaExtrato[]> {
+  const paginas = await extrairTextoPDF(buffer)
+  const linhas: LinhaExtrato[] = []
+
+  for (const texto of paginas) {
+    // Abordagem 1: regex para formato Bradesco (Data Desc Dcto Credito Debito Saldo)
+    const matches = [...texto.matchAll(
+      /(\d{2}\/\d{2}\/\d{4})\s+([A-Z][^\d]{5,80?})\s+([\d.]+)\s+([\d.,]+)?\s+([\d.,]+)?\s+([\d.,]+)/g
+    )]
+    if (matches.length > 0) {
+      for (const m of matches) {
+        const data = m[1]
+        const descricao = m[2].trim().replace(/\s+/g, ' ')
+        const credito = parseValorPDF(m[4] ?? '')
+        const debito  = parseValorPDF(m[5] ?? '')
+
+        if (descricao.length < 3) continue
+        if (descricao.toLowerCase().includes('saldo anterior')) continue
+
+        if (credito > 0) {
+          linhas.push({ data, descricao, valor: credito, tipo: 'receita' })
+        }
+        if (debito > 0) {
+          linhas.push({ data, descricao, valor: debito, tipo: 'despesa' })
+        }
+      }
+      if (linhas.length > 0) continue
+    }
+
+    // Abordagem 2: tokenização por palavras — funciona para extratos sem regex direta
+    // Divide o texto em tokens e tenta encontrar sequências: data + descrição + valor
+    const tokens = texto.split(/\s+/).filter(Boolean)
+    let i = 0
+    while (i < tokens.length) {
+      if (isData(tokens[i])) {
+        const data = tokens[i]
+        i++
+        const descTokens: string[] = []
+        // Coleta tokens de descrição até encontrar 2 valores numéricos consecutivos
+        while (i < tokens.length && !isData(tokens[i])) {
+          const raw = tokens[i].replace(/[R$]/g, '')
+          if (/^\d{1,3}(\.\d{3})*(,\d{2})?$/.test(raw) || /^\d+(,\d{2})?$/.test(raw)) break
+          descTokens.push(tokens[i])
+          i++
+        }
+        const descricao = descTokens.join(' ').trim()
+        if (descricao.toLowerCase().includes('saldo anterior') || descricao.length < 3) continue
+
+        // Tenta ler próximos 3 valores (Dcto/Credito/Debito ou Credito/Debito/Saldo)
+        const valores: number[] = []
+        let j = i
+        while (j < tokens.length && valores.length < 3) {
+          const v = parseValorPDF(tokens[j])
+          if (v > 0) { valores.push(v); j++ } else break
+        }
+
+        if (valores.length >= 2) {
+          // Heurística: se tem 3 valores → [dcto?, credito, debito, saldo]
+          // Bradesco: dcto(int) crédito débito saldo
+          // Detectamos pelo primeiro token (dcto é inteiro sem vírgula)
+          const primeiroToken = tokens[i] ?? ''
+          const isDcto = /^\d+$/.test(primeiroToken) && !primeiroToken.includes(',')
+          const credito = isDcto ? valores[1] : valores[0]
+          const debito  = isDcto ? valores[2] : valores[1]
+
+          if (credito > 0) linhas.push({ data, descricao, valor: credito, tipo: 'receita' })
+          if (debito  > 0) linhas.push({ data, descricao, valor: debito,  tipo: 'despesa' })
+        } else if (valores.length === 1) {
+          // Apenas um valor — usa heurística por tipo de lançamento
+          const desc = descricao.toLowerCase()
+          const isReceita = /(credito|getnet|master credito|visa credito|transferencia.*rem|pix.*rem)/i.test(desc)
+          linhas.push({ data, descricao, valor: valores[0], tipo: isReceita ? 'receita' : 'despesa' })
+        }
+      } else {
+        i++
+      }
+    }
+  }
+
+  // Remove duplicatas exatas (data + descricao + valor + tipo)
+  const visto = new Set<string>()
+  return linhas.filter(l => {
+    const key = `${l.data}|${l.descricao}|${l.valor}|${l.tipo}`
+    if (visto.has(key)) return false
+    visto.add(key)
+    return true
+  })
+}
+
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 // ── Componente principal ──────────────────────────────────────────────────────
@@ -253,15 +380,19 @@ export function ExtratoUpload() {
     let linhas: LinhaExtrato[] = []
     try {
       const buffer = await file.arrayBuffer()
-      linhas = parsePlanilha(buffer)
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        linhas = await parsePDF(buffer)
+      } else {
+        linhas = parsePlanilha(buffer)
+      }
     } catch {
-      setMsgErroUpload('Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls) ou CSV válido.')
+      setMsgErroUpload('Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls), CSV ou PDF válido.')
       setFase('idle')
       return
     }
 
     if (linhas.length === 0) {
-      setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo.')
+      setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo (Excel, CSV ou PDF de extrato bancário).')
       setFase('idle')
       return
     }
@@ -396,7 +527,7 @@ export function ExtratoUpload() {
         <div>
           <h2>Importar Extrato / Planilha</h2>
           <p className={styles.sectionSubtitle}>
-            Envie um extrato de banco ou planilha Excel — a IA classifica cada lançamento automaticamente.
+            Envie um extrato de banco (PDF ou Excel) ou planilha CSV — a IA classifica cada lançamento automaticamente.
           </p>
         </div>
         <a href="/exemplos/exemplo.xlsx" download className={styles.downloadBtn}>
@@ -417,7 +548,7 @@ export function ExtratoUpload() {
             <input
               ref={fileRef}
               type="file"
-              accept=".xlsx,.xls,.csv"
+              accept=".xlsx,.xls,.csv,.pdf"
               style={{ display: 'none' }}
               onChange={onFileChange}
             />
@@ -442,7 +573,7 @@ export function ExtratoUpload() {
                     ? `Enviar outro arquivo (atual: ${arquivo})`
                     : 'Arraste o arquivo aqui ou clique para selecionar'}
                 </p>
-                <p className={styles.dropHint}>Aceita .xlsx, .xls e .csv</p>
+                <p className={styles.dropHint}>Aceita .xlsx, .xls, .csv e .pdf</p>
               </>
             )}
           </div>

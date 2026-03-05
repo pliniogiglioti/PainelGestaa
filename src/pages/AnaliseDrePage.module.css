@@ -450,6 +450,28 @@ th { color: #8f8f8f; font-weight: 500; }
   opacity: 0.85;
 }
 
+.actionCell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.deleteBtn {
+  border: 1px solid rgba(255, 100, 100, 0.35);
+  background: rgba(255, 100, 100, 0.08);
+  color: #ff7070;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.deleteBtn:hover {
+  opacity: 0.85;
+}
+
 .tablePill {
   display: inline-flex;
   font-size: 11px;
