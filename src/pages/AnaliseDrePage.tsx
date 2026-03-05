@@ -713,7 +713,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
       )}
 
       {/* ── Extrato Upload ── */}
-      <ExtratoUpload empresaId={empresa.id} />
+      <ExtratoUpload empresaId={empresa.id} onSaved={() => fetchLancamentos(usuarioFiltro || undefined)} />
 
       {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentosFiltrados} />

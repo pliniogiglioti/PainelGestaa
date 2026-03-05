@@ -17,6 +17,10 @@ interface LinhaExtrato {
   descricao: string
   valor: number
   tipo: 'receita' | 'despesa'
+  /** Classificação já presente no arquivo importado (ex: coluna "Classificação") */
+  classificacaoArquivo?: string
+  /** Grupo já presente no arquivo importado (ex: coluna "Grupo") */
+  grupoArquivo?: string
 }
 
 interface LinhaClassificada extends LinhaExtrato {
@@ -47,6 +51,7 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(transferencia pix rem|pix.*receb|receb.*pix|pix.*entr)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
   { pattern: /(pix|transferencia)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
   { pattern: /(rendimento|aplicacao|investimento financeiro)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
+  { pattern: /\bdinheiro\b/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   // ── Impostos ──
   { pattern: /(simples nacional|imposto|iss|icms|pis|cofins|irpj|tributo|das )/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Simples Nacional', grupo: 'Impostos sobre Faturamento' },
@@ -151,17 +156,20 @@ function encontrarLinhaCabecalho(rows: unknown[][], maxLinhas = 20): number {
 function detectarColunas(headers: string[]): {
   data: number; descricao: number; valor: number; tipo: number
   credito: number; debito: number
+  classificacao: number; grupo: number
 } {
   const idx = (keys: string[]) =>
     headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k)))
 
   return {
-    data:     idx(['data', 'date', 'dt', 'vencimento']),
-    descricao:idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement', 'lançamento', 'lancamento']),
-    valor:    headers.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.toLowerCase().includes(k)) && !h.toLowerCase().includes('saldo')),
-    tipo:     idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
-    credito:  idx(['crédit', 'credit']),
-    debito:   idx(['débit', 'debit']),
+    data:          idx(['data', 'date', 'dt', 'vencimento']),
+    descricao:     idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement', 'lançamento', 'lancamento']),
+    valor:         headers.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.toLowerCase().includes(k)) && !h.toLowerCase().includes('saldo')),
+    tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
+    credito:       idx(['crédit', 'credit']),
+    debito:        idx(['débit', 'debit']),
+    classificacao: idx(['classific', 'categoria', 'category']),
+    grupo:         idx(['grupo', 'group', 'agrupamento']),
   }
 }
 
@@ -256,11 +264,16 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
       tipo = isNeg ? 'despesa' : parseTipo(rawTipo, absValor)
     }
 
+    const rawClassif = cols.classificacao >= 0 ? String(row[cols.classificacao] ?? '').trim() : ''
+    const rawGrupo   = cols.grupo          >= 0 ? String(row[cols.grupo]          ?? '').trim() : ''
+
     linhas.push({
       data:      formatarData(rawData),
       descricao: String(rawDesc ?? '').trim() || `Linha ${i + 1}`,
       valor:     valorNum,
       tipo,
+      ...(rawClassif ? { classificacaoArquivo: rawClassif } : {}),
+      ...(rawGrupo   ? { grupoArquivo: rawGrupo }           : {}),
     })
   }
 
@@ -394,9 +407,11 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 interface ExtratoUploadProps {
   /** ID da empresa para vincular os lançamentos importados */
   empresaId: string
+  /** Chamado após lançamentos salvos com sucesso — use para recarregar a lista na página pai */
+  onSaved?: () => void
 }
 
-export function ExtratoUpload({ empresaId }: ExtratoUploadProps) {
+export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging]                     = useState(false)
   const [arquivo, setArquivo]                       = useState<string>('')
@@ -489,9 +504,23 @@ export function ExtratoUpload({ empresaId }: ExtratoUploadProps) {
     const indicesParaIA: number[] = []
 
     for (let i = 0; i < linhas.length; i++) {
-      const local = classificarLocal(linhas[i].descricao)
+      const linha = linhas[i]
+
+      // Prioridade 1: classificação já presente no arquivo importado
+      if (linha.classificacaoArquivo) {
+        classificadas[i] = {
+          ...linha,
+          classificacao: linha.classificacaoArquivo,
+          grupo: linha.grupoArquivo || 'Outros',
+          status: 'ok',
+        }
+        continue
+      }
+
+      // Prioridade 2: regras locais de fallback
+      const local = classificarLocal(linha.descricao)
       if (local) {
-        classificadas[i] = { ...linhas[i], tipo: local.tipo, classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
+        classificadas[i] = { ...linha, tipo: local.tipo, classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
       } else {
         indicesParaIA.push(i)
       }
@@ -584,6 +613,7 @@ export function ExtratoUpload({ empresaId }: ExtratoUploadProps) {
       if (error) throw new Error(error.message)
       setSucessoSalvo(toInsert.length)
       setFase('concluido')
+      onSaved?.()
     } catch (e) {
       setErroSalvar(`Erro ao salvar: ${e instanceof Error ? e.message : 'Desconhecido'}`)
       setFase('revisao')
