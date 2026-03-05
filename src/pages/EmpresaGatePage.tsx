@@ -26,12 +26,49 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
 
   async function carregarEmpresas() {
     setLoading(true)
-    const { data } = await supabase
-      .from('empresas')
-      .select('*')
-      .eq('ativo', true)
-      .order('created_at')
-    setEmpresas(data ?? [])
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) { setLoading(false); return }
+
+    // Verifica se é admin do sistema (enxerga todas as empresas)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'admin'
+
+    let empresasData: Empresa[] = []
+
+    if (isAdmin) {
+      const { data } = await supabase
+        .from('empresas')
+        .select('*')
+        .eq('ativo', true)
+        .order('created_at')
+      empresasData = data ?? []
+    } else {
+      // Usuário comum: só enxerga empresas onde é membro
+      const { data: membros } = await supabase
+        .from('empresa_membros')
+        .select('empresa_id')
+        .eq('user_id', user.id)
+
+      const ids = (membros ?? []).map(m => m.empresa_id)
+
+      if (ids.length > 0) {
+        const { data } = await supabase
+          .from('empresas')
+          .select('*')
+          .in('id', ids)
+          .eq('ativo', true)
+          .order('created_at')
+        empresasData = data ?? []
+      }
+    }
+
+    setEmpresas(empresasData)
     setLoading(false)
   }
 
