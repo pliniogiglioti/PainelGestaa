@@ -267,11 +267,6 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
     const rawClassif = cols.classificacao >= 0 ? String(row[cols.classificacao] ?? '').trim() : ''
     const rawGrupo   = cols.grupo          >= 0 ? String(row[cols.grupo]          ?? '').trim() : ''
 
-    // Ignora linhas de totalizadores / saldos / cabeçalhos internos
-    const descNorm = String(rawDesc ?? '').trim().toLowerCase()
-    const isTotalizador = /^(total|subtotal|saldo|s\.a\.|saldo anterior|saldo final|saldo do dia|resultado|resumo|consolidado)/.test(descNorm)
-    if (isTotalizador) continue
-
     linhas.push({
       data:      formatarData(rawData),
       descricao: String(rawDesc ?? '').trim() || `Linha ${i + 1}`,
@@ -508,6 +503,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       return
     }
 
+    // Remove totalizadores / saldos que eventualmente passaram pelo parser
+    linhas = linhas.filter(l => {
+      const d = l.descricao.toLowerCase().trim()
+      return !/^(total|subtotal|saldo|s\.a\.|saldo anterior|saldo final|saldo do dia|resultado|resumo|consolidado|transferência entre contas|saldo em|saldo período)/.test(d)
+    })
+
     if (linhas.length === 0) {
       setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo (Excel, CSV ou PDF de extrato bancário).')
       setFase('idle')
@@ -603,6 +604,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     }
 
     const final = Array.from(classificadas)
+      .sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' }))
     setLinhasClass(final)
     // Pré-seleciona só os classificados com sucesso; erros ficam desmarcados
     setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok')))
