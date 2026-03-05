@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import AnaliseDrePage from './pages/AnaliseDrePage'
+import EmpresaGatePage from './pages/EmpresaGatePage'
+import type { Empresa } from './lib/types'
 
 export interface User {
   name: string
@@ -21,10 +23,11 @@ function sessionToUser(session: Session): User {
 }
 
 function App() {
-  const [user,       setUser]       = useState<User | null>(null)
-  const [loading,    setLoading]    = useState(true)
-  const [showRegister, setShowRegister] = useState(false)
-  const [pathname, setPathname] = useState(window.location.pathname)
+  const [user,             setUser]             = useState<User | null>(null)
+  const [loading,          setLoading]          = useState(true)
+  const [showRegister,     setShowRegister]     = useState(false)
+  const [pathname,         setPathname]         = useState(window.location.pathname)
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(null)
 
   useEffect(() => {
     // 1. Restore session that's already persisted in localStorage
@@ -70,9 +73,27 @@ function App() {
     )
   }
 
+  const navigate = (path: string) => {
+    window.history.pushState({}, '', path)
+    setPathname(path)
+  }
+
   if (user) {
     if (pathname === '/analise-dre') {
-      return <AnaliseDrePage />
+      if (!empresaSelecionada) {
+        return (
+          <EmpresaGatePage
+            onSelecionar={emp => setEmpresaSelecionada(emp)}
+            onVoltar={() => navigate('/')}
+          />
+        )
+      }
+      return (
+        <AnaliseDrePage
+          empresa={empresaSelecionada}
+          onTrocarEmpresa={() => setEmpresaSelecionada(null)}
+        />
+      )
     }
     return <DashboardPage user={user} onLogout={handleLogout} />
   }

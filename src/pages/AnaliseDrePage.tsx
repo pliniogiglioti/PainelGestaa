@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreClassificacao, DreLancamento, Database } from '../lib/types'
+import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
 import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
 import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
 
@@ -231,7 +231,12 @@ function AiSpinner() {
 
 type PerfilUsuario = { id: string; name: string | null; email: string | null }
 
-export default function AnaliseDrePage() {
+interface AnaliseDreProps {
+  empresa: Empresa
+  onTrocarEmpresa: () => void
+}
+
+export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreProps) {
   const [showWizard,     setShowWizard]     = useState(false)
   const [editingId,      setEditingId]      = useState<string | null>(null)
   const [step,           setStep]           = useState<Step>(1)
@@ -262,14 +267,20 @@ export default function AnaliseDrePage() {
     const myId = authData.user?.id
     if (!myId) { setLancamentos([]); return }
 
-    const userId = targetUserId ?? myId
-
-    const { data, error } = await supabase
+    // Filtra por empresa_id — RLS garante acesso apenas a membros
+    let query = supabase
       .from('dre_lancamentos')
       .select('*')
-      .eq('user_id', userId)
+      .eq('empresa_id', empresa.id)
       .order('data_lancamento', { ascending: false })
       .order('created_at', { ascending: false })
+
+    // Admin pode filtrar por usuário específico (para diagnóstico)
+    if (isAdmin && targetUserId) {
+      query = query.eq('user_id', targetUserId)
+    }
+
+    const { data, error } = await query
 
     if (error) { setError(error.message); return }
     setLancamentos(data ?? [])
@@ -590,7 +601,11 @@ export default function AnaliseDrePage() {
 
     const { error } = editingId
       ? await supabase.from('dre_lancamentos').update(payload).eq('id', editingId)
-      : await supabase.from('dre_lancamentos').insert({ ...payload, user_id: authData.user?.id ?? null })
+      : await supabase.from('dre_lancamentos').insert({
+          ...payload,
+          user_id:    authData.user?.id ?? null,
+          empresa_id: empresa.id,
+        })
 
     setSaving(false)
     if (error) { setError(error.message); return }
@@ -613,9 +628,23 @@ export default function AnaliseDrePage() {
         <div>
           <p className={styles.eyebrow}>Financeiro • Aplicativo interno</p>
           <h1>Análise DFC</h1>
-          <p className={styles.subtitle}>Acompanhe receitas, despesas e o resultado do período em tempo real.</p>
+          <p className={styles.subtitle}>
+            <span style={{ color: '#c9a22a', fontWeight: 600 }}>{empresa.nome}</span>
+            {empresa.cnpj ? ` · ${empresa.cnpj}` : ''} — Acompanhe receitas, despesas e o resultado do período.
+          </p>
         </div>
-        <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
+          <button
+            onClick={onTrocarEmpresa}
+            style={{
+              background: 'none', border: '1px solid #2a2a2a', borderRadius: 6,
+              padding: '4px 12px', color: '#888', fontSize: 12, cursor: 'pointer',
+            }}
+          >
+            Trocar empresa
+          </button>
+        </div>
       </header>
 
       {/* ── Stats ── */}
@@ -673,7 +702,7 @@ export default function AnaliseDrePage() {
       )}
 
       {/* ── Extrato Upload ── */}
-      <ExtratoUpload />
+      <ExtratoUpload empresaId={empresa.id} />
 
       {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentosFiltrados} />
