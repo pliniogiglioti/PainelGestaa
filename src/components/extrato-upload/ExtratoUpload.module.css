@@ -160,6 +160,33 @@
 .btnSecondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
 .btnSecondary:disabled { opacity: 0.4; cursor: default; }
 
+.btnRemover {
+  padding: 8px 14px;
+  background: rgba(220, 60, 60, 0.12);
+  border: 1px solid rgba(220, 60, 60, 0.35);
+  border-radius: 8px;
+  color: #e07070;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btnRemover:hover { background: rgba(220, 60, 60, 0.22); }
+
+.tdRemover { width: 32px; padding: 0 4px; text-align: center; }
+.btnRemoverLinha {
+  background: none;
+  border: none;
+  color: #666;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.btnRemoverLinha:hover { color: #e07070; background: rgba(220, 60, 60, 0.12); }
+
 /* ── Review phase ────────────────────────────────────────────────────────────── */
 
 .reviewWrap {
