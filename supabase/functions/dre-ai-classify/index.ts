@@ -121,7 +121,14 @@ GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
 `
 
 type ClassificacaoItem = { nome: string; tipo: 'receita' | 'despesa' }
-type AiResult = { tipo: 'receita' | 'despesa'; classificacao_nome: string; grupo: string; fonte?: 'ia' | 'fallback' }
+type AiResult = {
+  tipo: 'receita' | 'despesa'
+  classificacao_nome: string
+  grupo: string
+  fonte?: 'ia' | 'fallback'
+  /** 'confirmada' = bateu com o banco/regras; 'sugerida' = IA propôs algo razoável fora do cadastro */
+  confianca: 'confirmada' | 'sugerida'
+}
 type LancamentoInput = { descricao: string; valor: number; tipo: 'receita' | 'despesa' }
 
 const normalize = (value: string) =>
@@ -231,6 +238,7 @@ const pickFallback = (
         classificacao_nome: matched?.nome ?? rule.classificacao,
         grupo: rule.grupo,
         fonte: 'fallback',
+        confianca: 'confirmada',
       }
     }
   }
@@ -245,24 +253,55 @@ const pickFallback = (
       : (defaultDespesa?.nome ?? 'Outras Despesas'),
     grupo: tipoEntrada === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas',
     fonte: 'fallback',
+    confianca: 'confirmada',
   }
+}
+
+/**
+ * Detecta se a IA devolveu o texto da descrição original como classificação
+ * (alucinação). Heurísticas:
+ *  - >50% dos chars são maiúsculos (estilo extrato bancário)
+ *  - Contém dígitos (datas, códigos bancários)
+ *  - Nome muito longo (>8 palavras)
+ *  - O nome normalizado está contido na descrição normalizada
+ */
+const isAlucinacao = (nomeAi: string, descricao: string): boolean => {
+  if (!nomeAi) return true
+  const upper = (nomeAi.match(/[A-Z]/g) ?? []).length
+  if (nomeAi.length > 5 && upper / nomeAi.length > 0.55) return true
+  if (/\d/.test(nomeAi)) return true
+  if (nomeAi.split(/\s+/).length > 8) return true
+  const n1 = normalize(nomeAi)
+  const n2 = normalize(descricao)
+  if (n1.length > 12 && n2.includes(n1)) return true
+  return false
 }
 
 const toFinalResult = (
   parsed: { tipo: string; classificacao_nome: string; grupo: string },
   classificacoesDisponiveis: ClassificacaoItem[],
+  descricaoOriginal: string,
 ): AiResult => {
   const tipo: 'receita' | 'despesa' = parsed.tipo === 'receita' ? 'receita' : 'despesa'
   const nomeAi = String(parsed.classificacao_nome ?? '').trim()
-  const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
-  const classificacao_nome = matched?.nome || nomeAi || (tipo === 'receita' ? 'Receita Dinheiro' : 'Outras Despesas')
+  const grupo  = String(parsed.grupo ?? '').trim() || (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas')
 
-  return {
-    tipo,
-    classificacao_nome,
-    grupo: String(parsed.grupo ?? '').trim() || (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas'),
-    fonte: 'ia',
+  // 1. Bate exatamente com o banco de classificações cadastradas
+  const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
+  if (matched) {
+    return { tipo, classificacao_nome: matched.nome, grupo, fonte: 'ia', confianca: 'confirmada' }
   }
+
+  // 2. A IA devolveu algo parecido com a descrição (alucinação) → usa genérico
+  if (isAlucinacao(nomeAi, descricaoOriginal)) {
+    const generica = tipo === 'receita'
+      ? (classificacoesDisponiveis.find(c => c.tipo === 'receita')?.nome ?? 'Receita Dinheiro')
+      : (classificacoesDisponiveis.find(c => c.tipo === 'despesa')?.nome ?? 'Outras Despesas')
+    return { tipo, classificacao_nome: generica, grupo, fonte: 'ia', confianca: 'confirmada' }
+  }
+
+  // 3. IA sugeriu algo razoável que não está no banco → mostra como sugestão
+  return { tipo, classificacao_nome: nomeAi, grupo, fonte: 'ia', confianca: 'sugerida' }
 }
 
 const callGroq = async (groqApiKey: string, model: string, prompt: string): Promise<Response> => {
@@ -341,7 +380,7 @@ RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
 
   return parsed.map((p, i) => {
     try {
-      return toFinalResult(p, classificacoesDisponiveis)
+      return toFinalResult(p, classificacoesDisponiveis, lancamentos[i].descricao)
     } catch {
       return pickFallback(lancamentos[i].descricao, lancamentos[i].tipo, classificacoesDisponiveis)
     }
