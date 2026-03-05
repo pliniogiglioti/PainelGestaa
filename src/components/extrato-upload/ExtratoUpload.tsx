@@ -121,18 +121,44 @@ function toISO(dataBR: string): string {
   return dataBR
 }
 
-/** Tenta detectar colunas pelo cabeçalho (case-insensitive). */
+/** Varre as primeiras N linhas para encontrar a linha de cabeçalho real.
+ *  Útil para extratos bancários (Bradesco, Itaú etc.) que possuem linhas de
+ *  logotipo / metadados antes do cabeçalho de colunas.
+ */
+function encontrarLinhaCabecalho(rows: unknown[][], maxLinhas = 20): number {
+  const keywords = [
+    'data', 'date', 'lanç', 'lanc', 'crédit', 'credit',
+    'débit', 'debit', 'valor', 'descriç', 'descric',
+    'histórico', 'historico', 'lançamento',
+  ]
+  for (let i = 0; i < Math.min(rows.length, maxLinhas); i++) {
+    const row = rows[i] as unknown[]
+    const matches = row.filter(cell =>
+      keywords.some(k => String(cell ?? '').toLowerCase().includes(k))
+    )
+    if (matches.length >= 2) return i
+  }
+  return 0
+}
+
+/** Tenta detectar colunas pelo cabeçalho (case-insensitive).
+ *  Retorna também índices de colunas separadas de crédito e débito,
+ *  presentes em extratos Bradesco / Itaú.
+ */
 function detectarColunas(headers: string[]): {
   data: number; descricao: number; valor: number; tipo: number
+  credito: number; debito: number
 } {
   const idx = (keys: string[]) =>
     headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k)))
 
   return {
-    data:     idx(['data', 'date', 'dt', 'vencimento', 'lançamento', 'lancamento']),
-    descricao:idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement']),
+    data:     idx(['data', 'date', 'dt', 'vencimento']),
+    descricao:idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement', 'lançamento', 'lancamento']),
     valor:    idx(['valor', 'value', 'amount', 'vl ', 'r$']),
     tipo:     idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
+    credito:  idx(['crédit', 'credit']),
+    debito:   idx(['débit', 'debit']),
   }
 }
 
@@ -183,26 +209,49 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
 
   if (rows.length < 2) return []
 
-  const headers = (rows[0] as unknown[]).map(h => String(h ?? '').trim())
+  // Alguns extratos bancários (Bradesco, Itaú) têm linhas de logo/metadados
+  // antes do cabeçalho real — encontra a linha correta automaticamente.
+  const headerIdx = encontrarLinhaCabecalho(rows)
+  const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
   const cols = detectarColunas(headers)
+
+  const usaSeparado = cols.credito >= 0 || cols.debito >= 0
 
   const linhas: LinhaExtrato[] = []
 
-  for (let i = 1; i < rows.length; i++) {
+  for (let i = headerIdx + 1; i < rows.length; i++) {
     const row = rows[i] as unknown[]
-    const rawValor = cols.valor >= 0 ? row[cols.valor] : null
-    const valorNum = typeof rawValor === 'number' ? rawValor : parseValor(rawValor)
-    if (!valorNum) continue
 
-    const rawTipo  = cols.tipo >= 0 ? row[cols.tipo] : ''
-    const rawDesc  = cols.descricao >= 0 ? row[cols.descricao] : row.find(c => c !== '' && c !== rawValor && c !== rawTipo) ?? ''
-    const rawData  = cols.data >= 0 ? row[cols.data] : ''
+    const rawTipo  = cols.tipo      >= 0 ? row[cols.tipo]      : ''
+    const rawDesc  = cols.descricao >= 0 ? row[cols.descricao] : row.find(c => c !== '') ?? ''
+    const rawData  = cols.data      >= 0 ? row[cols.data]      : ''
+
+    let valorNum: number
+    let tipo: 'receita' | 'despesa'
+
+    if (usaSeparado) {
+      // Extrato Bradesco/Itaú: colunas Crédito (R$) e Débito (R$) separadas
+      const creditoNum = parseValor(cols.credito >= 0 ? row[cols.credito] : '')
+      const debitoNum  = parseValor(cols.debito  >= 0 ? row[cols.debito]  : '')
+      if (creditoNum > 0) {
+        valorNum = creditoNum; tipo = 'receita'
+      } else if (debitoNum > 0) {
+        valorNum = debitoNum; tipo = 'despesa'
+      } else {
+        continue // linha sem valor (ex: SALDO ANTERIOR, totalizadores)
+      }
+    } else {
+      const rawValor = cols.valor >= 0 ? row[cols.valor] : null
+      valorNum = typeof rawValor === 'number' ? rawValor : parseValor(rawValor)
+      if (!valorNum) continue
+      tipo = parseTipo(rawTipo, typeof rawValor === 'number' ? rawValor : valorNum)
+    }
 
     linhas.push({
       data:      formatarData(rawData),
       descricao: String(rawDesc ?? '').trim() || `Linha ${i + 1}`,
-      valor:     Math.abs(valorNum),
-      tipo:      parseTipo(rawTipo, typeof rawValor === 'number' ? rawValor : valorNum),
+      valor:     valorNum,
+      tipo,
     })
   }
 
