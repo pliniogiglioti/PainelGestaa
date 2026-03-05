@@ -169,3 +169,13 @@ DROP TRIGGER IF EXISTS trg_auto_vincular_criador ON public.empresas;
 CREATE TRIGGER trg_auto_vincular_criador
   AFTER INSERT ON public.empresas
   FOR EACH ROW EXECUTE FUNCTION public.fn_auto_vincular_criador();
+
+
+-- ── 4. BACKFILL: vincula criadores de empresas existentes ─────────────────────
+-- Garante que empresas criadas antes desta migration também apareçam para seus donos.
+
+INSERT INTO public.empresa_membros (empresa_id, user_id, role)
+SELECT id, created_by, 'admin'
+FROM   public.empresas
+WHERE  created_by IS NOT NULL
+ON CONFLICT (empresa_id, user_id) DO NOTHING;
