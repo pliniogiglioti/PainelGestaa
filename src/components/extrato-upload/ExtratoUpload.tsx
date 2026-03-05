@@ -457,6 +457,24 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const desmarcarErros = () =>
     setSelecionados(new Set(linhasClass.map((_, i) => i).filter(i => linhasClass[i].status === 'ok')))
 
+  const removerLinha = (idx: number) => {
+    setLinhasClass(prev => prev.filter((_, i) => i !== idx))
+    setSelecionados(prev => {
+      const next = new Set<number>()
+      for (const s of prev) {
+        if (s < idx) next.add(s)
+        else if (s > idx) next.add(s - 1)
+      }
+      return next
+    })
+  }
+
+  const removerSelecionados = () => {
+    const sel = selecionados
+    setLinhasClass(prev => prev.filter((_, i) => !sel.has(i)))
+    setSelecionados(new Set())
+  }
+
   const reiniciar = () => {
     setFase('idle')
     setArquivo('')
@@ -764,6 +782,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                   <th>Classificação</th>
                   <th>Grupo</th>
                   <th className={styles.thValor}>Valor</th>
+                  <th style={{ width: 32 }} />
                 </tr>
               </thead>
               <tbody>
@@ -812,6 +831,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
                       {moeda(l.valor)}
                     </td>
+                    <td className={styles.tdRemover} onClick={e => e.stopPropagation()}>
+                      <button
+                        className={styles.btnRemoverLinha}
+                        onClick={() => removerLinha(i)}
+                        title="Remover esta linha"
+                      >×</button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -834,6 +860,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               Total: <strong>{moeda(totalSelecionado)}</strong>
             </span>
             <div className={styles.footerBtns}>
+              {selecionados.size > 0 && (
+                <button
+                  className={styles.btnRemover}
+                  onClick={removerSelecionados}
+                  title="Remove as linhas selecionadas da lista (não serão importadas)"
+                >
+                  Remover selecionados ({selecionados.size})
+                </button>
+              )}
               <button
                 className={styles.btnSecondary}
                 onClick={salvarLancamentos}
