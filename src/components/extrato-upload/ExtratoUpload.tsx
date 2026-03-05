@@ -157,7 +157,7 @@ function detectarColunas(headers: string[]): {
   return {
     data:     idx(['data', 'date', 'dt', 'vencimento']),
     descricao:idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement', 'lançamento', 'lancamento']),
-    valor:    idx(['valor', 'value', 'amount', 'vl ', 'r$']),
+    valor:    headers.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.toLowerCase().includes(k)) && !h.toLowerCase().includes('saldo')),
     tipo:     idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
     credito:  idx(['crédit', 'credit']),
     debito:   idx(['débit', 'debit']),
@@ -243,10 +243,16 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
         continue // linha sem valor (ex: SALDO ANTERIOR, totalizadores)
       }
     } else {
+      // Extrato com coluna única de valor (ex: Itaú — "Valor (R$)" signed).
+      // Preserva o sinal para determinar tipo antes de chamar parseValor (que faz Math.abs).
       const rawValor = cols.valor >= 0 ? row[cols.valor] : null
-      valorNum = typeof rawValor === 'number' ? rawValor : parseValor(rawValor)
-      if (!valorNum) continue
-      tipo = parseTipo(rawTipo, typeof rawValor === 'number' ? rawValor : valorNum)
+      const isNeg = typeof rawValor === 'number'
+        ? rawValor < 0
+        : String(rawValor ?? '').trim().startsWith('-')
+      const absValor = parseValor(rawValor)
+      if (!absValor) continue // skip linhas de saldo/totalizador (Valor vazio)
+      valorNum = absValor
+      tipo = isNeg ? 'despesa' : parseTipo(rawTipo, absValor)
     }
 
     linhas.push({
@@ -386,20 +392,27 @@ const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 export function ExtratoUpload() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [dragging, setDragging]           = useState(false)
-  const [arquivo, setArquivo]             = useState<string>('')
-  const [progresso, setProgresso]         = useState<{ atual: number; total: number } | null>(null)
-  const [fase, setFase]                   = useState<Fase>('idle')
-  const [linhasClass, setLinhasClass]     = useState<LinhaClassificada[]>([])
-  const [selecionados, setSelecionados]   = useState<Set<number>>(new Set())
-  const [erroSalvar, setErroSalvar]       = useState<string>('')
-  const [sucessoSalvo, setSucessoSalvo]   = useState(0)
-  const [msgErroUpload, setMsgErroUpload] = useState<string>('')
+  const [dragging, setDragging]                     = useState(false)
+  const [arquivo, setArquivo]                       = useState<string>('')
+  const [progresso, setProgresso]                   = useState<{ atual: number; total: number } | null>(null)
+  const [fase, setFase]                             = useState<Fase>('idle')
+  const [linhasClass, setLinhasClass]               = useState<LinhaClassificada[]>([])
+  const [selecionados, setSelecionados]             = useState<Set<number>>(new Set())
+  const [erroSalvar, setErroSalvar]                 = useState<string>('')
+  const [sucessoSalvo, setSucessoSalvo]             = useState(0)
+  const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
+  const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
 
   const qtdErros       = linhasClass.filter(l => l.status === 'erro').length
   const todosChecked   = selecionados.size === linhasClass.length && linhasClass.length > 0
   const someChecked    = selecionados.size > 0 && !todosChecked
   const totalSelecionado = [...selecionados].reduce((s, i) => s + linhasClass[i].valor, 0)
+
+  const handleClassChange = (idx: number, novoNome: string) => {
+    setLinhasClass(prev => prev.map((l, i) =>
+      i === idx ? { ...l, classificacao: novoNome, sugerida: false } : l
+    ))
+  }
 
   const toggleItem = (i: number) => setSelecionados(prev => {
     const next = new Set(prev)
@@ -463,6 +476,7 @@ export function ExtratoUpload() {
     ])
     const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+    setClassificacoesDisp(classificacoes) // salva no estado para o dropdown de edição
 
     // ── Passo 1: classificar localmente ───────────────────────────────────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
@@ -733,18 +747,22 @@ export function ExtratoUpload() {
                         {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
                       </span>
                     </td>
-                    <td className={styles.tdClf}>
-                      {l.sugerida
-                        ? (
-                          <span
-                            className={styles.clfSugerida}
-                            title="Sugestão da IA — classificação não cadastrada no sistema. Revise antes de salvar."
-                          >
-                            {l.classificacao}
-                          </span>
-                        )
-                        : l.classificacao
-                      }
+                    <td className={styles.tdClf} onClick={e => e.stopPropagation()}>
+                      <select
+                        className={`${styles.selectClf} ${l.sugerida ? styles.selectClfSugerida : ''}`}
+                        value={l.classificacao}
+                        title={l.sugerida ? 'Sugestão da IA — não cadastrada no sistema. Altere se necessário.' : l.classificacao}
+                        onChange={e => handleClassChange(i, e.target.value)}
+                      >
+                        {classificacoesDisp
+                          .filter(c => c.tipo === l.tipo)
+                          .map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)
+                        }
+                        {/* Se a classificação atual não está no banco (ex: sugestão IA), mantém visível */}
+                        {!classificacoesDisp.some(c => c.nome === l.classificacao) && (
+                          <option value={l.classificacao}>{l.classificacao}</option>
+                        )}
+                      </select>
                     </td>
                     <td className={styles.tdGrupo}>{l.grupo}</td>
                     <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
