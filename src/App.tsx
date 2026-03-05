@@ -27,7 +27,14 @@ function App() {
   const [loading,          setLoading]          = useState(true)
   const [showRegister,     setShowRegister]     = useState(false)
   const [pathname,         setPathname]         = useState(window.location.pathname)
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(null)
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => {
+    try {
+      const stored = sessionStorage.getItem('empresa_selecionada')
+      return stored ? (JSON.parse(stored) as Empresa) : null
+    } catch {
+      return null
+    }
+  })
 
   useEffect(() => {
     // 1. Restore session that's already persisted in localStorage
@@ -51,6 +58,7 @@ function App() {
   }, [])
 
   const handleLogout = async () => {
+    sessionStorage.removeItem('empresa_selecionada')
     await supabase.auth.signOut()
     // onAuthStateChange will set user to null automatically
   }
@@ -78,12 +86,22 @@ function App() {
     setPathname(path)
   }
 
+  const selecionarEmpresa = (emp: Empresa) => {
+    sessionStorage.setItem('empresa_selecionada', JSON.stringify(emp))
+    setEmpresaSelecionada(emp)
+  }
+
+  const trocarEmpresa = () => {
+    sessionStorage.removeItem('empresa_selecionada')
+    setEmpresaSelecionada(null)
+  }
+
   if (user) {
     if (pathname === '/analise-dre') {
       if (!empresaSelecionada) {
         return (
           <EmpresaGatePage
-            onSelecionar={emp => setEmpresaSelecionada(emp)}
+            onSelecionar={selecionarEmpresa}
             onVoltar={() => navigate('/')}
           />
         )
@@ -91,7 +109,7 @@ function App() {
       return (
         <AnaliseDrePage
           empresa={empresaSelecionada}
-          onTrocarEmpresa={() => setEmpresaSelecionada(null)}
+          onTrocarEmpresa={trocarEmpresa}
         />
       )
     }
