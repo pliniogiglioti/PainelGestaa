@@ -257,6 +257,22 @@
 .tdData   { white-space: nowrap; color: #666; padding: 8px 12px; }
 .tdDesc   { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ccc; padding: 8px 12px; }
 .tdClf    { color: #aaa; padding: 8px 12px; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Classificação sugerida pela IA (não cadastrada no banco) */
+.clfSugerida {
+  color: #4ade80;
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  text-underline-offset: 3px;
+  cursor: help;
+  font-size: inherit;
+}
+
+.legendaSugerida {
+  padding: 6px 16px 2px;
+  font-size: 11px;
+  color: #888;
+}
 .tdGrupo  { color: #555; font-size: 11px; padding: 8px 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tdValor  { text-align: right; font-weight: 600; white-space: nowrap; padding: 8px 12px; }
 .thValor  { text-align: right !important; }

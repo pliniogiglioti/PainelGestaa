@@ -23,6 +23,8 @@ interface LinhaClassificada extends LinhaExtrato {
   classificacao: string
   grupo: string
   status: 'ok' | 'erro'
+  /** true quando a IA sugeriu uma classificação não cadastrada no banco */
+  sugerida?: boolean
 }
 
 type Fase = 'idle' | 'processando' | 'revisao' | 'salvando' | 'concluido'
@@ -498,7 +500,7 @@ export function ExtratoUpload() {
 
         if (error || !data?.resultados) throw new Error(error?.message ?? 'Sem resposta da IA')
 
-        const resultados = data.resultados as { classificacao_nome?: string; grupo?: string }[]
+        const resultados = data.resultados as { classificacao_nome?: string; grupo?: string; confianca?: string }[]
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
           classificadas[linhaIdx] = {
@@ -506,6 +508,7 @@ export function ExtratoUpload() {
             classificacao: String(r?.classificacao_nome ?? '').trim() || 'Outros',
             grupo:         String(r?.grupo ?? '').trim() || 'Outros',
             status: 'ok',
+            sugerida: r?.confianca === 'sugerida',
           }
         })
       } catch {
@@ -730,7 +733,19 @@ export function ExtratoUpload() {
                         {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
                       </span>
                     </td>
-                    <td className={styles.tdClf}>{l.classificacao}</td>
+                    <td className={styles.tdClf}>
+                      {l.sugerida
+                        ? (
+                          <span
+                            className={styles.clfSugerida}
+                            title="Sugestão da IA — classificação não cadastrada no sistema. Revise antes de salvar."
+                          >
+                            {l.classificacao}
+                          </span>
+                        )
+                        : l.classificacao
+                      }
+                    </td>
                     <td className={styles.tdGrupo}>{l.grupo}</td>
                     <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
                       {moeda(l.valor)}
@@ -740,6 +755,14 @@ export function ExtratoUpload() {
               </tbody>
             </table>
           </div>
+
+          {/* Legenda de classificações sugeridas pela IA */}
+          {linhasClass.some(l => l.sugerida) && (
+            <div className={styles.legendaSugerida}>
+              <span className={styles.clfSugerida}>Classificação sugerida</span>
+              {' '}— a IA propôs uma categoria não cadastrada no sistema. Revise antes de salvar.
+            </div>
+          )}
 
           {/* Rodapé com botões de salvar */}
           <div className={styles.reviewFooter}>
