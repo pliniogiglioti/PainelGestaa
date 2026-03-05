@@ -33,6 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_empresas_created_by
 ALTER TABLE public.empresas ENABLE ROW LEVEL SECURITY;
 
 -- Membros enxergam a empresa
+DROP POLICY IF EXISTS "Membro enxerga empresa" ON public.empresas;
 CREATE POLICY "Membro enxerga empresa"
   ON public.empresas FOR SELECT
   TO authenticated
@@ -45,12 +46,14 @@ CREATE POLICY "Membro enxerga empresa"
   );
 
 -- Qualquer usuário autenticado pode criar uma empresa
+DROP POLICY IF EXISTS "Usuario cria empresa" ON public.empresas;
 CREATE POLICY "Usuario cria empresa"
   ON public.empresas FOR INSERT
   TO authenticated
   WITH CHECK (created_by = auth.uid());
 
 -- Admin da empresa (role = 'admin' em empresa_membros) pode atualizar
+DROP POLICY IF EXISTS "Admin empresa pode atualizar" ON public.empresas;
 CREATE POLICY "Admin empresa pode atualizar"
   ON public.empresas FOR UPDATE
   TO authenticated
@@ -64,6 +67,7 @@ CREATE POLICY "Admin empresa pode atualizar"
   );
 
 -- Admin do sistema vê tudo
+DROP POLICY IF EXISTS "Admin sistema enxerga todas empresas" ON public.empresas;
 CREATE POLICY "Admin sistema enxerga todas empresas"
   ON public.empresas FOR SELECT
   TO authenticated
@@ -101,12 +105,14 @@ CREATE INDEX IF NOT EXISTS idx_empresa_membros_empresa_id
 ALTER TABLE public.empresa_membros ENABLE ROW LEVEL SECURITY;
 
 -- Usuário vê seus próprios vínculos
+DROP POLICY IF EXISTS "Usuario ve seus vinculos" ON public.empresa_membros;
 CREATE POLICY "Usuario ve seus vinculos"
   ON public.empresa_membros FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
 -- Admin do sistema vê todos os vínculos
+DROP POLICY IF EXISTS "Admin sistema ve todos vinculos" ON public.empresa_membros;
 CREATE POLICY "Admin sistema ve todos vinculos"
   ON public.empresa_membros FOR SELECT
   TO authenticated
@@ -119,12 +125,14 @@ CREATE POLICY "Admin sistema ve todos vinculos"
   );
 
 -- Usuário pode inserir seu próprio vínculo (ao criar empresa)
+DROP POLICY IF EXISTS "Usuario insere proprio vinculo" ON public.empresa_membros;
 CREATE POLICY "Usuario insere proprio vinculo"
   ON public.empresa_membros FOR INSERT
   TO authenticated
   WITH CHECK (user_id = auth.uid());
 
 -- Admin de empresa pode adicionar membros
+DROP POLICY IF EXISTS "Admin empresa adiciona membro" ON public.empresa_membros;
 CREATE POLICY "Admin empresa adiciona membro"
   ON public.empresa_membros FOR INSERT
   TO authenticated
@@ -138,6 +146,7 @@ CREATE POLICY "Admin empresa adiciona membro"
   );
 
 -- Admin de empresa pode remover membros
+DROP POLICY IF EXISTS "Admin empresa remove membro" ON public.empresa_membros;
 CREATE POLICY "Admin empresa remove membro"
   ON public.empresa_membros FOR DELETE
   TO authenticated
