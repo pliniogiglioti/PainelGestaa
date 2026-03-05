@@ -169,16 +169,38 @@ type Lancamento = {
 const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+/** Agrega lançamentos por grupo+classificação para reduzir tokens no prompt */
+function agregarLancamentos(lancamentos: Lancamento[]): Array<{
+  grupo: string; classificacao: string; tipo: 'receita' | 'despesa'
+  total: number; qtd: number
+}> {
+  const mapa = new Map<string, { grupo: string; classificacao: string; tipo: 'receita' | 'despesa'; total: number; qtd: number }>()
+  for (const l of lancamentos) {
+    const key = `${l.tipo}||${l.grupo}||${l.classificacao}`
+    const entry = mapa.get(key)
+    if (entry) {
+      entry.total += Number(l.valor)
+      entry.qtd++
+    } else {
+      mapa.set(key, { grupo: l.grupo, classificacao: l.classificacao, tipo: l.tipo, total: Number(l.valor), qtd: 1 })
+    }
+  }
+  return [...mapa.values()].sort((a, b) => {
+    if (a.tipo !== b.tipo) return a.tipo === 'receita' ? -1 : 1
+    return b.total - a.total
+  })
+}
+
 const buildPrompt = (lancamentos: Lancamento[], resumo: { receitas: number; despesas: number }) => {
   const resultado = resumo.receitas - resumo.despesas
   const margem    = resumo.receitas > 0 ? ((resultado / resumo.receitas) * 100).toFixed(1) : '0.0'
 
-  const linhas = lancamentos
-    .map(l => {
-      const data  = l.data ? new Date(l.data).toLocaleDateString('pt-BR') : '—'
-      const desc  = l.descricao || l.classificacao
-      const sinal = l.tipo === 'receita' ? '✅' : '🔴'
-      return `| ${data} | ${desc} | ${l.grupo} | ${l.classificacao} | ${sinal} | ${moeda(Number(l.valor))} |`
+  // Agrega por grupo/classificação — evita estouro de tokens com centenas de lançamentos
+  const agregados = agregarLancamentos(lancamentos)
+  const linhas = agregados
+    .map(a => {
+      const sinal = a.tipo === 'receita' ? '✅' : '🔴'
+      return `| ${a.grupo} | ${a.classificacao} | ${sinal} | ${a.qtd} | ${moeda(a.total)} |`
     })
     .join('\n')
 
@@ -190,7 +212,7 @@ ${PLANO_DE_CONTAS}
 ${AULAS_LINKS}
 ════════════════════════════════════════════════════════════════
 
-Analise os lançamentos financeiros abaixo e gere um relatório executivo em Markdown.
+Analise os dados financeiros abaixo e gere um relatório executivo em Markdown.
 
 ## Resumo financeiro
 - Total de lançamentos: ${lancamentos.length}
@@ -199,9 +221,9 @@ Analise os lançamentos financeiros abaixo e gere um relatório executivo em Mar
 - Resultado: ${moeda(resultado)} (${resultado >= 0 ? 'LUCRO' : 'PREJUÍZO'})
 - Margem líquida: ${margem}%
 
-## Lançamentos registrados
-| Data | Descrição | Grupo | Classificação | Tipo | Valor |
-|------|-----------|-------|---------------|------|-------|
+## Lançamentos agrupados por classificação
+| Grupo | Classificação | Tipo | Qtd | Total |
+|-------|--------------|------|-----|-------|
 ${linhas}
 
 ═══════════════════ INSTRUÇÕES DO RELATÓRIO ═══════════════════
