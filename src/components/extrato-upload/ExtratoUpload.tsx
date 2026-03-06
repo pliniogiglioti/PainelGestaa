@@ -604,7 +604,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     }
 
     const final = Array.from(classificadas)
-      .sort((a, b) => a.descricao.localeCompare(b.descricao, 'pt-BR', { sensitivity: 'base' }))
     setLinhasClass(final)
     // Pré-seleciona só os classificados com sucesso; erros ficam desmarcados
     setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok')))
@@ -821,6 +820,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                       >
                         {classificacoesDisp
                           .filter(c => c.tipo === l.tipo)
+                          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }))
                           .map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)
                         }
                         {/* Se a classificação atual não está no banco (ex: sugestão IA), mantém visível */}
