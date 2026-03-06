@@ -1,6 +1,8 @@
 // Supabase Edge Function: dre-ai-parse
-// Recebe conteúdo bruto de um extrato bancário (texto) e usa IA para extrair
-// apenas os lançamentos reais, ignorando totais, saldos e seções secundárias.
+// Recebe o arquivo convertido para JSON (array de linhas) e usa IA para
+// extrair apenas os lançamentos reais, ignorando totais, saldos e seções secundárias.
+// - XLSX/CSV → array de arrays de células: [["03/01/2026","PAGTO PIX","","-450.00"], ...]
+// - PDF      → array de strings (linhas de texto): ["03/01/2026 PAGTO PIX -450,00", ...]
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
@@ -78,37 +80,47 @@ serve(async (req: Request) => {
   }
 
   const modelo = String(body.modelo ?? DEFAULT_MODEL).trim() || DEFAULT_MODEL
-  const conteudo = String(body.conteudo ?? '').trim()
 
-  if (!conteudo) {
+  // `linhas` é um array de linhas já convertido para JSON pelo cliente:
+  //   XLSX → string[][]  (linhas × colunas)
+  //   PDF  → string[]    (uma string por linha de texto)
+  const linhas: unknown = body.linhas
+
+  if (!Array.isArray(linhas) || linhas.length === 0) {
     return new Response(JSON.stringify({ lancamentos: [] }), {
       status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   }
 
+  const conteudoJson = JSON.stringify(linhas)
+
   const prompt = `Você é um extrator de lançamentos financeiros de extratos bancários brasileiros.
 
-Analise o conteúdo abaixo e extraia APENAS os lançamentos reais (movimentações financeiras que entraram ou saíram da conta).
+Recebeu o conteúdo de um extrato já convertido para JSON.
+- Se for XLSX/CSV: cada elemento é um array de células de uma linha da planilha.
+- Se for PDF: cada elemento é uma string com o texto de uma linha.
 
-IGNORE completamente (não inclua no resultado):
+Extraia APENAS os lançamentos reais (movimentações financeiras que entraram ou saíram da conta).
+
+IGNORE completamente:
 - Linhas de total, subtotal, saldo anterior, saldo final, saldo do dia, saldo período
 - Cabeçalhos de colunas: "Data", "Histórico", "Valor", "Crédito", "Débito", "Saldo", "Dcto"
-- Títulos de seções: "Saldos Invest Fácil", "Resumo", "Extrato", "Período", qualquer linha sem data
-- Linhas em branco ou sem valor monetário
-- Números de documento/referência isolados
-- Quaisquer saldos de aplicações financeiras ou investimentos
+- Títulos de seções: "Saldos Invest Fácil", "Resumo", "Extrato", "Período"
+- Linhas sem data válida no formato DD/MM/AAAA ou sem valor monetário
+- Números de documento/referência isolados sem descrição e valor
+- Saldos de aplicações financeiras ou investimentos automáticos
 
 Para cada lançamento REAL extraído, retorne:
 - data: string exatamente no formato "DD/MM/AAAA"
-- descricao: texto da transação (sem a data e sem o valor)
-- valor: number POSITIVO (sempre, mesmo que débito/saída)
-- tipo: "receita" se for crédito/entrada na conta corrente; "despesa" se for débito/saída
+- descricao: texto da transação (limpo, sem data e sem valor)
+- valor: number POSITIVO (sempre positivo, mesmo débito/saída)
+- tipo: "receita" se crédito/entrada na conta; "despesa" se débito/saída
 
-RETORNE SOMENTE um array JSON válido, sem texto adicional, sem markdown, sem explicações.
+RETORNE SOMENTE um array JSON válido, sem texto adicional, sem markdown.
 Exemplo: [{"data":"03/03/2026","descricao":"PAGTO ELETRON FORNECEDOR","valor":802.76,"tipo":"despesa"}]
 
-CONTEÚDO DO EXTRATO:
-${conteudo}`
+DADOS DO EXTRATO (JSON):
+${conteudoJson}`
 
   let res = await callGroq(groqApiKey, modelo, prompt)
 
