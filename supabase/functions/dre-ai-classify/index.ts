@@ -473,6 +473,88 @@ serve(async (req: Request) => {
     : []
   const groqApiKey = Deno.env.get('GROQ_API_KEY')
 
+  // ── Parse mode: extrai lançamentos de linhas brutas de extrato bancário ──────
+  if (body.mode === 'parse' && Array.isArray(body.linhas)) {
+    type LancamentoParsed = { data: string; descricao: string; valor: number; tipo: 'receita' | 'despesa' }
+
+    const parseLancamentos = (content: string): LancamentoParsed[] => {
+      try {
+        const match = content.match(/\[[\s\S]*\]/)
+        if (!match) return []
+        const arr = JSON.parse(match[0])
+        if (!Array.isArray(arr)) return []
+        return arr.filter((item: unknown) => {
+          if (!item || typeof item !== 'object') return false
+          const o = item as Record<string, unknown>
+          return o.data && o.descricao && typeof o.valor === 'number' &&
+            (o.tipo === 'receita' || o.tipo === 'despesa')
+        }) as LancamentoParsed[]
+      } catch { return [] }
+    }
+
+    const linhasJson = JSON.stringify(body.linhas)
+
+    const prompt = `Você é um extrator de lançamentos financeiros de extratos bancários brasileiros.
+
+Recebeu linhas de um extrato já convertidas para JSON.
+- Se for XLSX/CSV: cada elemento é um array de células de uma linha da planilha.
+- Se for PDF: cada elemento é uma string com o texto de uma linha.
+
+Extraia APENAS os lançamentos reais (movimentações que entraram ou saíram da conta corrente).
+
+IGNORE completamente:
+- Linhas de cabeçalho: "Data", "Histórico", "Lançamento", "Valor", "Crédito", "Débito", "Saldo"
+- Linhas de saldo/totalizador: "SALDO ANTERIOR", "SALDO TOTAL DISPONÍVEL DIA", "SALDO DO DIA", "SALDO FINAL", "SALDO PERÍODO"
+- Títulos de seções: "Lançamentos", "Período", "Extrato", "Resumo", "Saldos Invest Fácil"
+- Linhas de metadados: "Atualização", "Nome", "Agência", "Conta", "CPF", "CNPJ"
+- Linhas sem data válida ou sem valor monetário real
+- Saldos de aplicações, rendimentos automáticos sem movimentação
+
+Regra crítica para XLSX: a coluna de VALOR DA TRANSAÇÃO é diferente da coluna SALDO.
+O saldo acumulado muda em toda linha; o valor da transação fica vazio em linhas de saldo.
+Use o valor da TRANSAÇÃO (não o saldo) para o campo "valor".
+
+Para cada lançamento REAL, retorne:
+- data: exatamente no formato "DD/MM/AAAA" (ex: "02/01/2026")
+- descricao: texto da transação sem data e sem valor
+- valor: número POSITIVO (mesmo que seja débito)
+- tipo: "receita" se crédito/entrada; "despesa" se débito/saída
+
+RETORNE SOMENTE um array JSON válido, sem texto adicional, sem markdown.
+Exemplo: [{"data":"02/01/2026","descricao":"PIX RECEBIDO ODONTO","valor":3175.00,"tipo":"receita"}]
+
+DADOS (JSON):
+${linhasJson}`
+
+    if (!groqApiKey) {
+      return new Response(JSON.stringify({ lancamentos: [] }), {
+        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    let res = await callGroq(groqApiKey, modelo, prompt)
+    if (!res.ok && modelo !== DEFAULT_MODEL) {
+      const errText = await res.text()
+      if (/model|decommissioned|not found|invalid/i.test(errText)) {
+        res = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+      }
+    }
+
+    if (!res.ok) {
+      return new Response(JSON.stringify({ lancamentos: [] }), {
+        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const groqData = await res.json()
+    const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+    const lancamentos = parseLancamentos(content)
+
+    return new Response(JSON.stringify({ lancamentos }), {
+      status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    })
+  }
+
   // ── Batch mode ──
   if (Array.isArray(body.lancamentos)) {
     const lancamentos = (body.lancamentos as LancamentoInput[]).map(l => ({
