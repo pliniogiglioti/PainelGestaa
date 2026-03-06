@@ -415,7 +415,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging]                     = useState(false)
   const [arquivo, setArquivo]                       = useState<string>('')
-  const [progresso, setProgresso]                   = useState<{ atual: number; total: number } | null>(null)
+  const [progresso, setProgresso]                   = useState<{ atual: number; total: number; label?: string } | null>(null)
   const [fase, setFase]                             = useState<Fase>('idle')
   const [linhasClass, setLinhasClass]               = useState<LinhaClassificada[]>([])
   const [selecionados, setSelecionados]             = useState<Set<number>>(new Set())
@@ -480,6 +480,79 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setMsgErroUpload('')
   }
 
+  /** Parse do arquivo usando IA — entende qualquer formato de extrato bancário */
+  const parseArquivoComIA = async (
+    file: File,
+    modelo: string,
+    onProgress: (atual: number, total: number) => void,
+  ): Promise<LinhaExtrato[]> => {
+    const buffer = await file.arrayBuffer()
+    const isPDF = file.name.toLowerCase().endsWith('.pdf')
+
+    // Converte o arquivo para blocos de texto para enviar à IA
+    let chunks: string[] = []
+    const LINHAS_POR_CHUNK = 80
+
+    if (isPDF) {
+      const paginas = await extrairTextoPDF(buffer)
+      const linhas = paginas.join('\n').split('\n').filter(l => l.trim())
+      for (let i = 0; i < linhas.length; i += LINHAS_POR_CHUNK) {
+        chunks.push(linhas.slice(i, i + LINHAS_POR_CHUNK).join('\n'))
+      }
+    } else {
+      const wb = read(buffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+      // Converte cada linha para texto "célula | célula | célula", ignorando células vazias
+      const linhasTexto = rows.map(row =>
+        (row as unknown[])
+          .map(c => typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim())
+          .filter(c => c && c !== '0.00')
+          .join(' | ')
+      ).filter(l => l.trim())
+
+      for (let i = 0; i < linhasTexto.length; i += LINHAS_POR_CHUNK) {
+        chunks.push(linhasTexto.slice(i, i + LINHAS_POR_CHUNK).join('\n'))
+      }
+    }
+
+    const resultado: LinhaExtrato[] = []
+
+    for (let i = 0; i < chunks.length; i++) {
+      if (i > 0) await sleep(600)
+      onProgress(i + 1, chunks.length)
+
+      try {
+        const { data: parseData, error } = await supabase.functions.invoke('dre-ai-parse', {
+          body: { conteudo: chunks[i], modelo },
+        })
+
+        if (error || !parseData?.lancamentos) continue
+
+        const lancamentos = parseData.lancamentos as Array<{
+          data: string; descricao: string; valor: number; tipo: string
+        }>
+
+        for (const l of lancamentos) {
+          const dataFormatada = formatarData(l.data)
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(dataFormatada)) continue
+          const valor = typeof l.valor === 'number' ? Math.abs(l.valor) : parseValor(String(l.valor))
+          if (!valor) continue
+          resultado.push({
+            data: dataFormatada,
+            descricao: String(l.descricao ?? '').trim() || 'Sem descrição',
+            valor,
+            tipo: l.tipo === 'receita' ? 'receita' : 'despesa',
+          })
+        }
+      } catch {
+        // Chunk falhou — continua com o próximo
+      }
+    }
+
+    return resultado
+  }
+
   const processarArquivo = useCallback(async (file: File) => {
     setArquivo(file.name)
     setLinhasClass([])
@@ -489,40 +562,50 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setFase('processando')
     setProgresso(null)
 
-    let linhas: LinhaExtrato[] = []
-    try {
-      const buffer = await file.arrayBuffer()
-      if (file.name.toLowerCase().endsWith('.pdf')) {
-        linhas = await parsePDF(buffer)
-      } else {
-        linhas = parsePlanilha(buffer)
-      }
-    } catch {
-      setMsgErroUpload('Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls), CSV ou PDF válido.')
-      setFase('idle')
-      return
-    }
-
-    // Remove linhas com data inválida (ex: "Total", "Saldo" na coluna de data)
-    // e totalizadores/saldos na coluna de descrição
-    linhas = linhas.filter(l => {
-      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(l.data)) return false
-      const d = l.descricao.toLowerCase().trim()
-      return !/^(total|subtotal|saldo|s\.a\.|saldo anterior|saldo final|saldo do dia|resultado|resumo|consolidado|transferência entre contas|saldo em|saldo período)/.test(d)
-    })
-
-    if (linhas.length === 0) {
-      setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo (Excel, CSV ou PDF de extrato bancário).')
-      setFase('idle')
-      return
-    }
-
+    // Busca modelo e classificações antes de parsear (modelo é necessário para o parse com IA)
     const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single(),
       supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
     ])
     const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+
+    // ── Parse do arquivo com IA (entende qualquer formato de extrato) ─────────
+    let linhas: LinhaExtrato[] = []
+    try {
+      setProgresso({ atual: 0, total: 1, label: 'Lendo arquivo com IA' })
+      linhas = await parseArquivoComIA(file, modelo, (atual, total) => {
+        setProgresso({ atual, total, label: 'Lendo arquivo com IA' })
+      })
+    } catch {
+      // IA falhou — usa parser tradicional como fallback
+    }
+
+    // Fallback: parser tradicional se a IA não retornou nada
+    if (linhas.length === 0) {
+      try {
+        const buffer = await file.arrayBuffer()
+        const linhasBruto = file.name.toLowerCase().endsWith('.pdf')
+          ? await parsePDF(buffer)
+          : parsePlanilha(buffer)
+        // Filtra totalizadores e datas inválidas no fallback
+        linhas = linhasBruto.filter(l => {
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(l.data)) return false
+          const d = l.descricao.toLowerCase().trim()
+          return !/^(total|subtotal|saldo|s\.a\.|resultado|resumo|consolidado)/.test(d)
+        })
+      } catch {
+        setMsgErroUpload('Não foi possível ler o arquivo. Verifique se é um arquivo Excel (.xlsx/.xls), CSV ou PDF válido.')
+        setFase('idle')
+        return
+      }
+    }
+
+    if (linhas.length === 0) {
+      setMsgErroUpload('Nenhuma linha com valor encontrada. Verifique o formato do arquivo (Excel, CSV ou PDF de extrato bancário).')
+      setFase('idle')
+      return
+    }
     setClassificacoesDisp(classificacoes) // salva no estado para o dropdown de edição
 
     // ── Passo 1: classificar localmente ───────────────────────────────────────
@@ -554,7 +637,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
     }
 
-    setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length })
+    setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length, label: 'Classificando com IA' })
 
     // ── Passo 2: enviar em batch para IA (com delay para evitar rate limit) ───
     const BATCH_IA = 15  // ~3-4K tokens por chamada, dentro do limite do Groq (12K/min)
@@ -602,6 +685,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       setProgresso({
         atual: (linhas.length - indicesParaIA.length) + Math.min(b + BATCH_IA, indicesParaIA.length),
         total: linhas.length,
+        label: 'Classificando com IA',
       })
     }
 
@@ -696,7 +780,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <div className={styles.progressWrap}>
                 <div className={styles.progressSpinner} />
                 <p className={styles.progressText}>
-                  Classificando com IA… {progresso.atual} de {progresso.total}
+                  {progresso.label ?? 'Classificando com IA'}… {progresso.atual} de {progresso.total}
                 </p>
                 <div className={styles.progressBar}>
                   <div
