@@ -503,8 +503,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       return
     }
 
-    // Remove totalizadores / saldos que eventualmente passaram pelo parser
+    // Remove linhas com data inválida (ex: "Total", "Saldo" na coluna de data)
+    // e totalizadores/saldos na coluna de descrição
     linhas = linhas.filter(l => {
+      if (!/^\d{2}\/\d{2}\/\d{4}$/.test(l.data)) return false
       const d = l.descricao.toLowerCase().trim()
       return !/^(total|subtotal|saldo|s\.a\.|saldo anterior|saldo final|saldo do dia|resultado|resumo|consolidado|transferência entre contas|saldo em|saldo período)/.test(d)
     })
