@@ -520,8 +520,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       onProgress(i + 1, chunks.length)
 
       try {
-        const { data: parseData, error } = await supabase.functions.invoke('dre-ai-parse', {
-          body: { linhas: chunks[i], modelo },
+        const { data: parseData, error } = await supabase.functions.invoke('dre-ai-classify', {
+          body: { mode: 'parse', linhas: chunks[i], modelo },
         })
 
         if (error || !parseData?.lancamentos) continue
