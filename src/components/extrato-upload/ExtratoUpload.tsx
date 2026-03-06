@@ -489,30 +489,27 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const buffer = await file.arrayBuffer()
     const isPDF = file.name.toLowerCase().endsWith('.pdf')
 
-    // Converte o arquivo para blocos de texto para enviar à IA
-    let chunks: string[] = []
+    // Converte o arquivo inteiro para JSON antes de enviar à IA
+    let chunks: unknown[][] = []  // cada chunk é um array de linhas (row[] ou string[])
     const LINHAS_POR_CHUNK = 80
 
     if (isPDF) {
       const paginas = await extrairTextoPDF(buffer)
       const linhas = paginas.join('\n').split('\n').filter(l => l.trim())
       for (let i = 0; i < linhas.length; i += LINHAS_POR_CHUNK) {
-        chunks.push(linhas.slice(i, i + LINHAS_POR_CHUNK).join('\n'))
+        chunks.push(linhas.slice(i, i + LINHAS_POR_CHUNK))
       }
     } else {
       const wb = read(buffer, { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
-      // Converte cada linha para texto "célula | célula | célula", ignorando células vazias
-      const linhasTexto = rows.map(row =>
-        (row as unknown[])
-          .map(c => typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim())
-          .filter(c => c && c !== '0.00')
-          .join(' | ')
-      ).filter(l => l.trim())
+      // Normaliza células: número → string com 2 casas decimais, resto → string
+      const rowsNorm = rows.map(row =>
+        (row as unknown[]).map(c => typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim())
+      ).filter(row => row.some(c => c))  // remove linhas totalmente vazias
 
-      for (let i = 0; i < linhasTexto.length; i += LINHAS_POR_CHUNK) {
-        chunks.push(linhasTexto.slice(i, i + LINHAS_POR_CHUNK).join('\n'))
+      for (let i = 0; i < rowsNorm.length; i += LINHAS_POR_CHUNK) {
+        chunks.push(rowsNorm.slice(i, i + LINHAS_POR_CHUNK))
       }
     }
 
@@ -524,7 +521,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
       try {
         const { data: parseData, error } = await supabase.functions.invoke('dre-ai-parse', {
-          body: { conteudo: chunks[i], modelo },
+          body: { linhas: chunks[i], modelo },
         })
 
         if (error || !parseData?.lancamentos) continue
