@@ -280,6 +280,84 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   return linhas
 }
 
+/**
+ * Valida se um arquivo xlsx/xls/csv tem a estrutura mínima esperada pelo sistema.
+ * Verifica: ao menos uma coluna de Data, uma de Descrição e uma de Valor,
+ * e pelo menos uma linha de dados com data DD/MM/AAAA e valor numérico.
+ */
+async function validarEstruturaArquivo(
+  file: File,
+): Promise<{ ok: true } | { ok: false; motivo: string }> {
+  try {
+    const buffer = await file.arrayBuffer()
+    const wb = read(buffer, { type: 'array' })
+
+    if (!wb.SheetNames.length) {
+      return { ok: false, motivo: 'O arquivo não contém nenhuma planilha.' }
+    }
+
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+
+    if (rows.length < 2) {
+      return { ok: false, motivo: 'A planilha precisa ter ao menos um cabeçalho e uma linha de dados.' }
+    }
+
+    const headerIdx = encontrarLinhaCabecalho(rows)
+    const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
+    const cols = detectarColunas(headers)
+
+    const faltando: string[] = []
+    if (cols.data < 0) faltando.push('"Data"')
+    if (cols.valor < 0 && cols.credito < 0 && cols.debito < 0) faltando.push('"Valor" (ou "Crédito"/"Débito")')
+    if (cols.descricao < 0) faltando.push('"Descrição" (ou "Histórico")')
+
+    if (faltando.length > 0) {
+      return {
+        ok: false,
+        motivo:
+          `Coluna(s) não encontrada(s): ${faltando.join(' e ')}. ` +
+          `Use o botão "Baixar exemplo .xlsx" acima para ver o formato correto.`,
+      }
+    }
+
+    // Verifica se ao menos uma linha tem data DD/MM/AAAA e valor > 0
+    let linhasValidas = 0
+    for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 20); i++) {
+      const row = rows[i] as unknown[]
+      const rawData = cols.data >= 0 ? row[cols.data] : ''
+      const dataFormatada = formatarData(rawData)
+      const valorNum =
+        cols.valor >= 0
+          ? parseValor(row[cols.valor])
+          : Math.max(
+              parseValor(cols.credito >= 0 ? row[cols.credito] : ''),
+              parseValor(cols.debito >= 0 ? row[cols.debito] : ''),
+            )
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataFormatada) && valorNum > 0) linhasValidas++
+    }
+
+    if (linhasValidas === 0) {
+      return {
+        ok: false,
+        motivo:
+          `Nenhuma linha com data no formato DD/MM/AAAA e valor numérico foi encontrada. ` +
+          `Verifique se as datas estão no formato correto (ex: 01/01/2026) e se os valores são números. ` +
+          `Clique em "Baixar exemplo .xlsx" acima para ver o modelo esperado.`,
+      }
+    }
+
+    return { ok: true }
+  } catch (e) {
+    return {
+      ok: false,
+      motivo:
+        `Não foi possível ler o arquivo: ${e instanceof Error ? e.message : 'formato inválido'}. ` +
+        `Certifique-se de que é um arquivo Excel (.xlsx/.xls) ou CSV válido e não está corrompido.`,
+    }
+  }
+}
+
 /** Extrai texto de todas as páginas de um PDF */
 async function extrairTextoPDF(buffer: ArrayBuffer): Promise<string[]> {
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise
@@ -566,6 +644,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       return
     }
 
+    // Validação estrutural do arquivo (colunas obrigatórias + dados válidos)
+    const validacao = await validarEstruturaArquivo(file)
+    if (!validacao.ok) {
+      setMsgErroUpload(validacao.motivo)
+      setFase('idle')
+      return
+    }
+
     setArquivo(file.name)
     setLinhasClass([])
     setSelecionados(new Set())
@@ -832,6 +918,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           {msgErroUpload && (
             <div className={styles.errosBox}>
               <strong>⚠️ {msgErroUpload}</strong>
+              <a
+                href="/exemplos/exemplo.xlsx"
+                download
+                className={styles.errosBoxDownloadLink}
+              >
+                ↓ Baixar exemplo .xlsx
+              </a>
             </div>
           )}
         </>
