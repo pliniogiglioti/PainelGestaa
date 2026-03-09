@@ -339,7 +339,7 @@
 .selectClf:hover, .selectClf:focus { border-bottom-color: #d5af45; color: #ddd; }
 .selectClf option { background: #1e1e1e; color: #ccc; }
 
-/* Quando IA sugeriu algo fora do banco: destaca em verde */
+/* Quando IA não identificou uma classificação cadastrada (Não Identificado): destaca em verde */
 .selectClfSugerida { border-bottom-color: #4ade80 !important; color: #4ade80 !important; }
 
 /* Span usado na legenda abaixo da tabela */
