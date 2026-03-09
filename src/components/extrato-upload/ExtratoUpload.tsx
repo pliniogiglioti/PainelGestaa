@@ -281,9 +281,31 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
 }
 
 /**
- * Valida se um arquivo xlsx/xls/csv tem a estrutura mínima esperada pelo sistema.
- * Verifica: ao menos uma coluna de Data, uma de Descrição e uma de Valor,
- * e pelo menos uma linha de dados com data DD/MM/AAAA e valor numérico.
+ * Normaliza string para comparação: minúsculas, sem acentos, sem espaços extras.
+ */
+function normalizar(s: string): string {
+  return s
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+}
+
+/**
+ * Colunas obrigatórias do arquivo de exemplo (Data, Descrição, Valor, Tipo).
+ * Aceita variações comuns de nomes, mas exige que TODAS estejam presentes.
+ */
+const COLUNAS_EXEMPLO: { nome: string; variantes: string[] }[] = [
+  { nome: 'Data',      variantes: ['data', 'date', 'dt'] },
+  { nome: 'Descrição', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos'] },
+  { nome: 'Valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'credito', 'debito', 'vlr', 'vl'] },
+  { nome: 'Tipo',      variantes: ['tipo', 'type', 'natureza', 'modalidade', 'entrada/saida', 'entrada ou saida'] },
+]
+
+/**
+ * Valida se o arquivo enviado tem a MESMA ESTRUTURA do arquivo de exemplo:
+ *  - Colunas: Data, Descrição, Valor, Tipo (todas obrigatórias)
+ *  - Dados: ao menos uma linha com data DD/MM/AAAA, valor numérico e tipo Entrada/Saída
  */
 async function validarEstruturaArquivo(
   file: File,
@@ -303,47 +325,74 @@ async function validarEstruturaArquivo(
       return { ok: false, motivo: 'A planilha precisa ter ao menos um cabeçalho e uma linha de dados.' }
     }
 
+    // Encontra linha de cabeçalho
     const headerIdx = encontrarLinhaCabecalho(rows)
-    const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
-    const cols = detectarColunas(headers)
+    const rawHeaders = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
+    const normHeaders = rawHeaders.map(normalizar)
 
-    const faltando: string[] = []
-    if (cols.data < 0) faltando.push('"Data"')
-    if (cols.valor < 0 && cols.credito < 0 && cols.debito < 0) faltando.push('"Valor" (ou "Crédito"/"Débito")')
-    if (cols.descricao < 0) faltando.push('"Descrição" (ou "Histórico")')
+    // Verifica se cada coluna obrigatória do exemplo está presente
+    const colFaltando: string[] = []
+    const colIndices: Record<string, number> = {}
 
-    if (faltando.length > 0) {
-      return {
-        ok: false,
-        motivo:
-          `Coluna(s) não encontrada(s): ${faltando.join(' e ')}. ` +
-          `Use o botão "Baixar exemplo .xlsx" acima para ver o formato correto.`,
+    for (const col of COLUNAS_EXEMPLO) {
+      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
+      if (idx < 0) {
+        colFaltando.push(`"${col.nome}"`)
+      } else {
+        colIndices[col.nome] = idx
       }
     }
 
-    // Verifica se ao menos uma linha tem data DD/MM/AAAA e valor > 0
+    if (colFaltando.length > 0) {
+      return {
+        ok: false,
+        motivo:
+          `O arquivo não segue o modelo esperado. ` +
+          `Coluna(s) não encontrada(s): ${colFaltando.join(', ')}. ` +
+          `A planilha deve ter as colunas: Data (DD/MM/AAAA), Descrição, Valor (número) e Tipo (Entrada/Saída), ` +
+          `assim como o arquivo de exemplo.`,
+      }
+    }
+
+    // Verifica dados: ao menos uma linha com data válida, valor numérico e tipo Entrada/Saída
+    const tiposValidos = ['entrada', 'saida', 'saída', 'receita', 'despesa', 'debito', 'débito', 'credito', 'crédito', 'c', 'd']
     let linhasValidas = 0
+
     for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 20); i++) {
       const row = rows[i] as unknown[]
-      const rawData = cols.data >= 0 ? row[cols.data] : ''
-      const dataFormatada = formatarData(rawData)
-      const valorNum =
-        cols.valor >= 0
-          ? parseValor(row[cols.valor])
-          : Math.max(
-              parseValor(cols.credito >= 0 ? row[cols.credito] : ''),
-              parseValor(cols.debito >= 0 ? row[cols.debito] : ''),
-            )
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataFormatada) && valorNum > 0) linhasValidas++
+      if (row.every(cell => String(cell ?? '').trim() === '')) continue // linha vazia
+
+      const rawData = row[colIndices['Data']]
+      const dataStr = formatarData(rawData)
+      const valorNum = parseValor(row[colIndices['Valor']])
+      const tipoStr = normalizar(String(row[colIndices['Tipo']] ?? ''))
+
+      const dataOk = /^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)
+      const valorOk = valorNum > 0
+      const tipoOk = tiposValidos.some(t => tipoStr.includes(t))
+
+      if (dataOk && valorOk) {
+        linhasValidas++
+        if (!tipoOk && tipoStr !== '') {
+          return {
+            ok: false,
+            motivo:
+              `O campo "Tipo" deve conter "Entrada" ou "Saída". ` +
+              `Valor encontrado: "${row[colIndices['Tipo']]}". ` +
+              `Use o arquivo de exemplo como referência.`,
+          }
+        }
+      }
     }
 
     if (linhasValidas === 0) {
       return {
         ok: false,
         motivo:
+          `O arquivo não segue o modelo esperado. ` +
           `Nenhuma linha com data no formato DD/MM/AAAA e valor numérico foi encontrada. ` +
-          `Verifique se as datas estão no formato correto (ex: 01/01/2026) e se os valores são números. ` +
-          `Clique em "Baixar exemplo .xlsx" acima para ver o modelo esperado.`,
+          `Verifique se as datas estão no formato "01/01/2026" e os valores são números. ` +
+          `Use o arquivo de exemplo como referência.`,
       }
     }
 
