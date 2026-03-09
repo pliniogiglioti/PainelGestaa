@@ -1474,6 +1474,40 @@
 
 .classAddRow .modalInput { flex: 1; }
 
+/* ── Exemplos de Upload ───────────────────────────────────────────────────── */
+
+.exemploInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.exemploColunas {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.exemploDownloadLink {
+  color: #d5af45;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.exemploDownloadLink:hover { background: rgba(213, 175, 69, 0.15); }
+
+.settingsErro {
+  color: #ff6b6b;
+  font-size: 12px;
+  margin: 0;
+}
+
 
 @media (max-width: 980px) {
   .showcaseLayout {

@@ -236,6 +236,28 @@ export interface Database {
         }
         Relationships: []
       }
+      exemplos_upload: {
+        Row: {
+          id:         string
+          nome:       string
+          arquivo:    string | null
+          cabecalhos: string[]
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          nome:        string
+          arquivo?:    string | null
+          cabecalhos?: string[]
+          created_at?: string
+        }
+        Update: {
+          nome?:       string
+          arquivo?:    string | null
+          cabecalhos?: string[]
+        }
+        Relationships: []
+      }
       configuracoes: {
         Row: {
           chave:      string
@@ -358,6 +380,7 @@ export type Empresa            = Database['public']['Tables']['empresas']['Row']
 export type EmpresaMembro      = Database['public']['Tables']['empresa_membros']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
+export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']['Row']
 export type Configuracao       = Database['public']['Tables']['configuracoes']['Row']
 export type ForumCategory      = Database['public']['Tables']['forum_categories']['Row']
 export type ForumTopic         = Database['public']['Tables']['forum_topics']['Row']

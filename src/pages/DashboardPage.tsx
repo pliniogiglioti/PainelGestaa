@@ -1,8 +1,9 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
+import { read, utils } from 'xlsx'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
-import type { App, AppCategory, DreClassificacao, ForumTopicWithMeta } from '../lib/types'
+import type { App, AppCategory, DreClassificacao, ExemploUpload, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 
@@ -159,8 +160,34 @@ function CategoryChip({ label, active, onClick }: { label: string; active: boole
 
 // ── Admin Settings Modal ──────────────────────────────────────────────────
 
+/** Lê cabeçalhos normalizados da primeira aba de um arquivo .xlsx/.csv */
+async function lerCabecalhosArquivo(file: File): Promise<string[]> {
+  const buffer = await file.arrayBuffer()
+  const wb = read(buffer, { type: 'array' })
+  if (!wb.SheetNames.length) return []
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+  if (!rows.length) return []
+  // Encontra a primeira linha com pelo menos 2 células preenchidas
+  const headerIdx = rows.findIndex(r =>
+    (r as unknown[]).filter(c => String(c ?? '').trim()).length >= 2,
+  )
+  if (headerIdx < 0) return []
+  return (rows[headerIdx] as unknown[])
+    .map(h =>
+      String(h ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(),
+    )
+    .filter(Boolean)
+}
+
+/** Exemplos pré-definidos (estáticos em /public/exemplos/) para semeadura inicial */
+const EXEMPLOS_ESTATICOS = [
+  { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx'    },
+  { nome: 'Conta Azul',     arquivo: 'conta-azul.xlsx' },
+]
+
 function AdminSettingsModal({ onClose }: { onClose: () => void }) {
-  const [tab,            setTab]            = useState<'modelo' | 'classificacoes'>('modelo')
+  const [tab,            setTab]            = useState<'modelo' | 'classificacoes' | 'exemplos'>('modelo')
   const [groqModels,     setGroqModels]     = useState(GROQ_MODELS_FALLBACK)
   const [modelsLoading,  setModelsLoading]  = useState(false)
   const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_GROQ_MODEL)
@@ -171,6 +198,16 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   const [novaClassTipo,  setNovaClassTipo]  = useState<'receita' | 'despesa'>('despesa')
   const [addingClass,    setAddingClass]    = useState(false)
 
+  // ── Exemplos de upload ─────────────────────────────────────────────────────
+  const [exemplos,        setExemplos]        = useState<ExemploUpload[]>([])
+  const [exemplosLoading, setExemplosLoading] = useState(false)
+  const [novoExNome,      setNovoExNome]      = useState('')
+  const [novoExArquivo,   setNovoExArquivo]   = useState('')
+  const [novoExFile,      setNovoExFile]      = useState<File | null>(null)
+  const [addingEx,        setAddingEx]        = useState(false)
+  const [exErro,          setExErro]          = useState('')
+  const exFileRef = useRef<HTMLInputElement>(null)
+
   const fetchClassificacoes = async () => {
     const { data } = await supabase
       .from('dre_classificacoes')
@@ -178,6 +215,86 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
       .order('tipo')
       .order('nome')
     setClassificacoes(data ?? [])
+  }
+
+  const fetchExemplos = async () => {
+    setExemplosLoading(true)
+    const { data } = await supabase
+      .from('exemplos_upload')
+      .select('*')
+      .order('created_at')
+    const lista = data ?? []
+
+    // Se o banco está vazio, semeia os exemplos estáticos automaticamente
+    if (lista.length === 0) {
+      for (const ex of EXEMPLOS_ESTATICOS) {
+        try {
+          const res = await fetch(`/exemplos/${ex.arquivo}`)
+          if (!res.ok) continue
+          const buffer = await res.arrayBuffer()
+          const wb = read(buffer, { type: 'array' })
+          if (!wb.SheetNames.length) continue
+          const ws = wb.Sheets[wb.SheetNames[0]]
+          const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+          const headerIdx = rows.findIndex(r =>
+            (r as unknown[]).filter(c => String(c ?? '').trim()).length >= 2,
+          )
+          if (headerIdx < 0) continue
+          const cabecalhos = (rows[headerIdx] as unknown[])
+            .map(h =>
+              String(h ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(),
+            )
+            .filter(Boolean)
+          await supabase.from('exemplos_upload').insert({
+            nome: ex.nome,
+            arquivo: ex.arquivo,
+            cabecalhos,
+          })
+        } catch { /* ignora erros de seed */ }
+      }
+      const { data: seeded } = await supabase
+        .from('exemplos_upload').select('*').order('created_at')
+      setExemplos(seeded ?? [])
+    } else {
+      setExemplos(lista)
+    }
+    setExemplosLoading(false)
+  }
+
+  const adicionarExemplo = async () => {
+    setExErro('')
+    if (!novoExNome.trim()) { setExErro('Informe um nome para o modelo.'); return }
+    if (!novoExFile)        { setExErro('Selecione um arquivo .xlsx ou .csv.'); return }
+
+    setAddingEx(true)
+    try {
+      const cabecalhos = await lerCabecalhosArquivo(novoExFile)
+      if (cabecalhos.length === 0) {
+        setExErro('Não foi possível ler os cabeçalhos do arquivo.')
+        setAddingEx(false)
+        return
+      }
+      const arquivo = novoExArquivo.trim() || null
+      const { error } = await supabase.from('exemplos_upload').insert({
+        nome: novoExNome.trim(),
+        arquivo,
+        cabecalhos,
+      })
+      if (error) { setExErro(error.message); setAddingEx(false); return }
+      setNovoExNome('')
+      setNovoExArquivo('')
+      setNovoExFile(null)
+      if (exFileRef.current) exFileRef.current.value = ''
+      await fetchExemplos()
+    } catch (e) {
+      setExErro(e instanceof Error ? e.message : 'Erro ao adicionar exemplo.')
+    }
+    setAddingEx(false)
+  }
+
+  const removerExemplo = async (id: string) => {
+    await supabase.from('exemplos_upload').delete().eq('id', id)
+    setExemplos(p => p.filter(e => e.id !== id))
   }
 
   useEffect(() => {
@@ -192,6 +309,7 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
 
     fetchGroqModels()
     fetchClassificacoes()
+    fetchExemplos()
   }, [])
 
   useEffect(() => {
@@ -257,6 +375,12 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
           >
             Classificações DRE
           </button>
+          <button
+            className={`${styles.settingsTab} ${tab === 'exemplos' ? styles.settingsTabActive : ''}`}
+            onClick={() => setTab('exemplos')}
+          >
+            Exemplos de Upload
+          </button>
         </div>
 
         {/* ── Tab: Modelo IA ── */}
@@ -288,6 +412,89 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
               >
                 {savingModelo ? 'Salvando...' : savedModelo ? 'Salvo ✓' : 'Salvar'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* ── Tab: Exemplos de Upload ── */}
+        {tab === 'exemplos' && (
+          <div className={styles.settingsBody}>
+            <p className={styles.settingsHint}>
+              Cada modelo abaixo define quais colunas são aceitas no upload de extratos.
+              O sistema identifica o arquivo pelo cabeçalho — não pelo nome do arquivo.
+            </p>
+
+            {exemplosLoading && <p className={styles.settingsHint}>Carregando...</p>}
+
+            <div className={styles.classListWrap}>
+              {!exemplosLoading && exemplos.length === 0 && (
+                <p className={styles.settingsHint}>Nenhum modelo cadastrado ainda.</p>
+              )}
+              {exemplos.map(ex => (
+                <div key={ex.id} className={styles.classItem}>
+                  <div className={styles.exemploInfo}>
+                    <span className={styles.classNome}>{ex.nome}</span>
+                    <span className={styles.exemploColunas}>
+                      {ex.cabecalhos.join(' · ')}
+                    </span>
+                  </div>
+                  {ex.arquivo && (
+                    <a
+                      href={`/exemplos/${ex.arquivo}`}
+                      download
+                      className={styles.exemploDownloadLink}
+                      title="Baixar arquivo de exemplo"
+                    >
+                      ↓
+                    </a>
+                  )}
+                  <button
+                    className={styles.classRemoveBtn}
+                    onClick={() => removerExemplo(ex.id)}
+                    title="Remover modelo"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.classAddForm}>
+              <p className={styles.modalLabel}>Novo modelo</p>
+              <div className={styles.classAddRow}>
+                <input
+                  className={styles.modalInput}
+                  placeholder="Nome do modelo (ex: Conta Azul)"
+                  value={novoExNome}
+                  onChange={e => setNovoExNome(e.target.value)}
+                />
+              </div>
+              <div className={styles.classAddRow} style={{ marginTop: 8 }}>
+                <input
+                  className={styles.modalInput}
+                  placeholder="Nome do arquivo estático (ex: conta-azul.xlsx) — opcional"
+                  value={novoExArquivo}
+                  onChange={e => setNovoExArquivo(e.target.value)}
+                />
+              </div>
+              <div className={styles.classAddRow} style={{ marginTop: 8 }}>
+                <input
+                  ref={exFileRef}
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  className={styles.modalInput}
+                  style={{ cursor: 'pointer' }}
+                  onChange={e => setNovoExFile(e.target.files?.[0] ?? null)}
+                />
+                <button
+                  className={styles.modalSubmit}
+                  onClick={adicionarExemplo}
+                  disabled={addingEx || !novoExNome.trim() || !novoExFile}
+                >
+                  {addingEx ? '...' : '+ Adicionar'}
+                </button>
+              </div>
+              {exErro && <p className={styles.settingsErro}>{exErro}</p>}
             </div>
           </div>
         )}
