@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../../lib/supabase'
@@ -292,60 +292,9 @@ function normalizar(s: string): string {
 }
 
 /**
- * ── Modelos de exemplo disponíveis para download ─────────────────────────────
- * Para adicionar um novo formato:
- *   1. Coloque o arquivo .xlsx em /public/exemplos/
- *   2. Adicione um objeto { nome, arquivo } aqui
- * A validação de upload vai aceitar qualquer arquivo com estrutura
- * compatível com um dos modelos desta lista.
- */
-export const EXEMPLOS_UPLOAD: { nome: string; arquivo: string }[] = [
-  { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx' },
-  { nome: 'Conta Azul',    arquivo: 'conta-azul.xlsx' },
-  // { nome: 'Omie',          arquivo: 'omie.xlsx'         },
-]
-
-/**
- * Lê os cabeçalhos normalizados de um arquivo de exemplo via fetch.
- */
-async function lerCabecalhosExemplo(arquivo: string): Promise<string[] | null> {
-  try {
-    const res = await fetch(`/exemplos/${arquivo}`)
-    if (!res.ok) return null
-    const buffer = await res.arrayBuffer()
-    const wb = read(buffer, { type: 'array' })
-    if (!wb.SheetNames.length) return null
-    const ws = wb.Sheets[wb.SheetNames[0]]
-    const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
-    if (!rows.length) return null
-    const headerIdx = encontrarLinhaCabecalho(rows)
-    return (rows[headerIdx] as unknown[])
-      .map(h => normalizar(String(h ?? '').trim()))
-      .filter(Boolean)
-  } catch {
-    return null
-  }
-}
-
-/**
- * Retorna os índices das colunas de data e valor no arquivo,
- * usando os cabeçalhos do exemplo como referência.
- */
-function mapearColunas(
-  uploadHeaders: string[],
-  exemploHeaders: string[],
-): Record<string, number> {
-  const cols: Record<string, number> = {}
-  for (const eh of exemploHeaders) {
-    const idx = uploadHeaders.findIndex(uh => uh === eh || uh.includes(eh) || eh.includes(uh))
-    if (idx >= 0) cols[eh] = idx
-  }
-  return cols
-}
-
-/**
- * Valida se o arquivo enviado tem estrutura compatível com algum dos
- * arquivos de exemplo em EXEMPLOS_UPLOAD.
+ * Valida se o arquivo enviado tem estrutura compatível com algum dos modelos
+ * cadastrados na tabela `exemplos_upload` (configurável pelo admin).
+ * A identificação é feita pelos cabeçalhos — não pelo nome do arquivo.
  */
 async function validarEstruturaArquivo(
   file: File,
@@ -369,32 +318,32 @@ async function validarEstruturaArquivo(
     const uploadHeaders = (rows[headerIdx] as unknown[])
       .map(h => normalizar(String(h ?? '').trim()))
 
-    // Tenta casar com cada arquivo de exemplo
+    // Busca os modelos cadastrados no banco
+    const { data: exemplos } = await supabase
+      .from('exemplos_upload')
+      .select('nome, cabecalhos')
+
+    const lista = exemplos ?? []
     let nomeMatch: string | null = null
-    let colIndices: Record<string, number> = {}
 
-    for (const ex of EXEMPLOS_UPLOAD) {
-      const exemploHeaders = await lerCabecalhosExemplo(ex.arquivo)
-      if (!exemploHeaders || exemploHeaders.length === 0) continue
+    for (const ex of lista) {
+      const exemploHeaders: string[] = ex.cabecalhos ?? []
+      if (exemploHeaders.length === 0) continue
 
-      // Verifica se o arquivo enviado contém todas as colunas do exemplo
+      // Verifica se o arquivo enviado contém todas as colunas do modelo
       const todas = exemploHeaders.every(eh =>
         uploadHeaders.some(uh => uh === eh || uh.includes(eh) || eh.includes(uh)),
       )
-      if (todas) {
-        nomeMatch = ex.nome
-        colIndices = mapearColunas(uploadHeaders, exemploHeaders)
-        break
-      }
+      if (todas) { nomeMatch = ex.nome; break }
     }
 
     if (!nomeMatch) {
-      const lista = EXEMPLOS_UPLOAD.map(e => `• ${e.nome}`).join('\n')
+      const nomes = lista.map(e => `• ${e.nome}`).join('\n')
       return {
         ok: false,
         motivo:
           `O arquivo não segue nenhum dos modelos disponíveis. ` +
-          `Baixe um dos modelos abaixo e use-o como referência:\n${lista}`,
+          `Baixe um dos modelos abaixo e use-o como referência:${nomes ? '\n' + nomes : ''}`,
       }
     }
 
@@ -407,7 +356,7 @@ async function validarEstruturaArquivo(
       const row = rows[i] as unknown[]
       if (row.every(cell => String(cell ?? '').trim() === '')) continue
 
-      const rawData = cols.data >= 0 ? row[cols.data] : (colIndices['data'] !== undefined ? row[colIndices['data']] : '')
+      const rawData = cols.data >= 0 ? row[cols.data] : ''
       const dataStr = formatarData(rawData)
 
       let valorNum = 0
@@ -587,6 +536,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
   const [showSugeridaModal,  setShowSugeridaModal]  = useState(false)
+  const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
+
+  useEffect(() => {
+    supabase.from('exemplos_upload').select('nome, arquivo').order('created_at')
+      .then(({ data }) => setExemplosDb(data ?? []))
+  }, [])
 
   const qtdErros       = linhasClass.filter(l => l.status === 'erro').length
   const todosChecked   = selecionados.size === linhasClass.length && linhasClass.length > 0
@@ -953,19 +908,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             Envie uma planilha Excel (.xlsx/.xls) ou CSV — a IA classifica cada lançamento automaticamente.
           </p>
         </div>
-        <div className={styles.exemplosWrap}>
-          <span className={styles.exemplosLabel}>↓ Baixar modelo:</span>
-          {EXEMPLOS_UPLOAD.map(ex => (
-            <a
-              key={ex.arquivo}
-              href={`/exemplos/${ex.arquivo}`}
-              download
-              className={styles.downloadBtn}
-            >
-              {ex.nome}
-            </a>
-          ))}
-        </div>
+        {exemplosDb.some(e => e.arquivo) && (
+          <div className={styles.exemplosWrap}>
+            <span className={styles.exemplosLabel}>↓ Baixar modelo:</span>
+            {exemplosDb.filter(e => e.arquivo).map(ex => (
+              <a
+                key={ex.arquivo}
+                href={`/exemplos/${ex.arquivo}`}
+                download
+                className={styles.downloadBtn}
+              >
+                {ex.nome}
+              </a>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Drop zone (idle / processando) ──────────────────────────────────── */}
@@ -1013,19 +970,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           {msgErroUpload && (
             <div className={styles.errosBox}>
               <strong>⚠️ {msgErroUpload}</strong>
-              <div className={styles.exemplosWrapErro}>
-                <span>Baixe um modelo:</span>
-                {EXEMPLOS_UPLOAD.map(ex => (
-                  <a
-                    key={ex.arquivo}
-                    href={`/exemplos/${ex.arquivo}`}
-                    download
-                    className={styles.errosBoxDownloadLink}
-                  >
-                    ↓ {ex.nome}
-                  </a>
-                ))}
-              </div>
+              {exemplosDb.some(e => e.arquivo) && (
+                <div className={styles.exemplosWrapErro}>
+                  <span>Baixe um modelo:</span>
+                  {exemplosDb.filter(e => e.arquivo).map(ex => (
+                    <a
+                      key={ex.arquivo}
+                      href={`/exemplos/${ex.arquivo}`}
+                      download
+                      className={styles.errosBoxDownloadLink}
+                    >
+                      ↓ {ex.nome}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </>
