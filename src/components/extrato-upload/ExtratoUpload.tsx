@@ -535,8 +535,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
-  const [showSugeridaModal,  setShowSugeridaModal]  = useState(false)
-  const [pendingSaveIndices, setPendingSaveIndices]  = useState<Set<number> | null>(null)
+  const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
+  const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
 
   useEffect(() => {
@@ -842,28 +842,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   }, [])
 
   const salvarTudo = async () => {
-    const indices = new Set(linhasClass.map((_, i) => i))
-    if (linhasClass.some(l => l.sugerida)) {
-      setPendingSaveIndices(indices)
+    const naoClass = linhasClass.filter(l => l.sugerida)
+    if (naoClass.length > 0) {
+      setNaoClassificadosModal(naoClass)
       setShowSugeridaModal(true)
       return
     }
+    const indices = new Set(linhasClass.map((_, i) => i))
     setSelecionados(indices)
     await salvarComIndices(indices)
-  }
-
-  const confirmarSalvar = async () => {
-    setShowSugeridaModal(false)
-    const indices = pendingSaveIndices ?? new Set(linhasClass.map((_, i) => i))
-    setSelecionados(indices)
-    await salvarComIndices(indices)
-    setPendingSaveIndices(null)
   }
 
   const salvarLancamentos = async () => {
-    const temNaoIdentificado = [...selecionados].some(i => linhasClass[i].sugerida)
-    if (temNaoIdentificado) {
-      setPendingSaveIndices(new Set(selecionados))
+    const naoClass = [...selecionados].map(i => linhasClass[i]).filter(l => l.sugerida)
+    if (naoClass.length > 0) {
+      setNaoClassificadosModal(naoClass)
       setShowSugeridaModal(true)
       return
     }
@@ -1171,33 +1164,29 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
       {/* ── Modal: classificações sugeridas ────────────────────────────────── */}
       {showSugeridaModal && (
-        <div className={styles.modalOverlaySugerida} onClick={() => { setShowSugeridaModal(false); setPendingSaveIndices(null) }}>
+        <div className={styles.modalOverlaySugerida} onClick={() => setShowSugeridaModal(false)}>
           <div className={styles.modalSugerida} onClick={e => e.stopPropagation()}>
             <div className={styles.modalSugeridaIcon}>⚠️</div>
             <h3 className={styles.modalSugeridaTitulo}>Lançamentos sem classificação</h3>
             <p className={styles.modalSugeridaTexto}>
-              {pendingSaveIndices
-                ? [...pendingSaveIndices].filter(i => linhasClass[i].sugerida).length
-                : linhasClass.filter(l => l.sugerida).length
-              } lançamento(s) estão marcados como{' '}
-              <strong>Não Identificado</strong> e ainda não têm uma classificação definida.
-              Recomendamos selecionar uma classificação antes de salvar.
+              Os lançamentos abaixo estão como <strong>Não Identificado</strong>.
+              Selecione uma classificação para cada um antes de salvar:
             </p>
-            <p className={styles.modalSugeridaTexto}>
-              Deseja salvar mesmo assim?
-            </p>
+            <ul className={styles.modalNaoClassList}>
+              {naoClassificadosModal.map((l, i) => (
+                <li key={i}>
+                  <span className={styles.modalNaoClassData}>{l.data}</span>
+                  <span className={styles.modalNaoClassDesc}>{l.descricao}</span>
+                  <span className={styles.modalNaoClassValor}>{moeda(l.valor)}</span>
+                </li>
+              ))}
+            </ul>
             <div className={styles.modalSugeridaBtns}>
               <button
-                className={styles.btnSecondary}
-                onClick={() => { setShowSugeridaModal(false); setPendingSaveIndices(null) }}
+                className={styles.btnPrimary}
+                onClick={() => setShowSugeridaModal(false)}
               >
                 ← Voltar e classificar
-              </button>
-              <button
-                className={styles.btnPrimary}
-                onClick={confirmarSalvar}
-              >
-                Salvar mesmo assim →
               </button>
             </div>
           </div>
