@@ -292,20 +292,79 @@ function normalizar(s: string): string {
 }
 
 /**
- * Colunas obrigatórias do arquivo de exemplo (Data, Descrição, Valor, Tipo).
- * Aceita variações comuns de nomes, mas exige que TODAS estejam presentes.
+ * Formatos de planilha aceitos pelo sistema.
+ * Cada formato define colunas obrigatórias e opcionais.
+ * O arquivo é válido se bater com QUALQUER um dos formatos.
  */
-const COLUNAS_EXEMPLO: { nome: string; variantes: string[] }[] = [
-  { nome: 'Data',      variantes: ['data', 'date', 'dt'] },
-  { nome: 'Descrição', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos'] },
-  { nome: 'Valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'credito', 'debito', 'vlr', 'vl'] },
-  { nome: 'Tipo',      variantes: ['tipo', 'type', 'natureza', 'modalidade', 'entrada/saida', 'entrada ou saida'] },
+const FORMATOS_ACEITOS: {
+  nome: string
+  obrigatorias: { chave: string; variantes: string[] }[]
+  opcionais:    { chave: string; variantes: string[] }[]
+}[] = [
+  {
+    // Formato padrão: Data, Descrição, Valor, Tipo
+    nome: 'Padrão (Data / Descrição / Valor / Tipo)',
+    obrigatorias: [
+      { chave: 'data',      variantes: ['data', 'date', 'dt'] },
+      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
+      { chave: 'valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'vlr', 'vl', 'importancia'] },
+      { chave: 'tipo',      variantes: ['tipo', 'type', 'natureza', 'modalidade', 'entrada/saida', 'entrada ou saida', 'dc', 'd/c'] },
+    ],
+    opcionais: [],
+  },
+  {
+    // Extrato bancário: Data, Histórico/Descrição, Crédito, Débito
+    nome: 'Extrato Bancário (Data / Histórico / Crédito / Débito)',
+    obrigatorias: [
+      { chave: 'data',    variantes: ['data', 'date', 'dt'] },
+      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
+      { chave: 'credito', variantes: ['credito', 'crédito', 'credit', 'cr', 'entrada', 'entradas', 'receita'] },
+      { chave: 'debito',  variantes: ['debito', 'débito', 'debit', 'db', 'saida', 'saidas', 'saída', 'saídas', 'despesa'] },
+    ],
+    opcionais: [],
+  },
+  {
+    // Formato simples: Data, Descrição, Valor (sem coluna Tipo — o sinal do valor determina)
+    nome: 'Simples (Data / Descrição / Valor)',
+    obrigatorias: [
+      { chave: 'data',      variantes: ['data', 'date', 'dt'] },
+      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
+      { chave: 'valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'vlr', 'vl', 'importancia'] },
+    ],
+    opcionais: [
+      { chave: 'tipo', variantes: ['tipo', 'type', 'natureza', 'modalidade', 'dc', 'd/c'] },
+    ],
+  },
 ]
 
 /**
- * Valida se o arquivo enviado tem a MESMA ESTRUTURA do arquivo de exemplo:
- *  - Colunas: Data, Descrição, Valor, Tipo (todas obrigatórias)
- *  - Dados: ao menos uma linha com data DD/MM/AAAA, valor numérico e tipo Entrada/Saída
+ * Tenta encaixar os cabeçalhos do arquivo em um dos FORMATOS_ACEITOS.
+ * Retorna os índices das colunas se encontrar match, ou null.
+ */
+function detectarFormato(
+  normHeaders: string[],
+): { formato: string; colIndices: Record<string, number> } | null {
+  for (const fmt of FORMATOS_ACEITOS) {
+    const colIndices: Record<string, number> = {}
+    let ok = true
+    for (const col of fmt.obrigatorias) {
+      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
+      if (idx < 0) { ok = false; break }
+      colIndices[col.chave] = idx
+    }
+    if (!ok) continue
+    for (const col of fmt.opcionais) {
+      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
+      if (idx >= 0) colIndices[col.chave] = idx
+    }
+    return { formato: fmt.nome, colIndices }
+  }
+  return null
+}
+
+/**
+ * Valida se o arquivo enviado tem uma estrutura reconhecida pelo sistema.
+ * Suporta múltiplos formatos (padrão, extrato bancário, simples).
  */
 async function validarEstruturaArquivo(
   file: File,
@@ -325,74 +384,53 @@ async function validarEstruturaArquivo(
       return { ok: false, motivo: 'A planilha precisa ter ao menos um cabeçalho e uma linha de dados.' }
     }
 
-    // Encontra linha de cabeçalho
     const headerIdx = encontrarLinhaCabecalho(rows)
     const rawHeaders = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
     const normHeaders = rawHeaders.map(normalizar)
 
-    // Verifica se cada coluna obrigatória do exemplo está presente
-    const colFaltando: string[] = []
-    const colIndices: Record<string, number> = {}
+    const match = detectarFormato(normHeaders)
 
-    for (const col of COLUNAS_EXEMPLO) {
-      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
-      if (idx < 0) {
-        colFaltando.push(`"${col.nome}"`)
-      } else {
-        colIndices[col.nome] = idx
-      }
-    }
-
-    if (colFaltando.length > 0) {
+    if (!match) {
+      const formatos = FORMATOS_ACEITOS.map(f => `• ${f.nome}`).join('\n')
       return {
         ok: false,
         motivo:
-          `O arquivo não segue o modelo esperado. ` +
-          `Coluna(s) não encontrada(s): ${colFaltando.join(', ')}. ` +
-          `A planilha deve ter as colunas: Data (DD/MM/AAAA), Descrição, Valor (número) e Tipo (Entrada/Saída), ` +
-          `assim como o arquivo de exemplo.`,
+          `O arquivo não segue nenhum dos formatos aceitos. ` +
+          `Certifique-se de que a planilha tem ao menos as colunas de Data, Descrição e Valor. ` +
+          `Formatos suportados:\n${formatos}`,
       }
     }
 
-    // Verifica dados: ao menos uma linha com data válida, valor numérico e tipo Entrada/Saída
-    const tiposValidos = ['entrada', 'saida', 'saída', 'receita', 'despesa', 'debito', 'débito', 'credito', 'crédito', 'c', 'd']
-    let linhasValidas = 0
+    const { colIndices } = match
 
+    // Verifica se ao menos uma linha tem data válida e valor numérico
+    let linhasValidas = 0
     for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 20); i++) {
       const row = rows[i] as unknown[]
-      if (row.every(cell => String(cell ?? '').trim() === '')) continue // linha vazia
+      if (row.every(cell => String(cell ?? '').trim() === '')) continue
 
-      const rawData = row[colIndices['Data']]
+      const rawData = row[colIndices['data']]
       const dataStr = formatarData(rawData)
-      const valorNum = parseValor(row[colIndices['Valor']])
-      const tipoStr = normalizar(String(row[colIndices['Tipo']] ?? ''))
 
-      const dataOk = /^\d{2}\/\d{2}\/\d{4}$/.test(dataStr)
-      const valorOk = valorNum > 0
-      const tipoOk = tiposValidos.some(t => tipoStr.includes(t))
-
-      if (dataOk && valorOk) {
-        linhasValidas++
-        if (!tipoOk && tipoStr !== '') {
-          return {
-            ok: false,
-            motivo:
-              `O campo "Tipo" deve conter "Entrada" ou "Saída". ` +
-              `Valor encontrado: "${row[colIndices['Tipo']]}". ` +
-              `Use o arquivo de exemplo como referência.`,
-          }
-        }
+      let valorNum = 0
+      if (colIndices['valor'] !== undefined) {
+        valorNum = Math.abs(parseValor(row[colIndices['valor']]))
+      } else {
+        valorNum = Math.max(
+          parseValor(colIndices['credito'] !== undefined ? row[colIndices['credito']] : ''),
+          parseValor(colIndices['debito']  !== undefined ? row[colIndices['debito']]  : ''),
+        )
       }
+
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr) && valorNum > 0) linhasValidas++
     }
 
     if (linhasValidas === 0) {
       return {
         ok: false,
         motivo:
-          `O arquivo não segue o modelo esperado. ` +
-          `Nenhuma linha com data no formato DD/MM/AAAA e valor numérico foi encontrada. ` +
-          `Verifique se as datas estão no formato "01/01/2026" e os valores são números. ` +
-          `Use o arquivo de exemplo como referência.`,
+          `Formato reconhecido (${match.formato}), mas nenhuma linha com data DD/MM/AAAA e valor numérico foi encontrada. ` +
+          `Verifique se as datas estão no formato "01/01/2026" e os valores são números.`,
       }
     }
 
