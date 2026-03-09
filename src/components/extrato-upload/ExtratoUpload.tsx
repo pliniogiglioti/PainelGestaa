@@ -301,7 +301,7 @@ function normalizar(s: string): string {
  */
 export const EXEMPLOS_UPLOAD: { nome: string; arquivo: string }[] = [
   { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx' },
-  // { nome: 'Conta Azul',    arquivo: 'conta-azul.xlsx'  },
+  { nome: 'Conta Azul',    arquivo: 'conta-azul.xlsx' },
   // { nome: 'Omie',          arquivo: 'omie.xlsx'         },
 ]
 
