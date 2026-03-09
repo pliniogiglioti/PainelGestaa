@@ -244,17 +244,12 @@ const pickFallback = (
     }
   }
 
-  const defaultReceita = classificacoesDisponiveis.find(c => c.tipo === 'receita')
-  const defaultDespesa = classificacoesDisponiveis.find(c => c.tipo === 'despesa')
-
   return {
     tipo: tipoEntrada,
-    classificacao_nome: tipoEntrada === 'receita'
-      ? (defaultReceita?.nome ?? 'Receita Dinheiro')
-      : (defaultDespesa?.nome ?? 'Outras Despesas'),
-    grupo: tipoEntrada === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas',
+    classificacao_nome: 'Não Identificado',
+    grupo: '',
     fonte: 'fallback',
-    confianca: 'confirmada',
+    confianca: 'sugerida',
   }
 }
 
@@ -293,16 +288,8 @@ const toFinalResult = (
     return { tipo, classificacao_nome: matched.nome, grupo, fonte: 'ia', confianca: 'confirmada' }
   }
 
-  // 2. A IA devolveu algo parecido com a descrição (alucinação) → usa genérico
-  if (isAlucinacao(nomeAi, descricaoOriginal)) {
-    const generica = tipo === 'receita'
-      ? (classificacoesDisponiveis.find(c => c.tipo === 'receita')?.nome ?? 'Receita Dinheiro')
-      : (classificacoesDisponiveis.find(c => c.tipo === 'despesa')?.nome ?? 'Outras Despesas')
-    return { tipo, classificacao_nome: generica, grupo, fonte: 'ia', confianca: 'confirmada' }
-  }
-
-  // 3. IA sugeriu algo razoável que não está no banco → mostra como sugestão
-  return { tipo, classificacao_nome: nomeAi, grupo, fonte: 'ia', confianca: 'sugerida' }
+  // 2 & 3. IA não identificou uma classificação cadastrada (alucinação ou fora do banco) → não identificado
+  return { tipo, classificacao_nome: 'Não Identificado', grupo: '', fonte: 'ia', confianca: 'sugerida' }
 }
 
 const callGroq = async (groqApiKey: string, model: string, prompt: string): Promise<Response> => {
