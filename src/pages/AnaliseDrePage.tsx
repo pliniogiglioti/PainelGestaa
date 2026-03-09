@@ -231,6 +231,17 @@ function AiSpinner() {
 
 type PerfilUsuario = { id: string; name: string | null; email: string | null }
 
+type GrupoData = {
+  nome: string
+  total: number
+  tipo: 'receita' | 'despesa'
+  classificacoes: { nome: string; total: number; items: DreLancamento[] }[]
+}
+
+type DreListItem =
+  | { kind: 'grupo'; data: GrupoData }
+  | { kind: 'totalizador'; label: string; valor: number; pct?: number }
+
 interface AnaliseDreProps {
   empresa: Empresa
   onTrocarEmpresa: () => void
@@ -429,6 +440,80 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
         return b.total - a.total
       })
   }, [lancamentosFiltrados, tipoMap])
+
+  // ── DRE ordered list com totalizadores ────────────────────────────────────
+  const dreOrdenadoItems = useMemo<DreListItem[]>(() => {
+    const gruposMap = new Map<string, GrupoData>(lancamentosAgrupados.map(g => [g.nome.toLowerCase().trim(), g as GrupoData]))
+    const used = new Set<string>()
+    const result: DreListItem[] = []
+
+    // Seção 1: Receitas Operacionais (todos grupos receita exceto Receitas Financeiras)
+    const gruposReceita = lancamentosAgrupados.filter(
+      g => g.tipo === 'receita' && g.nome.toLowerCase().trim() !== 'receitas financeiras'
+    )
+    for (const g of gruposReceita) {
+      result.push({ kind: 'grupo', data: g })
+      used.add(g.nome.toLowerCase().trim())
+    }
+    if (gruposReceita.length > 0) {
+      result.push({ kind: 'totalizador', label: 'RECEITAS OPERACIONAIS', valor: kpis.receitaOperacional })
+    }
+
+    // Seção 2: Deduções de Receita + Impostos → RECEITA LÍQUIDA
+    let addedDeducoes = false
+    for (const nome of ['deduções de receita', 'impostos sobre faturamento']) {
+      const g = gruposMap.get(nome)
+      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedDeducoes = true }
+    }
+    if (addedDeducoes) {
+      result.push({ kind: 'totalizador', label: 'RECEITA LÍQUIDA', valor: kpis.receitaLiquida })
+    }
+
+    // Seção 3: Despesas Operacionais diretas → MARGEM DE CONTRIBUIÇÃO
+    let addedOp = false
+    const g3 = gruposMap.get('despesas operacionais')
+    if (g3) { result.push({ kind: 'grupo', data: g3 }); used.add('despesas operacionais'); addedOp = true }
+    if (addedOp) {
+      result.push({ kind: 'totalizador', label: 'MARGEM DE CONTRIBUIÇÃO', valor: kpis.margemContrib, pct: kpis.margemContribPct })
+    }
+
+    // Seção 4: Despesas Indiretas → EBITDA
+    let addedIndir = false
+    for (const nome of ['despesas com pessoal', 'despesas administrativas', 'despesas comerciais e marketing', 'despesas com ti']) {
+      const g = gruposMap.get(nome)
+      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedIndir = true }
+    }
+    if (addedIndir) {
+      result.push({ kind: 'totalizador', label: 'EBITDA', valor: kpis.ebitda, pct: kpis.ebitdaPct })
+    }
+
+    // Seção 5: Resultado Financeiro → EBIT
+    let addedFin = false
+    for (const nome of ['receitas financeiras', 'despesas financeiras']) {
+      const g = gruposMap.get(nome)
+      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedFin = true }
+    }
+    if (addedFin) {
+      result.push({ kind: 'totalizador', label: 'EBIT', valor: kpis.ebit, pct: kpis.ebitPct })
+    }
+
+    // Seção 6: Investimentos → NOPAT
+    let addedInvest = false
+    const g6 = gruposMap.get('investimentos')
+    if (g6) { result.push({ kind: 'grupo', data: g6 }); used.add('investimentos'); addedInvest = true }
+    if (addedInvest) {
+      result.push({ kind: 'totalizador', label: 'NOPAT (RESULTADO OPERACIONAL)', valor: kpis.nopat, pct: kpis.nopatPct })
+    }
+
+    // Grupos restantes não mapeados no DRE
+    for (const g of lancamentosAgrupados) {
+      if (!used.has(g.nome.toLowerCase().trim())) {
+        result.push({ kind: 'grupo', data: g })
+      }
+    }
+
+    return result
+  }, [lancamentosAgrupados, kpis])
 
   const toggleGrupo = (key: string) => setExpandedGrupos(prev => {
     const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
@@ -828,7 +913,24 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
           </div>
         ) : (
           <div className={styles.accordionList}>
-            {lancamentosAgrupados.map(grupo => {
+            {dreOrdenadoItems.map((item) => {
+              if (item.kind === 'totalizador') {
+                const tot = item as { kind: 'totalizador'; label: string; valor: number; pct?: number }
+                const tone = tot.valor > 0 ? 'positive' : tot.valor < 0 ? 'negative' : 'neutral'
+                return (
+                  <div
+                    key={`tot-${tot.label}`}
+                    className={`${styles.totalizadorRow} ${tone === 'positive' ? styles.totalizadorPositive : tone === 'negative' ? styles.totalizadorNegative : ''}`}
+                  >
+                    <span className={styles.totalizadorLabel}>{tot.label}</span>
+                    <div className={styles.totalizadorValues}>
+                      {tot.pct !== undefined && <span className={styles.totalizadorPct}>{tot.pct.toFixed(1)}%</span>}
+                      <strong className={styles.totalizadorValor}>{moeda(tot.valor)}</strong>
+                    </div>
+                  </div>
+                )
+              }
+              const grupo = item.data
               const gKey = grupo.nome
               const gAberto = expandedGrupos.has(gKey)
               return (

@@ -551,6 +551,19 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   }
 
   const processarArquivo = useCallback(async (file: File) => {
+    // Validação de tipo de arquivo — garante que o sistema consegue ler antes de processar
+    const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+    const tiposAceitos = ['xlsx', 'xls', 'csv', 'pdf']
+    if (!tiposAceitos.includes(ext)) {
+      setMsgErroUpload(
+        `Formato ".${ext || 'desconhecido'}" não é suportado pelo sistema. ` +
+        `Envie um arquivo .xlsx, .xls, .csv ou .pdf. ` +
+        `Clique em "Baixar exemplo .xlsx" para ver um modelo compatível.`
+      )
+      setFase('idle')
+      return
+    }
+
     setArquivo(file.name)
     setLinhasClass([])
     setSelecionados(new Set())

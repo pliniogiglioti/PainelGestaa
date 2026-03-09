@@ -1072,6 +1072,62 @@ th { color: #8f8f8f; font-weight: 500; }
   font-weight: 600;
 }
 
+/* ── Totalizador DRE ── */
+
+.totalizadorRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid #2a2a2a;
+  border-left: 3px solid #3a3a3a;
+  margin: 2px 0;
+}
+
+.totalizadorPositive {
+  border-left-color: rgba(54, 198, 126, 0.6);
+  background: rgba(54, 198, 126, 0.04);
+}
+
+.totalizadorNegative {
+  border-left-color: rgba(255, 108, 108, 0.6);
+  background: rgba(255, 108, 108, 0.04);
+}
+
+.totalizadorLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: #666;
+}
+
+.totalizadorPositive .totalizadorLabel { color: #5aba74; }
+.totalizadorNegative .totalizadorLabel { color: #e06060; }
+
+.totalizadorValues {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.totalizadorPct {
+  font-size: 12px;
+  color: #606060;
+  font-weight: 600;
+}
+
+.totalizadorValor {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f2f2f2;
+}
+
+.totalizadorPositive .totalizadorValor { color: #4ce09a; }
+.totalizadorNegative .totalizadorValor { color: #ff9f9f; }
+
 /* ── Responsive ── */
 
 @media (max-width: 700px) {
