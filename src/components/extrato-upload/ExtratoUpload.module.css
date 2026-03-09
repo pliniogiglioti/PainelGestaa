@@ -44,6 +44,28 @@
 }
 .downloadBtn:hover { background: rgba(213, 175, 69, 0.22); }
 
+.exemplosWrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.exemplosLabel {
+  font-size: 13px;
+  color: #888;
+  white-space: nowrap;
+}
+
+.exemplosWrapErro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #aaa;
+}
+
 /* ── Drop Zone ───────────────────────────────────────────────────────────────── */
 
 .dropZone {
