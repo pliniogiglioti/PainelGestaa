@@ -292,79 +292,60 @@ function normalizar(s: string): string {
 }
 
 /**
- * Formatos de planilha aceitos pelo sistema.
- * Cada formato define colunas obrigatórias e opcionais.
- * O arquivo é válido se bater com QUALQUER um dos formatos.
+ * ── Modelos de exemplo disponíveis para download ─────────────────────────────
+ * Para adicionar um novo formato:
+ *   1. Coloque o arquivo .xlsx em /public/exemplos/
+ *   2. Adicione um objeto { nome, arquivo } aqui
+ * A validação de upload vai aceitar qualquer arquivo com estrutura
+ * compatível com um dos modelos desta lista.
  */
-const FORMATOS_ACEITOS: {
-  nome: string
-  obrigatorias: { chave: string; variantes: string[] }[]
-  opcionais:    { chave: string; variantes: string[] }[]
-}[] = [
-  {
-    // Formato padrão: Data, Descrição, Valor, Tipo
-    nome: 'Padrão (Data / Descrição / Valor / Tipo)',
-    obrigatorias: [
-      { chave: 'data',      variantes: ['data', 'date', 'dt'] },
-      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
-      { chave: 'valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'vlr', 'vl', 'importancia'] },
-      { chave: 'tipo',      variantes: ['tipo', 'type', 'natureza', 'modalidade', 'entrada/saida', 'entrada ou saida', 'dc', 'd/c'] },
-    ],
-    opcionais: [],
-  },
-  {
-    // Extrato bancário: Data, Histórico/Descrição, Crédito, Débito
-    nome: 'Extrato Bancário (Data / Histórico / Crédito / Débito)',
-    obrigatorias: [
-      { chave: 'data',    variantes: ['data', 'date', 'dt'] },
-      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
-      { chave: 'credito', variantes: ['credito', 'crédito', 'credit', 'cr', 'entrada', 'entradas', 'receita'] },
-      { chave: 'debito',  variantes: ['debito', 'débito', 'debit', 'db', 'saida', 'saidas', 'saída', 'saídas', 'despesa'] },
-    ],
-    opcionais: [],
-  },
-  {
-    // Formato simples: Data, Descrição, Valor (sem coluna Tipo — o sinal do valor determina)
-    nome: 'Simples (Data / Descrição / Valor)',
-    obrigatorias: [
-      { chave: 'data',      variantes: ['data', 'date', 'dt'] },
-      { chave: 'descricao', variantes: ['descricao', 'descricoes', 'historico', 'historicos', 'descr', 'description', 'memo', 'lancamento', 'lancamentos', 'complemento'] },
-      { chave: 'valor',     variantes: ['valor', 'value', 'montante', 'quantia', 'vlr', 'vl', 'importancia'] },
-    ],
-    opcionais: [
-      { chave: 'tipo', variantes: ['tipo', 'type', 'natureza', 'modalidade', 'dc', 'd/c'] },
-    ],
-  },
+export const EXEMPLOS_UPLOAD: { nome: string; arquivo: string }[] = [
+  { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx' },
+  // { nome: 'Conta Azul',    arquivo: 'conta-azul.xlsx'  },
+  // { nome: 'Omie',          arquivo: 'omie.xlsx'         },
 ]
 
 /**
- * Tenta encaixar os cabeçalhos do arquivo em um dos FORMATOS_ACEITOS.
- * Retorna os índices das colunas se encontrar match, ou null.
+ * Lê os cabeçalhos normalizados de um arquivo de exemplo via fetch.
  */
-function detectarFormato(
-  normHeaders: string[],
-): { formato: string; colIndices: Record<string, number> } | null {
-  for (const fmt of FORMATOS_ACEITOS) {
-    const colIndices: Record<string, number> = {}
-    let ok = true
-    for (const col of fmt.obrigatorias) {
-      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
-      if (idx < 0) { ok = false; break }
-      colIndices[col.chave] = idx
-    }
-    if (!ok) continue
-    for (const col of fmt.opcionais) {
-      const idx = normHeaders.findIndex(h => col.variantes.some(v => h === v || h.includes(v)))
-      if (idx >= 0) colIndices[col.chave] = idx
-    }
-    return { formato: fmt.nome, colIndices }
+async function lerCabecalhosExemplo(arquivo: string): Promise<string[] | null> {
+  try {
+    const res = await fetch(`/exemplos/${arquivo}`)
+    if (!res.ok) return null
+    const buffer = await res.arrayBuffer()
+    const wb = read(buffer, { type: 'array' })
+    if (!wb.SheetNames.length) return null
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+    if (!rows.length) return null
+    const headerIdx = encontrarLinhaCabecalho(rows)
+    return (rows[headerIdx] as unknown[])
+      .map(h => normalizar(String(h ?? '').trim()))
+      .filter(Boolean)
+  } catch {
+    return null
   }
-  return null
 }
 
 /**
- * Valida se o arquivo enviado tem uma estrutura reconhecida pelo sistema.
- * Suporta múltiplos formatos (padrão, extrato bancário, simples).
+ * Retorna os índices das colunas de data e valor no arquivo,
+ * usando os cabeçalhos do exemplo como referência.
+ */
+function mapearColunas(
+  uploadHeaders: string[],
+  exemploHeaders: string[],
+): Record<string, number> {
+  const cols: Record<string, number> = {}
+  for (const eh of exemploHeaders) {
+    const idx = uploadHeaders.findIndex(uh => uh === eh || uh.includes(eh) || eh.includes(uh))
+    if (idx >= 0) cols[eh] = idx
+  }
+  return cols
+}
+
+/**
+ * Valida se o arquivo enviado tem estrutura compatível com algum dos
+ * arquivos de exemplo em EXEMPLOS_UPLOAD.
  */
 async function validarEstruturaArquivo(
   file: File,
@@ -385,40 +366,57 @@ async function validarEstruturaArquivo(
     }
 
     const headerIdx = encontrarLinhaCabecalho(rows)
-    const rawHeaders = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
-    const normHeaders = rawHeaders.map(normalizar)
+    const uploadHeaders = (rows[headerIdx] as unknown[])
+      .map(h => normalizar(String(h ?? '').trim()))
 
-    const match = detectarFormato(normHeaders)
+    // Tenta casar com cada arquivo de exemplo
+    let nomeMatch: string | null = null
+    let colIndices: Record<string, number> = {}
 
-    if (!match) {
-      const formatos = FORMATOS_ACEITOS.map(f => `• ${f.nome}`).join('\n')
-      return {
-        ok: false,
-        motivo:
-          `O arquivo não segue nenhum dos formatos aceitos. ` +
-          `Certifique-se de que a planilha tem ao menos as colunas de Data, Descrição e Valor. ` +
-          `Formatos suportados:\n${formatos}`,
+    for (const ex of EXEMPLOS_UPLOAD) {
+      const exemploHeaders = await lerCabecalhosExemplo(ex.arquivo)
+      if (!exemploHeaders || exemploHeaders.length === 0) continue
+
+      // Verifica se o arquivo enviado contém todas as colunas do exemplo
+      const todas = exemploHeaders.every(eh =>
+        uploadHeaders.some(uh => uh === eh || uh.includes(eh) || eh.includes(uh)),
+      )
+      if (todas) {
+        nomeMatch = ex.nome
+        colIndices = mapearColunas(uploadHeaders, exemploHeaders)
+        break
       }
     }
 
-    const { colIndices } = match
+    if (!nomeMatch) {
+      const lista = EXEMPLOS_UPLOAD.map(e => `• ${e.nome}`).join('\n')
+      return {
+        ok: false,
+        motivo:
+          `O arquivo não segue nenhum dos modelos disponíveis. ` +
+          `Baixe um dos modelos abaixo e use-o como referência:\n${lista}`,
+      }
+    }
 
-    // Verifica se ao menos uma linha tem data válida e valor numérico
+    // Verifica se ao menos uma linha tem data DD/MM/AAAA e valor numérico
+    const cols = detectarColunas(
+      (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim()),
+    )
     let linhasValidas = 0
     for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 20); i++) {
       const row = rows[i] as unknown[]
       if (row.every(cell => String(cell ?? '').trim() === '')) continue
 
-      const rawData = row[colIndices['data']]
+      const rawData = cols.data >= 0 ? row[cols.data] : (colIndices['data'] !== undefined ? row[colIndices['data']] : '')
       const dataStr = formatarData(rawData)
 
       let valorNum = 0
-      if (colIndices['valor'] !== undefined) {
-        valorNum = Math.abs(parseValor(row[colIndices['valor']]))
-      } else {
+      if (cols.valor >= 0) {
+        valorNum = Math.abs(parseValor(row[cols.valor]))
+      } else if (cols.credito >= 0 || cols.debito >= 0) {
         valorNum = Math.max(
-          parseValor(colIndices['credito'] !== undefined ? row[colIndices['credito']] : ''),
-          parseValor(colIndices['debito']  !== undefined ? row[colIndices['debito']]  : ''),
+          parseValor(cols.credito >= 0 ? row[cols.credito] : ''),
+          parseValor(cols.debito  >= 0 ? row[cols.debito]  : ''),
         )
       }
 
@@ -429,7 +427,7 @@ async function validarEstruturaArquivo(
       return {
         ok: false,
         motivo:
-          `Formato reconhecido (${match.formato}), mas nenhuma linha com data DD/MM/AAAA e valor numérico foi encontrada. ` +
+          `Modelo reconhecido (${nomeMatch}), mas nenhuma linha com data DD/MM/AAAA e valor numérico foi encontrada. ` +
           `Verifique se as datas estão no formato "01/01/2026" e os valores são números.`,
       }
     }
@@ -955,9 +953,19 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             Envie uma planilha Excel (.xlsx/.xls) ou CSV — a IA classifica cada lançamento automaticamente.
           </p>
         </div>
-        <a href="/exemplos/exemplo.xlsx" download className={styles.downloadBtn}>
-          ↓ Baixar exemplo .xlsx
-        </a>
+        <div className={styles.exemplosWrap}>
+          <span className={styles.exemplosLabel}>↓ Baixar modelo:</span>
+          {EXEMPLOS_UPLOAD.map(ex => (
+            <a
+              key={ex.arquivo}
+              href={`/exemplos/${ex.arquivo}`}
+              download
+              className={styles.downloadBtn}
+            >
+              {ex.nome}
+            </a>
+          ))}
+        </div>
       </div>
 
       {/* ── Drop zone (idle / processando) ──────────────────────────────────── */}
@@ -1005,13 +1013,19 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           {msgErroUpload && (
             <div className={styles.errosBox}>
               <strong>⚠️ {msgErroUpload}</strong>
-              <a
-                href="/exemplos/exemplo.xlsx"
-                download
-                className={styles.errosBoxDownloadLink}
-              >
-                ↓ Baixar exemplo .xlsx
-              </a>
+              <div className={styles.exemplosWrapErro}>
+                <span>Baixe um modelo:</span>
+                {EXEMPLOS_UPLOAD.map(ex => (
+                  <a
+                    key={ex.arquivo}
+                    href={`/exemplos/${ex.arquivo}`}
+                    download
+                    className={styles.errosBoxDownloadLink}
+                  >
+                    ↓ {ex.nome}
+                  </a>
+                ))}
+              </div>
             </div>
           )}
         </>
