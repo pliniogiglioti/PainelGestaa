@@ -423,6 +423,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
+  const [showSugeridaModal,  setShowSugeridaModal]  = useState(false)
 
   const qtdErros       = linhasClass.filter(l => l.status === 'erro').length
   const todosChecked   = selecionados.size === linhasClass.length && linhasClass.length > 0
@@ -553,11 +554,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const processarArquivo = useCallback(async (file: File) => {
     // Validação de tipo de arquivo — garante que o sistema consegue ler antes de processar
     const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
-    const tiposAceitos = ['xlsx', 'xls', 'csv', 'pdf']
+    const tiposAceitos = ['xlsx', 'xls', 'csv']
     if (!tiposAceitos.includes(ext)) {
       setMsgErroUpload(
-        `Formato ".${ext || 'desconhecido'}" não é suportado pelo sistema. ` +
-        `Envie um arquivo .xlsx, .xls, .csv ou .pdf. ` +
+        `Formato ".${ext || 'desconhecido'}" não é suportado. ` +
+        `Envie uma planilha .xlsx, .xls ou .csv. ` +
+        `PDF não é aceito pois o sistema pode interpretar números de página e totais como lançamentos. ` +
         `Clique em "Baixar exemplo .xlsx" para ver um modelo compatível.`
       )
       setFase('idle')
@@ -699,7 +701,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       })
     }
 
-    const final = Array.from(classificadas)
+    // Ordena: sugestões da IA primeiro (precisam de revisão), depois erros, depois ok
+    const final = Array.from(classificadas).sort((a, b) => {
+      if (a.sugerida && !b.sugerida) return -1
+      if (!a.sugerida && b.sugerida) return 1
+      return 0
+    })
     setLinhasClass(final)
     // Pré-seleciona só os classificados com sucesso; erros ficam desmarcados
     setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok')))
@@ -708,6 +715,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   }, [])
 
   const salvarTudo = async () => {
+    const temSugeridas = linhasClass.some(l => l.sugerida)
+    if (temSugeridas) {
+      setShowSugeridaModal(true)
+      return
+    }
+    setSelecionados(new Set(linhasClass.map((_, i) => i)))
+    await salvarComIndices(new Set(linhasClass.map((_, i) => i)))
+  }
+
+  const confirmarSalvarTudo = async () => {
+    setShowSugeridaModal(false)
     setSelecionados(new Set(linhasClass.map((_, i) => i)))
     await salvarComIndices(new Set(linhasClass.map((_, i) => i)))
   }
@@ -761,7 +779,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         <div>
           <h2>Importar Extrato / Planilha</h2>
           <p className={styles.sectionSubtitle}>
-            Envie um extrato de banco (PDF ou Excel) ou planilha CSV — a IA classifica cada lançamento automaticamente.
+            Envie uma planilha Excel (.xlsx/.xls) ou CSV — a IA classifica cada lançamento automaticamente.
           </p>
         </div>
         <a href="/exemplos/exemplo.xlsx" download className={styles.downloadBtn}>
@@ -782,7 +800,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             <input
               ref={fileRef}
               type="file"
-              accept=".xlsx,.xls,.csv,.pdf"
+              accept=".xlsx,.xls,.csv"
               style={{ display: 'none' }}
               onChange={onFileChange}
             />
@@ -807,7 +825,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     ? `Enviar outro arquivo (atual: ${arquivo})`
                     : 'Arraste o arquivo aqui ou clique para selecionar'}
                 </p>
-                <p className={styles.dropHint}>Aceita .xlsx, .xls, .csv e .pdf</p>
+                <p className={styles.dropHint}>Aceita .xlsx, .xls e .csv</p>
               </>
             )}
           </div>
@@ -982,6 +1000,38 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 title="Envia todos os lançamentos do arquivo de uma vez"
               >
                 {fase === 'salvando' ? 'Salvando…' : `Lançar Tudo (${linhasClass.length}) →`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: classificações sugeridas ────────────────────────────────── */}
+      {showSugeridaModal && (
+        <div className={styles.modalOverlaySugerida} onClick={() => setShowSugeridaModal(false)}>
+          <div className={styles.modalSugerida} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalSugeridaIcon}>⚠️</div>
+            <h3 className={styles.modalSugeridaTitulo}>Classificações com sugestão da IA</h3>
+            <p className={styles.modalSugeridaTexto}>
+              {linhasClass.filter(l => l.sugerida).length} lançamento(s) foram classificados com categorias{' '}
+              <strong>sugeridas pela IA</strong> que podem não estar cadastradas no sistema.
+              Recomendamos revisar antes de importar.
+            </p>
+            <p className={styles.modalSugeridaTexto}>
+              Deseja lançar tudo mesmo assim?
+            </p>
+            <div className={styles.modalSugeridaBtns}>
+              <button
+                className={styles.btnSecondary}
+                onClick={() => setShowSugeridaModal(false)}
+              >
+                ← Voltar e revisar
+              </button>
+              <button
+                className={styles.btnPrimary}
+                onClick={confirmarSalvarTudo}
+              >
+                Lançar tudo assim mesmo →
               </button>
             </div>
           </div>
