@@ -445,11 +445,59 @@
   border: 1px solid #333;
   border-radius: 12px;
   padding: 32px;
-  max-width: 460px;
+  max-width: 560px;
   width: calc(100% - 32px);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.modalNaoClassList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  background: #0d0d0d;
+}
+
+.modalNaoClassList li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid #1e1e1e;
+  font-size: 12px;
+}
+
+.modalNaoClassList li:last-child { border-bottom: none; }
+
+.modalNaoClassData {
+  color: #666;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.modalNaoClassDesc {
+  color: #bbb;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modalNaoClassValor {
+  color: #4ade80;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .modalSugeridaIcon {
