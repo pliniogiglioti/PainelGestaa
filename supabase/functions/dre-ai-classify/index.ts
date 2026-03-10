@@ -163,42 +163,45 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(tarifa.*venda|tarifa.*credito|tarifa.*debito|tarifa.*adquir|getnet.*tarifa|getnet.*cobranca|cobranca.*getnet|adquirencia.*tarifa|taxa cartao|tarifa cartao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Meios de Pagamento - Padrão', grupo: 'Deduções de Receita' },
   { pattern: /(cancelamento|devolucao|estorno)/i, tipo: 'despesa', classificacao: 'Vendas Canceladas / Devoluções', grupo: 'Deduções de Receita' },
   // ── Despesas bancárias — ANTES dos padrões amplos de pix/transferencia para evitar falso match ──
-  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
+  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|tx manut|taxa manutencao|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia|cip liquidacao|compensacao cip|ted cobranca|doc cobranca)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
   // ── Receitas ──
-  { pattern: /(getnet|cielo|rede\b|stone\b|pagseguro|sumup|pagbank|mercadopago|visa.*credito|master.*credito|elo.*credito|amex.*credito|credito.*adquir)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
+  { pattern: /(getnet|cielo|rede\b|stone\b|pagseguro|sumup|pagbank|mercadopago|visa.*credito|master.*credito|elo.*credito|amex.*credito|credito.*adquir|subadquir|adquirente)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
   { pattern: /(cartao|card)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
-  { pattern: /(transferencia pix rem|pix.*receb|receb.*pix|pix.*entr)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
+  { pattern: /(transferencia pix rem|pix.*receb|receb.*pix|pix.*entr|cred pix|credito pix|pix cred)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
+  { pattern: /(ted receb|doc receb|ted entr|doc entr|cred ted|cred doc)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
   { pattern: /(pix|transferencia)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
-  { pattern: /(rendimento|aplicacao|investimento financeiro)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
+  { pattern: /(rendimento|aplicacao|invest facil|invest auto|cdb|lci|lca)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
   { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   // ── Impostos ──
-  { pattern: /(simples nacional|lucro presumido|imposto|iss|icms|pis|cofins|irpj|tributo|das )/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional', grupo: 'Impostos sobre Faturamento' },
+  { pattern: /(simples nacional|lucro presumido|das\b|darf\b|imposto|iss|icms|pis|cofins|irpj|tributo|guia recolhimento)/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional', grupo: 'Impostos sobre Faturamento' },
   // ── Despesas Operacionais ──
   { pattern: /(laboratorio|\blab\b|tecnico dental|dental.*lab|pag.*\blab\b|laborat)/i, tipo: 'despesa', classificacao: 'Serviços Técnicos para Laboratórios', grupo: 'Despesas Operacionais' },
   { pattern: /(material|insumo|implante|componente)/i, tipo: 'despesa', classificacao: 'Custo de Materiais e Insumos', grupo: 'Despesas Operacionais' },
   { pattern: /(dentista|terceiro pf|prestador|autonomo)/i, tipo: 'despesa', classificacao: 'Serviços Terceiros PF (dentistas)', grupo: 'Despesas Operacionais' },
   { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties e Assistência Técnica', grupo: 'Despesas Operacionais' },
+  { pattern: /(comissao\b|gratificacao\b|bonus func)/i, tipo: 'despesa', classificacao: 'OP Gratificações', grupo: 'Despesas Operacionais' },
   // ── Marketing ──
   { pattern: /(marketing|midia|anuncio|google ads|meta ads|instagram|facebook ads)/i, tipo: 'despesa', classificacao: 'Marketing Digital', grupo: 'Despesas Comerciais e Marketing' },
   { pattern: /(agencia|assessoria)/i, tipo: 'despesa', classificacao: 'Agência e Assessoria', grupo: 'Despesas Comerciais e Marketing' },
   // ── Pessoal ──
   { pattern: /(pro.?labore)/i, tipo: 'despesa', classificacao: 'Pró-labore', grupo: 'Despesas com Pessoal' },
-  { pattern: /(salario|ordenado|folha de pagamento)/i, tipo: 'despesa', classificacao: 'Salários e Ordenados', grupo: 'Despesas com Pessoal' },
+  { pattern: /(cred salario|dep salario|deposito salario|credito salario|pagto salario|pgto salario|folha de pagamento|salario|ordenado)/i, tipo: 'despesa', classificacao: 'Salários e Ordenados', grupo: 'Despesas com Pessoal' },
   { pattern: /(13.? salario|decimo terceiro)/i, tipo: 'despesa', classificacao: '13° Salário', grupo: 'Despesas com Pessoal' },
-  { pattern: /(rescisao|aviso previo|demissao)/i, tipo: 'despesa', classificacao: 'Rescisões', grupo: 'Despesas com Pessoal' },
-  { pattern: /\binss\b/i, tipo: 'despesa', classificacao: 'INSS', grupo: 'Despesas com Pessoal' },
+  { pattern: /(rescisao|aviso previo|demissao|verbas rescisoria)/i, tipo: 'despesa', classificacao: 'Rescisões', grupo: 'Despesas com Pessoal' },
+  { pattern: /(\binss\b|gps\b|pagto gps|pgto gps)/i, tipo: 'despesa', classificacao: 'INSS', grupo: 'Despesas com Pessoal' },
   { pattern: /\bfgts\b/i, tipo: 'despesa', classificacao: 'FGTS', grupo: 'Despesas com Pessoal' },
-  { pattern: /(vale transporte|vt\b)/i, tipo: 'despesa', classificacao: 'Vale Transporte', grupo: 'Despesas com Pessoal' },
-  { pattern: /(vale refeicao|vale alimentacao|vr\b|va\b)/i, tipo: 'despesa', classificacao: 'Vale Refeição', grupo: 'Despesas com Pessoal' },
-  { pattern: /(combustivel|gasolina|etanol|abastecimento)/i, tipo: 'despesa', classificacao: 'Combustível', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale transporte|vt\b|beneficio transporte)/i, tipo: 'despesa', classificacao: 'Vale Transporte', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale refeicao|vale alimentacao|vr\b|va\b|ticket refeicao|alelo|sodexo|flash beneficio)/i, tipo: 'despesa', classificacao: 'Vale Refeição', grupo: 'Despesas com Pessoal' },
+  { pattern: /(combustivel|gasolina|etanol|abastecimento|posto )/i, tipo: 'despesa', classificacao: 'Combustível', grupo: 'Despesas com Pessoal' },
+  { pattern: /(plano saude|plano odonto|convenio medico|unimed|amil|hapvida)/i, tipo: 'despesa', classificacao: 'Outras Despesas Com Funcionários', grupo: 'Despesas com Pessoal' },
   // ── Administrativas ──
   { pattern: /(aluguel|locacao|condominio)/i, tipo: 'despesa', classificacao: 'Aluguel', grupo: 'Despesas Administrativas' },
-  { pattern: /(energia|luz\b|eletricidade)/i, tipo: 'despesa', classificacao: 'Energia Elétrica', grupo: 'Despesas Administrativas' },
-  { pattern: /(agua\b|esgoto|sabesp|saneamento)/i, tipo: 'despesa', classificacao: 'Água e Esgoto', grupo: 'Despesas Administrativas' },
-  { pattern: /(telefone|telefonia|celular|plano|vivo|claro|tim|oi\b)/i, tipo: 'despesa', classificacao: 'Telefonia', grupo: 'Despesas Administrativas' },
-  { pattern: /(internet\b|banda larga|fibra)/i, tipo: 'despesa', classificacao: 'Internet', grupo: 'Despesas com TI' },
-  { pattern: /(software|sistema|licenca|saas|assinatura)/i, tipo: 'despesa', classificacao: 'Sistema de Gestão', grupo: 'Despesas com TI' },
-  { pattern: /(hospedagem|servidor|cloud|aws|gcp|azure)/i, tipo: 'despesa', classificacao: 'Hospedagem de Dados', grupo: 'Despesas com TI' },
+  { pattern: /(energia|luz\b|eletricidade|enel\b|cemig\b|copel\b|elektro\b|cpfl\b|coelba\b|energisa\b)/i, tipo: 'despesa', classificacao: 'Energia Elétrica', grupo: 'Despesas Administrativas' },
+  { pattern: /(agua\b|esgoto|sabesp\b|saneamento|caesb\b|sanepar\b|cedae\b|cosanpa\b|copasa\b)/i, tipo: 'despesa', classificacao: 'Água e Esgoto', grupo: 'Despesas Administrativas' },
+  { pattern: /(telefone|telefonia|celular|plano|vivo\b|claro\b|tim\b|oi\b|nextel|algar)/i, tipo: 'despesa', classificacao: 'Telefonia', grupo: 'Despesas Administrativas' },
+  { pattern: /(internet\b|banda larga|fibra|net combo)/i, tipo: 'despesa', classificacao: 'Internet', grupo: 'Despesas com TI' },
+  { pattern: /(software|sistema|licenca|saas|assinatura|clinicorp|dental office|wevio|totvs|sankhya)/i, tipo: 'despesa', classificacao: 'Sistema de Gestão', grupo: 'Despesas com TI' },
+  { pattern: /(hospedagem|servidor|cloud|aws\b|gcp\b|azure\b|digitalocean)/i, tipo: 'despesa', classificacao: 'Hospedagem de Dados', grupo: 'Despesas com TI' },
   { pattern: /(computador|notebook|impressora|periferico|hardware)/i, tipo: 'despesa', classificacao: 'Investimento - Computadores e Periféricos', grupo: 'Investimentos' },
   { pattern: /(maquina|equipamento|autoclave|cadeira odonto)/i, tipo: 'despesa', classificacao: 'Investimento - Máquinas e Equipamentos', grupo: 'Investimentos' },
   { pattern: /(movel|mobilia|mesa|cadeira\b)/i, tipo: 'despesa', classificacao: 'Investimento - Móveis e Utensílios', grupo: 'Investimentos' },
@@ -217,11 +220,14 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(consultoria\b)/i, tipo: 'despesa', classificacao: 'Consultoria', grupo: 'Despesas Administrativas' },
   { pattern: /(refeicao|almoco|lanche|restaurante)/i, tipo: 'despesa', classificacao: 'Refeições e Lanches', grupo: 'Despesas Comerciais e Marketing' },
   { pattern: /(viagem|estadia|hotel|passagem)/i, tipo: 'despesa', classificacao: 'Viagens e Estadias', grupo: 'Despesas Administrativas' },
-  { pattern: /(uber\b|taxi|99\b|ifood)/i, tipo: 'despesa', classificacao: 'Uber e Táxi', grupo: 'Despesas Administrativas' },
-  { pattern: /(material escritorio|papel|caneta|toner)/i, tipo: 'despesa', classificacao: 'Material de Escritório', grupo: 'Despesas Administrativas' },
+  { pattern: /(uber\b|taxi|99\b|ifood|cabify)/i, tipo: 'despesa', classificacao: 'Uber e Táxi', grupo: 'Despesas Administrativas' },
+  { pattern: /(material escritorio|papel|caneta|toner|cartucho)/i, tipo: 'despesa', classificacao: 'Material de Escritório', grupo: 'Despesas Administrativas' },
   { pattern: /(uniforme|epj|epi\b)/i, tipo: 'despesa', classificacao: 'Uniformes', grupo: 'Despesas Administrativas' },
   { pattern: /(estacionamento|parking)/i, tipo: 'despesa', classificacao: 'Estacionamento', grupo: 'Despesas Administrativas' },
   { pattern: /(limpeza\b|desinfetante|produto limpeza)/i, tipo: 'despesa', classificacao: 'Material de Limpeza', grupo: 'Despesas Administrativas' },
+  { pattern: /(motoboy|loggi\b|entregador|motofrete)/i, tipo: 'despesa', classificacao: 'Serviço de Motoboy', grupo: 'Despesas Administrativas' },
+  { pattern: /(taxa\b|tarifa\b|emolumento)/i, tipo: 'despesa', classificacao: 'Taxas e Emolumentos', grupo: 'Despesas Administrativas' },
+  { pattern: /(exame.*admiss|exame.*demiss|exame.*periodi|medicina.*trabalho)/i, tipo: 'despesa', classificacao: 'Exames Ocupacionais', grupo: 'Despesas Administrativas' },
 ]
 
 const pickFallback = (
@@ -334,9 +340,27 @@ despesa→ Deduções de Receita | Impostos sobre Faturamento | Despesas Operaci
     .map((l, i) => `${i + 1}. "${l.descricao}" | ${l.tipo}`)
     .join('\n')
 
+  const EXEMPLOS = `EXEMPLOS (use os nomes EXATOS abaixo):
+- "PAGTO BOLETO VIVO"         → despesa | Telefonia | Despesas Administrativas
+- "DAS SIMPLES NACIONAL"      → despesa | Impostos sobre Receitas - Presumido e Simples Nacional | Impostos sobre Faturamento
+- "PAGTO FGTS"                → despesa | FGTS | Despesas com Pessoal
+- "GPS INSS"                  → despesa | INSS | Despesas com Pessoal
+- "FOLHA SALARIOS"            → despesa | Salários e Ordenados | Despesas com Pessoal
+- "PRO LABORE SOCIO"          → despesa | Pró-labore | Despesas com Pessoal
+- "GETNET CREDITO"            → receita | Receita Cartão | Receitas Operacionais
+- "PIX RECEBIDO PACIENTE"     → receita | Receita PIX / Transferências | Receitas Operacionais
+- "NF LABORATORIO DENTAL"     → despesa | Serviços Técnicos para Laboratórios | Despesas Operacionais
+- "ENERGIA ENEL FATURA"       → despesa | Energia Elétrica | Despesas Administrativas
+- "ALUGUEL IMOVEL COMERCIAL"  → despesa | Aluguel | Despesas Administrativas
+- "IOF BANCO"                 → despesa | IOF | Despesas Administrativas
+- "TARIFA MANUT CONTA"        → despesa | Despesas Bancárias | Despesas Financeiras
+- "BOLETO CONTABILIDADE"      → despesa | Contabilidade | Despesas Administrativas`
+
   const prompt = `Assistente contábil DRE Brasil. Classifique cada lançamento.
 
 GRUPOS: ${GRUPOS_COMPACTOS}
+
+${EXEMPLOS}
 
 LANÇAMENTOS:
 ${itensTexto}
