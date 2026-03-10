@@ -171,6 +171,9 @@ type Lancamento = {
 const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+// Máximo de linhas na tabela do prompt — evita prompts gigantes com centenas de classificações
+const MAX_TABELA_ROWS = 50
+
 /** Agrega lançamentos por grupo+classificação para reduzir tokens no prompt */
 function agregarLancamentos(lancamentos: Lancamento[]): Array<{
   grupo: string; classificacao: string; tipo: 'receita' | 'despesa'
@@ -187,10 +190,41 @@ function agregarLancamentos(lancamentos: Lancamento[]): Array<{
       mapa.set(key, { grupo: l.grupo, classificacao: l.classificacao, tipo: l.tipo, total: Number(l.valor), qtd: 1 })
     }
   }
-  return [...mapa.values()].sort((a, b) => {
+
+  const sorted = [...mapa.values()].sort((a, b) => {
     if (a.tipo !== b.tipo) return a.tipo === 'receita' ? -1 : 1
     return b.total - a.total
   })
+
+  // Limita a MAX_TABELA_ROWS linhas; o excedente é consolidado em linhas "Outros"
+  if (sorted.length <= MAX_TABELA_ROWS) return sorted
+
+  const top = sorted.slice(0, MAX_TABELA_ROWS)
+  const rest = sorted.slice(MAX_TABELA_ROWS)
+
+  const outrosReceita = rest.filter(r => r.tipo === 'receita')
+  const outrosDespesa = rest.filter(r => r.tipo === 'despesa')
+
+  if (outrosReceita.length > 0) {
+    top.push({
+      grupo: 'Outros',
+      classificacao: `(${outrosReceita.length} classificações menores agrupadas)`,
+      tipo: 'receita',
+      total: outrosReceita.reduce((s, r) => s + r.total, 0),
+      qtd:   outrosReceita.reduce((s, r) => s + r.qtd,   0),
+    })
+  }
+  if (outrosDespesa.length > 0) {
+    top.push({
+      grupo: 'Outros',
+      classificacao: `(${outrosDespesa.length} classificações menores agrupadas)`,
+      tipo: 'despesa',
+      total: outrosDespesa.reduce((s, r) => s + r.total, 0),
+      qtd:   outrosDespesa.reduce((s, r) => s + r.qtd,   0),
+    })
+  }
+
+  return top
 }
 
 const buildPrompt = (lancamentos: Lancamento[], resumo: { receitas: number; despesas: number }) => {
@@ -309,7 +343,8 @@ serve(async (req: Request) => {
 
   const callGroq = async (modelToUse: string): Promise<Response> => {
     const controller = new AbortController()
-    const timeout    = setTimeout(() => controller.abort(), 30000)
+    // 55 s — deixa margem para o overhead da Edge Function dentro do limite de 60 s do Supabase
+    const timeout    = setTimeout(() => controller.abort(), 55000)
     try {
       return await fetch(GROQ_API_URL, {
         method: 'POST',
@@ -336,6 +371,15 @@ serve(async (req: Request) => {
     // Fallback to default model if the configured one is unavailable
     if (!groqRes.ok) {
       const errText = await groqRes.text()
+
+      // Rate limit — orienta o usuário a tentar novamente em vez de erro genérico
+      if (groqRes.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Limite de requisições da IA atingido. Aguarde alguns segundos e tente novamente.' }),
+          { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        )
+      }
+
       if (modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)) {
         groqRes = await callGroq(DEFAULT_MODEL)
       } else {
@@ -348,6 +392,12 @@ serve(async (req: Request) => {
 
     if (!groqRes.ok) {
       const errText = await groqRes.text()
+      if (groqRes.status === 429) {
+        return new Response(
+          JSON.stringify({ error: 'Limite de requisições da IA atingido. Aguarde alguns segundos e tente novamente.' }),
+          { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
+        )
+      }
       return new Response(
         JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }),
         { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
@@ -369,7 +419,10 @@ serve(async (req: Request) => {
       headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const isTimeout = err instanceof Error && (err.name === 'AbortError' || /abort/i.test(err.message))
+    const msg = isTimeout
+      ? 'A IA demorou muito para responder. Tente novamente em alguns instantes.'
+      : (err instanceof Error ? err.message : String(err))
     return new Response(
       JSON.stringify({ error: `Erro ao chamar a IA: ${msg}` }),
       { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
