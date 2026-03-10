@@ -405,11 +405,19 @@ serve(async (req: Request) => {
     }
 
     const groqData = await groqRes.json()
-    const analysis = String(groqData?.choices?.[0]?.message?.content ?? '').trim()
+    const choice   = groqData?.choices?.[0]
+    // Alguns modelos de raciocínio (ex: deepseek-r1) retornam o texto em
+    // `reasoning_content` com `content` vazio — usamos o que estiver disponível.
+    const analysis = String(
+      choice?.message?.content || choice?.message?.reasoning_content || ''
+    ).trim()
 
     if (!analysis) {
+      const finishReason = choice?.finish_reason ?? 'desconhecido'
       return new Response(
-        JSON.stringify({ error: 'IA não retornou conteúdo.' }),
+        JSON.stringify({
+          error: `IA não retornou conteúdo (finish_reason: ${finishReason}). O modelo configurado pode ser incompatível. Tente alterar o modelo nas configurações.`,
+        }),
         { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       )
     }
