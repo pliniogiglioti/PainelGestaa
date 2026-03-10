@@ -272,7 +272,7 @@
   border-radius: 10px;
   border: none;
   background: transparent;
-  color: #505050;
+  color: var(--text-dim);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -334,7 +334,7 @@
   border-radius: 10px;
   border: none;
   background: transparent;
-  color: #444;
+  color: var(--text-dim);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -707,9 +707,7 @@
 
 .netflixCard:hover {
   transform: translateY(-10px);
-  box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.7),
-    0 0 24px rgba(201, 162, 42, 0.08);
+  box-shadow: var(--shadow-card-hover);
   z-index: 10;
 }
 
@@ -951,12 +949,12 @@
 }
 
 .forumAuthor strong {
-  color: #888;
+  color: var(--text-muted);
 }
 
 .forumDate {
   font-size: 12px;
-  color: #383838;
+  color: var(--text-dim);
 }
 
 .forumTopicStats {
@@ -1056,7 +1054,7 @@
 .modalLabel {
   font-size: 12px;
   font-weight: 500;
-  color: #666;
+  color: var(--text-muted);
 }
 
 .modalInput {

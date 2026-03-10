@@ -2,7 +2,8 @@
 
 .page {
   min-height: 100vh;
-  background: #080808;
+  background: var(--bg);
+  color: var(--text);
   padding: 40px 32px 60px;
   display: flex;
   flex-direction: column;
@@ -14,14 +15,14 @@
   align-items: center;
   justify-content: center;
   height: 100vh;
-  background: #080808;
+  background: var(--bg);
 }
 
 .spinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #1e1e1e;
-  border-top-color: #c9a22a;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -40,7 +41,7 @@
   align-self: flex-start;
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
   padding: 0;
@@ -48,18 +49,18 @@
   margin-bottom: 8px;
 }
 
-.btnVoltar:hover { color: #c9a22a; }
+.btnVoltar:hover { color: var(--gold); }
 
 .titulo {
   font-size: clamp(22px, 3vw, 32px);
   font-weight: 700;
-  color: #fff;
+  color: var(--text);
   margin: 0;
 }
 
 .subtitulo {
   font-size: 14px;
-  color: #666;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -78,7 +79,8 @@
   width: 185px;
   height: 275px;
   border-radius: 12px;
-  background-color: #1a1a1a;
+  background-color: var(--bg-elevated);
+  border: 1px solid var(--border);
   position: relative;
   overflow: hidden;
   cursor: pointer;
@@ -90,9 +92,7 @@
 
 .card:hover {
   transform: translateY(-10px);
-  box-shadow:
-    0 20px 48px rgba(0, 0, 0, 0.7),
-    0 0 24px rgba(201, 162, 42, 0.08);
+  box-shadow: var(--shadow-card-hover);
   z-index: 10;
 }
 
@@ -140,7 +140,7 @@
 .cardLabel {
   font-size: 10px;
   font-weight: 600;
-  color: #c9a22a;
+  color: var(--gold);
   text-transform: uppercase;
   letter-spacing: 0.8px;
 }
@@ -167,7 +167,7 @@
 
 .cardCnpj {
   font-size: 10px;
-  color: #555;
+  color: var(--text-muted);
   margin: 0;
 }
 
@@ -193,7 +193,7 @@
   margin-top: 8px;
   width: 100%;
   padding: 7px 0;
-  background: #c9a22a;
+  background: var(--gold);
   color: #000;
   border: none;
   border-radius: 6px;
@@ -203,13 +203,13 @@
   transition: background 0.2s;
 }
 
-.btnSelecionar:hover { background: #d5af45; }
+.btnSelecionar:hover { background: var(--gold-light); }
 
 /* ── Card "Criar empresa" ─────────────────────────────────────────────────── */
 
 .cardNova {
-  background: #111;
-  border: 2px dashed #2a2a2a;
+  background: var(--bg-surface);
+  border: 2px dashed var(--border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -220,7 +220,7 @@
 }
 
 .cardNova:hover {
-  border-color: #c9a22a;
+  border-color: var(--gold);
 }
 
 .cardNova .cardContent {
@@ -235,7 +235,7 @@
 .iconPlus {
   font-size: 48px;
   font-weight: 200;
-  color: #c9a22a;
+  color: var(--gold);
   line-height: 1;
   transition: transform 0.2s;
 }
@@ -247,7 +247,7 @@
 .cardLabelNova {
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.6px;
   margin: 0;
@@ -258,7 +258,7 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0,0,0,0.75);
+  background: rgba(0,0,0,0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,8 +267,8 @@
 }
 
 .modal {
-  background: #141414;
-  border: 1px solid #2a2a2a;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 32px;
   width: 100%;
@@ -276,6 +276,7 @@
   display: flex;
   flex-direction: column;
   gap: 24px;
+  box-shadow: var(--shadow-modal);
   animation: modalIn 0.22s ease;
 }
 
@@ -287,7 +288,7 @@
 .modalTitulo {
   font-size: 20px;
   font-weight: 700;
-  color: #fff;
+  color: var(--text);
   margin: 0;
 }
 
@@ -303,7 +304,7 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #888;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -311,23 +312,23 @@
 .opcional {
   font-weight: 400;
   text-transform: none;
-  color: #555;
+  color: var(--text-dim);
   letter-spacing: 0;
 }
 
 .input {
-  background: #0d0d0d;
-  border: 1px solid #2a2a2a;
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
-  color: #fff;
+  color: var(--text);
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s;
 }
 
-.input:focus { border-color: #c9a22a; }
-.input::placeholder { color: #444; }
+.input:focus { border-color: var(--gold); }
+.input::placeholder { color: var(--text-dim); }
 
 .erro {
   color: #e06060;
@@ -344,19 +345,19 @@
 
 .btnCancelar {
   background: none;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 9px 20px;
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
   transition: border-color 0.2s, color 0.2s;
 }
 
-.btnCancelar:hover { border-color: #444; color: #ccc; }
+.btnCancelar:hover { border-color: var(--text-dim); color: var(--text); }
 
 .btnCriar {
-  background: #c9a22a;
+  background: var(--gold);
   border: none;
   border-radius: 8px;
   padding: 9px 22px;
@@ -367,5 +368,5 @@
   transition: background 0.2s;
 }
 
-.btnCriar:hover:not(:disabled) { background: #d5af45; }
+.btnCriar:hover:not(:disabled) { background: var(--gold-light); }
 .btnCriar:disabled, .btnCancelar:disabled { opacity: 0.5; cursor: not-allowed; }

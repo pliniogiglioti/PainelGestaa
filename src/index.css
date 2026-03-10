@@ -9,13 +9,19 @@
   --border-gold: #c9a22a44;
 
   --gold:        #c9a22a;
-  --gold-light:  #e8c84e;
+  --gold-light:  #d5af45;
   --gold-dark:   #8b6914;
   --gold-glow:   #c9a22a33;
 
   --text:        #e8e8e8;
-  --text-muted:  #555;
-  --text-dim:    #333;
+  --text-muted:  #888;
+  --text-dim:    #555;
+
+  --shadow-card-hover: 0 20px 48px rgba(0,0,0,0.65), 0 0 24px rgba(201,162,42,0.10);
+  --shadow-dropdown:   0 8px 24px rgba(0,0,0,0.50);
+  --shadow-modal:      0 24px 64px rgba(0,0,0,0.60);
+
+  --bg-page-gradient:  radial-gradient(circle at 20% -10%, #2a210e 0%, #0a0a0a 45%), #050505;
 
   --radius:      12px;
   --radius-sm:   8px;
@@ -35,6 +41,12 @@ html[data-theme="light"] {
   --text:        #18181b;
   --text-muted:  #71717a;
   --text-dim:    #a1a1aa;
+
+  --shadow-card-hover: 0 8px 32px rgba(0,0,0,0.12), 0 0 16px rgba(201,162,42,0.18);
+  --shadow-dropdown:   0 8px 24px rgba(0,0,0,0.10);
+  --shadow-modal:      0 8px 40px rgba(0,0,0,0.15);
+
+  --bg-page-gradient:  var(--bg);
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
@@ -59,5 +71,5 @@ body {
 /* ── Scrollbar global ────────────────────────────────────────────────────── */
 ::-webkit-scrollbar        { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track  { background: var(--bg); }
-::-webkit-scrollbar-thumb  { background: #222; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #333; }
+::-webkit-scrollbar-thumb  { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-dim); }
