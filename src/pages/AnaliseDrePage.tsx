@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
@@ -874,6 +874,28 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const kpiTone = (v: number): 'positive' | 'negative' | 'neutral' =>
     v > 0 ? 'positive' : v < 0 ? 'negative' : 'neutral'
 
+  // ── Helpers para colunas mensais no accordion ─────────────────────────────
+  const getMesGrupoTotal = (nomeGrupo: string, mesData: MesComparativoData): number =>
+    mesData.agrupados.find(g => g.nome === nomeGrupo)?.total ?? 0
+
+  const getMesClfTotal = (nomeGrupo: string, nomeClt: string, mesData: MesComparativoData): number =>
+    mesData.agrupados
+      .find(g => g.nome === nomeGrupo)
+      ?.classificacoes.find(c => c.nome === nomeClt)?.total ?? 0
+
+  const getMesTotalizadorValor = (label: string, mesData: MesComparativoData): number => {
+    const k = mesData.kpis
+    switch (label) {
+      case 'RECEITAS OPERACIONAIS': return k.receitaOperacional
+      case 'RECEITA LÍQUIDA': return k.receitaLiquida
+      case 'MARGEM DE CONTRIBUIÇÃO': return k.margemContrib
+      case 'EBITDA': return k.ebitda
+      case 'EBIT': return k.ebit
+      case 'NOPAT (RESULTADO OPERACIONAL)': return k.nopat
+      default: return 0
+    }
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
@@ -960,166 +982,6 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
 
       {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentosFiltrados} />
-
-      {/* ── DRE Comparativo por Mês ── */}
-      {dreComparativoPorMes.length > 0 && (
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <h2>DRE Comparativo</h2>
-              <span className={styles.stepIndicator}>
-                {dreComparativoPorMes.map(m => m.label).join(' · ')}
-              </span>
-            </div>
-          </div>
-          <div className={styles.dreComparativoWrapper}>
-            <table className={styles.dreComparativoTable}>
-              <thead>
-                <tr className={styles.dreComparativoHead}>
-                  <th className={styles.dreComparativoNomeCol}>Grupo / Linha</th>
-                  {dreComparativoPorMes.map(m => (
-                    <>
-                      <th key={`${m.mes}-val`} className={styles.dreComparativoValCol}>{m.label} R$</th>
-                      <th key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{m.label} %</th>
-                    </>
-                  ))}
-                  {dreComparativoPorMes.length > 1 && (
-                    <>
-                      <th className={styles.dreComparativoValCol}>Total R$</th>
-                      <th className={styles.dreComparativoPctCol}>Total %</th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {(() => {
-                  const rows: ReactNode[] = []
-                  const usedGrupos = new Set<string>()
-
-                  const getGrupoTotal = (mesData: MesComparativoData, nomeGrupo: string) =>
-                    mesData.agrupados.find(g => g.nome.toLowerCase().trim() === nomeGrupo.toLowerCase().trim())?.total ?? 0
-
-                  const getKpiVal = (mesData: MesComparativoData, label: string): number => {
-                    const k = mesData.kpis
-                    switch (label) {
-                      case 'RECEITAS OPERACIONAIS': return k.receitaOperacional
-                      case 'RECEITA LÍQUIDA': return k.receitaLiquida
-                      case 'MARGEM DE CONTRIBUIÇÃO': return k.margemContrib
-                      case 'EBITDA': return k.ebitda
-                      case 'EBIT': return k.ebit
-                      case 'NOPAT (RESULTADO OPERACIONAL)': return k.nopat
-                      default: return 0
-                    }
-                  }
-
-                  const renderGrupoRow = (nomeGrupo: string) => {
-                    const totaisMes = dreComparativoPorMes.map(m => getGrupoTotal(m, nomeGrupo))
-                    if (totaisMes.every(v => v === 0)) return
-                    usedGrupos.add(nomeGrupo.toLowerCase().trim())
-                    const totalGeral = totaisMes.reduce((s, v) => s + v, 0)
-                    const tipo = dreComparativoPorMes
-                      .flatMap(m => m.agrupados)
-                      .find(g => g.nome.toLowerCase().trim() === nomeGrupo.toLowerCase().trim())?.tipo ?? 'despesa'
-
-                    rows.push(
-                      <tr key={`grupo-${nomeGrupo}`} className={`${styles.dreComparativoGrupoRow} ${tipo === 'receita' ? styles.dreComparativoReceita : styles.dreComparativoDespesa}`}>
-                        <td className={styles.dreComparativoNomeCol}>
-                          <span className={styles.dreComparativoBadge}>{tipo === 'receita' ? '↑' : '↓'}</span>
-                          {nomeGrupo}
-                        </td>
-                        {dreComparativoPorMes.map(m => {
-                          const val = getGrupoTotal(m, nomeGrupo)
-                          const base = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 1
-                          return (
-                            <>
-                              <td key={`${m.mes}-val`} className={`${styles.dreComparativoValCol} ${tipo === 'receita' ? styles.dreComparativoTextReceita : styles.dreComparativoTextDespesa}`}>{moeda(val)}</td>
-                              <td key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{((val / base) * 100).toFixed(1)}%</td>
-                            </>
-                          )
-                        })}
-                        {dreComparativoPorMes.length > 1 && (() => {
-                          const totalBase = dreComparativoPorMes.reduce((s, m) => s + (m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 0), 0) || 1
-                          return (
-                            <>
-                              <td className={`${styles.dreComparativoValCol} ${tipo === 'receita' ? styles.dreComparativoTextReceita : styles.dreComparativoTextDespesa}`}>{moeda(totalGeral)}</td>
-                              <td className={styles.dreComparativoPctCol}>{((totalGeral / totalBase) * 100).toFixed(1)}%</td>
-                            </>
-                          )
-                        })()}
-                      </tr>
-                    )
-                  }
-
-                  const renderTotalizadorRow = (label: string, comPct = false) => {
-                    const totaisMes = dreComparativoPorMes.map(m => getKpiVal(m, label))
-                    const totalGeral = totaisMes.reduce((s, v) => s + v, 0)
-                    rows.push(
-                      <tr key={`tot-${label}`} className={`${styles.dreComparativoTotalizador} ${totalGeral >= 0 ? styles.dreComparativoTotalizadorPos : styles.dreComparativoTotalizadorNeg}`}>
-                        <td className={styles.dreComparativoNomeCol}>{label}</td>
-                        {dreComparativoPorMes.map(m => {
-                          const val = getKpiVal(m, label)
-                          const base = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 1
-                          return (
-                            <>
-                              <td key={`${m.mes}-val`} className={styles.dreComparativoValCol}>{moeda(val)}</td>
-                              <td key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{comPct ? `${((val / base) * 100).toFixed(1)}%` : ''}</td>
-                            </>
-                          )
-                        })}
-                        {dreComparativoPorMes.length > 1 && (() => {
-                          const totalBase = dreComparativoPorMes.reduce((s, m) => s + (m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 0), 0) || 1
-                          return (
-                            <>
-                              <td className={styles.dreComparativoValCol}>{moeda(totalGeral)}</td>
-                              <td className={styles.dreComparativoPctCol}>{comPct ? `${((totalGeral / totalBase) * 100).toFixed(1)}%` : ''}</td>
-                            </>
-                          )
-                        })()}
-                      </tr>
-                    )
-                  }
-
-                  // Renderiza grupos de receita (exceto Receitas Financeiras)
-                  const allGruposReceita = [...new Set<string>(
-                    dreComparativoPorMes.flatMap(m => m.agrupados.filter(g => g.tipo === 'receita' && g.nome.toLowerCase().trim() !== 'receitas financeiras').map(g => g.nome))
-                  )]
-                  allGruposReceita.forEach(nome => renderGrupoRow(nome))
-                  if (allGruposReceita.length > 0) renderTotalizadorRow('RECEITAS OPERACIONAIS')
-
-                  renderGrupoRow('Deduções de Receita')
-                  renderGrupoRow('Impostos sobre Faturamento')
-                  const hasDeducoes = usedGrupos.has('deduções de receita') || usedGrupos.has('impostos sobre faturamento')
-                  if (hasDeducoes) renderTotalizadorRow('RECEITA LÍQUIDA')
-
-                  renderGrupoRow('Despesas Operacionais')
-                  if (usedGrupos.has('despesas operacionais')) renderTotalizadorRow('MARGEM DE CONTRIBUIÇÃO', true)
-
-                  renderGrupoRow('Despesas com Pessoal')
-                  renderGrupoRow('Despesas Administrativas')
-                  renderGrupoRow('Despesas Comerciais e Marketing')
-                  renderGrupoRow('Despesas com TI')
-                  const hasIndir = ['despesas com pessoal','despesas administrativas','despesas comerciais e marketing','despesas com ti'].some(k => usedGrupos.has(k))
-                  if (hasIndir) renderTotalizadorRow('EBITDA', true)
-
-                  renderGrupoRow('Receitas Financeiras')
-                  renderGrupoRow('Despesas Financeiras')
-                  const hasFin = usedGrupos.has('receitas financeiras') || usedGrupos.has('despesas financeiras')
-                  if (hasFin) renderTotalizadorRow('EBIT', true)
-
-                  renderGrupoRow('Investimentos')
-                  if (usedGrupos.has('investimentos')) renderTotalizadorRow('NOPAT (RESULTADO OPERACIONAL)', true)
-
-                  // Grupos restantes
-                  const allGruposUsados = [...new Set<string>(dreComparativoPorMes.flatMap(m => m.agrupados.map(g => g.nome)))]
-                  allGruposUsados.filter(n => !usedGrupos.has(n.toLowerCase().trim())).forEach(nome => renderGrupoRow(nome))
-
-                  return rows
-                })()}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
 
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
@@ -1252,8 +1114,33 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                   >
                     <span className={styles.totalizadorLabel}>{tot.label}</span>
                     <div className={styles.totalizadorValues}>
-                      {tot.pct !== undefined && <span className={styles.totalizadorPct}>{tot.pct.toFixed(1)}%</span>}
-                      <strong className={styles.totalizadorValor}>{moeda(tot.valor)}</strong>
+                      {dreComparativoPorMes.length > 0 ? (
+                        <>
+                          {dreComparativoPorMes.map(m => {
+                            const val = getMesTotalizadorValor(tot.label, m)
+                            const base = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 1
+                            return (
+                              <div key={m.mes} className={styles.mesColCell}>
+                                <span className={styles.mesColLabel}>{m.label}</span>
+                                <strong className={styles.totalizadorValor}>{moeda(val)}</strong>
+                                {tot.pct !== undefined && <span className={styles.totalizadorPct}>{((val / base) * 100).toFixed(1)}%</span>}
+                              </div>
+                            )
+                          })}
+                          {dreComparativoPorMes.length > 1 && (
+                            <div className={`${styles.mesColCell} ${styles.mesColTotal}`}>
+                              <span className={styles.mesColLabel}>Total</span>
+                              <strong className={styles.totalizadorValor}>{moeda(tot.valor)}</strong>
+                              {tot.pct !== undefined && <span className={styles.totalizadorPct}>{tot.pct.toFixed(1)}%</span>}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <>
+                          {tot.pct !== undefined && <span className={styles.totalizadorPct}>{tot.pct.toFixed(1)}%</span>}
+                          <strong className={styles.totalizadorValor}>{moeda(tot.valor)}</strong>
+                        </>
+                      )}
                     </div>
                   </div>
                 )
@@ -1274,9 +1161,30 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                       </span>
                     </div>
                     <div className={styles.grupoBlockRight}>
-                      <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
-                        {moeda(grupo.total)}
-                      </strong>
+                      {dreComparativoPorMes.length > 0 ? (
+                        <div className={styles.mesColValues}>
+                          {dreComparativoPorMes.map(m => (
+                            <div key={m.mes} className={styles.mesColCell}>
+                              <span className={styles.mesColLabel}>{m.label}</span>
+                              <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                                {moeda(getMesGrupoTotal(grupo.nome, m))}
+                              </strong>
+                            </div>
+                          ))}
+                          {dreComparativoPorMes.length > 1 && (
+                            <div className={`${styles.mesColCell} ${styles.mesColTotal}`}>
+                              <span className={styles.mesColLabel}>Total</span>
+                              <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                                {moeda(grupo.total)}
+                              </strong>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                          {moeda(grupo.total)}
+                        </strong>
+                      )}
                       <span className={styles.chevronIcon}>{gAberto ? '▲' : '▼'}</span>
                     </div>
                   </button>
@@ -1292,7 +1200,24 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                               <span className={styles.clfNome}>{clf.nome}</span>
                               <div className={styles.clfRight}>
                                 <span className={styles.clfCount}>{clf.items.length} lançamento(s)</span>
-                                <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                {dreComparativoPorMes.length > 0 ? (
+                                  <div className={styles.mesColValues}>
+                                    {dreComparativoPorMes.map(m => (
+                                      <div key={m.mes} className={styles.mesColCell}>
+                                        <span className={styles.mesColLabel}>{m.label}</span>
+                                        <strong className={styles.clfTotal}>{moeda(getMesClfTotal(grupo.nome, clf.nome, m))}</strong>
+                                      </div>
+                                    ))}
+                                    {dreComparativoPorMes.length > 1 && (
+                                      <div className={`${styles.mesColCell} ${styles.mesColTotal}`}>
+                                        <span className={styles.mesColLabel}>Total</span>
+                                        <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                )}
                                 <span className={styles.chevronSm}>{cAberto ? '▲' : '▼'}</span>
                               </div>
                             </button>
