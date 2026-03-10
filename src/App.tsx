@@ -27,6 +27,10 @@ function App() {
   const [loading,          setLoading]          = useState(true)
   const [showRegister,     setShowRegister]     = useState(false)
   const [pathname,         setPathname]         = useState(window.location.pathname)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('theme')
+    return saved === 'light' ? 'light' : 'dark'
+  })
   const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => {
     try {
       const stored = sessionStorage.getItem('empresa_selecionada')
@@ -35,6 +39,13 @@ function App() {
       return null
     }
   })
+
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('theme', theme)
+  }, [theme])
+
+  const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
   useEffect(() => {
     // 1. Restore session that's already persisted in localStorage
@@ -113,7 +124,7 @@ function App() {
         />
       )
     }
-    return <DashboardPage user={user} onLogout={handleLogout} />
+    return <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
   }
 
   if (showRegister) {

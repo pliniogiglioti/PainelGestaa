@@ -7,6 +7,9 @@
     <title>PainelGestaa</title>
   </head>
   <body>
+    <script>
+      (function(){var t=localStorage.getItem('theme');if(t==='light')document.documentElement.setAttribute('data-theme','light');})();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
