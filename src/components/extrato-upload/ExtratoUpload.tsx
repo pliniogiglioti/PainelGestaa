@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, memo, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../../lib/supabase'
@@ -195,6 +195,11 @@ const CLASSIFICACAO_GRUPO: Record<string, string> = {
   'Investimento - Instalações de Terceiros': 'Investimentos',
   'Dividendos e Despesas dos Sócios': 'Investimentos',
 }
+
+/** Lista de grupos disponíveis extraída do mapeamento (sem duplicatas, ordenada) */
+const GRUPOS_DISPONIVEIS = [...new Set(Object.values(CLASSIFICACAO_GRUPO))].sort((a, b) =>
+  a.localeCompare(b, 'pt-BR', { sensitivity: 'base' })
+)
 
 /**
  * Retorna true se as duas descrições são "parecidas o suficiente" para sugerir
@@ -621,6 +626,103 @@ async function parsePDF(buffer: ArrayBuffer): Promise<LinhaExtrato[]> {
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// ── Row memoizado — evita re-render de 2500 linhas ao marcar/desmarcar ────────
+
+interface LancamentoRowProps {
+  linha: LinhaClassificada
+  index: number
+  isSelecionado: boolean
+  classificacoesOrdenadas: { nome: string; tipo: string }[]
+  onToggle: (i: number) => void
+  onClassChange: (i: number, nome: string) => void
+  onGrupoChange: (i: number, grupo: string) => void
+  onRemover: (i: number) => void
+  styles: Record<string, string>
+}
+
+const LancamentoRow = memo(function LancamentoRow({
+  linha: l,
+  index: i,
+  isSelecionado,
+  classificacoesOrdenadas,
+  onToggle,
+  onClassChange,
+  onGrupoChange,
+  onRemover,
+  styles,
+}: LancamentoRowProps) {
+  return (
+    <tr
+      className={[
+        l.status === 'erro' ? styles.rowErro : '',
+        isSelecionado ? styles.rowSelecionada : styles.rowDesmarcada,
+      ].join(' ')}
+      onClick={() => onToggle(i)}
+    >
+      <td className={styles.checkCell}>
+        <input
+          type="checkbox"
+          checked={isSelecionado}
+          onChange={() => onToggle(i)}
+          onClick={e => e.stopPropagation()}
+        />
+      </td>
+      <td className={styles.tdData}>{l.data}</td>
+      <td className={styles.tdDesc} title={l.descricao}>{l.descricao}</td>
+      <td>
+        <span className={`${styles.tipoPill} ${l.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
+          {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
+        </span>
+      </td>
+      <td className={styles.tdClf} onClick={e => e.stopPropagation()}>
+        <select
+          className={`${styles.selectClf} ${l.sugerida ? styles.selectClfSugerida : ''}`}
+          value={l.classificacao}
+          title={l.sugerida ? 'Não identificado — selecione uma classificação para este lançamento.' : l.classificacao}
+          onChange={e => onClassChange(i, e.target.value)}
+        >
+          {classificacoesOrdenadas.map(c => (
+            <option key={c.nome} value={c.nome}>{c.nome}</option>
+          ))}
+          {/* Se a classificação atual não está no banco (ex: sugestão IA), mantém visível */}
+          {!classificacoesOrdenadas.some(c => c.nome === l.classificacao) && (
+            <option value={l.classificacao}>{l.classificacao}</option>
+          )}
+        </select>
+      </td>
+      <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
+        {l.sugerida ? (
+          <select
+            className={styles.selectClf}
+            value={l.grupo}
+            onChange={e => onGrupoChange(i, e.target.value)}
+          >
+            {GRUPOS_DISPONIVEIS.map(g => (
+              <option key={g} value={g}>{g}</option>
+            ))}
+            {/* Mantém grupo atual visível se não estiver na lista padrão */}
+            {!GRUPOS_DISPONIVEIS.includes(l.grupo) && l.grupo && (
+              <option value={l.grupo}>{l.grupo}</option>
+            )}
+          </select>
+        ) : (
+          l.grupo
+        )}
+      </td>
+      <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
+        {moeda(l.valor)}
+      </td>
+      <td className={styles.tdRemover} onClick={e => e.stopPropagation()}>
+        <button
+          className={styles.btnRemoverLinha}
+          onClick={() => onRemover(i)}
+          title="Remover esta linha"
+        >×</button>
+      </td>
+    </tr>
+  )
+})
+
 // ── Componente principal ──────────────────────────────────────────────────────
 
 interface ExtratoUploadProps {
@@ -659,22 +761,46 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const someChecked    = selecionados.size > 0 && !todosChecked
   const totalSelecionado = [...selecionados].reduce((s, i) => s + linhasClass[i].valor, 0)
 
-  const handleClassChange = (idx: number, novoNome: string) => {
-    const novoGrupo = CLASSIFICACAO_GRUPO[novoNome] ?? linhasClass[idx].grupo
+  // Pré-computa listas de classificações ordenadas por tipo — evita sort a cada render de linha
+  const classificacoesReceita = useMemo(() =>
+    classificacoesDisp.filter(c => c.tipo === 'receita').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [classificacoesDisp]
+  )
+  const classificacoesDespesa = useMemo(() =>
+    classificacoesDisp.filter(c => c.tipo === 'despesa').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
+    [classificacoesDisp]
+  )
+
+  const handleClassChange = useCallback((idx: number, novoNome: string) => {
+    // Usa functional update para evitar dependência de linhasClass no callback
+    setLinhasClass(prev => {
+      const novoGrupo = CLASSIFICACAO_GRUPO[novoNome] ?? prev[idx].grupo
+      // Procura similares do mesmo tipo antes de atualizar o estado
+      if (novoNome !== 'Não Identificado' && prev[idx].sugerida) {
+        const tipoAtual = prev[idx].tipo
+        const descAtual = prev[idx].descricao
+        const similares = prev
+          .map((l, i) => ({ l, i }))
+          .filter(({ l, i }) => i !== idx && l.sugerida && l.tipo === tipoAtual && descricaoParecida(l.descricao, descAtual))
+          .map(({ i }) => i)
+        // Agenda sugestão de parecidos fora do setState para não ter side-effect no updater
+        setTimeout(() =>
+          setSugestaoParecidos(similares.length > 0 ? { classificacao: novoNome, grupo: novoGrupo, similares } : null)
+        , 0)
+      } else {
+        setTimeout(() => setSugestaoParecidos(null), 0)
+      }
+      return prev.map((l, i) =>
+        i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: novoNome === 'Não Identificado' } : l
+      )
+    })
+  }, [])
+
+  const handleGrupoChange = useCallback((idx: number, novoGrupo: string) => {
     setLinhasClass(prev => prev.map((l, i) =>
-      i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: novoNome === 'Não Identificado' } : l
+      i === idx ? { ...l, grupo: novoGrupo } : l
     ))
-    // Se o usuário está classificando um "Não Identificado", procura itens parecidos
-    if (novoNome !== 'Não Identificado' && linhasClass[idx].sugerida) {
-      const similares = linhasClass
-        .map((l, i) => ({ l, i }))
-        .filter(({ l, i }) => i !== idx && l.sugerida && descricaoParecida(l.descricao, linhasClass[idx].descricao))
-        .map(({ i }) => i)
-      setSugestaoParecidos(similares.length > 0 ? { classificacao: novoNome, grupo: novoGrupo, similares } : null)
-    } else {
-      setSugestaoParecidos(null)
-    }
-  }
+  }, [])
 
   const aplicarClassificacaoParecidos = () => {
     if (!sugestaoParecidos) return
@@ -685,11 +811,11 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setSugestaoParecidos(null)
   }
 
-  const toggleItem = (i: number) => setSelecionados(prev => {
+  const toggleItem = useCallback((i: number) => setSelecionados(prev => {
     const next = new Set(prev)
     next.has(i) ? next.delete(i) : next.add(i)
     return next
-  })
+  }), [])
 
   const toggleTodos = () => {
     if (todosChecked || someChecked) {
@@ -702,7 +828,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const desmarcarErros = () =>
     setSelecionados(new Set(linhasClass.map((_, i) => i).filter(i => linhasClass[i].status === 'ok')))
 
-  const removerLinha = (idx: number) => {
+  const removerLinha = useCallback((idx: number) => {
     setLinhasClass(prev => prev.filter((_, i) => i !== idx))
     setSelecionados(prev => {
       const next = new Set<number>()
@@ -712,7 +838,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
       return next
     })
-  }
+  }, [])
 
   const removerSelecionados = () => {
     const sel = selecionados
@@ -1245,59 +1371,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               </thead>
               <tbody>
                 {linhasClass.map((l, i) => (
-                  <tr
+                  <LancamentoRow
                     key={i}
-                    className={[
-                      l.status === 'erro' ? styles.rowErro : '',
-                      selecionados.has(i) ? styles.rowSelecionada : styles.rowDesmarcada,
-                    ].join(' ')}
-                    onClick={() => toggleItem(i)}
-                  >
-                    <td className={styles.checkCell}>
-                      <input
-                        type="checkbox"
-                        checked={selecionados.has(i)}
-                        onChange={() => toggleItem(i)}
-                        onClick={e => e.stopPropagation()}
-                      />
-                    </td>
-                    <td className={styles.tdData}>{l.data}</td>
-                    <td className={styles.tdDesc} title={l.descricao}>{l.descricao}</td>
-                    <td>
-                      <span className={`${styles.tipoPill} ${l.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
-                        {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
-                      </span>
-                    </td>
-                    <td className={styles.tdClf} onClick={e => e.stopPropagation()}>
-                      <select
-                        className={`${styles.selectClf} ${l.sugerida ? styles.selectClfSugerida : ''}`}
-                        value={l.classificacao}
-                        title={l.sugerida ? 'Não identificado — selecione uma classificação para este lançamento.' : l.classificacao}
-                        onChange={e => handleClassChange(i, e.target.value)}
-                      >
-                        {classificacoesDisp
-                          .filter(c => c.tipo === l.tipo)
-                          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }))
-                          .map(c => <option key={c.nome} value={c.nome}>{c.nome}</option>)
-                        }
-                        {/* Se a classificação atual não está no banco (ex: sugestão IA), mantém visível */}
-                        {!classificacoesDisp.some(c => c.nome === l.classificacao) && (
-                          <option value={l.classificacao}>{l.classificacao}</option>
-                        )}
-                      </select>
-                    </td>
-                    <td className={styles.tdGrupo}>{l.grupo}</td>
-                    <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
-                      {moeda(l.valor)}
-                    </td>
-                    <td className={styles.tdRemover} onClick={e => e.stopPropagation()}>
-                      <button
-                        className={styles.btnRemoverLinha}
-                        onClick={() => removerLinha(i)}
-                        title="Remover esta linha"
-                      >×</button>
-                    </td>
-                  </tr>
+                    linha={l}
+                    index={i}
+                    isSelecionado={selecionados.has(i)}
+                    classificacoesOrdenadas={l.tipo === 'receita' ? classificacoesReceita : classificacoesDespesa}
+                    onToggle={toggleItem}
+                    onClassChange={handleClassChange}
+                    onGrupoChange={handleGrupoChange}
+                    onRemover={removerLinha}
+                    styles={styles}
+                  />
                 ))}
               </tbody>
             </table>
