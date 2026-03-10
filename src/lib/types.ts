@@ -352,6 +352,38 @@ export interface Database {
         }
         Relationships: []
       }
+      dre_classificacao_historico: {
+        Row: {
+          id:                    string
+          empresa_id:            string
+          descricao_normalizada: string
+          classificacao:         string
+          grupo:                 string
+          tipo:                  'receita' | 'despesa'
+          frequencia:            number
+          updated_at:            string
+        }
+        Insert: {
+          id?:                   string
+          empresa_id:            string
+          descricao_normalizada: string
+          classificacao:         string
+          grupo:                 string
+          tipo:                  'receita' | 'despesa'
+          frequencia?:           number
+          updated_at?:           string
+        }
+        Update: {
+          empresa_id?:            string
+          descricao_normalizada?: string
+          classificacao?:         string
+          grupo?:                 string
+          tipo?:                  'receita' | 'despesa'
+          frequencia?:            number
+          updated_at?:            string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -384,7 +416,8 @@ export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']
 export type Configuracao       = Database['public']['Tables']['configuracoes']['Row']
 export type ForumCategory      = Database['public']['Tables']['forum_categories']['Row']
 export type ForumTopic         = Database['public']['Tables']['forum_topics']['Row']
-export type ForumReply         = Database['public']['Tables']['forum_replies']['Row']
+export type ForumReply                  = Database['public']['Tables']['forum_replies']['Row']
+export type DreClassificacaoHistorico  = Database['public']['Tables']['dre_classificacao_historico']['Row']
 
 // ── Extended types with joined data ──────────────────────────────────────
 
