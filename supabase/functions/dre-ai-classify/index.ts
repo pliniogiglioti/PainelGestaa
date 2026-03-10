@@ -33,13 +33,12 @@ GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
 
 [Deduções de Receita] → tipo: despesa
   - Vendas Canceladas / Devoluções
-  - Tarifa de Cartão / Aluguel de POS
-  - Tarifa de Cartão / Antecipação
-  - Tarifa de Cartão / Padrão
+  - Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas
+  - Tarifa de Cartão / Meios de Pagamento - Antecipação
+  - Tarifa de Cartão / Meios de Pagamento - Padrão
 
 [Impostos sobre Faturamento] → tipo: despesa
-  - Impostos sobre Receitas - Simples Nacional
-  - Impostos sobre Receitas - Lucro Presumido
+  - Impostos sobre Receitas - Presumido e Simples Nacional
 
 [Despesas Operacionais] → tipo: despesa
   - OP Gratificações
@@ -159,8 +158,9 @@ const parseBatchResponse = (content: string): Array<{ tipo: string; classificaca
 
 const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; classificacao: string; grupo: string }> = [
   // ── Deduções de Receita (tarifas e taxas) — ANTES das receitas para evitar falso match ──
-  { pattern: /(tarifa.*venda|tarifa.*credito|tarifa.*debito|tarifa.*adquir|getnet.*tarifa|getnet.*cobranca|cobranca.*getnet|adquirencia.*tarifa)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Padrão', grupo: 'Deduções de Receita' },
-  { pattern: /(taxa cartao|tarifa cartao|pos\b|maquininha|antecipacao.*cartao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Padrão', grupo: 'Deduções de Receita' },
+  { pattern: /(antecipacao.*cartao|cartao.*antecipacao|antecip)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Meios de Pagamento - Antecipação', grupo: 'Deduções de Receita' },
+  { pattern: /(pos\b|maquininha|aluguel.*pos|pos.*aluguel)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas', grupo: 'Deduções de Receita' },
+  { pattern: /(tarifa.*venda|tarifa.*credito|tarifa.*debito|tarifa.*adquir|getnet.*tarifa|getnet.*cobranca|cobranca.*getnet|adquirencia.*tarifa|taxa cartao|tarifa cartao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Meios de Pagamento - Padrão', grupo: 'Deduções de Receita' },
   { pattern: /(cancelamento|devolucao|estorno)/i, tipo: 'despesa', classificacao: 'Vendas Canceladas / Devoluções', grupo: 'Deduções de Receita' },
   // ── Despesas bancárias — ANTES dos padrões amplos de pix/transferencia para evitar falso match ──
   { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
@@ -172,7 +172,7 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(rendimento|aplicacao|investimento financeiro)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
   { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   // ── Impostos ──
-  { pattern: /(simples nacional|imposto|iss|icms|pis|cofins|irpj|tributo|das )/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Simples Nacional', grupo: 'Impostos sobre Faturamento' },
+  { pattern: /(simples nacional|lucro presumido|imposto|iss|icms|pis|cofins|irpj|tributo|das )/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional', grupo: 'Impostos sobre Faturamento' },
   // ── Despesas Operacionais ──
   { pattern: /(laboratorio|\blab\b|tecnico dental|dental.*lab|pag.*\blab\b|laborat)/i, tipo: 'despesa', classificacao: 'Serviços Técnicos para Laboratórios', grupo: 'Despesas Operacionais' },
   { pattern: /(material|insumo|implante|componente)/i, tipo: 'despesa', classificacao: 'Custo de Materiais e Insumos', grupo: 'Despesas Operacionais' },
