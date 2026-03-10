@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
@@ -28,6 +28,97 @@ const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
+
+// ── Mapeamento oficial: classificação → grupo (plano de contas) ───────────────
+const CLASSIFICACAO_TO_GRUPO: Record<string, string> = {
+  // Receitas Operacionais
+  'Receita Dinheiro': 'Receitas Operacionais',
+  'Receita Cartão': 'Receitas Operacionais',
+  'Receita Financeiras': 'Receitas Operacionais',
+  'Receita PIX / Transferências': 'Receitas Operacionais',
+  'Receita Subadquirência (BT)': 'Receitas Operacionais',
+  // Receitas Financeiras
+  'Rendimento de Aplicação Financeira': 'Receitas Financeiras',
+  'Descontos Obtidos': 'Receitas Financeiras',
+  // Deduções de Receita
+  'Vendas Canceladas / Devoluções': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Antecipação': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Padrão': 'Deduções de Receita',
+  // Impostos sobre Faturamento
+  'Impostos sobre Receitas - Presumido e Simples Nacional': 'Impostos sobre Faturamento',
+  // Despesas Operacionais
+  'OP Gratificações': 'Despesas Operacionais',
+  'Custo de Materiais e Insumos': 'Despesas Operacionais',
+  'Serviços Terceiros PF (dentistas)': 'Despesas Operacionais',
+  'Serviços Técnicos para Laboratórios': 'Despesas Operacionais',
+  'Royalties e Assistência Técnica': 'Despesas Operacionais',
+  'Fundo Nacional de Marketing': 'Despesas Operacionais',
+  // Despesas com Pessoal
+  'Pró-labore': 'Despesas com Pessoal',
+  'Salários e Ordenados': 'Despesas com Pessoal',
+  '13° Salário': 'Despesas com Pessoal',
+  'Rescisões': 'Despesas com Pessoal',
+  'INSS': 'Despesas com Pessoal',
+  'FGTS': 'Despesas com Pessoal',
+  'Outras Despesas Com Funcionários': 'Despesas com Pessoal',
+  'Vale Transporte': 'Despesas com Pessoal',
+  'Vale Refeição': 'Despesas com Pessoal',
+  'Combustível': 'Despesas com Pessoal',
+  // Despesas Administrativas
+  'Adiantamento a Fornecedor': 'Despesas Administrativas',
+  'Energia Elétrica': 'Despesas Administrativas',
+  'Água e Esgoto': 'Despesas Administrativas',
+  'Aluguel': 'Despesas Administrativas',
+  'Manutenção e Conservação Predial': 'Despesas Administrativas',
+  'Telefonia': 'Despesas Administrativas',
+  'Uniformes': 'Despesas Administrativas',
+  'Manutenção e Reparos': 'Despesas Administrativas',
+  'Seguros': 'Despesas Administrativas',
+  'Uber e Táxi': 'Despesas Administrativas',
+  'Copa e Cozinha': 'Despesas Administrativas',
+  'Cartórios': 'Despesas Administrativas',
+  'Viagens e Estadias': 'Despesas Administrativas',
+  'Material de Escritório': 'Despesas Administrativas',
+  'Estacionamento': 'Despesas Administrativas',
+  'Material de Limpeza': 'Despesas Administrativas',
+  'Bens de Pequeno Valor': 'Despesas Administrativas',
+  'Custas Processuais': 'Despesas Administrativas',
+  'Outras Despesas': 'Despesas Administrativas',
+  'Consultoria': 'Despesas Administrativas',
+  'Contabilidade': 'Despesas Administrativas',
+  'Jurídico': 'Despesas Administrativas',
+  'Limpeza': 'Despesas Administrativas',
+  'Segurança e Vigilância': 'Despesas Administrativas',
+  'Serviço de Motoboy': 'Despesas Administrativas',
+  'IOF': 'Despesas Administrativas',
+  'Taxas e Emolumentos': 'Despesas Administrativas',
+  'Multa e Juros s/ Contas Pagas em Atraso': 'Despesas Administrativas',
+  'Exames Ocupacionais': 'Despesas Administrativas',
+  // Despesas Comerciais e Marketing
+  'Refeições e Lanches': 'Despesas Comerciais e Marketing',
+  'Outras Despesas com Vendas': 'Despesas Comerciais e Marketing',
+  'Agência e Assessoria': 'Despesas Comerciais e Marketing',
+  'Produção de Material': 'Despesas Comerciais e Marketing',
+  'Marketing Digital': 'Despesas Comerciais e Marketing',
+  'Feiras e Eventos': 'Despesas Comerciais e Marketing',
+  // Despesas com TI
+  'Internet': 'Despesas com TI',
+  'Informática e Software': 'Despesas com TI',
+  'Hospedagem de Dados': 'Despesas com TI',
+  'Sistema de Gestão': 'Despesas com TI',
+  // Despesas Financeiras
+  'Despesas Bancárias': 'Despesas Financeiras',
+  'Depreciação e Amortização': 'Despesas Financeiras',
+  'Juros Passivos': 'Despesas Financeiras',
+  'Financiamentos / Empréstimos': 'Despesas Financeiras',
+  // Investimentos
+  'Investimento - Máquinas e Equipamentos': 'Investimentos',
+  'Investimento - Computadores e Periféricos': 'Investimentos',
+  'Investimento - Móveis e Utensílios': 'Investimentos',
+  'Investimento - Instalações de Terceiros': 'Investimentos',
+  'Dividendos e Despesas dos Sócios': 'Investimentos',
+}
 
 // ── Helpers: soma por grupo exato (primary) + keywords (fallback) ─────────────
 
@@ -261,7 +352,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
   const [anoFiltro,        setAnoFiltro]        = useState('todos')
-  const [mesFiltroNum,     setMesFiltroNum]     = useState('todos')
+  const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
   const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
@@ -380,6 +471,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
     }))
   }, [lancamentos, anoFiltro])
 
+  const toggleMes = (mes: string) =>
+    setMesesFiltro(prev =>
+      prev.includes(mes) ? prev.filter(m => m !== mes) : [...prev, mes].sort()
+    )
+
   const lancamentosFiltrados = useMemo(() => {
     return lancamentos.filter(item => {
       const tipoItem = item.tipo
@@ -388,10 +484,10 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
       if (tipoFiltro !== 'todos' && tipoItem !== tipoFiltro) return false
       const src = item.data_lancamento ?? item.created_at
       if (anoFiltro !== 'todos' && (!src || src.slice(0, 4) !== anoFiltro)) return false
-      if (mesFiltroNum !== 'todos' && (!src || src.slice(5, 7) !== mesFiltroNum)) return false
+      if (mesesFiltro.length > 0 && (!src || !mesesFiltro.includes(src.slice(5, 7)))) return false
       return true
     })
-  }, [lancamentos, anoFiltro, mesFiltroNum, tipoFiltro, tipoMap])
+  }, [lancamentos, anoFiltro, mesesFiltro, tipoFiltro, tipoMap])
 
   const totais = useMemo(() =>
     lancamentosFiltrados.reduce((acc, item) => {
@@ -514,6 +610,71 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
 
     return result
   }, [lancamentosAgrupados, kpis])
+
+  // ── Comparativo por mês: calcula grupos+kpis para cada mês selecionado ───────
+  type MesComparativoData = {
+    mes: string
+    label: string
+    receitas: number
+    despesas: number
+    agrupados: ReturnType<typeof calcularAgrupados>
+    kpis: ReturnType<typeof calcularKpis>
+  }
+
+  function calcularAgrupados(
+    items: DreLancamento[],
+    tMap: Record<string, string>,
+  ) {
+    const grupoMap = new Map<string, {
+      total: number; tipo: 'receita' | 'despesa'
+      classificacoes: Map<string, { total: number; items: DreLancamento[] }>
+    }>()
+    for (const l of items) {
+      const gKey = l.grupo || 'Sem grupo'
+      const cKey = l.classificacao || 'Sem classificação'
+      const tipo = (l.tipo ?? tMap[l.classificacao] ?? 'despesa') as 'receita' | 'despesa'
+      if (!grupoMap.has(gKey)) grupoMap.set(gKey, { total: 0, tipo, classificacoes: new Map() })
+      const g = grupoMap.get(gKey)!
+      g.total += Number(l.valor)
+      if (!g.classificacoes.has(cKey)) g.classificacoes.set(cKey, { total: 0, items: [] })
+      const c = g.classificacoes.get(cKey)!
+      c.total += Number(l.valor)
+      c.items.push(l)
+    }
+    return [...grupoMap.entries()].map(([nome, d]) => ({
+      nome, total: d.total, tipo: d.tipo,
+      classificacoes: [...d.classificacoes.entries()]
+        .map(([cNome, cd]) => ({ nome: cNome, total: cd.total, items: cd.items }))
+        .sort((a, b) => b.total - a.total),
+    }))
+  }
+
+  const dreComparativoPorMes = useMemo<MesComparativoData[]>(() => {
+    if (mesesFiltro.length === 0) return []
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
+    return mesesFiltro.map(mes => {
+      const items = lancamentos.filter(l => {
+        const src = l.data_lancamento ?? l.created_at
+        if (!src) return false
+        if (anoFiltro !== 'todos' && src.slice(0, 4) !== anoFiltro) return false
+        return src.slice(5, 7) === mes
+      })
+      const rec = items.filter(l => (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') === 'receita')
+        .reduce((s, l) => s + Number(l.valor), 0)
+      const desp = items.filter(l => (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') === 'despesa')
+        .reduce((s, l) => s + Number(l.valor), 0)
+      const agrupados = calcularAgrupados(items, tipoMap)
+      const k = calcularKpis(items, rec)
+      return {
+        mes,
+        label: formatter.format(new Date(`2000-${mes}-01T00:00:00Z`)),
+        receitas: rec,
+        despesas: desp,
+        agrupados,
+        kpis: k,
+      }
+    })
+  }, [mesesFiltro, lancamentos, anoFiltro, tipoMap])
 
   const toggleGrupo = (key: string) => setExpandedGrupos(prev => {
     const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
@@ -640,18 +801,15 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
         const grupoIa = String(data.grupo ?? '').trim()
         const classificacaoIa = String(data.classificacao_nome ?? '').trim()
 
-        setForm(p => ({ ...p, classificacaoNome: classificacaoIa, grupo: grupoIa }))
+        // Valida se o grupo sugerido está no plano de contas oficial
+        const gruposOficiais = grupos.filter(g => g.tipo === form.tipo).map(g => g.nome)
+        const grupoFinal =
+          gruposOficiais.includes(grupoIa) ? grupoIa :
+          (CLASSIFICACAO_TO_GRUPO[classificacaoIa] ?? '')
+
+        setForm(p => ({ ...p, classificacaoNome: classificacaoIa, grupo: grupoFinal }))
 
         if (data?.aviso) setAiWarning(String(data.aviso))
-
-        if (grupoIa) {
-          const resGrupo = await ensureGrupoCatalogado(grupoIa, form.tipo)
-          if (!resGrupo.ok) {
-            setAiError(`Grupo sugerido, mas falha ao cadastrar no catálogo: ${resGrupo.error}`)
-          } else {
-            fetchGrupos()
-          }
-        }
       }
     } catch (e) {
       setAiError(`Erro inesperado: ${String(e)}`)
@@ -803,6 +961,166 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
       {/* ── AI Assistant ── */}
       <DreAssistentePanel lancamentos={lancamentosFiltrados} />
 
+      {/* ── DRE Comparativo por Mês ── */}
+      {dreComparativoPorMes.length > 0 && (
+        <section className={styles.panel}>
+          <div className={styles.panelHeader}>
+            <div>
+              <h2>DRE Comparativo</h2>
+              <span className={styles.stepIndicator}>
+                {dreComparativoPorMes.map(m => m.label).join(' · ')}
+              </span>
+            </div>
+          </div>
+          <div className={styles.dreComparativoWrapper}>
+            <table className={styles.dreComparativoTable}>
+              <thead>
+                <tr className={styles.dreComparativoHead}>
+                  <th className={styles.dreComparativoNomeCol}>Grupo / Linha</th>
+                  {dreComparativoPorMes.map(m => (
+                    <>
+                      <th key={`${m.mes}-val`} className={styles.dreComparativoValCol}>{m.label} R$</th>
+                      <th key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{m.label} %</th>
+                    </>
+                  ))}
+                  {dreComparativoPorMes.length > 1 && (
+                    <>
+                      <th className={styles.dreComparativoValCol}>Total R$</th>
+                      <th className={styles.dreComparativoPctCol}>Total %</th>
+                    </>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const rows: ReactNode[] = []
+                  const usedGrupos = new Set<string>()
+
+                  const getGrupoTotal = (mesData: MesComparativoData, nomeGrupo: string) =>
+                    mesData.agrupados.find(g => g.nome.toLowerCase().trim() === nomeGrupo.toLowerCase().trim())?.total ?? 0
+
+                  const getKpiVal = (mesData: MesComparativoData, label: string): number => {
+                    const k = mesData.kpis
+                    switch (label) {
+                      case 'RECEITAS OPERACIONAIS': return k.receitaOperacional
+                      case 'RECEITA LÍQUIDA': return k.receitaLiquida
+                      case 'MARGEM DE CONTRIBUIÇÃO': return k.margemContrib
+                      case 'EBITDA': return k.ebitda
+                      case 'EBIT': return k.ebit
+                      case 'NOPAT (RESULTADO OPERACIONAL)': return k.nopat
+                      default: return 0
+                    }
+                  }
+
+                  const renderGrupoRow = (nomeGrupo: string) => {
+                    const totaisMes = dreComparativoPorMes.map(m => getGrupoTotal(m, nomeGrupo))
+                    if (totaisMes.every(v => v === 0)) return
+                    usedGrupos.add(nomeGrupo.toLowerCase().trim())
+                    const totalGeral = totaisMes.reduce((s, v) => s + v, 0)
+                    const tipo = dreComparativoPorMes
+                      .flatMap(m => m.agrupados)
+                      .find(g => g.nome.toLowerCase().trim() === nomeGrupo.toLowerCase().trim())?.tipo ?? 'despesa'
+
+                    rows.push(
+                      <tr key={`grupo-${nomeGrupo}`} className={`${styles.dreComparativoGrupoRow} ${tipo === 'receita' ? styles.dreComparativoReceita : styles.dreComparativoDespesa}`}>
+                        <td className={styles.dreComparativoNomeCol}>
+                          <span className={styles.dreComparativoBadge}>{tipo === 'receita' ? '↑' : '↓'}</span>
+                          {nomeGrupo}
+                        </td>
+                        {dreComparativoPorMes.map(m => {
+                          const val = getGrupoTotal(m, nomeGrupo)
+                          const base = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 1
+                          return (
+                            <>
+                              <td key={`${m.mes}-val`} className={`${styles.dreComparativoValCol} ${tipo === 'receita' ? styles.dreComparativoTextReceita : styles.dreComparativoTextDespesa}`}>{moeda(val)}</td>
+                              <td key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{((val / base) * 100).toFixed(1)}%</td>
+                            </>
+                          )
+                        })}
+                        {dreComparativoPorMes.length > 1 && (() => {
+                          const totalBase = dreComparativoPorMes.reduce((s, m) => s + (m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 0), 0) || 1
+                          return (
+                            <>
+                              <td className={`${styles.dreComparativoValCol} ${tipo === 'receita' ? styles.dreComparativoTextReceita : styles.dreComparativoTextDespesa}`}>{moeda(totalGeral)}</td>
+                              <td className={styles.dreComparativoPctCol}>{((totalGeral / totalBase) * 100).toFixed(1)}%</td>
+                            </>
+                          )
+                        })()}
+                      </tr>
+                    )
+                  }
+
+                  const renderTotalizadorRow = (label: string, comPct = false) => {
+                    const totaisMes = dreComparativoPorMes.map(m => getKpiVal(m, label))
+                    const totalGeral = totaisMes.reduce((s, v) => s + v, 0)
+                    rows.push(
+                      <tr key={`tot-${label}`} className={`${styles.dreComparativoTotalizador} ${totalGeral >= 0 ? styles.dreComparativoTotalizadorPos : styles.dreComparativoTotalizadorNeg}`}>
+                        <td className={styles.dreComparativoNomeCol}>{label}</td>
+                        {dreComparativoPorMes.map(m => {
+                          const val = getKpiVal(m, label)
+                          const base = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 1
+                          return (
+                            <>
+                              <td key={`${m.mes}-val`} className={styles.dreComparativoValCol}>{moeda(val)}</td>
+                              <td key={`${m.mes}-pct`} className={styles.dreComparativoPctCol}>{comPct ? `${((val / base) * 100).toFixed(1)}%` : ''}</td>
+                            </>
+                          )
+                        })}
+                        {dreComparativoPorMes.length > 1 && (() => {
+                          const totalBase = dreComparativoPorMes.reduce((s, m) => s + (m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : 0), 0) || 1
+                          return (
+                            <>
+                              <td className={styles.dreComparativoValCol}>{moeda(totalGeral)}</td>
+                              <td className={styles.dreComparativoPctCol}>{comPct ? `${((totalGeral / totalBase) * 100).toFixed(1)}%` : ''}</td>
+                            </>
+                          )
+                        })()}
+                      </tr>
+                    )
+                  }
+
+                  // Renderiza grupos de receita (exceto Receitas Financeiras)
+                  const allGruposReceita = [...new Set<string>(
+                    dreComparativoPorMes.flatMap(m => m.agrupados.filter(g => g.tipo === 'receita' && g.nome.toLowerCase().trim() !== 'receitas financeiras').map(g => g.nome))
+                  )]
+                  allGruposReceita.forEach(nome => renderGrupoRow(nome))
+                  if (allGruposReceita.length > 0) renderTotalizadorRow('RECEITAS OPERACIONAIS')
+
+                  renderGrupoRow('Deduções de Receita')
+                  renderGrupoRow('Impostos sobre Faturamento')
+                  const hasDeducoes = usedGrupos.has('deduções de receita') || usedGrupos.has('impostos sobre faturamento')
+                  if (hasDeducoes) renderTotalizadorRow('RECEITA LÍQUIDA')
+
+                  renderGrupoRow('Despesas Operacionais')
+                  if (usedGrupos.has('despesas operacionais')) renderTotalizadorRow('MARGEM DE CONTRIBUIÇÃO', true)
+
+                  renderGrupoRow('Despesas com Pessoal')
+                  renderGrupoRow('Despesas Administrativas')
+                  renderGrupoRow('Despesas Comerciais e Marketing')
+                  renderGrupoRow('Despesas com TI')
+                  const hasIndir = ['despesas com pessoal','despesas administrativas','despesas comerciais e marketing','despesas com ti'].some(k => usedGrupos.has(k))
+                  if (hasIndir) renderTotalizadorRow('EBITDA', true)
+
+                  renderGrupoRow('Receitas Financeiras')
+                  renderGrupoRow('Despesas Financeiras')
+                  const hasFin = usedGrupos.has('receitas financeiras') || usedGrupos.has('despesas financeiras')
+                  if (hasFin) renderTotalizadorRow('EBIT', true)
+
+                  renderGrupoRow('Investimentos')
+                  if (usedGrupos.has('investimentos')) renderTotalizadorRow('NOPAT (RESULTADO OPERACIONAL)', true)
+
+                  // Grupos restantes
+                  const allGruposUsados = [...new Set<string>(dreComparativoPorMes.flatMap(m => m.agrupados.map(g => g.nome)))]
+                  allGruposUsados.filter(n => !usedGrupos.has(n.toLowerCase().trim())).forEach(nome => renderGrupoRow(nome))
+
+                  return rows
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
         <div className={styles.panelHeader}>
@@ -852,7 +1170,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                             setUsuarioFiltro(u.id)
                             setBuscaUsuario(u.name ?? u.email ?? '')
                             setShowUserDropdown(false)
-                            setAnoFiltro('todos'); setMesFiltroNum('todos')
+                            setAnoFiltro('todos'); setMesesFiltro([])
                             fetchLancamentos(u.id)
                           }}
                         >
@@ -870,7 +1188,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
               Ano
               <select
                 value={anoFiltro}
-                onChange={e => { setAnoFiltro(e.target.value); setMesFiltroNum('todos') }}
+                onChange={e => { setAnoFiltro(e.target.value); setMesesFiltro([]) }}
                 className={styles.filterSelect}
               >
                 <option value="todos">Todos os anos</option>
@@ -878,15 +1196,25 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
               </select>
             </label>
 
-            <label className={styles.filterLabel}>
-              Mês
-              <select value={mesFiltroNum} onChange={e => setMesFiltroNum(e.target.value)} className={styles.filterSelect}>
-                <option value="todos">Todos os meses</option>
+            <div className={styles.filterLabel}>
+              <span>Meses</span>
+              <div className={styles.mesFiltroChips}>
                 {mesesOptions.map(opt => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <button
+                    key={opt.value}
+                    className={`${styles.mesChip} ${mesesFiltro.includes(opt.value) ? styles.mesChipSelected : ''}`}
+                    onClick={() => toggleMes(opt.value)}
+                  >
+                    {opt.label}
+                  </button>
                 ))}
-              </select>
-            </label>
+                {mesesFiltro.length > 0 && (
+                  <button className={styles.mesChipClear} onClick={() => setMesesFiltro([])}>
+                    ✕ limpar
+                  </button>
+                )}
+              </div>
+            </div>
 
             <label className={styles.filterLabel}>
               Tipo
@@ -1159,7 +1487,10 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                           <button
                             key={c.id}
                             className={`${styles.listboxItem} ${form.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
-                            onClick={() => setForm(p => ({ ...p, classificacaoNome: c.nome }))}
+                            onClick={() => {
+                              const grupoMapeado = CLASSIFICACAO_TO_GRUPO[c.nome] ?? form.grupo
+                              setForm(p => ({ ...p, classificacaoNome: c.nome, grupo: grupoMapeado }))
+                            }}
                           >
                             <span className={styles.listboxRadio}>
                               {form.classificacaoNome === c.nome ? '●' : '○'}
@@ -1188,37 +1519,24 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
               <div className={styles.wizardStep}>
                 <label className={styles.wizardLabel}>Grupo / Categoria</label>
 
-                {form.grupo && !aiError && (
-                  <div className={styles.aiSelectedBox}>
-                    <span className={styles.aiSelectedLabel}>IA identificou</span>
-                    <strong className={styles.aiSelectedValue}>{form.grupo}</strong>
-                  </div>
-                )}
+                <p className={styles.wizardHint}>
+                  {form.grupo
+                    ? `IA sugeriu "${form.grupo}" — confirme ou altere abaixo.`
+                    : 'Selecione o grupo do plano de contas:'}
+                </p>
 
-                <input
-                  className={styles.wizardInput}
-                  value={form.grupo}
-                  onChange={e => setForm(p => ({ ...p, grupo: e.target.value }))}
-                  placeholder="Ex: Materiais de Escritório"
-                  autoFocus
-                />
-
-                {gruposExistentes.length > 0 && (
-                  <div className={styles.grupoQuickList}>
-                    <span className={styles.classGroupLabel}>Usados anteriormente</span>
-                    <div className={styles.grupoQuickChips}>
-                      {gruposExistentes.map(g => (
-                        <button
-                          key={g}
-                          className={`${styles.grupoChip} ${form.grupo === g ? styles.grupoChipSelected : ''}`}
-                          onClick={() => setForm(p => ({ ...p, grupo: g }))}
-                        >
-                          {g}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className={styles.listbox}>
+                  {grupos.filter(g => g.tipo === form.tipo).map(g => (
+                    <button
+                      key={g.id}
+                      className={`${styles.listboxItem} ${form.grupo === g.nome ? styles.listboxItemSelected : ''}`}
+                      onClick={() => setForm(p => ({ ...p, grupo: g.nome }))}
+                    >
+                      <span className={styles.listboxRadio}>{form.grupo === g.nome ? '●' : '○'}</span>
+                      {g.nome}
+                    </button>
+                  ))}
+                </div>
 
                 <div className={styles.summary}>
                   <div className={styles.summaryRow}><span>Data</span><strong>{new Date(form.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</strong></div>
