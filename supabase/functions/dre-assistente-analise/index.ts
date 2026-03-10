@@ -33,8 +33,10 @@ const PLANO_DE_CONTAS = `
 1.4 — Receita PIX / Transferências | 1.5 — Receita Subadquirência (BT)
 
 ## 2. DEDUÇÕES DE RECEITA
-2.1 — Vendas Canceladas / Devoluções | 2.2 — Tarifa de Cartão / Aluguel de POS
-2.3 — Tarifa de Cartão / Antecipação | 2.4 — Tarifa de Cartão / Padrão
+2.1 — Vendas Canceladas / Devoluções
+2.2 — Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas
+2.3 — Tarifa de Cartão / Meios de Pagamento - Antecipação
+2.4 — Tarifa de Cartão / Meios de Pagamento - Padrão
 
 ## 3. IMPOSTOS SOBRE O FATURAMENTO
 3.1 — Impostos sobre Receitas - Presumido e Simples Nacional
