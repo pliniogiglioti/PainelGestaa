@@ -155,7 +155,10 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
       })
 
       if (fnError) {
-        setError(`Erro ao chamar a IA: ${fnError.message ?? String(fnError)}`)
+        // O Supabase SDK sempre seta fnError com mensagem genérica em respostas não-2xx.
+        // O erro real está em `data.error` quando disponível.
+        const detail = (data as Record<string, unknown> | null)?.error
+        setError(detail ? String(detail) : `Erro ao chamar a IA: ${fnError.message ?? String(fnError)}`)
         return
       }
 
