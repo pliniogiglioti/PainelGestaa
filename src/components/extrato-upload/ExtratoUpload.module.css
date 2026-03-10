@@ -384,6 +384,32 @@
 .tdReceita { color: #5aba74 !important; }
 .tdDespesa { color: #e06060 !important; }
 
+/* ── Banner: classificar parecidos ──────────────────────────────────────────── */
+
+.bannerParecidos {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  background: rgba(213, 175, 69, 0.10);
+  border: 1px solid rgba(213, 175, 69, 0.30);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.bannerParecidosTexto {
+  font-size: 13px;
+  color: #d5af45;
+}
+
+.bannerParecidosBtns {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* ── Review footer ───────────────────────────────────────────────────────────── */
 
 .reviewFooter {

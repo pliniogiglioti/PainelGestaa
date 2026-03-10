@@ -45,13 +45,14 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(tarifa.*venda|tarifa.*credito|tarifa.*debito|tarifa.*adquir|getnet.*tarifa|getnet.*cobranca|cobranca.*getnet|adquirencia.*tarifa|taxa cartao|tarifa cartao)/i, tipo: 'despesa', classificacao: 'Tarifa de Cartão / Meios de Pagamento - Padrão', grupo: 'Deduções de Receita' },
   { pattern: /(cancelamento|devolucao|estorno)/i, tipo: 'despesa', classificacao: 'Vendas Canceladas / Devoluções', grupo: 'Deduções de Receita' },
   // ── Despesas bancárias — ANTES dos padrões amplos de pix/transferencia para evitar falso match ──
-  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
+  { pattern: /(tarifa bancaria|taxa bancaria|manutencao conta|tx manut|taxa manutencao|liquidacao qrcode|liquidacao pix|taxa.*pix|taxa.*transferencia|cip liquidacao|compensacao cip|ted cobranca|doc cobranca)/i, tipo: 'despesa', classificacao: 'Despesas Bancárias', grupo: 'Despesas Financeiras' },
   // ── Receitas ──
-  { pattern: /(getnet|cielo|rede\b|stone\b|pagseguro|sumup|pagbank|mercadopago|visa.*credito|master.*credito|elo.*credito|amex.*credito|credito.*adquir)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
+  { pattern: /(getnet|cielo|rede\b|stone\b|pagseguro|sumup|pagbank|mercadopago|visa.*credito|master.*credito|elo.*credito|amex.*credito|credito.*adquir|subadquir|adquirente)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
   { pattern: /(cartao|card)/i, tipo: 'receita', classificacao: 'Receita Cartão', grupo: 'Receitas Operacionais' },
-  { pattern: /(transferencia pix rem|pix.*receb|receb.*pix|pix.*entr)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
+  { pattern: /(transferencia pix rem|pix.*receb|receb.*pix|pix.*entr|cred pix|credito pix|pix cred)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
+  { pattern: /(ted receb|doc receb|ted entr|doc entr|cred ted|cred doc)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
   { pattern: /(pix|transferencia)/i, tipo: 'receita', classificacao: 'Receita PIX / Transferências', grupo: 'Receitas Operacionais' },
-  { pattern: /(rendimento|aplicacao|investimento financeiro)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
+  { pattern: /(rendimento|aplicacao|invest facil|invest auto|cdb|lci|lca)/i, tipo: 'receita', classificacao: 'Rendimento de Aplicação Financeira', grupo: 'Receitas Financeiras' },
   { pattern: /\bdinheiro\b/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   { pattern: /(venda|faturamento|consulta|atendimento|tratamento|servico prestado|honorario|receita|pagamento paciente)/i, tipo: 'receita', classificacao: 'Receita Dinheiro', grupo: 'Receitas Operacionais' },
   // ── Impostos ──
@@ -66,21 +67,22 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(agencia|assessoria)/i, tipo: 'despesa', classificacao: 'Agência e Assessoria', grupo: 'Despesas Comerciais e Marketing' },
   // ── Pessoal ──
   { pattern: /(pro.?labore)/i, tipo: 'despesa', classificacao: 'Pró-labore', grupo: 'Despesas com Pessoal' },
-  { pattern: /(salario|ordenado|folha de pagamento)/i, tipo: 'despesa', classificacao: 'Salários e Ordenados', grupo: 'Despesas com Pessoal' },
+  { pattern: /(cred salario|dep salario|deposito salario|credito salario|pagto salario|pgto salario|folha de pagamento|salario|ordenado)/i, tipo: 'despesa', classificacao: 'Salários e Ordenados', grupo: 'Despesas com Pessoal' },
   { pattern: /(13.? salario|decimo terceiro)/i, tipo: 'despesa', classificacao: '13° Salário', grupo: 'Despesas com Pessoal' },
-  { pattern: /(rescisao|aviso previo|demissao)/i, tipo: 'despesa', classificacao: 'Rescisões', grupo: 'Despesas com Pessoal' },
-  { pattern: /\binss\b/i, tipo: 'despesa', classificacao: 'INSS', grupo: 'Despesas com Pessoal' },
+  { pattern: /(rescisao|aviso previo|demissao|verbas rescisoria)/i, tipo: 'despesa', classificacao: 'Rescisões', grupo: 'Despesas com Pessoal' },
+  { pattern: /(\binss\b|gps\b|pagto gps|pgto gps|recolh.*previdencia)/i, tipo: 'despesa', classificacao: 'INSS', grupo: 'Despesas com Pessoal' },
   { pattern: /\bfgts\b/i, tipo: 'despesa', classificacao: 'FGTS', grupo: 'Despesas com Pessoal' },
-  { pattern: /(vale transporte|vt\b)/i, tipo: 'despesa', classificacao: 'Vale Transporte', grupo: 'Despesas com Pessoal' },
-  { pattern: /(vale refeicao|vale alimentacao|vr\b|va\b)/i, tipo: 'despesa', classificacao: 'Vale Refeição', grupo: 'Despesas com Pessoal' },
-  { pattern: /(combustivel|gasolina|etanol|abastecimento)/i, tipo: 'despesa', classificacao: 'Combustível', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale transporte|vt\b|beneficio transporte)/i, tipo: 'despesa', classificacao: 'Vale Transporte', grupo: 'Despesas com Pessoal' },
+  { pattern: /(vale refeicao|vale alimentacao|vr\b|va\b|ticket refeicao|alelo|sodexo|flash beneficio)/i, tipo: 'despesa', classificacao: 'Vale Refeição', grupo: 'Despesas com Pessoal' },
+  { pattern: /(combustivel|gasolina|etanol|abastecimento|posto )/i, tipo: 'despesa', classificacao: 'Combustível', grupo: 'Despesas com Pessoal' },
+  { pattern: /(plano saude|plano odonto|convenio medico|unimed|amil|sulamerica.*saude|bradesco.*saude|hapvida)/i, tipo: 'despesa', classificacao: 'Outras Despesas Com Funcionários', grupo: 'Despesas com Pessoal' },
   { pattern: /(aluguel|locacao|condominio)/i, tipo: 'despesa', classificacao: 'Aluguel', grupo: 'Despesas Administrativas' },
-  { pattern: /(energia|luz\b|eletricidade)/i, tipo: 'despesa', classificacao: 'Energia Elétrica', grupo: 'Despesas Administrativas' },
-  { pattern: /(agua\b|esgoto|sabesp|saneamento)/i, tipo: 'despesa', classificacao: 'Água e Esgoto', grupo: 'Despesas Administrativas' },
-  { pattern: /(telefone|telefonia|celular|plano|vivo|claro|tim|oi\b)/i, tipo: 'despesa', classificacao: 'Telefonia', grupo: 'Despesas Administrativas' },
-  { pattern: /(internet\b|banda larga|fibra)/i, tipo: 'despesa', classificacao: 'Internet', grupo: 'Despesas com TI' },
-  { pattern: /(software|sistema|licenca|saas|assinatura)/i, tipo: 'despesa', classificacao: 'Sistema de Gestão', grupo: 'Despesas com TI' },
-  { pattern: /(hospedagem|servidor|cloud|aws|gcp|azure)/i, tipo: 'despesa', classificacao: 'Hospedagem de Dados', grupo: 'Despesas com TI' },
+  { pattern: /(energia|luz\b|eletricidade|enel\b|cemig\b|copel\b|elektro\b|cpfl\b|coelba\b|celpe\b|energisa\b)/i, tipo: 'despesa', classificacao: 'Energia Elétrica', grupo: 'Despesas Administrativas' },
+  { pattern: /(agua\b|esgoto|sabesp\b|saneamento|caesb\b|sanepar\b|cedae\b|cosanpa\b|copasa\b|caema\b)/i, tipo: 'despesa', classificacao: 'Água e Esgoto', grupo: 'Despesas Administrativas' },
+  { pattern: /(telefone|telefonia|celular|plano|vivo\b|claro\b|tim\b|oi\b|nextel|algar)/i, tipo: 'despesa', classificacao: 'Telefonia', grupo: 'Despesas Administrativas' },
+  { pattern: /(internet\b|banda larga|fibra|vivo fibra|oi fibra|claro net|net combo)/i, tipo: 'despesa', classificacao: 'Internet', grupo: 'Despesas com TI' },
+  { pattern: /(software|sistema|licenca|saas|assinatura|clinicorp|dental office|wevio|gestor|totvs|sankhya)/i, tipo: 'despesa', classificacao: 'Sistema de Gestão', grupo: 'Despesas com TI' },
+  { pattern: /(hospedagem|servidor|cloud|aws\b|gcp\b|azure\b|digitalocean|supabase)/i, tipo: 'despesa', classificacao: 'Hospedagem de Dados', grupo: 'Despesas com TI' },
   { pattern: /(computador|notebook|impressora|periférico|hardware)/i, tipo: 'despesa', classificacao: 'Investimento - Computadores e Periféricos', grupo: 'Investimentos' },
   { pattern: /(maquina|equipamento|autoclave|cadeira odonto)/i, tipo: 'despesa', classificacao: 'Investimento - Máquinas e Equipamentos', grupo: 'Investimentos' },
   { pattern: /(movel|mobilia|mesa|cadeira\b)/i, tipo: 'despesa', classificacao: 'Investimento - Móveis e Utensílios', grupo: 'Investimentos' },
@@ -99,15 +101,119 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(consultoria\b)/i, tipo: 'despesa', classificacao: 'Consultoria', grupo: 'Despesas Administrativas' },
   { pattern: /(refeicao|almoco|lanche|restaurante)/i, tipo: 'despesa', classificacao: 'Refeições e Lanches', grupo: 'Despesas Comerciais e Marketing' },
   { pattern: /(viagem|estadia|hotel|passagem)/i, tipo: 'despesa', classificacao: 'Viagens e Estadias', grupo: 'Despesas Administrativas' },
-  { pattern: /(uber\b|taxi|99\b|ifood)/i, tipo: 'despesa', classificacao: 'Uber e Táxi', grupo: 'Despesas Administrativas' },
-  { pattern: /(material escritorio|papel|caneta|toner)/i, tipo: 'despesa', classificacao: 'Material de Escritório', grupo: 'Despesas Administrativas' },
-  { pattern: /(uniforme|epj|epi\b)/i, tipo: 'despesa', classificacao: 'Uniformes', grupo: 'Despesas Administrativas' },
-  { pattern: /(estacionamento|parking)/i, tipo: 'despesa', classificacao: 'Estacionamento', grupo: 'Despesas Administrativas' },
-  { pattern: /(limpeza\b|desinfetante|produto limpeza)/i, tipo: 'despesa', classificacao: 'Material de Limpeza', grupo: 'Despesas Administrativas' },
+  { pattern: /(uber\b|taxi|99\b|ifood|cabify)/i, tipo: 'despesa', classificacao: 'Uber e Táxi', grupo: 'Despesas Administrativas' },
+  { pattern: /(material escritorio|papel|caneta|toner|cartucho)/i, tipo: 'despesa', classificacao: 'Material de Escritório', grupo: 'Despesas Administrativas' },
+  { pattern: /(uniforme|epj|epi\b|vestimenta)/i, tipo: 'despesa', classificacao: 'Uniformes', grupo: 'Despesas Administrativas' },
+  { pattern: /(estacionamento|parking|park\b)/i, tipo: 'despesa', classificacao: 'Estacionamento', grupo: 'Despesas Administrativas' },
+  { pattern: /(limpeza\b|desinfetante|produto limpeza|higienizacao)/i, tipo: 'despesa', classificacao: 'Material de Limpeza', grupo: 'Despesas Administrativas' },
+  { pattern: /(motoboy|loggi\b|entregador|motofrete)/i, tipo: 'despesa', classificacao: 'Serviço de Motoboy', grupo: 'Despesas Administrativas' },
+  { pattern: /(darf\b|dae\b|guia recolhimento|recolhimento federal)/i, tipo: 'despesa', classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional', grupo: 'Impostos sobre Faturamento' },
+  { pattern: /(taxa\b|tarifa\b|emolumento)/i, tipo: 'despesa', classificacao: 'Taxas e Emolumentos', grupo: 'Despesas Administrativas' },
+  { pattern: /(comissao\b|gratificacao\b|bonus func)/i, tipo: 'despesa', classificacao: 'OP Gratificações', grupo: 'Despesas Operacionais' },
+  { pattern: /(exame.*admiss|exame.*demiss|exame.*periodi|medicina.*trabalho)/i, tipo: 'despesa', classificacao: 'Exames Ocupacionais', grupo: 'Despesas Administrativas' },
 ]
 
 const normalize = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+/** Mapa exaustivo classificação → grupo (espelha o plano_de_contas_dre.md) */
+const CLASSIFICACAO_GRUPO: Record<string, string> = {
+  'Receita Dinheiro': 'Receitas Operacionais',
+  'Receita Cartão': 'Receitas Operacionais',
+  'Receita Financeiras': 'Receitas Operacionais',
+  'Receita PIX / Transferências': 'Receitas Operacionais',
+  'Receita Subadquirência (BT)': 'Receitas Operacionais',
+  'Rendimento de Aplicação Financeira': 'Receitas Financeiras',
+  'Descontos Obtidos': 'Receitas Financeiras',
+  'Vendas Canceladas / Devoluções': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Antecipação': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Padrão': 'Deduções de Receita',
+  'Impostos sobre Receitas - Presumido e Simples Nacional': 'Impostos sobre Faturamento',
+  'OP Gratificações': 'Despesas Operacionais',
+  'Custo de Materiais e Insumos': 'Despesas Operacionais',
+  'Serviços Terceiros PF (dentistas)': 'Despesas Operacionais',
+  'Serviços Técnicos para Laboratórios': 'Despesas Operacionais',
+  'Royalties e Assistência Técnica': 'Despesas Operacionais',
+  'Fundo Nacional de Marketing': 'Despesas Operacionais',
+  'Pró-labore': 'Despesas com Pessoal',
+  'Salários e Ordenados': 'Despesas com Pessoal',
+  '13° Salário': 'Despesas com Pessoal',
+  'Rescisões': 'Despesas com Pessoal',
+  'INSS': 'Despesas com Pessoal',
+  'FGTS': 'Despesas com Pessoal',
+  'Outras Despesas Com Funcionários': 'Despesas com Pessoal',
+  'Vale Transporte': 'Despesas com Pessoal',
+  'Vale Refeição': 'Despesas com Pessoal',
+  'Combustível': 'Despesas com Pessoal',
+  'Adiantamento a Fornecedor': 'Despesas Administrativas',
+  'Energia Elétrica': 'Despesas Administrativas',
+  'Água e Esgoto': 'Despesas Administrativas',
+  'Aluguel': 'Despesas Administrativas',
+  'Manutenção e Conservação Predial': 'Despesas Administrativas',
+  'Telefonia': 'Despesas Administrativas',
+  'Uniformes': 'Despesas Administrativas',
+  'Manutenção e Reparos': 'Despesas Administrativas',
+  'Seguros': 'Despesas Administrativas',
+  'Uber e Táxi': 'Despesas Administrativas',
+  'Copa e Cozinha': 'Despesas Administrativas',
+  'Cartórios': 'Despesas Administrativas',
+  'Viagens e Estadias': 'Despesas Administrativas',
+  'Material de Escritório': 'Despesas Administrativas',
+  'Estacionamento': 'Despesas Administrativas',
+  'Material de Limpeza': 'Despesas Administrativas',
+  'Bens de Pequeno Valor': 'Despesas Administrativas',
+  'Custas Processuais': 'Despesas Administrativas',
+  'Outras Despesas': 'Despesas Administrativas',
+  'Consultoria': 'Despesas Administrativas',
+  'Contabilidade': 'Despesas Administrativas',
+  'Jurídico': 'Despesas Administrativas',
+  'Limpeza': 'Despesas Administrativas',
+  'Segurança e Vigilância': 'Despesas Administrativas',
+  'Serviço de Motoboy': 'Despesas Administrativas',
+  'IOF': 'Despesas Administrativas',
+  'Taxas e Emolumentos': 'Despesas Administrativas',
+  'Multa e Juros s/ Contas Pagas em Atraso': 'Despesas Administrativas',
+  'Exames Ocupacionais': 'Despesas Administrativas',
+  'Refeições e Lanches': 'Despesas Comerciais e Marketing',
+  'Outras Despesas com Vendas': 'Despesas Comerciais e Marketing',
+  'Agência e Assessoria': 'Despesas Comerciais e Marketing',
+  'Produção de Material': 'Despesas Comerciais e Marketing',
+  'Marketing Digital': 'Despesas Comerciais e Marketing',
+  'Feiras e Eventos': 'Despesas Comerciais e Marketing',
+  'Internet': 'Despesas com TI',
+  'Informática e Software': 'Despesas com TI',
+  'Hospedagem de Dados': 'Despesas com TI',
+  'Sistema de Gestão': 'Despesas com TI',
+  'Despesas Bancárias': 'Despesas Financeiras',
+  'Depreciação e Amortização': 'Despesas Financeiras',
+  'Juros Passivos': 'Despesas Financeiras',
+  'Financiamentos / Empréstimos': 'Despesas Financeiras',
+  'Investimento - Máquinas e Equipamentos': 'Investimentos',
+  'Investimento - Computadores e Periféricos': 'Investimentos',
+  'Investimento - Móveis e Utensílios': 'Investimentos',
+  'Investimento - Instalações de Terceiros': 'Investimentos',
+  'Dividendos e Despesas dos Sócios': 'Investimentos',
+}
+
+/**
+ * Retorna true se as duas descrições são "parecidas o suficiente" para sugerir
+ * aplicação em lote. Usa sobreposição de palavras significativas (≥ 3 chars).
+ */
+function descricaoParecida(a: string, b: string): boolean {
+  const na = normalize(a)
+  const nb = normalize(b)
+  if (na === nb) return true
+  // substring bidirecional (um contém o outro)
+  if (na.length > 5 && nb.length > 5 && (na.includes(nb) || nb.includes(na))) return true
+  // sobreposição de palavras ≥ 60 %
+  const wa = na.split(/\s+/).filter(w => w.length > 2)
+  const wb = nb.split(/\s+/).filter(w => w.length > 2)
+  if (wa.length === 0 || wb.length === 0) return false
+  const setA = new Set(wa)
+  const matches = wb.filter(w => setA.has(w)).length
+  return matches / Math.max(wa.length, wb.length) >= 0.6
+}
 
 /** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
 function classificarLocal(descricao: string): { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' } | null {
@@ -539,6 +645,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
+  const [sugestaoParecidos, setSugestaoParecidos]   = useState<{
+    classificacao: string; grupo: string; similares: number[]
+  } | null>(null)
 
   useEffect(() => {
     supabase.from('exemplos_upload').select('nome, arquivo').order('created_at')
@@ -551,9 +660,29 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const totalSelecionado = [...selecionados].reduce((s, i) => s + linhasClass[i].valor, 0)
 
   const handleClassChange = (idx: number, novoNome: string) => {
+    const novoGrupo = CLASSIFICACAO_GRUPO[novoNome] ?? linhasClass[idx].grupo
     setLinhasClass(prev => prev.map((l, i) =>
-      i === idx ? { ...l, classificacao: novoNome, sugerida: novoNome === 'Não Identificado' } : l
+      i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: novoNome === 'Não Identificado' } : l
     ))
+    // Se o usuário está classificando um "Não Identificado", procura itens parecidos
+    if (novoNome !== 'Não Identificado' && linhasClass[idx].sugerida) {
+      const similares = linhasClass
+        .map((l, i) => ({ l, i }))
+        .filter(({ l, i }) => i !== idx && l.sugerida && descricaoParecida(l.descricao, linhasClass[idx].descricao))
+        .map(({ i }) => i)
+      setSugestaoParecidos(similares.length > 0 ? { classificacao: novoNome, grupo: novoGrupo, similares } : null)
+    } else {
+      setSugestaoParecidos(null)
+    }
+  }
+
+  const aplicarClassificacaoParecidos = () => {
+    if (!sugestaoParecidos) return
+    const { classificacao, grupo, similares } = sugestaoParecidos
+    setLinhasClass(prev => prev.map((l, i) =>
+      similares.includes(i) ? { ...l, classificacao, grupo, sugerida: false } : l
+    ))
+    setSugestaoParecidos(null)
   }
 
   const toggleItem = (i: number) => setSelecionados(prev => {
@@ -702,13 +831,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setFase('processando')
     setProgresso(null)
 
-    // Busca modelo e classificações antes de parsear (modelo é necessário para o parse com IA)
-    const [{ data: configData }, { data: classData }] = await Promise.all([
+    // Busca modelo, classificações e histórico de correções da empresa
+    const [{ data: configData }, { data: classData }, { data: historicoData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single(),
       supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
+      supabase.from('dre_classificacao_historico')
+        .select('descricao_normalizada, classificacao, grupo, tipo')
+        .eq('empresa_id', empresaId),
     ])
     const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+    // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
+    const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
+      ((historicoData ?? []) as { descricao_normalizada: string; classificacao: string; grupo: string; tipo: string }[])
+        .map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
+    )
 
     // ── Parse do arquivo com IA (entende qualquer formato de extrato) ─────────
     let linhas: LinhaExtrato[] = []
@@ -772,9 +909,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const local = classificarLocal(linha.descricao)
       if (local) {
         classificadas[i] = { ...linha, tipo: local.tipo, classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
-      } else {
-        indicesParaIA.push(i)
+        continue
       }
+
+      // Prioridade 3: histórico de correções manuais desta empresa
+      const chaveHist = normalize(linha.descricao)
+      const hist = historico.get(chaveHist)
+      if (hist) {
+        classificadas[i] = { ...linha, tipo: hist.tipo, classificacao: hist.classificacao, grupo: hist.grupo, status: 'ok' }
+        continue
+      }
+
+      indicesParaIA.push(i)
     }
 
     setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length, label: 'Classificando com IA' })
@@ -881,6 +1027,23 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }))
       const { error } = await supabase.from('dre_lancamentos').insert(toInsert)
       if (error) throw new Error(error.message)
+
+      // Aprende com este upload: upsert no histórico para classificações válidas
+      const historicoItems = [...indices].sort((a, b) => a - b)
+        .filter(i => linhasClass[i].classificacao && linhasClass[i].classificacao !== 'Não Identificado')
+        .map(i => ({
+          empresa_id:            empresaId,
+          descricao_normalizada: normalize(linhasClass[i].descricao),
+          classificacao:         linhasClass[i].classificacao,
+          grupo:                 linhasClass[i].grupo,
+          tipo:                  linhasClass[i].tipo,
+          updated_at:            new Date().toISOString(),
+        }))
+      if (historicoItems.length > 0) {
+        await supabase.from('dre_classificacao_historico')
+          .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
+      }
+
       setSucessoSalvo(toInsert.length)
       setFase('concluido')
       onSaved?.()
@@ -1037,6 +1200,24 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
           {erroSalvar && (
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
+          )}
+
+          {/* Banner: aplicar classificação a lançamentos parecidos */}
+          {sugestaoParecidos && (
+            <div className={styles.bannerParecidos}>
+              <span className={styles.bannerParecidosTexto}>
+                Aplicar <strong>{sugestaoParecidos.classificacao}</strong> aos outros{' '}
+                <strong>{sugestaoParecidos.similares.length}</strong> lançamento{sugestaoParecidos.similares.length > 1 ? 's' : ''} parecido{sugestaoParecidos.similares.length > 1 ? 's' : ''}?
+              </span>
+              <div className={styles.bannerParecidosBtns}>
+                <button className={styles.btnPrimary} onClick={aplicarClassificacaoParecidos}>
+                  Sim, aplicar a todos
+                </button>
+                <button className={styles.btnSecondary} onClick={() => setSugestaoParecidos(null)}>
+                  Não
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Tabela de revisão */}
