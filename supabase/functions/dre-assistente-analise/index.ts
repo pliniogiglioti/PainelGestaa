@@ -15,148 +15,43 @@ const CORS_HEADERS = {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CONTEXTO DA IA — conteúdo de public/ia/plano_de_contas_dre.md
+// CONTEXTO DA IA — versão compacta para reduzir tokens no prompt
 // ─────────────────────────────────────────────────────────────────────────────
 const PLANO_DE_CONTAS = `
-# Plano de Contas — DRE (Grupos e Classificações)
-
-## Regras rápidas de classificação
-- Receitas: entradas de vendas/serviços/produtos.
-- Deduções de receita: estornos, cancelamentos e taxas de cartão/antecipação/POS.
-- Impostos sobre faturamento: Simples/Presumido (sobre receita).
-- Despesas operacionais: gastos diretamente ligados à entrega (laboratório, materiais, terceiros).
-- Despesas com pessoal: salários, encargos, benefícios, pró-labore.
-- Despesas administrativas/gerais: aluguel, energia, internet, contabilidade, etc.
-
-## 1. RECEITAS OPERACIONAIS
-1.1 — Receita Dinheiro | 1.2 — Receita Cartão | 1.3 — Receita Financeiras
-1.4 — Receita PIX / Transferências | 1.5 — Receita Subadquirência (BT)
-
-## 2. DEDUÇÕES DE RECEITA
-2.1 — Vendas Canceladas / Devoluções
-2.2 — Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas
-2.3 — Tarifa de Cartão / Meios de Pagamento - Antecipação
-2.4 — Tarifa de Cartão / Meios de Pagamento - Padrão
-
-## 3. IMPOSTOS SOBRE O FATURAMENTO
-3.1 — Impostos sobre Receitas - Presumido e Simples Nacional
-
-## 4. DESPESAS OPERACIONAIS
-4.1 — OP Gratificações | 4.2 — Custo de Materiais e Insumos
-4.3 — Serviços Terceiros PF (dentistas) | 4.4 — Serviços técnicos para Laboratórios
-4.5 — Royalties e Assistência Técnica | 4.6 — Fundo Nacional de Marketing
-
-## 5. MARGEM DE CONTRIBUIÇÃO (Receita − Despesas Variáveis)
-
-## 6. DESPESAS COM PESSOAL
-6.1 — Pró-labore | 6.2 — Salários e Ordenados | 6.3 — 13° Salário
-6.4 — Rescisões | 6.5 — INSS | 6.6 — FGTS
-6.7 — Outras Despesas Com Funcionários | 6.8 — Vale Transporte
-6.9 — Vale Refeição | 6.10 — Combustível
-
-## 7. DESPESAS ADMINISTRATIVAS
-7.1 — Adiantamento a Fornecedor | 7.2 — Energia Elétrica | 7.3 — Água e Esgoto
-7.4 — Aluguel | 7.5 — Manutenção Predial | 7.6 — Telefonia | 7.7 — Uniformes
-7.8 — Manutenção e Reparos | 7.9 — Seguros | 7.10 — Uber e Táxi
-7.11 — Copa e Cozinha | 7.12 — Cartórios | 7.13 — Viagens e Estadias
-7.14 — Material de Escritório | 7.15 — Estacionamento | 7.16 — Material de Limpeza
-7.17 — Bens de Pequeno Valor | 7.18 — Custas Processuais | 7.19 — Outras Despesas
-7.20 — Consultoria | 7.21 — Contabilidade | 7.22 — Jurídico | 7.23 — Limpeza
-7.24 — Segurança e Vigilância | 7.25 — Serviço de Motoboy | 7.26 — IOF
-7.27 — Taxas e Emolumentos | 7.28 — Multa e Juros s/ Contas Pagas em Atraso
-7.29 — Exames Ocupacionais
-
-## 8. DESPESAS COMERCIAIS E MARKETING
-8.1 — Refeições e Lanches | 8.2 — Outras Despesas com Vendas
-8.3 — Agência e Assessoria | 8.4 — Produção de Material
-8.5 — Marketing Digital | 8.6 — Feiras e Eventos
-
-## 9. DESPESAS COM TI
-9.1 — Internet | 9.2 — Informática e Software
-9.3 — Hospedagem de Dados | 9.4 — Sistema de Gestão
-
-## 10. EBITDA (Resultado Operacional antes de depreciação)
-
-## 11. RECEITAS FINANCEIRAS
-11.1 — Rendimento de Aplicação Financeira | 11.2 — Descontos Obtidos
-
-## 12. DESPESAS FINANCEIRAS
-12.1 — Despesas Bancárias | 12.2 — Depreciação e Amortização
-12.3 — Juros Passivos | 12.4 — Financiamentos / Empréstimos
-
-## 13. EBIT (Lucro Operacional Real)
-
-## 14. INVESTIMENTOS
-14.1 — Investimento - Máquinas e Equipamentos
-14.2 — Investimento - Computadores e Periféricos
-14.3 — Investimento - Móveis e Utensílios
-14.4 — Investimento - Instalações de Terceiros
-14.4 — Dividendos e Despesas dos Sócios
-
-## 15. NOPAT (RESULTADO OPERACIONAL)
+Plano de Contas DRE:
+1-RECEITAS: Dinheiro|Cartão|Financeiras|PIX|Subadquirência
+2-DEDUÇÕES: Devoluções|Tarifa Cartão(POS/Antecipação/Padrão)
+3-IMPOSTOS: Simples/Presumido
+4-DESP.OPERACIONAIS: Gratificações|Materiais|Terceiros PF|Laboratório|Royalties|Marketing
+6-DESP.PESSOAL: Pró-labore|Salários|13°|Rescisão|INSS|FGTS|Benefícios|VT|VR|Combustível
+7-DESP.ADMIN: Aluguel|Energia|Água|Telefonia|Manutenção|Seguros|Limpeza|Contabilidade|Jurídico|Consultoria|IOF|Multas|Outras
+8-COMERCIAL/MKT: Refeições|Agência|Material|Marketing Digital|Eventos
+9-TI: Internet|Software|Hospedagem|Sistema de Gestão
+11-REC.FINANCEIRAS: Rendimentos|Descontos obtidos
+12-DESP.FINANCEIRAS: Tarifas bancárias|Depreciação|Juros|Financiamentos
+14-INVESTIMENTOS: Máquinas|Computadores|Móveis|Instalações|Dividendos sócios
 `
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LINKS DAS AULAS — conteúdo de public/ia/aulas_gestao_financeira.md
+// LINKS DAS AULAS — versão compacta (2 momentos-chave por aula)
 // Use APENAS estas URLs ao recomendar aulas. Não invente links.
 // ─────────────────────────────────────────────────────────────────────────────
 const AULAS_LINKS = `
-## Aulas disponíveis na plataforma (cite APENAS estas URLs e os minutos indicados)
-
-- **M6_A2_Gestão Financeira** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8f102f08eade02c8e7f7a6e00379a21ddf9166f6b87f35ce034c3eb45cdc3775ea16e334ccb3053e
-  Momentos-chave:
-  • (00:26) "Caixa é rei, gestão é rainha" — diferença entre faturamento e lucro real
-  • (01:41) O que é gasto, custo, despesa e investimento — 4 conceitos fundamentais
-  • (02:54) Custo variável: o que muda com o volume de vendas da clínica
-  • (03:42) Custo fixo: aluguel, salário — não variam com as vendas
-  • (05:23) Exercício prático: classificando os custos da clínica
-
-- **M6_A3_Fundamentos Financeiros** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe3b0c3137a472dca022c568c3ad69ea61ebb5dfc1b81550cd3b6966629255b28210a0dc615155d7f
-  Momentos-chave:
-  • (00:26) Fluxo de caixa como pulso da clínica — acompanhar entradas e saídas diariamente
-  • (03:28) Contas a pagar e a receber — como prever o caixa futuro
-  • (05:00) D+0, D+30, D+60 — datas de pagamento afetam o caixa
-  • (06:27) Não antecipe vendas no cartão sem necessidade — os juros corroem o lucro
-  • (07:40) Estoque é dinheiro parado — equilibrar falta com excesso
-  • (10:04) Inventário mensal obrigatório para evitar desperdício e roubo
-
-- **M6_A4_DRE** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fb334e1273ae0f6b915375684fe428ed57efb99688046f0a323e66fa6aa2b12f38837e03360a61de5
-  Momentos-chave:
-  • (01:33) DRE como termômetro do negócio — ilumina o caminho, mas quem age é o gestor
-  • (03:00) Estrutura do DRE: receita → custos variáveis → margem de contribuição
-  • (04:07) EBITDA: primeiro indicador de lucro operacional
-  • (05:02) EBIT e valuation — valor da empresa = múltiplo do EBIT anual
-  • (13:03) Benchmarks por faturamento — compare sua clínica com o padrão de mercado
-
-- **M6_A5_EBIT** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe2e54ea87eaf1955bcb330114df5ede79d778a1fee96bb52bdfa65933febf4aed57f863d86a6a1a6
-  Momentos-chave:
-  • (01:22) Receita financeira — ganho de capital fora das vendas (juros de aplicação)
-  • (02:19) Amortização — como tratar pagamentos de empréstimos no DRE
-  • (04:11) Dever: amortizar dívidas é melhor que investir — retorno garantido
-  • (05:27) Depreciação — perda de valor de ativos ao longo do tempo
-  • (08:21) Reservar dinheiro para reposição futura de equipamentos
-
-- **M6_A6_Balanço Patrimonial** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f874e8a957bd891e8ca8bacf58ef5d3e41f47e3ab2995963f09e63bb503eb0240ae1a105003d658e8
-  Momentos-chave:
-  • (04:53) Ativo, passivo e patrimônio líquido — os 3 componentes do balanço
-  • (05:59) Seu contador deve entregar o balanço mensalmente — exija isso
-  • (06:36) Patrimônio líquido como fonte de recursos — alternativa a empréstimo
-  • (07:49) Patrimônio líquido positivo é pré-requisito para retirar dividendos
-
-- **M6_A7_Ponto de Equilíbrio e CG** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f5e7fb6918e7c0e82e4aa9f037b3eeeafcecab5a136bcfc52ab479213b0786bca091d4f8bcb1cded2
-  Momentos-chave:
-  • (00:32) Ponto de equilíbrio — faturamento mínimo onde lucro = zero
-  • (02:00) Cortar custos fixos é a alavanca mais eficiente para baixar o PE
-  • (05:33) Fórmula: Custos Fixos ÷ (1 − % Margem de Contribuição) = Ponto de Equilíbrio
-  • (07:00) Capital de giro = (Custos Variáveis + Fixos) ÷ 2 — guarde 15 dias de despesa
-
-- **M6_A8_Regime Contábil** — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8a227f1dac8f6f5ce0e911927ebd0681b22ae5f3221af01b29f2ababb2854459fea1d09f0d046bfb
-  Momentos-chave:
-  • (01:01) Regime caixa — lançar quando o dinheiro efetivamente entra/sai da conta
-  • (01:56) Regime competência — lançar na data do evento gerador (não do pagamento)
-  • (04:05) DRE usa competência; DFC usa caixa — formatos diferentes, mesma contabilidade
-  • (06:42) Empresas morrem por falta de caixa, mesmo com DRE positivo — o DFC salva
-  • (08:32) DRE positivo com DFC negativo é possível — entenda a diferença dos regimes
+Aulas disponíveis (cite APENAS estas URLs e minutos):
+- M6_A2_Gestão Financeira — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8f102f08eade02c8e7f7a6e00379a21ddf9166f6b87f35ce034c3eb45cdc3775ea16e334ccb3053e
+  ▶(01:41) gasto/custo/despesa/investimento ▶(05:23) exercício prático custos
+- M6_A3_Fundamentos Financeiros — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe3b0c3137a472dca022c568c3ad69ea61ebb5dfc1b81550cd3b6966629255b28210a0dc615155d7f
+  ▶(00:26) fluxo de caixa diário ▶(06:27) perigo de antecipar cartão
+- M6_A4_DRE — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fb334e1273ae0f6b915375684fe428ed57efb99688046f0a323e66fa6aa2b12f38837e03360a61de5
+  ▶(03:00) estrutura DRE ▶(13:03) benchmarks por faturamento
+- M6_A5_EBIT — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5fe2e54ea87eaf1955bcb330114df5ede79d778a1fee96bb52bdfa65933febf4aed57f863d86a6a1a6
+  ▶(02:19) amortização de empréstimos ▶(05:27) depreciação de ativos
+- M6_A6_Balanço Patrimonial — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f874e8a957bd891e8ca8bacf58ef5d3e41f47e3ab2995963f09e63bb503eb0240ae1a105003d658e8
+  ▶(04:53) ativo/passivo/PL ▶(07:49) PL positivo para dividendos
+- M6_A7_Ponto de Equilíbrio — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f5e7fb6918e7c0e82e4aa9f037b3eeeafcecab5a136bcfc52ab479213b0786bca091d4f8bcb1cded2
+  ▶(05:33) fórmula PE ▶(07:00) capital de giro = 15 dias de despesa
+- M6_A8_Regime Contábil — https://plataforma.clinicscale.com.br/course/programa-de-aceleracao-clinic-scale/53616c7465645f5f8a227f1dac8f6f5ce0e911927ebd0681b22ae5f3221af01b29f2ababb2854459fea1d09f0d046bfb
+  ▶(04:05) DRE=competência, DFC=caixa ▶(06:42) DFC salva empresa mesmo com DRE positivo
 `
 
 type Lancamento = {
@@ -172,7 +67,7 @@ const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 // Máximo de linhas na tabela do prompt — evita prompts gigantes com centenas de classificações
-const MAX_TABELA_ROWS = 50
+const MAX_TABELA_ROWS = 30
 
 /** Agrega lançamentos por grupo+classificação para reduzir tokens no prompt */
 function agregarLancamentos(lancamentos: Lancamento[]): Array<{
@@ -368,11 +263,16 @@ serve(async (req: Request) => {
   try {
     let groqRes = await callGroq(modelo)
 
+    // Rate limit: aguarda 15 s e tenta mais uma vez antes de desistir
+    if (groqRes.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, 15000))
+      groqRes = await callGroq(modelo)
+    }
+
     // Fallback to default model if the configured one is unavailable
     if (!groqRes.ok) {
       const errText = await groqRes.text()
 
-      // Rate limit — orienta o usuário a tentar novamente em vez de erro genérico
       if (groqRes.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Limite de requisições da IA atingido. Aguarde alguns segundos e tente novamente.' }),
