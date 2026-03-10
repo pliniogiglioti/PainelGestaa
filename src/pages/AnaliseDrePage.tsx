@@ -351,7 +351,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
-  const [anoFiltro,        setAnoFiltro]        = useState('todos')
+  const [anoFiltro,        setAnoFiltro]        = useState(String(new Date().getFullYear()))
   const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
   const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
   // Admin
