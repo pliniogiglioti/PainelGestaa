@@ -1004,6 +1004,11 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <strong className={styles.reviewTitle}>
                 Revise os {linhasClass.length} lançamentos classificados
               </strong>
+              {linhasClass.filter(l => l.sugerida).length > 0 && (
+                <span className={styles.reviewNaoIdBadge}>
+                  ⚠ {linhasClass.filter(l => l.sugerida).length} não identificado{linhasClass.filter(l => l.sugerida).length > 1 ? 's' : ''} — revise antes de salvar
+                </span>
+              )}
               {qtdErros > 0 && (
                 <span className={styles.reviewErroBadge}>
                   ⚠ {qtdErros} com atenção — desmarcados automaticamente
