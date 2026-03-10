@@ -99,7 +99,7 @@
 .topNavWrap {
   height: 72px;
   border-bottom: 1px solid var(--border);
-  background: rgba(8, 8, 8, 0.96);
+  background: var(--bg-nav);
   backdrop-filter: blur(8px);
   display: flex;
   align-items: center;
@@ -140,6 +140,54 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+/* ── Theme toggle switch ─────────────────────────────────────────────────── */
+
+.themeToggle {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  transition: background 0.25s, border-color 0.25s;
+  flex-shrink: 0;
+}
+
+.themeToggleDark {
+  background: var(--bg-hover);
+  justify-content: flex-start;
+}
+
+.themeToggleLight {
+  background: var(--gold);
+  border-color: var(--gold);
+  justify-content: flex-end;
+}
+
+.themeToggleKnob {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.25s, color 0.25s;
+  flex-shrink: 0;
+}
+
+.themeToggleDark .themeToggleKnob {
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.themeToggleLight .themeToggleKnob {
+  background: #fff;
+  color: #b8860b;
 }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
