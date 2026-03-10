@@ -351,7 +351,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
-  const [anoFiltro,        setAnoFiltro]        = useState('todos')
+  const [anoFiltro,        setAnoFiltro]        = useState(String(new Date().getFullYear()))
   const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
   const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
   // Admin
@@ -650,9 +650,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   }
 
   const dreComparativoPorMes = useMemo<MesComparativoData[]>(() => {
-    if (mesesFiltro.length === 0) return []
+    // Se nenhum mês selecionado, usa todos os meses disponíveis (ano atual)
+    const mesesEfetivos = mesesFiltro.length > 0 ? mesesFiltro : mesesOptions.map(m => m.value)
+    if (mesesEfetivos.length === 0) return []
     const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'short', timeZone: 'UTC' })
-    return mesesFiltro.map(mes => {
+    return mesesEfetivos.map(mes => {
       const items = lancamentos.filter(l => {
         const src = l.data_lancamento ?? l.created_at
         if (!src) return false
@@ -674,7 +676,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
         kpis: k,
       }
     })
-  }, [mesesFiltro, lancamentos, anoFiltro, tipoMap])
+  }, [mesesFiltro, mesesOptions, lancamentos, anoFiltro, tipoMap])
 
   const toggleGrupo = (key: string) => setExpandedGrupos(prev => {
     const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n
