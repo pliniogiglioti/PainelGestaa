@@ -1226,7 +1226,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                             {cAberto && (
                               <table className={styles.lancTable}>
                                 <thead>
-                                  <tr><th>Data</th><th>Descrição</th><th>Valor</th><th></th></tr>
+                                  <tr><th>Data</th><th>Descrição</th><th>Valor</th><th className={styles.thPct}>% Rec. Op.</th><th></th></tr>
                                 </thead>
                                 <tbody>
                                   {clf.items.map(item => (
@@ -1235,6 +1235,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                                       <td>{item.descricao ?? '—'}</td>
                                       <td className={item.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}>
                                         {moeda(Number(item.valor))}
+                                      </td>
+                                      <td className={styles.tdPct}>
+                                        {kpis.receitaOperacional > 0
+                                          ? pct((Number(item.valor) / kpis.receitaOperacional) * 100)
+                                          : '—'}
                                       </td>
                                       <td className={styles.actionCell}>
                                         <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
