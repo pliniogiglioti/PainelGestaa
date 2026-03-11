@@ -1,8 +1,8 @@
 /* ── Section ─────────────────────────────────────────────────────────────────── */
 
 .section {
-  background: rgba(12, 12, 12, 0.85);
-  border: 1px solid #252525;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 18px;
   padding: 26px 28px;
   margin-bottom: 22px;
@@ -24,7 +24,7 @@
 
 .sectionSubtitle {
   margin: 0;
-  color: #888;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -69,7 +69,7 @@
 /* ── Drop Zone ───────────────────────────────────────────────────────────────── */
 
 .dropZone {
-  border: 2px dashed #333;
+  border: 2px dashed var(--border);
   border-radius: 14px;
   padding: 36px 24px;
   text-align: center;
@@ -92,12 +92,12 @@
 .dropTitle {
   margin: 0 0 4px;
   font-size: 15px;
-  color: #ddd;
+  color: var(--text);
 }
 .dropHint {
   margin: 0;
   font-size: 12px;
-  color: #666;
+  color: var(--text-muted);
 }
 
 /* ── Progress ────────────────────────────────────────────────────────────────── */
@@ -112,7 +112,7 @@
 .progressSpinner {
   width: 28px;
   height: 28px;
-  border: 3px solid #2a2a2a;
+  border: 3px solid var(--bg-hover);
   border-top-color: #d5af45;
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
@@ -122,13 +122,13 @@
 .progressText {
   margin: 0;
   font-size: 14px;
-  color: #aaa;
+  color: var(--text-muted);
 }
 
 .progressBar {
   width: 240px;
   height: 4px;
-  background: #2a2a2a;
+  background: var(--bg-hover);
   border-radius: 999px;
   overflow: hidden;
 }
@@ -186,16 +186,16 @@
 
 .btnSecondary {
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid #333;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  color: #aaa;
+  color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
   transition: background 0.15s;
   white-space: nowrap;
 }
-.btnSecondary:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); }
+.btnSecondary:hover:not(:disabled) { background: var(--bg-hover); }
 .btnSecondary:disabled { opacity: 0.4; cursor: default; }
 
 .btnRemover {
@@ -249,7 +249,7 @@
 
 .reviewTitle {
   font-size: 15px;
-  color: #e0e0e0;
+  color: var(--text);
 }
 
 .reviewErroBadge {
@@ -283,7 +283,7 @@
 .reviewTableWrap {
   max-height: 500px;
   overflow-y: auto;
-  border: 1px solid #252525;
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -297,20 +297,20 @@
   position: sticky;
   top: 0;
   z-index: 1;
-  background: #111;
+  background: var(--bg-elevated);
   padding: 9px 12px;
   text-align: left;
-  color: #555;
+  color: var(--text-dim);
   font-size: 10.5px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  border-bottom: 1px solid #252525;
+  border-bottom: 1px solid var(--border);
 }
 
 .reviewTable tbody tr {
   cursor: pointer;
   transition: background 0.1s, opacity 0.1s;
-  border-bottom: 1px solid #1a1a1a;
+  border-bottom: 1px solid var(--border);
 }
 .reviewTable tbody tr:last-child { border-bottom: none; }
 .reviewTable tbody tr:hover { background: rgba(255, 255, 255, 0.045) !important; opacity: 1 !important; }
@@ -329,16 +329,16 @@
 }
 .checkCell input[type='checkbox'] { cursor: pointer; accent-color: #d5af45; }
 
-.tdData   { white-space: nowrap; color: #666; padding: 8px 12px; }
-.tdDesc   { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #ccc; padding: 8px 12px; }
-.tdClf    { color: #aaa; padding: 8px 12px; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdData   { white-space: nowrap; color: var(--text-dim); padding: 8px 12px; }
+.tdDesc   { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); padding: 8px 12px; }
+.tdClf    { color: var(--text-muted); padding: 8px 12px; font-size: 12px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Select editável de classificação na tabela de revisão */
 .selectClf {
   background: transparent;
   border: none;
-  border-bottom: 1px dashed #444;
-  color: #aaa;
+  border-bottom: 1px dashed var(--border);
+  color: var(--text-muted);
   font-size: 11px;
   padding: 1px 2px;
   cursor: pointer;
@@ -346,8 +346,8 @@
   max-width: 170px;
   outline: none;
 }
-.selectClf:hover, .selectClf:focus { border-bottom-color: #d5af45; color: #ddd; }
-.selectClf option { background: #1e1e1e; color: #ccc; }
+.selectClf:hover, .selectClf:focus { border-bottom-color: #d5af45; color: var(--text); }
+.selectClf option { background: var(--bg-elevated); color: var(--text); }
 
 /* Quando IA não identificou uma classificação cadastrada (Não Identificado): destaca em verde */
 .selectClfSugerida { border-bottom-color: #4ade80 !important; color: #4ade80 !important; }
@@ -367,7 +367,7 @@
   font-size: 11px;
   color: #888;
 }
-.tdGrupo  { color: #555; font-size: 11px; padding: 8px 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tdGrupo  { color: var(--text-dim); font-size: 11px; padding: 8px 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tdValor  { text-align: right; font-weight: 600; white-space: nowrap; padding: 8px 12px; }
 .thValor  { text-align: right !important; }
 .tdPct    { text-align: right; font-size: 11px; color: #777; white-space: nowrap; padding: 8px 8px; width: 64px; }
@@ -420,17 +420,17 @@
   align-items: center;
   gap: 16px;
   padding: 12px 16px;
-  background: rgba(16, 16, 16, 0.95);
-  border: 1px solid #252525;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 10px;
   flex-wrap: wrap;
 }
 
 .footerInfo {
   font-size: 13px;
-  color: #777;
+  color: var(--text-muted);
 }
-.footerInfo strong { color: #ddd; }
+.footerInfo strong { color: var(--text); }
 
 .footerBtns {
   display: flex;
@@ -479,8 +479,8 @@
 }
 
 .modalSugerida {
-  background: #141414;
-  border: 1px solid #333;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 32px;
   max-width: 560px;
@@ -501,9 +501,9 @@
   gap: 4px;
   max-height: 220px;
   overflow-y: auto;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: #0d0d0d;
+  background: var(--bg-surface);
 }
 
 .modalNaoClassList li {
@@ -511,20 +511,20 @@
   align-items: baseline;
   gap: 8px;
   padding: 7px 12px;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--border);
   font-size: 12px;
 }
 
 .modalNaoClassList li:last-child { border-bottom: none; }
 
 .modalNaoClassData {
-  color: #666;
+  color: var(--text-dim);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .modalNaoClassDesc {
-  color: #bbb;
+  color: var(--text);
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -546,14 +546,14 @@
 .modalSugeridaTitulo {
   font-size: 17px;
   font-weight: 700;
-  color: #f2f2f2;
+  color: var(--text);
   margin: 0;
   text-align: center;
 }
 
 .modalSugeridaTexto {
   font-size: 14px;
-  color: #aaa;
+  color: var(--text-muted);
   margin: 0;
   line-height: 1.6;
   text-align: center;

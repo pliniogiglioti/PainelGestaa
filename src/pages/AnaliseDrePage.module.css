@@ -344,7 +344,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 16px;
-  background: rgba(16,16,16,0.9);
+  background: var(--bg-elevated);
   border: none;
   cursor: pointer;
   text-align: left;
@@ -352,7 +352,7 @@
   gap: 10px;
   transition: background 0.12s;
 }
-.grupoBlockHeader:hover { background: rgba(28,28,28,0.9); }
+.grupoBlockHeader:hover { background: var(--bg-hover); }
 
 .grupoBlockLeft { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
 
@@ -380,7 +380,7 @@
 
 /* ── Classificações ── */
 
-.clfList { border-top: 1px solid #1e1e1e; background: rgba(8,8,8,0.6); }
+.clfList { border-top: 1px solid var(--border); background: var(--bg-surface); }
 
 .clfBlock { border-bottom: 1px solid var(--border); }
 .clfBlock:last-child { border-bottom: none; }
