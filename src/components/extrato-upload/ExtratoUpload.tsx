@@ -202,6 +202,24 @@ const GRUPOS_DISPONIVEIS = [...new Set(Object.values(CLASSIFICACAO_GRUPO))].sort
 )
 
 /**
+ * Mapa normalizado classificação → grupo, usado como fallback quando o nome
+ * da classificação não bate exatamente com a chave (acento, case, espaço etc.)
+ */
+const LOOKUP_GRUPO_NORM = new Map<string, string>([
+  ...Object.entries(CLASSIFICACAO_GRUPO).map(([k, v]) => [normalize(k), v] as [string, string]),
+  ...FALLBACK_RULES.map(r => [normalize(r.classificacao), r.grupo] as [string, string]),
+])
+
+/** Resolve o grupo de uma classificação com múltiplos níveis de fallback */
+function resolveGrupo(nome: string, tipo: 'receita' | 'despesa'): string {
+  return (
+    CLASSIFICACAO_GRUPO[nome] ??
+    LOOKUP_GRUPO_NORM.get(normalize(nome)) ??
+    (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas')
+  )
+}
+
+/**
  * Retorna true se as duas descrições são "parecidas o suficiente" para sugerir
  * aplicação em lote. Usa sobreposição de palavras significativas (≥ 3 chars).
  */
@@ -633,6 +651,7 @@ interface LancamentoRowProps {
   index: number
   isSelecionado: boolean
   classificacoesOrdenadas: { nome: string; tipo: string }[]
+  totalReceitasOp: number
   onToggle: (i: number) => void
   onClassChange: (i: number, nome: string) => void
   onGrupoChange: (i: number, grupo: string) => void
@@ -645,12 +664,14 @@ const LancamentoRow = memo(function LancamentoRow({
   index: i,
   isSelecionado,
   classificacoesOrdenadas,
+  totalReceitasOp,
   onToggle,
   onClassChange,
   onGrupoChange,
   onRemover,
   styles,
 }: LancamentoRowProps) {
+  const pct = totalReceitasOp > 0 ? (l.valor / totalReceitasOp) * 100 : null
   return (
     <tr
       className={[
@@ -708,6 +729,9 @@ const LancamentoRow = memo(function LancamentoRow({
       <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
         {moeda(l.valor)}
       </td>
+      <td className={styles.tdPct} title="% relativo às Receitas Operacionais">
+        {pct !== null ? `${pct.toFixed(1)}%` : '—'}
+      </td>
       <td className={styles.tdRemover} onClick={e => e.stopPropagation()}>
         <button
           className={styles.btnRemoverLinha}
@@ -757,6 +781,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const someChecked    = selecionados.size > 0 && !todosChecked
   const totalSelecionado = [...selecionados].reduce((s, i) => s + linhasClass[i].valor, 0)
 
+  // Total de Receitas Operacionais — base para cálculo de % por linha
+  const totalReceitasOp = useMemo(
+    () => linhasClass.filter(l => l.grupo === 'Receitas Operacionais').reduce((s, l) => s + l.valor, 0),
+    [linhasClass]
+  )
+
   // Pré-computa listas de classificações ordenadas por tipo — evita sort a cada render de linha
   const classificacoesReceita = useMemo(() =>
     classificacoesDisp.filter(c => c.tipo === 'receita').sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' })),
@@ -770,7 +800,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const handleClassChange = useCallback((idx: number, novoNome: string) => {
     // Usa functional update para evitar dependência de linhasClass no callback
     setLinhasClass(prev => {
-      const novoGrupo = CLASSIFICACAO_GRUPO[novoNome] ?? prev[idx].grupo
+      const novoGrupo = resolveGrupo(novoNome, prev[idx].tipo)
       // Procura similares do mesmo tipo antes de atualizar o estado
       if (novoNome !== 'Não Identificado' && prev[idx].sugerida) {
         const tipoAtual = prev[idx].tipo
@@ -1362,6 +1392,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                   <th>Classificação</th>
                   <th>Grupo</th>
                   <th className={styles.thValor}>Valor</th>
+                  <th className={styles.thPct} title="% relativo às Receitas Operacionais">% Rec. Op.</th>
                   <th style={{ width: 32 }} />
                 </tr>
               </thead>
@@ -1373,6 +1404,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     index={i}
                     isSelecionado={selecionados.has(i)}
                     classificacoesOrdenadas={l.tipo === 'receita' ? classificacoesReceita : classificacoesDespesa}
+                    totalReceitasOp={totalReceitasOp}
                     onToggle={toggleItem}
                     onClassChange={handleClassChange}
                     onGrupoChange={handleGrupoChange}

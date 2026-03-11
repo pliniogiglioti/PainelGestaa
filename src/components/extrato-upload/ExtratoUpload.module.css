@@ -370,6 +370,8 @@
 .tdGrupo  { color: #555; font-size: 11px; padding: 8px 12px; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tdValor  { text-align: right; font-weight: 600; white-space: nowrap; padding: 8px 12px; }
 .thValor  { text-align: right !important; }
+.tdPct    { text-align: right; font-size: 11px; color: #777; white-space: nowrap; padding: 8px 8px; width: 64px; }
+.thPct    { text-align: right !important; font-size: 11px; width: 64px; }
 
 .tipoPill {
   font-size: 10.5px;
