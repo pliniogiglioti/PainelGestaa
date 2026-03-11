@@ -413,6 +413,8 @@
 
 .tdReceita { color: #5aba74 !important; font-weight: 600; }
 .tdDespesa { color: #e06060 !important; font-weight: 600; }
+.tdPct  { text-align: right; color: var(--text-dim); font-size: 11px; white-space: nowrap; width: 72px; }
+.thPct  { text-align: right !important; width: 72px; }
 
 /* ── Table ── */
 
