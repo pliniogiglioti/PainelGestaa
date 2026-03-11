@@ -1165,27 +1165,36 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                     <div className={styles.grupoBlockRight}>
                       {dreComparativoPorMes.length > 0 ? (
                         <div className={styles.mesColValues}>
-                          {dreComparativoPorMes.map(m => (
-                            <div key={m.mes} className={styles.mesColCell}>
-                              <span className={styles.mesColLabel}>{m.label}</span>
-                              <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
-                                {moeda(getMesGrupoTotal(grupo.nome, m))}
-                              </strong>
-                            </div>
-                          ))}
+                          {dreComparativoPorMes.map(m => {
+                            const gVal = getMesGrupoTotal(grupo.nome, m)
+                            const gBase = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : null
+                            return (
+                              <div key={m.mes} className={styles.mesColCell}>
+                                <span className={styles.mesColLabel}>{m.label}</span>
+                                <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                                  {moeda(gVal)}
+                                </strong>
+                                <span className={styles.totalizadorPct}>{gBase ? ((gVal / gBase) * 100).toFixed(1) + '%' : '—'}</span>
+                              </div>
+                            )
+                          })}
                           {dreComparativoPorMes.length > 1 && (
                             <div className={`${styles.mesColCell} ${styles.mesColTotal}`}>
                               <span className={styles.mesColLabel}>Total</span>
                               <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
                                 {moeda(grupo.total)}
                               </strong>
+                              <span className={styles.totalizadorPct}>{kpis.receitaOperacional > 0 ? ((grupo.total / kpis.receitaOperacional) * 100).toFixed(1) + '%' : '—'}</span>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
-                          {moeda(grupo.total)}
-                        </strong>
+                        <>
+                          <strong className={grupo.tipo === 'receita' ? styles.valorPositivo : styles.valorNegativo}>
+                            {moeda(grupo.total)}
+                          </strong>
+                          <span className={styles.totalizadorPct}>{kpis.receitaOperacional > 0 ? ((grupo.total / kpis.receitaOperacional) * 100).toFixed(1) + '%' : '—'}</span>
+                        </>
                       )}
                       <span className={styles.chevronIcon}>{gAberto ? '▲' : '▼'}</span>
                     </div>
@@ -1204,21 +1213,30 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                                 <span className={styles.clfCount}>{clf.items.length} lançamento(s)</span>
                                 {dreComparativoPorMes.length > 0 ? (
                                   <div className={styles.mesColValues}>
-                                    {dreComparativoPorMes.map(m => (
-                                      <div key={m.mes} className={styles.mesColCell}>
-                                        <span className={styles.mesColLabel}>{m.label}</span>
-                                        <strong className={styles.clfTotal}>{moeda(getMesClfTotal(grupo.nome, clf.nome, m))}</strong>
-                                      </div>
-                                    ))}
+                                    {dreComparativoPorMes.map(m => {
+                                      const cVal = getMesClfTotal(grupo.nome, clf.nome, m)
+                                      const cBase = m.kpis.receitaOperacional > 0 ? m.kpis.receitaOperacional : null
+                                      return (
+                                        <div key={m.mes} className={styles.mesColCell}>
+                                          <span className={styles.mesColLabel}>{m.label}</span>
+                                          <strong className={styles.clfTotal}>{moeda(cVal)}</strong>
+                                          <span className={styles.totalizadorPct}>{cBase ? ((cVal / cBase) * 100).toFixed(1) + '%' : '—'}</span>
+                                        </div>
+                                      )
+                                    })}
                                     {dreComparativoPorMes.length > 1 && (
                                       <div className={`${styles.mesColCell} ${styles.mesColTotal}`}>
                                         <span className={styles.mesColLabel}>Total</span>
                                         <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                        <span className={styles.totalizadorPct}>{kpis.receitaOperacional > 0 ? ((clf.total / kpis.receitaOperacional) * 100).toFixed(1) + '%' : '—'}</span>
                                       </div>
                                     )}
                                   </div>
                                 ) : (
-                                  <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                  <>
+                                    <strong className={styles.clfTotal}>{moeda(clf.total)}</strong>
+                                    <span className={styles.totalizadorPct}>{kpis.receitaOperacional > 0 ? ((clf.total / kpis.receitaOperacional) * 100).toFixed(1) + '%' : '—'}</span>
+                                  </>
                                 )}
                                 <span className={styles.chevronSm}>{cAberto ? '▲' : '▼'}</span>
                               </div>
