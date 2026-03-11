@@ -691,23 +691,19 @@ const LancamentoRow = memo(function LancamentoRow({
         </select>
       </td>
       <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
-        {l.sugerida ? (
-          <select
-            className={styles.selectClf}
-            value={l.grupo}
-            onChange={e => onGrupoChange(i, e.target.value)}
-          >
-            {GRUPOS_DISPONIVEIS.map(g => (
-              <option key={g} value={g}>{g}</option>
-            ))}
-            {/* Mantém grupo atual visível se não estiver na lista padrão */}
-            {!GRUPOS_DISPONIVEIS.includes(l.grupo) && l.grupo && (
-              <option value={l.grupo}>{l.grupo}</option>
-            )}
-          </select>
-        ) : (
-          l.grupo
-        )}
+        <select
+          className={styles.selectClf}
+          value={l.grupo}
+          onChange={e => onGrupoChange(i, e.target.value)}
+        >
+          {GRUPOS_DISPONIVEIS.map(g => (
+            <option key={g} value={g}>{g}</option>
+          ))}
+          {/* Mantém grupo atual visível se não estiver na lista padrão */}
+          {!GRUPOS_DISPONIVEIS.includes(l.grupo) && l.grupo && (
+            <option value={l.grupo}>{l.grupo}</option>
+          )}
+        </select>
       </td>
       <td className={`${styles.tdValor} ${l.tipo === 'receita' ? styles.tdReceita : styles.tdDespesa}`}>
         {moeda(l.valor)}
