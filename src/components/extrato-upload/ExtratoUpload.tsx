@@ -409,6 +409,24 @@ function formatarData(raw: unknown): string {
   return s
 }
 
+/**
+ * Detecta se o arquivo é um formato estruturado com coluna de categoria/classificação
+ * (ex: Conta Azul "Categoria 1"). Nesses casos a IA de parse não é necessária.
+ */
+async function arquivoTemColunaCategoria(file: File): Promise<boolean> {
+  try {
+    const buffer = await file.arrayBuffer()
+    const wb = read(buffer, { type: 'array' })
+    const ws = wb.Sheets[wb.SheetNames[0]]
+    const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
+    const headerIdx = encontrarLinhaCabecalho(rows)
+    const headers = (rows[headerIdx] as unknown[]).map(h => normalize(String(h ?? '')))
+    return headers.some(h => h.includes('categoria 1') || h === 'categoria' || h.includes('classificac') || h.includes('classificaç'))
+  } catch {
+    return false
+  }
+}
+
 /** Parse planilha → lista de linhas brutas */
 function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   const wb = read(buffer, { type: 'array' })
@@ -1080,18 +1098,24 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         .map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
 
-    // ── Parse do arquivo com IA (entende qualquer formato de extrato) ─────────
+    // ── Parse do arquivo ──────────────────────────────────────────────────────
+    // Se o arquivo já tem coluna de categoria/classificação (ex: Conta Azul),
+    // usa o parser local diretamente — sem custo de IA.
     let linhas: LinhaExtrato[] = []
-    try {
-      setProgresso({ atual: 0, total: 1, label: 'Lendo arquivo com IA' })
-      linhas = await parseArquivoComIA(file, modelo, (atual, total) => {
-        setProgresso({ atual, total, label: 'Lendo arquivo com IA' })
-      })
-    } catch {
-      // IA falhou — usa parser tradicional como fallback
+    const temCategoria = await arquivoTemColunaCategoria(file)
+
+    if (!temCategoria) {
+      try {
+        setProgresso({ atual: 0, total: 1, label: 'Lendo arquivo com IA' })
+        linhas = await parseArquivoComIA(file, modelo, (atual, total) => {
+          setProgresso({ atual, total, label: 'Lendo arquivo com IA' })
+        })
+      } catch {
+        // IA falhou — usa parser tradicional como fallback
+      }
     }
 
-    // Fallback: parser tradicional se a IA não retornou nada
+    // Parser tradicional: obrigatório para arquivos com categoria, fallback para os demais
     if (linhas.length === 0) {
       try {
         const buffer = await file.arrayBuffer()
