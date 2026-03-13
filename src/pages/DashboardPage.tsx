@@ -9,13 +9,19 @@ import { DesignButton, DesignIconButton } from '../components/design/DesignSyste
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
-const GROQ_MODELS_FALLBACK = [
-  { value: 'llama-3.3-70b-versatile',        label: 'Llama 3.3 70B Versatile (Recomendado)' },
-  { value: 'llama-3.1-8b-instant',           label: 'Llama 3.1 8B Instant (Rápido)' },
-  { value: 'deepseek-r1-distill-llama-70b',  label: 'DeepSeek R1 70B' },
+const OPENAI_MODELS_FALLBACK = [
+  { value: 'gpt-4o-mini',       label: 'GPT-4o Mini (Recomendado)' },
+  { value: 'gpt-4o',            label: 'GPT-4o' },
+  { value: 'gpt-4-turbo',       label: 'GPT-4 Turbo' },
+  { value: 'gpt-4',             label: 'GPT-4' },
+  { value: 'gpt-3.5-turbo',     label: 'GPT-3.5 Turbo' },
+  { value: 'gpt-3.5-turbo-16k', label: 'GPT-3.5 Turbo 16K' },
+  { value: 'o1-mini',           label: 'O1 Mini' },
+  { value: 'o1-preview',        label: 'O1 Preview' },
+  { value: 'o3-mini',           label: 'O3 Mini' },
 ]
 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
 
 interface DashboardPageProps {
   user: User
@@ -220,9 +226,9 @@ const EXEMPLOS_ESTATICOS = [
 
 function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   const [tab,            setTab]            = useState<'modelo' | 'classificacoes' | 'exemplos'>('modelo')
-  const [groqModels,     setGroqModels]     = useState(GROQ_MODELS_FALLBACK)
+  const [openaiModels,   setOpenaiModels]   = useState(OPENAI_MODELS_FALLBACK)
   const [modelsLoading,  setModelsLoading]  = useState(false)
-  const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_GROQ_MODEL)
+  const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_OPENAI_MODEL)
   const [savingModelo,   setSavingModelo]   = useState(false)
   const [savedModelo,    setSavedModelo]    = useState(false)
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
@@ -330,43 +336,43 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   }
 
   useEffect(() => {
-    const fetchGroqModels = async () => {
+    const fetchOpenAIModels = async () => {
       setModelsLoading(true)
-      const { data, error } = await supabase.functions.invoke('groq-models', { method: 'GET' })
+      const { data, error } = await supabase.functions.invoke('openai-models', { method: 'GET' })
       if (!error && Array.isArray(data?.models) && data.models.length > 0) {
-        setGroqModels(data.models.map((model: string) => ({ value: model, label: model })))
+        setOpenaiModels(data.models.map((model: string) => ({ value: model, label: model })))
       }
       setModelsLoading(false)
     }
 
-    fetchGroqModels()
+    fetchOpenAIModels()
     fetchClassificacoes()
     fetchExemplos()
   }, [])
 
   useEffect(() => {
-    supabase.from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
+    supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
       .then(({ data }) => {
         if (!data) return
-        const existeNoCatalogo = groqModels.some(model => model.value === data.valor)
+        const existeNoCatalogo = openaiModels.some(model => model.value === data.valor)
         if (existeNoCatalogo) {
           setModeloAtual(data.valor)
           return
         }
 
         if (data.valor) {
-          setGroqModels(p => [...p, { value: data.valor, label: `${data.valor} (configurado)` }])
+          setOpenaiModels(p => [...p, { value: data.valor, label: `${data.valor} (configurado)` }])
           setModeloAtual(data.valor)
           return
         }
 
-        setModeloAtual(DEFAULT_GROQ_MODEL)
+        setModeloAtual(DEFAULT_OPENAI_MODEL)
       })
-  }, [groqModels])
+  }, [openaiModels])
 
   const salvarModelo = async () => {
     setSavingModelo(true)
-    await supabase.from('configuracoes').upsert({ chave: 'modelo_groq', valor: modeloAtual })
+    await supabase.from('configuracoes').upsert({ chave: 'modelo_openai', valor: modeloAtual })
     setSavingModelo(false)
     setSavedModelo(true)
     setTimeout(() => setSavedModelo(false), 2000)
@@ -419,13 +425,13 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
         {tab === 'modelo' && (
           <div className={styles.settingsBody}>
             <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Modelo GroqCloud</label>
+              <label className={styles.modalLabel}>Modelo OpenAI</label>
               <select
                 className={styles.modalInput}
                 value={modeloAtual}
                 onChange={e => setModeloAtual(e.target.value)}
               >
-                {groqModels.map(m => (
+                {openaiModels.map(m => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
               </select>
@@ -433,7 +439,7 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
                 Modelo usado para sugerir a classificação automática nos lançamentos do DRE.
               </p>
               {modelsLoading && (
-                <p className={styles.settingsHint}>Atualizando catálogo de modelos ativos...</p>
+                <p className={styles.settingsHint}>Atualizando catálogo de modelos disponíveis...</p>
               )}
             </div>
             <div className={styles.modalActions}>

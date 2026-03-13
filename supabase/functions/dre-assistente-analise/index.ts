@@ -1,12 +1,12 @@
 // Supabase Edge Function: dre-assistente-analise
-// Analyzes all user lancamentos using Groq AI and returns a markdown DRE report.
+// Analyzes all user lancamentos using OpenAI and returns a markdown DRE report.
 // Context: plano de contas + course links embedded directly (edge functions
 // cannot access the filesystem, so the content from public/ia/ is inlined here).
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+const DEFAULT_MODEL = 'gpt-4o-mini'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -226,25 +226,25 @@ serve(async (req: Request) => {
     { receitas: 0, despesas: 0 },
   )
 
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')
-  if (!groqApiKey) {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!openaiApiKey) {
     return new Response(
-      JSON.stringify({ error: 'GROQ_API_KEY não configurada no servidor Supabase.' }),
+      JSON.stringify({ error: 'OPENAI_API_KEY não configurada no servidor Supabase.' }),
       { status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
     )
   }
 
   const prompt = buildPrompt(lancamentos, resumo)
 
-  const callGroq = async (modelToUse: string): Promise<Response> => {
+  const callOpenAI = async (modelToUse: string): Promise<Response> => {
     const controller = new AbortController()
     // 55 s — deixa margem para o overhead da Edge Function dentro do limite de 60 s do Supabase
     const timeout    = setTimeout(() => controller.abort(), 55000)
     try {
-      return await fetch(GROQ_API_URL, {
+      return await fetch(OPENAI_API_URL, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${groqApiKey}`,
+          Authorization: `Bearer ${openaiApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -261,56 +261,52 @@ serve(async (req: Request) => {
   }
 
   try {
-    let groqRes = await callGroq(modelo)
+    let openaiRes = await callOpenAI(modelo)
 
     // Rate limit: aguarda 15 s e tenta mais uma vez antes de desistir
-    if (groqRes.status === 429) {
+    if (openaiRes.status === 429) {
       await new Promise(resolve => setTimeout(resolve, 15000))
-      groqRes = await callGroq(modelo)
+      openaiRes = await callOpenAI(modelo)
     }
 
     // Fallback to default model if the configured one is unavailable
-    if (!groqRes.ok) {
-      const errText = await groqRes.text()
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
 
-      if (groqRes.status === 429) {
+      if (openaiRes.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Limite de requisições da IA atingido. Aguarde alguns segundos e tente novamente.' }),
           { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
         )
       }
 
-      if (modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)) {
-        groqRes = await callGroq(DEFAULT_MODEL)
+      if (modelo !== DEFAULT_MODEL && /model|not found|invalid/i.test(errText)) {
+        openaiRes = await callOpenAI(DEFAULT_MODEL)
       } else {
         return new Response(
-          JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }),
+          JSON.stringify({ error: `OpenAI indisponível: ${errText.slice(0, 200)}` }),
           { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
         )
       }
     }
 
-    if (!groqRes.ok) {
-      const errText = await groqRes.text()
-      if (groqRes.status === 429) {
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
+      if (openaiRes.status === 429) {
         return new Response(
           JSON.stringify({ error: 'Limite de requisições da IA atingido. Aguarde alguns segundos e tente novamente.' }),
           { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
         )
       }
       return new Response(
-        JSON.stringify({ error: `Groq indisponível: ${errText.slice(0, 200)}` }),
+        JSON.stringify({ error: `OpenAI indisponível: ${errText.slice(0, 200)}` }),
         { status: 502, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } },
       )
     }
 
-    const groqData = await groqRes.json()
-    const choice   = groqData?.choices?.[0]
-    // Alguns modelos de raciocínio (ex: deepseek-r1) retornam o texto em
-    // `reasoning_content` com `content` vazio — usamos o que estiver disponível.
-    const analysis = String(
-      choice?.message?.content || choice?.message?.reasoning_content || ''
-    ).trim()
+    const openaiData = await openaiRes.json()
+    const choice     = openaiData?.choices?.[0]
+    const analysis   = String(choice?.message?.content || '').trim()
 
     if (!analysis) {
       const finishReason = choice?.finish_reason ?? 'desconhecido'
