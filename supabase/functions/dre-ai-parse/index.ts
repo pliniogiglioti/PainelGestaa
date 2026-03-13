@@ -6,8 +6,8 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+const DEFAULT_MODEL = 'gpt-4o-mini'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -22,11 +22,11 @@ type Lancamento = {
   tipo: 'receita' | 'despesa'
 }
 
-const callGroq = async (apiKey: string, model: string, prompt: string): Promise<Response> => {
+const callOpenAI = async (apiKey: string, model: string, prompt: string): Promise<Response> => {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 45000)
   try {
-    return await fetch(GROQ_API_URL, {
+    return await fetch(OPENAI_API_URL, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -63,9 +63,9 @@ serve(async (req: Request) => {
     return new Response(null, { status: 204, headers: CORS_HEADERS })
   }
 
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')
-  if (!groqApiKey) {
-    return new Response(JSON.stringify({ lancamentos: [], erro: 'GROQ_API_KEY não configurada' }), {
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!openaiApiKey) {
+    return new Response(JSON.stringify({ lancamentos: [], erro: 'OPENAI_API_KEY não configurada' }), {
       status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
   }
@@ -122,12 +122,12 @@ Exemplo: [{"data":"03/03/2026","descricao":"PAGTO ELETRON FORNECEDOR","valor":80
 DADOS DO EXTRATO (JSON):
 ${conteudoJson}`
 
-  let res = await callGroq(groqApiKey, modelo, prompt)
+  let res = await callOpenAI(openaiApiKey, modelo, prompt)
 
   if (!res.ok && modelo !== DEFAULT_MODEL) {
     const errText = await res.text()
-    if (/model|decommissioned|not found|invalid/i.test(errText)) {
-      res = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+    if (/model|not found|invalid/i.test(errText)) {
+      res = await callOpenAI(openaiApiKey, DEFAULT_MODEL, prompt)
     }
   }
 
@@ -137,8 +137,8 @@ ${conteudoJson}`
     })
   }
 
-  const groqData = await res.json()
-  const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+  const openaiData = await res.json()
+  const content: string = openaiData?.choices?.[0]?.message?.content ?? ''
   const lancamentos = parseLancamentos(content)
 
   return new Response(JSON.stringify({ lancamentos }), {

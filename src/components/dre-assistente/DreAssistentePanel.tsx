@@ -144,8 +144,8 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
 
     try {
       const { data: configData } = await supabase
-        .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      const modelo = configData?.valor ?? 'llama-3.3-70b-versatile'
+        .from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
+      const modelo = configData?.valor ?? 'gpt-4o-mini'
 
       const { data, error: fnError } = await supabase.functions.invoke('dre-assistente-analise', {
         body: {
@@ -249,7 +249,7 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
     <section className={styles.panel}>
       <div className={styles.panelHeader}>
         <div className={styles.panelMeta}>
-          <span className={styles.panelEyebrow}>IA • Groq</span>
+          <span className={styles.panelEyebrow}>IA • OpenAI</span>
           <h2 className={styles.panelTitle}>Assistente de DFC</h2>
           <p className={styles.panelDesc}>
             Análise dos seus lançamentos com inteligência artificial. Clique em "Gerar Análise" quando quiser.

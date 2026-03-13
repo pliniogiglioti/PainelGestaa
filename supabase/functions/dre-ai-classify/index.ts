@@ -1,12 +1,12 @@
 // Supabase Edge Function: dre-ai-classify
-// Calls GroqCloud API to identify BOTH the classification AND the group
+// Calls OpenAI API to identify BOTH the classification AND the group
 // for a DRE lancamento, pre-filling the wizard fields for the user.
 // Supports single-item and batch modes.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions'
-const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions'
+const DEFAULT_MODEL = 'gpt-4o-mini'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -298,13 +298,13 @@ const toFinalResult = (
   return { tipo, classificacao_nome: 'Não Identificado', grupo: '', fonte: 'ia', confianca: 'sugerida' }
 }
 
-const callGroq = async (groqApiKey: string, model: string, prompt: string): Promise<Response> => {
+const callOpenAI = async (openaiApiKey: string, model: string, prompt: string): Promise<Response> => {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 30000)
   try {
-    return await fetch(GROQ_API_URL, {
+    return await fetch(OPENAI_API_URL, {
       method: 'POST',
-      headers: { Authorization: `Bearer ${groqApiKey}`, 'Content-Type': 'application/json' },
+      headers: { Authorization: `Bearer ${openaiApiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model,
         messages: [{ role: 'user', content: prompt }],
@@ -324,9 +324,9 @@ async function handleBatch(
   lancamentos: LancamentoInput[],
   classificacoesDisponiveis: ClassificacaoItem[],
   modelo: string,
-  groqApiKey: string | undefined,
+  openaiApiKey: string | undefined,
 ): Promise<AiResult[]> {
-  if (!groqApiKey) {
+  if (!openaiApiKey) {
     return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
   }
 
@@ -368,12 +368,12 @@ ${itensTexto}
 RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
 [{"tipo":"despesa","classificacao_nome":"Nome exato","grupo":"Grupo exato"}, ...]`
 
-  let res = await callGroq(groqApiKey, modelo, prompt)
+  let res = await callOpenAI(openaiApiKey, modelo, prompt)
 
   if (!res.ok && modelo !== DEFAULT_MODEL) {
     const errText = await res.text()
-    if (/model|decommissioned|not found|invalid/i.test(errText)) {
-      res = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+    if (/model|not found|invalid/i.test(errText)) {
+      res = await callOpenAI(openaiApiKey, DEFAULT_MODEL, prompt)
     }
   }
 
@@ -381,8 +381,8 @@ RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
     return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
   }
 
-  const groqData = await res.json()
-  const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+  const openaiData = await res.json()
+  const content: string = openaiData?.choices?.[0]?.message?.content ?? ''
   const parsed = parseBatchResponse(content)
 
   if (!parsed || parsed.length !== lancamentos.length) {
@@ -407,10 +407,10 @@ async function handleSingle(
   tipoEntrada: 'receita' | 'despesa',
   classificacoesDisponiveis: ClassificacaoItem[],
   modelo: string,
-  groqApiKey: string | undefined,
+  openaiApiKey: string | undefined,
 ): Promise<AiResult> {
   const fallback = pickFallback(descricao, tipoEntrada, classificacoesDisponiveis)
-  if (!groqApiKey) return { ...fallback, aviso: 'GROQ_API_KEY não configurada; usado fallback local.' } as AiResult & { aviso: string }
+  if (!openaiApiKey) return { ...fallback, aviso: 'OPENAI_API_KEY não configurada; usado fallback local.' } as AiResult & { aviso: string }
 
   const listaClassificacoesBanco = classificacoesDisponiveis.length > 0
     ? `\nClassificações já cadastradas no sistema (prefira estas quando aplicável):\n` +
@@ -438,17 +438,17 @@ Formato obrigatório:
 {"tipo": "despesa", "classificacao_nome": "Nome exato do plano de contas", "grupo": "Grupo exato do plano de contas"}`
 
   try {
-    let groqRes = await callGroq(groqApiKey, modelo, prompt)
-    if (!groqRes.ok) {
-      const errText = await groqRes.text()
-      const shouldRetry = modelo !== DEFAULT_MODEL && /model|decommissioned|not found|invalid/i.test(errText)
-      if (shouldRetry) groqRes = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
-      else return { ...fallback, aviso: 'Groq indisponível; usado fallback.' } as AiResult & { aviso: string }
+    let openaiRes = await callOpenAI(openaiApiKey, modelo, prompt)
+    if (!openaiRes.ok) {
+      const errText = await openaiRes.text()
+      const shouldRetry = modelo !== DEFAULT_MODEL && /model|not found|invalid/i.test(errText)
+      if (shouldRetry) openaiRes = await callOpenAI(openaiApiKey, DEFAULT_MODEL, prompt)
+      else return { ...fallback, aviso: 'OpenAI indisponível; usado fallback.' } as AiResult & { aviso: string }
     }
-    if (!groqRes.ok) return { ...fallback, aviso: 'Groq indisponível; usado fallback.' } as AiResult & { aviso: string }
+    if (!openaiRes.ok) return { ...fallback, aviso: 'OpenAI indisponível; usado fallback.' } as AiResult & { aviso: string }
 
-    const groqData = await groqRes.json()
-    const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+    const openaiData = await openaiRes.json()
+    const content: string = openaiData?.choices?.[0]?.message?.content ?? ''
     const parsed = parseAiResponse(content)
     if (!parsed) return { ...fallback, aviso: 'Resposta fora do formato esperado; usado fallback.' } as AiResult & { aviso: string }
     return toFinalResult(parsed, classificacoesDisponiveis)
@@ -482,7 +482,7 @@ serve(async (req: Request) => {
   const classificacoesDisponiveis: ClassificacaoItem[] = Array.isArray(body.classificacoes_disponiveis)
     ? body.classificacoes_disponiveis as ClassificacaoItem[]
     : []
-  const groqApiKey = Deno.env.get('GROQ_API_KEY')
+  const openaiApiKey = Deno.env.get('OPENAI_API_KEY')
 
   // ── Parse mode: extrai lançamentos de linhas brutas de extrato bancário ──────
   if (body.mode === 'parse' && Array.isArray(body.linhas)) {
@@ -537,17 +537,17 @@ Exemplo: [{"data":"02/01/2026","descricao":"PIX RECEBIDO ODONTO","valor":3175.00
 DADOS (JSON):
 ${linhasJson}`
 
-    if (!groqApiKey) {
+    if (!openaiApiKey) {
       return new Response(JSON.stringify({ lancamentos: [] }), {
         status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
       })
     }
 
-    let res = await callGroq(groqApiKey, modelo, prompt)
+    let res = await callOpenAI(openaiApiKey, modelo, prompt)
     if (!res.ok && modelo !== DEFAULT_MODEL) {
       const errText = await res.text()
-      if (/model|decommissioned|not found|invalid/i.test(errText)) {
-        res = await callGroq(groqApiKey, DEFAULT_MODEL, prompt)
+      if (/model|not found|invalid/i.test(errText)) {
+        res = await callOpenAI(openaiApiKey, DEFAULT_MODEL, prompt)
       }
     }
 
@@ -557,8 +557,8 @@ ${linhasJson}`
       })
     }
 
-    const groqData = await res.json()
-    const content: string = groqData?.choices?.[0]?.message?.content ?? ''
+    const openaiData = await res.json()
+    const content: string = openaiData?.choices?.[0]?.message?.content ?? ''
     const lancamentos = parseLancamentos(content)
 
     return new Response(JSON.stringify({ lancamentos }), {
@@ -580,7 +580,7 @@ ${linhasJson}`
       })
     }
 
-    const resultados = await handleBatch(lancamentos, classificacoesDisponiveis, modelo, groqApiKey)
+    const resultados = await handleBatch(lancamentos, classificacoesDisponiveis, modelo, openaiApiKey)
     return new Response(JSON.stringify({ resultados }), {
       status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
     })
@@ -591,7 +591,7 @@ ${linhasJson}`
   const valor = Number(body.valor ?? 0)
   const tipoEntrada: 'receita' | 'despesa' = body.tipo === 'receita' ? 'receita' : 'despesa'
 
-  const result = await handleSingle(descricao, valor, tipoEntrada, classificacoesDisponiveis, modelo, groqApiKey)
+  const result = await handleSingle(descricao, valor, tipoEntrada, classificacoesDisponiveis, modelo, openaiApiKey)
   return new Response(JSON.stringify(result), {
     status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   })
