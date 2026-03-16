@@ -34,7 +34,7 @@ function App() {
   })
   const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => {
     try {
-      const stored = sessionStorage.getItem('empresa_selecionada')
+      const stored = localStorage.getItem('empresa_selecionada')
       return stored ? (JSON.parse(stored) as Empresa) : null
     } catch {
       return null
@@ -70,7 +70,7 @@ function App() {
   }, [])
 
   const handleLogout = async () => {
-    sessionStorage.removeItem('empresa_selecionada')
+    localStorage.removeItem('empresa_selecionada')
     await supabase.auth.signOut()
     // onAuthStateChange will set user to null automatically
   }
@@ -99,12 +99,12 @@ function App() {
   }
 
   const selecionarEmpresa = (emp: Empresa) => {
-    sessionStorage.setItem('empresa_selecionada', JSON.stringify(emp))
+    localStorage.setItem('empresa_selecionada', JSON.stringify(emp))
     setEmpresaSelecionada(emp)
   }
 
   const trocarEmpresa = () => {
-    sessionStorage.removeItem('empresa_selecionada')
+    localStorage.removeItem('empresa_selecionada')
     setEmpresaSelecionada(null)
   }
 

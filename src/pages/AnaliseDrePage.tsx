@@ -24,7 +24,7 @@ const INITIAL_FORM: FormState = {
   tipo: '', data: today(), descricao: '', valor: '', classificacaoNome: '', grupo: '',
 }
 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_AI_MODEL = 'gpt-4o-mini'
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
@@ -839,8 +839,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
     try {
       const { data: configData } = await supabase
-        .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
+        .from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
+      const modelo = configData?.valor ?? DEFAULT_AI_MODEL
 
       const classesDoTipo = classificacoes
         .filter(c => c.tipo === form.tipo)
