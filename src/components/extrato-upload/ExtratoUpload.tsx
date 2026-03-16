@@ -927,12 +927,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setLinhasClass(prev => {
       const novoGrupo = resolveGrupo(novoNome, prev[idx].tipo)
       // Procura similares do mesmo tipo antes de atualizar o estado
-      if (novoNome !== 'Não Identificado' && prev[idx].sugerida) {
+      if (novoNome !== 'Não Identificado') {
         const tipoAtual = prev[idx].tipo
         const descAtual = prev[idx].descricao
         const similares = prev
           .map((l, i) => ({ l, i }))
-          .filter(({ l, i }) => i !== idx && l.sugerida && l.tipo === tipoAtual && descricaoParecida(l.descricao, descAtual))
+          .filter(({ l, i }) => i !== idx && l.tipo === tipoAtual && descricaoParecida(l.descricao, descAtual))
           .map(({ i }) => i)
         // Agenda sugestão de parecidos fora do setState para não ter side-effect no updater
         setTimeout(() =>
