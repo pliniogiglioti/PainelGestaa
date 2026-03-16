@@ -17,6 +17,9 @@ interface LinhaExtrato {
   descricao: string
   valor: number
   tipo: 'receita' | 'despesa'
+  /** true quando o tipo foi determinado por fonte autoritativa (sinal do valor ou coluna Tipo/Natureza).
+   *  Quando true, as etapas de classificação local e histórico NÃO devem sobrescrever o tipo. */
+  tipoDefinido?: boolean
   /** Classificação já presente no arquivo importado (ex: coluna "Classificação") */
   classificacaoArquivo?: string
   /** Grupo já presente no arquivo importado (ex: coluna "Grupo") */
@@ -370,15 +373,17 @@ function detectarColunas(headers: string[]): {
   }
 }
 
-/** Normaliza valor brasileiro: "1.234,56" → 1234.56 */
+/** Normaliza valor brasileiro: "1.234,56" ou "-1.234,56" → 1234.56 (sempre positivo) */
 function parseValor(raw: unknown): number {
   if (typeof raw === 'number') return Math.abs(raw)
   const s = String(raw ?? '').trim().replace(/\s/g, '')
   const clean = s.replace(/[R$]/g, '').trim()
-  if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(clean)) {
-    return Math.abs(parseFloat(clean.replace(/\./g, '').replace(',', '.')))
+  // Remove sinal negativo antes de testar o regex (o sinal já foi capturado pelo isNeg)
+  const cleanAbs = clean.replace(/^-/, '')
+  if (/^\d{1,3}(\.\d{3})*(,\d+)?$/.test(cleanAbs)) {
+    return parseFloat(cleanAbs.replace(/\./g, '').replace(',', '.'))
   }
-  return Math.abs(parseFloat(clean.replace(/,/g, '')) || 0)
+  return Math.abs(parseFloat(cleanAbs.replace(/,/g, '')) || 0)
 }
 
 /** Detecta se é entrada ou saída */
@@ -455,20 +460,23 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
     let valorNum: number
     let tipo: 'receita' | 'despesa'
 
+    let tipoDefinido = false
+
     if (usaSeparado) {
       // Extrato Bradesco/Itaú: colunas Crédito (R$) e Débito (R$) separadas
       const creditoNum = parseValor(cols.credito >= 0 ? row[cols.credito] : '')
       const debitoNum  = parseValor(cols.debito  >= 0 ? row[cols.debito]  : '')
       if (creditoNum > 0) {
-        valorNum = creditoNum; tipo = 'receita'
+        valorNum = creditoNum; tipo = 'receita'; tipoDefinido = true
       } else if (debitoNum > 0) {
-        valorNum = debitoNum; tipo = 'despesa'
+        valorNum = debitoNum; tipo = 'despesa'; tipoDefinido = true
       } else {
         continue // linha sem valor (ex: SALDO ANTERIOR, totalizadores)
       }
     } else {
-      // Extrato com coluna única de valor (ex: Itaú — "Valor (R$)" signed).
-      // Preserva o sinal para determinar tipo antes de chamar parseValor (que faz Math.abs).
+      // Extrato com coluna única de valor (ex: Conta Azul, Itaú — "Valor (R$)" signed).
+      // Preserva o sinal para determinar tipo antes de chamar parseValor.
+      // Conta Azul usa valores negativos para despesas e positivos para receitas.
       const rawValor = cols.valor >= 0 ? row[cols.valor] : null
       const isNeg = typeof rawValor === 'number'
         ? rawValor < 0
@@ -476,7 +484,15 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
       const absValor = parseValor(rawValor)
       if (!absValor) continue // skip linhas de saldo/totalizador (Valor vazio)
       valorNum = absValor
-      tipo = isNeg ? 'despesa' : parseTipo(rawTipo, absValor)
+      // Sinal negativo → despesa; positivo → verifica coluna Tipo ou default receita
+      if (isNeg) {
+        tipo = 'despesa'
+        tipoDefinido = true
+      } else {
+        tipo = parseTipo(rawTipo, absValor)
+        // tipoDefinido = true quando coluna Tipo/Natureza estava preenchida
+        tipoDefinido = cols.tipo >= 0 && String(rawTipo ?? '').trim() !== ''
+      }
     }
 
     const rawClassif = cols.classificacao >= 0 ? String(row[cols.classificacao] ?? '').trim() : ''
@@ -501,6 +517,7 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
       descricao: String(rawDesc ?? '').trim() || `Linha ${i + 1}`,
       valor:     valorNum,
       tipo,
+      tipoDefinido,
       ...(classificacaoFinal ? { classificacaoArquivo: classificacaoFinal } : {}),
       ...(rawGrupo           ? { grupoArquivo: rawGrupo }                   : {}),
     })
@@ -1163,17 +1180,32 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Prioridade 2: regras locais de fallback
+      // Quando tipoDefinido=true (sinal do Valor ou coluna Tipo presente no arquivo),
+      // preserva o tipo original — não deixa a regra de descrição sobrescrever.
       const local = classificarLocal(linha.descricao)
       if (local) {
-        classificadas[i] = { ...linha, tipo: local.tipo, classificacao: local.classificacao, grupo: local.grupo, status: 'ok' }
+        classificadas[i] = {
+          ...linha,
+          tipo: linha.tipoDefinido ? linha.tipo : local.tipo,
+          classificacao: local.classificacao,
+          grupo: local.grupo,
+          status: 'ok',
+        }
         continue
       }
 
       // Prioridade 3: histórico de correções manuais desta empresa
+      // Idem: preserva tipo do arquivo se ele é autoritativo.
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
       if (hist) {
-        classificadas[i] = { ...linha, tipo: hist.tipo, classificacao: hist.classificacao, grupo: hist.grupo, status: 'ok' }
+        classificadas[i] = {
+          ...linha,
+          tipo: linha.tipoDefinido ? linha.tipo : hist.tipo,
+          classificacao: hist.classificacao,
+          grupo: hist.grupo,
+          status: 'ok',
+        }
         continue
       }
 
