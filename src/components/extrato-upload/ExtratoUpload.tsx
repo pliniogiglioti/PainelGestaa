@@ -1247,18 +1247,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           const r = resultados[ri]
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
-            classificacao: String(r?.classificacao_nome ?? '').trim() || 'Outros',
-            grupo:         String(r?.grupo ?? '').trim() || 'Outros',
+            classificacao: String(r?.classificacao_nome ?? '').trim() || 'Não Identificado',
+            grupo:         String(r?.grupo ?? '').trim() || '',
             status: 'ok',
-            sugerida: r?.confianca === 'sugerida',
+            sugerida: !r?.classificacao_nome || r?.confianca === 'sugerida',
           }
         })
       } catch {
         fatia.forEach(linhaIdx => {
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
-            classificacao: 'Não classificado',
-            grupo: 'Outros',
+            classificacao: 'Não Identificado',
+            grupo: '',
             status: 'erro',
           }
         })
@@ -1269,6 +1269,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         total: linhas.length,
         label: 'Classificando com IA',
       })
+    }
+
+    // ── Passo 3: valida TODAS as classificações contra o plano de contas ─────
+    // Qualquer resultado (Conta Azul, regras locais, histórico ou IA) que não
+    // estiver cadastrado em dre_classificacoes é descartado → Não Identificado.
+    const validNomes = new Set(classificacoes.map(c => c.nome))
+    for (let i = 0; i < classificadas.length; i++) {
+      const clf = classificadas[i]
+      if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
+      }
     }
 
     // Ordena: sugestões da IA primeiro (precisam de revisão), depois erros, depois ok
