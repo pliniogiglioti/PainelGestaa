@@ -363,6 +363,9 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   // Accordion lançamentos
   const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())
   const [expandedClfs,     setExpandedClfs]     = useState<Set<string>>(new Set())
+  // Excluir período
+  const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
+  const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
 
  const fetchLancamentos = async (targetUserId?: string) => {
   const { data: authData } = await supabase.auth.getUser()
@@ -743,6 +746,45 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
     fetchLancamentos(usuarioFiltro || undefined)
   }
 
+  /** IDs dos lançamentos do período selecionado (ano + meses, ignora filtro de tipo) */
+  const idsPeriodoSelecionado = useMemo(() => {
+    if (anoFiltro === 'todos') return []
+    return lancamentos
+      .filter(item => {
+        const src = item.data_lancamento ?? item.created_at
+        if (!src || src.slice(0, 4) !== anoFiltro) return false
+        if (mesesFiltro.length > 0 && !mesesFiltro.includes(src.slice(5, 7))) return false
+        return true
+      })
+      .map(item => item.id)
+  }, [lancamentos, anoFiltro, mesesFiltro])
+
+  const excluirLancamentosPeriodo = async () => {
+    if (idsPeriodoSelecionado.length === 0) return
+    setDeletingPeriodo(true)
+    // Deleta em lotes de 200 para não estourar o limite da URL
+    const LOTE = 200
+    for (let i = 0; i < idsPeriodoSelecionado.length; i += LOTE) {
+      const lote = idsPeriodoSelecionado.slice(i, i + LOTE)
+      const { error } = await supabase.from('dre_lancamentos').delete().in('id', lote)
+      if (error) { alert(`Erro ao excluir: ${error.message}`); setDeletingPeriodo(false); return }
+    }
+    setDeletingPeriodo(false)
+    setShowDeletePeriodo(false)
+    setMesesFiltro([])
+    fetchLancamentos(usuarioFiltro || undefined)
+  }
+
+  const labelPeriodo = (() => {
+    if (anoFiltro === 'todos') return ''
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+    if (mesesFiltro.length === 0) return `todos os meses de ${anoFiltro}`
+    const nomes = mesesFiltro.map(mm =>
+      formatter.format(new Date(`2000-${mm}-01T00:00:00Z`))
+    )
+    return `${nomes.join(', ')} de ${anoFiltro}`
+  })()
+
   const ensureGrupoCatalogado = async (grupoNomeRaw: string, tipoRaw: '' | 'receita' | 'despesa') => {
     const grupoNome = grupoNomeRaw.trim()
     if (!grupoNome) return { ok: false as const, error: 'Grupo vazio.' }
@@ -1092,6 +1134,16 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
                 <option value="despesa">Despesas</option>
               </select>
             </label>
+
+            {anoFiltro !== 'todos' && (
+              <button
+                className={styles.deletePeriodoBtn}
+                onClick={() => setShowDeletePeriodo(true)}
+                title="Excluir todos os lançamentos do período selecionado"
+              >
+                🗑 Excluir período
+              </button>
+            )}
 
             <button className={styles.newBtn} onClick={openWizard}>+ Novo lançamento</button>
           </div>
@@ -1508,6 +1560,57 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
               </div>
             )}
 
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: excluir período ── */}
+      {showDeletePeriodo && (
+        <div className={styles.modalOverlay} onClick={() => !deletingPeriodo && setShowDeletePeriodo(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2>Excluir período</h2>
+              <button className={styles.closeBtn} onClick={() => setShowDeletePeriodo(false)} disabled={deletingPeriodo}>✕</button>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
+              Você está prestes a excluir permanentemente:
+            </p>
+
+            <div className={styles.deletePeriodoInfo}>
+              <span className={styles.deletePeriodoCount}>{idsPeriodoSelecionado.length}</span>
+              <span className={styles.deletePeriodoDesc}>
+                lançamento{idsPeriodoSelecionado.length !== 1 ? 's' : ''} de{' '}
+                <strong>{labelPeriodo}</strong>
+              </span>
+            </div>
+
+            {idsPeriodoSelecionado.length === 0 ? (
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', margin: '16px 0' }}>
+                Nenhum lançamento encontrado neste período.
+              </p>
+            ) : (
+              <p style={{ color: '#ff9f9f', fontSize: 13, marginBottom: 24 }}>
+                ⚠ Esta ação não pode ser desfeita.
+              </p>
+            )}
+
+            <div className={styles.deletePeriodoBtns}>
+              <button
+                className={styles.cancelBtn}
+                onClick={() => setShowDeletePeriodo(false)}
+                disabled={deletingPeriodo}
+              >
+                Cancelar
+              </button>
+              <button
+                className={styles.deletePeriodoConfirmBtn}
+                onClick={excluirLancamentosPeriodo}
+                disabled={deletingPeriodo || idsPeriodoSelecionado.length === 0}
+              >
+                {deletingPeriodo ? 'Excluindo…' : `Excluir ${idsPeriodoSelecionado.length} lançamento${idsPeriodoSelecionado.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
           </div>
         </div>
       )}
