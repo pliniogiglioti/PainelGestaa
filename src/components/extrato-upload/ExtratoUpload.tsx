@@ -224,6 +224,11 @@ const CONTA_AZUL_CATEGORY_MAP: Record<string, { classificacao: string; grupo: st
   'receita cartao':                          { classificacao: 'Receita Cartão',                                            grupo: 'Receitas Operacionais' },
   'receita pix':                             { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
   'receita transferencia':                   { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
+  'receita conta bancaria':                  { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
+  'receita conta bancária':                  { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
+  'receita bancaria':                        { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
+  'outras receitas':                         { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
+  'receita financeira':                      { classificacao: 'Rendimento de Aplicação Financeira',                        grupo: 'Receitas Financeiras' },
   'receita subadquirencia':                  { classificacao: 'Receita Subadquirência (BT)',                               grupo: 'Receitas Operacionais' },
   'proteticos':                              { classificacao: 'Serviços Técnicos para Laboratórios',                      grupo: 'Despesas Operacionais' },
   'material aplicado no servico':            { classificacao: 'Custo de Materiais e Insumos',                             grupo: 'Despesas Operacionais' },
@@ -507,8 +512,12 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
         classificacaoFinal = mapped.classificacao
         rawGrupo = mapped.grupo
       } else {
-        const grupo = CLASSIFICACAO_GRUPO[rawClassif] ?? LOOKUP_GRUPO_NORM.get(normalize(rawClassif))
-        if (grupo) rawGrupo = grupo
+        // Tenta pelo mapa direto; se ainda não achar, deriva pelo tipo da transação
+        // para garantir que grupoArquivo nunca fique vazio quando há classificacaoArquivo.
+        // Isso evita que a categoria do arquivo seja ignorada na etapa de classificação.
+        rawGrupo = CLASSIFICACAO_GRUPO[rawClassif]
+          ?? LOOKUP_GRUPO_NORM.get(normalize(rawClassif))
+          ?? resolveGrupo(rawClassif, tipo)
       }
     }
 
