@@ -24,7 +24,7 @@ const INITIAL_FORM: FormState = {
   tipo: '', data: today(), descricao: '', valor: '', classificacaoNome: '', grupo: '',
 }
 
-const DEFAULT_GROQ_MODEL = 'llama-3.3-70b-versatile'
+const DEFAULT_AI_MODEL = 'gpt-4o-mini'
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
@@ -336,9 +336,10 @@ type DreListItem =
 interface AnaliseDreProps {
   empresa: Empresa
   onTrocarEmpresa: () => void
+  onVoltar: () => void
 }
 
-export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreProps) {
+export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: AnaliseDreProps) {
   const [showWizard,     setShowWizard]     = useState(false)
   const [editingId,      setEditingId]      = useState<string | null>(null)
   const [step,           setStep]           = useState<Step>(1)
@@ -367,10 +368,13 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
 
- const fetchLancamentos = async (targetUserId?: string) => {
+ const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
   const { data: authData } = await supabase.auth.getUser()
   const myId = authData.user?.id
   if (!myId) { setLancamentos([]); return }
+
+  // adminOverride is used on initial load to bypass stale isAdmin state (React batching)
+  const effectiveAdmin = adminOverride ?? isAdmin
 
   const PAGE_SIZE = 1000
   let from = 0
@@ -385,7 +389,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
       .order('created_at', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
 
-    if (isAdmin && targetUserId) {
+    if (effectiveAdmin && targetUserId) {
       query = query.eq('user_id', targetUserId)
     }
 
@@ -424,16 +428,32 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
       if (!myId) { fetchLancamentos(); return }
 
       supabase.from('profiles').select('role').eq('id', myId).single()
-        .then(({ data: profile }) => {
+        .then(async ({ data: profile }) => {
           const admin = profile?.role === 'admin'
           setIsAdmin(admin)
+
+          // Validate that user still has access to this empresa (sessionStorage may be stale)
+          if (!admin) {
+            const { data: membro } = await supabase
+              .from('empresa_membros')
+              .select('user_id')
+              .eq('empresa_id', empresa.id)
+              .eq('user_id', myId)
+              .maybeSingle()
+            if (!membro) {
+              onTrocarEmpresa()
+              return
+            }
+          }
+
           if (admin) {
             supabase.from('profiles')
               .select('id, name, email')
               .order('name', { ascending: true })
               .then(({ data: users }) => setUsuarios(users ?? []))
           }
-          fetchLancamentos()
+          // Pass admin explicitly to avoid stale closure (React state not yet committed)
+          fetchLancamentos(undefined, admin)
         })
     })
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -692,7 +712,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
     [...new Set([
       ...grupos.map(g => g.nome).filter(Boolean),
       ...lancamentos.map(l => l.grupo).filter(Boolean),
-    ])].slice(0, 12),
+    ])],
   [grupos, lancamentos])
 
   const classificacoesFiltradas = useMemo(() =>
@@ -819,8 +839,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
 
     try {
       const { data: configData } = await supabase
-        .from('configuracoes').select('valor').eq('chave', 'modelo_groq').single()
-      const modelo = configData?.valor ?? DEFAULT_GROQ_MODEL
+        .from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
+      const modelo = configData?.valor ?? DEFAULT_AI_MODEL
 
       const classesDoTipo = classificacoes
         .filter(c => c.tipo === form.tipo)
@@ -954,7 +974,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa }: AnaliseDreP
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-          <a href="/" className={styles.backLink}>← Voltar ao dashboard</a>
+          <button onClick={onVoltar} className={styles.backLink} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar ao dashboard</button>
           <button
             onClick={onTrocarEmpresa}
             style={{

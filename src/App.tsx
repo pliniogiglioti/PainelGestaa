@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import AnaliseDrePage from './pages/AnaliseDrePage'
 import EmpresaGatePage from './pages/EmpresaGatePage'
+import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
 export interface User {
@@ -33,7 +34,7 @@ function App() {
   })
   const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => {
     try {
-      const stored = sessionStorage.getItem('empresa_selecionada')
+      const stored = localStorage.getItem('empresa_selecionada')
       return stored ? (JSON.parse(stored) as Empresa) : null
     } catch {
       return null
@@ -69,7 +70,7 @@ function App() {
   }, [])
 
   const handleLogout = async () => {
-    sessionStorage.removeItem('empresa_selecionada')
+    localStorage.removeItem('empresa_selecionada')
     await supabase.auth.signOut()
     // onAuthStateChange will set user to null automatically
   }
@@ -98,12 +99,12 @@ function App() {
   }
 
   const selecionarEmpresa = (emp: Empresa) => {
-    sessionStorage.setItem('empresa_selecionada', JSON.stringify(emp))
+    localStorage.setItem('empresa_selecionada', JSON.stringify(emp))
     setEmpresaSelecionada(emp)
   }
 
   const trocarEmpresa = () => {
-    sessionStorage.removeItem('empresa_selecionada')
+    localStorage.removeItem('empresa_selecionada')
     setEmpresaSelecionada(null)
   }
 
@@ -111,20 +112,33 @@ function App() {
     if (pathname === '/analise-dre') {
       if (!empresaSelecionada) {
         return (
-          <EmpresaGatePage
-            onSelecionar={selecionarEmpresa}
-            onVoltar={() => navigate('/')}
-          />
+          <ErrorBoundary>
+            <EmpresaGatePage
+              onSelecionar={selecionarEmpresa}
+              onVoltar={() => navigate('/')}
+            />
+          </ErrorBoundary>
         )
       }
       return (
-        <AnaliseDrePage
-          empresa={empresaSelecionada}
-          onTrocarEmpresa={trocarEmpresa}
-        />
+        <ErrorBoundary>
+          <AnaliseDrePage
+            empresa={empresaSelecionada}
+            onTrocarEmpresa={trocarEmpresa}
+            onVoltar={() => navigate('/')}
+          />
+        </ErrorBoundary>
       )
     }
-    return <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+    // Redirect unknown routes to home
+    if (pathname !== '/') {
+      navigate('/')
+    }
+    return (
+      <ErrorBoundary>
+        <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+      </ErrorBoundary>
+    )
   }
 
   if (showRegister) {

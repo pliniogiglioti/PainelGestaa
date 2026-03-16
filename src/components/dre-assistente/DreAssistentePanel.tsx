@@ -93,7 +93,7 @@ function renderMarkdownSafe(markdown: string) {
 
 const serializeLancamentos = (lancamentos: DreLancamento[]) =>
   lancamentos.map(item => ({
-    data: item.created_at,
+    data: item.data_lancamento ?? item.created_at,
     descricao: item.descricao,
     valor: item.valor,
     tipo: item.tipo,
