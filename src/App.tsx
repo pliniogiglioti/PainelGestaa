@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import AnaliseDrePage from './pages/AnaliseDrePage'
 import EmpresaGatePage from './pages/EmpresaGatePage'
+import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
 export interface User {
@@ -111,20 +112,33 @@ function App() {
     if (pathname === '/analise-dre') {
       if (!empresaSelecionada) {
         return (
-          <EmpresaGatePage
-            onSelecionar={selecionarEmpresa}
-            onVoltar={() => navigate('/')}
-          />
+          <ErrorBoundary>
+            <EmpresaGatePage
+              onSelecionar={selecionarEmpresa}
+              onVoltar={() => navigate('/')}
+            />
+          </ErrorBoundary>
         )
       }
       return (
-        <AnaliseDrePage
-          empresa={empresaSelecionada}
-          onTrocarEmpresa={trocarEmpresa}
-        />
+        <ErrorBoundary>
+          <AnaliseDrePage
+            empresa={empresaSelecionada}
+            onTrocarEmpresa={trocarEmpresa}
+            onVoltar={() => navigate('/')}
+          />
+        </ErrorBoundary>
       )
     }
-    return <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+    // Redirect unknown routes to home
+    if (pathname !== '/') {
+      navigate('/')
+    }
+    return (
+      <ErrorBoundary>
+        <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+      </ErrorBoundary>
+    )
   }
 
   if (showRegister) {
