@@ -505,6 +505,7 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
 
     // Quando o arquivo tem categoria (ex: Conta Azul "Categoria 1") mas sem grupo,
     // tenta mapear para a classificação e grupo do plano de contas do sistema.
+    // Se a categoria NÃO estiver no mapa, descarta — será tratado como Não Identificado.
     let classificacaoFinal = rawClassif
     if (rawClassif && !rawGrupo) {
       const mapped = resolveContaAzulCategory(rawClassif)
@@ -512,12 +513,9 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
         classificacaoFinal = mapped.classificacao
         rawGrupo = mapped.grupo
       } else {
-        // Tenta pelo mapa direto; se ainda não achar, deriva pelo tipo da transação
-        // para garantir que grupoArquivo nunca fique vazio quando há classificacaoArquivo.
-        // Isso evita que a categoria do arquivo seja ignorada na etapa de classificação.
-        rawGrupo = CLASSIFICACAO_GRUPO[rawClassif]
-          ?? LOOKUP_GRUPO_NORM.get(normalize(rawClassif))
-          ?? resolveGrupo(rawClassif, tipo)
+        // Categoria do arquivo não encontrada no plano de contas → descarta
+        // para que o lançamento seja tratado como Não Identificado.
+        classificacaoFinal = ''
       }
     }
 
