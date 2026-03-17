@@ -32,6 +32,8 @@ interface LinhaClassificada extends LinhaExtrato {
   status: 'ok' | 'erro'
   /** true quando a IA sugeriu uma classificação não cadastrada no banco */
   sugerida?: boolean
+  /** Texto original sugerido pela IA quando não estava no catálogo */
+  sugestaoIA?: string
 }
 
 type Fase = 'idle' | 'processando' | 'revisao' | 'salvando' | 'concluido'
@@ -778,6 +780,7 @@ interface LancamentoRowProps {
   onToggle: (i: number) => void
   onClassChange: (i: number, nome: string) => void
   onGrupoChange: (i: number, grupo: string) => void
+  onAplicarSugestao: (i: number) => void
   onRemover: (i: number) => void
   styles: Record<string, string>
 }
@@ -791,6 +794,7 @@ const LancamentoRow = memo(function LancamentoRow({
   onToggle,
   onClassChange,
   onGrupoChange,
+  onAplicarSugestao,
   onRemover,
   styles,
 }: LancamentoRowProps) {
@@ -833,6 +837,15 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
+        {l.sugerida && l.sugestaoIA && (
+          <div
+            className={styles.badgeSugestaoIA}
+            title={`Sugestão da IA: ${l.sugestaoIA} — clique para aplicar`}
+            onClick={() => onAplicarSugestao(i)}
+          >
+            💡 {l.sugestaoIA}
+          </div>
+        )}
       </td>
       <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
         <select
@@ -949,6 +962,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setLinhasClass(prev => prev.map((l, i) =>
       i === idx ? { ...l, grupo: novoGrupo } : l
     ))
+  }, [])
+
+  const handleAplicarSugestao = useCallback((idx: number) => {
+    setLinhasClass(prev => {
+      const linha = prev[idx]
+      if (!linha?.sugestaoIA) return prev
+      const novoGrupo = resolveGrupo(linha.sugestaoIA, linha.tipo)
+      return prev.map((l, i) =>
+        i === idx ? { ...l, classificacao: linha.sugestaoIA!, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined } : l
+      )
+    })
   }, [])
 
   const aplicarClassificacaoParecidos = () => {
@@ -1291,7 +1315,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
-        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: clf.classificacao }
       }
     }
 
@@ -1577,6 +1601,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     onToggle={toggleItem}
                     onClassChange={handleClassChange}
                     onGrupoChange={handleGrupoChange}
+                    onAplicarSugestao={handleAplicarSugestao}
                     onRemover={removerLinha}
                     styles={styles}
                   />
@@ -1589,7 +1614,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           {linhasClass.some(l => l.sugerida) && (
             <div className={styles.legendaSugerida}>
               <span className={styles.clfSugerida}>Não Identificado</span>
-              {' '}— a IA não conseguiu identificar uma classificação para este lançamento. Selecione uma antes de salvar.
+              {' '}— a IA não conseguiu identificar uma classificação cadastrada. Quando disponível, clique na sugestão amarela 💡 para aplicá-la, ou selecione manualmente antes de salvar.
             </div>
           )}
 
