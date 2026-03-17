@@ -853,7 +853,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     return { ok: true as const }
   }
 
-  // After step 4 (valor): AI identifies classificacao + grupo
+  // After step 4 (valor): consulta histórico primeiro, só chama IA se não encontrar
   const goToStep5 = async () => {
     if (valorNumerico <= 0) return
     setStep(5)
@@ -863,6 +863,24 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     setForm(p => ({ ...p, classificacaoNome: '', grupo: '' }))
 
     try {
+      // Prioridade 1: histórico da empresa (mesma lógica do ExtratoUpload)
+      const descNorm = form.descricao.trim()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+      const { data: histData } = await supabase
+        .from('dre_classificacao_historico')
+        .select('classificacao, grupo, tipo')
+        .eq('empresa_id', empresa.id)
+        .eq('descricao_normalizada', descNorm)
+        .maybeSingle()
+
+      if (histData?.classificacao) {
+        setForm(p => ({ ...p, classificacaoNome: histData.classificacao, grupo: histData.grupo ?? '' }))
+        setAiWarning('Classificado pelo histórico da empresa.')
+        return
+      }
+
+      // Prioridade 2: IA
       const { data: configData } = await supabase
         .from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
       const modelo = configData?.valor ?? DEFAULT_AI_MODEL
@@ -890,14 +908,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         const grupoIa = String(data.grupo ?? '').trim()
         const classificacaoIa = String(data.classificacao_nome ?? '').trim()
 
-        // Valida se o grupo sugerido está no plano de contas oficial
         const gruposOficiais = grupos.filter(g => g.tipo === form.tipo).map(g => g.nome)
         const grupoFinal =
           gruposOficiais.includes(grupoIa) ? grupoIa :
           (CLASSIFICACAO_TO_GRUPO[classificacaoIa] ?? '')
 
         setForm(p => ({ ...p, classificacaoNome: classificacaoIa, grupo: grupoFinal }))
-
         if (data?.aviso) setAiWarning(String(data.aviso))
       }
     } catch (e) {
