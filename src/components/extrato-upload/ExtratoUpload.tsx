@@ -1347,8 +1347,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           updated_at:            new Date().toISOString(),
         }))
       if (historicoItems.length > 0) {
-        await supabase.from('dre_classificacao_historico')
+        const { error: histError } = await supabase.from('dre_classificacao_historico')
           .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
+        if (histError) throw new Error(histError.message)
       }
 
       setSucessoSalvo(toInsert.length)
