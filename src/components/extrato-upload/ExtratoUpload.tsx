@@ -1106,21 +1106,33 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setFase('processando')
     setProgresso(null)
 
-    // Busca modelo, classificações e histórico de correções da empresa
-    const [{ data: configData }, { data: classData }, { data: historicoData }] = await Promise.all([
+    // Busca modelo e classificações em paralelo; histórico é paginado (sem limite server-side)
+    const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single(),
       supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
-      supabase.from('dre_classificacao_historico')
+    ])
+
+    // Pagina o histórico para garantir que tudo é lido, independente do max_rows do Supabase
+    const HIST_PAGE = 1000
+    let histAll: { descricao_normalizada: string; classificacao: string; grupo: string; tipo: string }[] = []
+    let histFrom = 0
+    while (true) {
+      const { data: page, error: histErr } = await supabase
+        .from('dre_classificacao_historico')
         .select('descricao_normalizada, classificacao, grupo, tipo')
         .eq('empresa_id', empresaId)
-        .limit(50000),   // Supabase default é 1000 — garante ler todo o histórico da empresa
-    ])
+        .range(histFrom, histFrom + HIST_PAGE - 1)
+      if (histErr) break
+      histAll = histAll.concat(page ?? [])
+      if ((page ?? []).length < HIST_PAGE) break
+      histFrom += HIST_PAGE
+    }
+
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
-      ((historicoData ?? []) as { descricao_normalizada: string; classificacao: string; grupo: string; tipo: string }[])
-        .map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
+      histAll.map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
