@@ -352,6 +352,28 @@
 /* Quando IA não identificou uma classificação cadastrada (Não Identificado): destaca em verde */
 .selectClfSugerida { border-bottom-color: #4ade80 !important; color: #4ade80 !important; }
 
+/* Badge com a sugestão original da IA (exibida abaixo do select Não Identificado) */
+.badgeSugestaoIA {
+  font-size: 10px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-top: 3px;
+  cursor: pointer;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  line-height: 1.4;
+}
+.badgeSugestaoIA:hover {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
 /* Span usado na legenda abaixo da tabela */
 .clfSugerida {
   color: #4ade80;
