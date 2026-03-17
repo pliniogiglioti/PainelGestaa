@@ -927,6 +927,22 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
     setSaving(false)
     if (error) { setError(error.message); return }
+
+    // Aprende com esta entrada: salva/atualiza histórico para que próximos
+    // uploads com a mesma descrição já venham classificados corretamente.
+    const descricaoNorm = (form.descricao.trim())
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+    if (descricaoNorm && classificacaoNome !== 'Não Identificado') {
+      await supabase.from('dre_classificacao_historico').upsert({
+        empresa_id:            empresa.id,
+        descricao_normalizada: descricaoNorm,
+        classificacao:         classificacaoNome,
+        grupo:                 grupoNome,
+        tipo:                  tipoClassificacao,
+        updated_at:            new Date().toISOString(),
+      }, { onConflict: 'empresa_id,descricao_normalizada' })
+    }
+
     closeWizard(); fetchLancamentos(usuarioFiltro || undefined); fetchGrupos(); fetchClassificacoes()
   }
 
