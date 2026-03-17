@@ -782,17 +782,42 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const excluirLancamentosPeriodo = async () => {
     if (idsPeriodoSelecionado.length === 0) return
     setDeletingPeriodo(true)
-    // Deleta em lotes de 200 para não estourar o limite da URL
-    const LOTE = 200
-    for (let i = 0; i < idsPeriodoSelecionado.length; i += LOTE) {
-      const lote = idsPeriodoSelecionado.slice(i, i + LOTE)
-      const { error } = await supabase.from('dre_lancamentos').delete().in('id', lote)
-      if (error) { alert(`Erro ao excluir: ${error.message}`); setDeletingPeriodo(false); return }
+    try {
+      // Deleta diretamente no servidor por filtro de data (evita limite de URL com listas de IDs)
+      const meses = mesesFiltro.length > 0 ? mesesFiltro : null
+
+      if (meses) {
+        // Deleta mês a mês para evitar queries complexas
+        for (const mes of meses) {
+          const inicioMes = `${anoFiltro}-${mes}-01`
+          const proxMes = mes === '12'
+            ? `${Number(anoFiltro) + 1}-01-01`
+            : `${anoFiltro}-${String(Number(mes) + 1).padStart(2, '0')}-01`
+          const { error } = await supabase
+            .from('dre_lancamentos').delete()
+            .eq('empresa_id', empresa.id)
+            .gte('data_lancamento', inicioMes)
+            .lt('data_lancamento', proxMes)
+          if (error) throw new Error(error.message)
+        }
+      } else {
+        // Deleta o ano inteiro de uma vez
+        const { error } = await supabase
+          .from('dre_lancamentos').delete()
+          .eq('empresa_id', empresa.id)
+          .gte('data_lancamento', `${anoFiltro}-01-01`)
+          .lt('data_lancamento', `${Number(anoFiltro) + 1}-01-01`)
+        if (error) throw new Error(error.message)
+      }
+
+      setShowDeletePeriodo(false)
+      setMesesFiltro([])
+      fetchLancamentos(usuarioFiltro || undefined)
+    } catch (e) {
+      alert(`Erro ao excluir: ${e instanceof Error ? e.message : 'Desconhecido'}`)
+    } finally {
+      setDeletingPeriodo(false)
     }
-    setDeletingPeriodo(false)
-    setShowDeletePeriodo(false)
-    setMesesFiltro([])
-    fetchLancamentos(usuarioFiltro || undefined)
   }
 
   const labelPeriodo = (() => {
