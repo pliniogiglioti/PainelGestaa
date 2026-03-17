@@ -1112,7 +1112,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
       supabase.from('dre_classificacao_historico')
         .select('descricao_normalizada, classificacao, grupo, tipo')
-        .eq('empresa_id', empresaId),
+        .eq('empresa_id', empresaId)
+        .limit(50000),   // Supabase default é 1000 — garante ler todo o histórico da empresa
     ])
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
