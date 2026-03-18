@@ -1387,7 +1387,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       // Aprende com este upload: upsert no histórico para classificações válidas
       // Deduplica por empresa_id+descricao_normalizada para evitar o erro
       // "ON CONFLICT DO UPDATE command cannot affect row a second time"
-      const historicoMap = new Map<string, object>()
+      type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
+      const historicoMap = new Map<string, HistoricoItem>()
       ;[...indices].sort((a, b) => a - b)
         .filter(i => linhasClass[i].classificacao && linhasClass[i].classificacao !== 'Não Identificado')
         .forEach(i => {
