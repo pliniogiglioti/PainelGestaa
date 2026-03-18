@@ -1130,16 +1130,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-      // Se a coluna existir, verifica contra o plano de contas oficial.
-      // Encontrou → usa. Não encontrou → "Não Identificado". Não vai para IA nem fallback.
-      if (linha.classificacaoArquivo) {
-        const emPlano = nomesOficiaisSet.has(linha.classificacaoArquivo)
+      // Encontrou no plano de contas → usa e para. Não encontrou → cai no histórico/IA.
+      if (linha.classificacaoArquivo && nomesOficiaisSet.has(linha.classificacaoArquivo)) {
         classificadas[i] = {
           ...linha,
-          classificacao: emPlano ? linha.classificacaoArquivo : 'Não Identificado',
-          grupo: emPlano
-            ? (linha.grupoArquivo || resolveGrupo(linha.classificacaoArquivo, linha.tipo))
-            : '',
+          classificacao: linha.classificacaoArquivo,
+          grupo: linha.grupoArquivo || resolveGrupo(linha.classificacaoArquivo, linha.tipo),
           status: 'ok',
         }
         continue
