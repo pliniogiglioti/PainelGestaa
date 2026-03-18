@@ -1162,9 +1162,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+    // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
+    const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
-      histAll.map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
+      histAll
+        .filter(h => nomesOficiaisSet.has(h.classificacao))
+        .map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
