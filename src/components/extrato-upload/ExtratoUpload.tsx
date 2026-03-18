@@ -315,10 +315,13 @@ function descricaoParecida(a: string, b: string): boolean {
   return matches / Math.max(wa.length, wb.length) >= 0.6
 }
 
-/** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
-function classificarLocal(descricao: string): { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' } | null {
+/** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match.
+ *  Quando tipoForcado é informado, só considera regras daquele tipo — evita que
+ *  um padrão de receita (ex: mercadopago) sobrescreva uma despesa real. */
+function classificarLocal(descricao: string, tipoForcado?: 'receita' | 'despesa'): { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' } | null {
   const text = normalize(descricao)
-  for (const rule of FALLBACK_RULES) {
+  const rules = tipoForcado ? FALLBACK_RULES.filter(r => r.tipo === tipoForcado) : FALLBACK_RULES
+  for (const rule of rules) {
     if (rule.pattern.test(text)) {
       return { classificacao: rule.classificacao, grupo: rule.grupo, tipo: rule.tipo }
     }
@@ -1236,13 +1239,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Prioridade 2: regras locais de fallback
-      // Se tipoDefinido=true e o tipo do arquivo diverge do tipo da regra,
-      // ignora a regra (classificação seria de tipo errado) e cai na IA.
-      const local = classificarLocal(linha.descricao)
-      if (local && (!linha.tipoDefinido || linha.tipo === local.tipo)) {
+      // Quando tipoDefinido=true, filtra regras pelo tipo do arquivo para não
+      // aplicar classificações de receita em despesas (ex: mercadopago como despesa
+      // deve procurar regras de despesa na descrição, não retornar "Receita Cartão").
+      const local = classificarLocal(linha.descricao, linha.tipoDefinido ? linha.tipo : undefined)
+      if (local) {
         classificadas[i] = {
           ...linha,
-          tipo: linha.tipoDefinido ? linha.tipo : local.tipo,
+          tipo: local.tipo,
           classificacao: local.classificacao,
           grupo: local.grupo,
           status: 'ok',
@@ -1251,13 +1255,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Prioridade 3: histórico de correções manuais desta empresa
-      // Idem: se o tipo do histórico diverge do tipo autoritativo do arquivo, ignora.
+      // Só usa o histórico se o tipo registrado bate com o tipo do arquivo.
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
       if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         classificadas[i] = {
           ...linha,
-          tipo: linha.tipoDefinido ? linha.tipo : hist.tipo,
+          tipo: hist.tipo,
           classificacao: hist.classificacao,
           grupo: hist.grupo,
           status: 'ok',
