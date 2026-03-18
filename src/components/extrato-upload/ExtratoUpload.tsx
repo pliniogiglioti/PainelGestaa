@@ -215,77 +215,6 @@ const LOOKUP_GRUPO_NORM = new Map<string, string>([
   ...FALLBACK_RULES.map(r => [normalize(r.classificacao), r.grupo] as [string, string]),
 ])
 
-/**
- * Mapa de categorias do Conta Azul → classificação/grupo do sistema.
- * Chaves normalizadas (sem acentos, minúsculas). Textos entre parênteses são ignorados
- * na busca para cobrir variações como "Material Fornecedores (implante, componentes)".
- */
-const CONTA_AZUL_CATEGORY_MAP: Record<string, { classificacao: string; grupo: string }> = {
-  'receita caixa (dinheiro)':                { classificacao: 'Receita Dinheiro',                                          grupo: 'Receitas Operacionais' },
-  'receita caixa':                           { classificacao: 'Receita Dinheiro',                                          grupo: 'Receitas Operacionais' },
-  'receita cartao':                          { classificacao: 'Receita Cartão',                                            grupo: 'Receitas Operacionais' },
-  'receita pix':                             { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'receita transferencia':                   { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'receita conta bancaria':                  { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'receita conta bancária':                  { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'receita bancaria':                        { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'outras receitas':                         { classificacao: 'Receita PIX / Transferências',                              grupo: 'Receitas Operacionais' },
-  'receita financeira':                      { classificacao: 'Rendimento de Aplicação Financeira',                        grupo: 'Receitas Financeiras' },
-  'receita subadquirencia':                  { classificacao: 'Receita Subadquirência (BT)',                               grupo: 'Receitas Operacionais' },
-  'proteticos':                              { classificacao: 'Serviços Técnicos para Laboratórios',                      grupo: 'Despesas Operacionais' },
-  'material aplicado no servico':            { classificacao: 'Custo de Materiais e Insumos',                             grupo: 'Despesas Operacionais' },
-  'material fornecedores':                   { classificacao: 'Custo de Materiais e Insumos',                             grupo: 'Despesas Operacionais' },
-  'pro-labore':                              { classificacao: 'Pró-labore',                                               grupo: 'Despesas com Pessoal' },
-  'pro labore':                              { classificacao: 'Pró-labore',                                               grupo: 'Despesas com Pessoal' },
-  'salarios':                                { classificacao: 'Salários e Ordenados',                                     grupo: 'Despesas com Pessoal' },
-  'folha de pagamento':                      { classificacao: 'Salários e Ordenados',                                     grupo: 'Despesas com Pessoal' },
-  'inss':                                    { classificacao: 'INSS',                                                     grupo: 'Despesas com Pessoal' },
-  'fgts':                                    { classificacao: 'FGTS',                                                     grupo: 'Despesas com Pessoal' },
-  'vale transporte':                         { classificacao: 'Vale Transporte',                                          grupo: 'Despesas com Pessoal' },
-  'vale refeicao':                           { classificacao: 'Vale Refeição',                                            grupo: 'Despesas com Pessoal' },
-  'combustivel':                             { classificacao: 'Combustível',                                              grupo: 'Despesas com Pessoal' },
-  'investimento - maquinas e equipamentos':  { classificacao: 'Investimento - Máquinas e Equipamentos',                   grupo: 'Investimentos' },
-  'investimento - maquinas e equipamento':   { classificacao: 'Investimento - Máquinas e Equipamentos',                   grupo: 'Investimentos' },
-  'investimento - computadores e perifericos': { classificacao: 'Investimento - Computadores e Periféricos',              grupo: 'Investimentos' },
-  'investimento - moveis e utensilios':      { classificacao: 'Investimento - Móveis e Utensílios',                       grupo: 'Investimentos' },
-  'investimento - instalacoes':              { classificacao: 'Investimento - Instalações de Terceiros',                  grupo: 'Investimentos' },
-  'dividendos':                              { classificacao: 'Dividendos e Despesas dos Sócios',                         grupo: 'Investimentos' },
-  'material de escritorio/cozinha/banheiro': { classificacao: 'Material de Escritório',                                   grupo: 'Despesas Administrativas' },
-  'material de escritorio':                  { classificacao: 'Material de Escritório',                                   grupo: 'Despesas Administrativas' },
-  'aluguel/luvas':                           { classificacao: 'Aluguel',                                                  grupo: 'Despesas Administrativas' },
-  'aluguel':                                 { classificacao: 'Aluguel',                                                  grupo: 'Despesas Administrativas' },
-  'taxas diversas':                          { classificacao: 'Taxas e Emolumentos',                                      grupo: 'Despesas Administrativas' },
-  'energia eletrica':                        { classificacao: 'Energia Elétrica',                                         grupo: 'Despesas Administrativas' },
-  'agua e esgoto':                           { classificacao: 'Água e Esgoto',                                            grupo: 'Despesas Administrativas' },
-  'telefonia':                               { classificacao: 'Telefonia',                                                grupo: 'Despesas Administrativas' },
-  'contabilidade':                           { classificacao: 'Contabilidade',                                            grupo: 'Despesas Administrativas' },
-  'consultoria':                             { classificacao: 'Consultoria',                                              grupo: 'Despesas Administrativas' },
-  'juridico':                                { classificacao: 'Jurídico',                                                 grupo: 'Despesas Administrativas' },
-  'limpeza':                                 { classificacao: 'Limpeza',                                                  grupo: 'Despesas Administrativas' },
-  'seguros':                                 { classificacao: 'Seguros',                                                  grupo: 'Despesas Administrativas' },
-  'manutencao':                              { classificacao: 'Manutenção e Reparos',                                     grupo: 'Despesas Administrativas' },
-  'movimentacao financeira':                 { classificacao: 'Outras Despesas',                                          grupo: 'Despesas Administrativas' },
-  'internet':                                { classificacao: 'Internet',                                                 grupo: 'Despesas com TI' },
-  'sistema de gestao':                       { classificacao: 'Sistema de Gestão',                                        grupo: 'Despesas com TI' },
-  'marketing':                               { classificacao: 'Marketing Digital',                                        grupo: 'Despesas Comerciais e Marketing' },
-  'simples nacional':                        { classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional',   grupo: 'Impostos sobre Faturamento' },
-  'impostos':                                { classificacao: 'Impostos sobre Receitas - Presumido e Simples Nacional',   grupo: 'Impostos sobre Faturamento' },
-  'despesas bancarias':                      { classificacao: 'Despesas Bancárias',                                       grupo: 'Despesas Financeiras' },
-  'financiamentos':                          { classificacao: 'Financiamentos / Empréstimos',                             grupo: 'Despesas Financeiras' },
-  'emprestimos':                             { classificacao: 'Financiamentos / Empréstimos',                             grupo: 'Despesas Financeiras' },
-}
-
-/** Resolve a categoria do Conta Azul para classificação/grupo do sistema.
- *  Tenta: chave exata → chave sem parênteses → chave parcial (startsWith). */
-function resolveContaAzulCategory(raw: string): { classificacao: string; grupo: string } | null {
-  const norm = normalize(raw)
-  const normNoParens = norm.replace(/\s*\([^)]*\)/g, '').trim()
-  return (
-    CONTA_AZUL_CATEGORY_MAP[norm] ??
-    CONTA_AZUL_CATEGORY_MAP[normNoParens] ??
-    (Object.entries(CONTA_AZUL_CATEGORY_MAP).find(([k]) => norm.startsWith(k))?.[1] ?? null)
-  )
-}
 
 /** Resolve o grupo de uma classificação com múltiplos níveis de fallback */
 function resolveGrupo(nome: string, tipo: 'receita' | 'despesa'): string {
@@ -315,16 +244,6 @@ function descricaoParecida(a: string, b: string): boolean {
   return matches / Math.max(wa.length, wb.length) >= 0.6
 }
 
-/** Tenta classificar localmente sem chamada de rede. Retorna null se não houver match. */
-function classificarLocal(descricao: string): { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' } | null {
-  const text = normalize(descricao)
-  for (const rule of FALLBACK_RULES) {
-    if (rule.pattern.test(text)) {
-      return { classificacao: rule.classificacao, grupo: rule.grupo, tipo: rule.tipo }
-    }
-  }
-  return null
-}
 
 const moeda = (v: number) =>
   v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -503,23 +422,11 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
     }
 
     const rawClassif = cols.classificacao >= 0 ? String(row[cols.classificacao] ?? '').trim() : ''
-    let rawGrupo     = cols.grupo          >= 0 ? String(row[cols.grupo]          ?? '').trim() : ''
-
-    // Quando o arquivo tem categoria (ex: Conta Azul "Categoria 1") mas sem grupo,
-    // tenta mapear para a classificação e grupo do plano de contas do sistema.
-    // Se a categoria NÃO estiver no mapa, descarta — será tratado como Não Identificado.
-    let classificacaoFinal = rawClassif
-    if (rawClassif && !rawGrupo) {
-      const mapped = resolveContaAzulCategory(rawClassif)
-      if (mapped) {
-        classificacaoFinal = mapped.classificacao
-        rawGrupo = mapped.grupo
-      } else {
-        // Categoria do arquivo não encontrada no plano de contas → descarta
-        // para que o lançamento seja tratado como Não Identificado.
-        classificacaoFinal = ''
-      }
-    }
+    const rawGrupo   = cols.grupo          >= 0 ? String(row[cols.grupo]          ?? '').trim() : ''
+    // Armazena a categoria do arquivo exatamente como veio (ex: Conta Azul "Categoria 1").
+    // A verificação contra o plano de contas ocorre na etapa de classificação,
+    // onde nomesOficiaisSet está disponível.
+    const classificacaoFinal = rawClassif
 
     linhas.push({
       data:      formatarData(rawData),
@@ -1222,42 +1129,25 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i]
 
-      // Prioridade 1: classificação já presente no arquivo importado
-      // Só usa dados do arquivo se ambos classificação E grupo estiverem presentes,
-      // para não sobrescrever a IA com dados incompletos.
-      if (linha.classificacaoArquivo && linha.grupoArquivo) {
+      // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
+      // Encontrou no plano de contas → usa e para. Não encontrou → cai no histórico/IA.
+      if (linha.classificacaoArquivo && nomesOficiaisSet.has(linha.classificacaoArquivo)) {
         classificadas[i] = {
           ...linha,
           classificacao: linha.classificacaoArquivo,
-          grupo: linha.grupoArquivo,
+          grupo: linha.grupoArquivo || resolveGrupo(linha.classificacaoArquivo, linha.tipo),
           status: 'ok',
         }
         continue
       }
 
-      // Prioridade 2: regras locais de fallback
-      // Quando tipoDefinido=true (sinal do Valor ou coluna Tipo presente no arquivo),
-      // preserva o tipo original — não deixa a regra de descrição sobrescrever.
-      const local = classificarLocal(linha.descricao)
-      if (local) {
-        classificadas[i] = {
-          ...linha,
-          tipo: linha.tipoDefinido ? linha.tipo : local.tipo,
-          classificacao: local.classificacao,
-          grupo: local.grupo,
-          status: 'ok',
-        }
-        continue
-      }
-
-      // Prioridade 3: histórico de correções manuais desta empresa
-      // Idem: preserva tipo do arquivo se ele é autoritativo.
+      // Prioridade 2: histórico de correções manuais desta empresa
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
-      if (hist) {
+      if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         classificadas[i] = {
           ...linha,
-          tipo: linha.tipoDefinido ? linha.tipo : hist.tipo,
+          tipo: hist.tipo,
           classificacao: hist.classificacao,
           grupo: hist.grupo,
           status: 'ok',
