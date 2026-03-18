@@ -1385,16 +1385,24 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (error) throw new Error(error.message)
 
       // Aprende com este upload: upsert no histórico para classificações válidas
-      const historicoItems = [...indices].sort((a, b) => a - b)
+      // Deduplica por empresa_id+descricao_normalizada para evitar o erro
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
+      const historicoMap = new Map<string, HistoricoItem>()
+      ;[...indices].sort((a, b) => a - b)
         .filter(i => linhasClass[i].classificacao && linhasClass[i].classificacao !== 'Não Identificado')
-        .map(i => ({
-          empresa_id:            empresaId,
-          descricao_normalizada: normalize(linhasClass[i].descricao),
-          classificacao:         linhasClass[i].classificacao,
-          grupo:                 linhasClass[i].grupo,
-          tipo:                  linhasClass[i].tipo,
-          updated_at:            new Date().toISOString(),
-        }))
+        .forEach(i => {
+          const key = `${empresaId}|${normalize(linhasClass[i].descricao)}`
+          historicoMap.set(key, {
+            empresa_id:            empresaId,
+            descricao_normalizada: normalize(linhasClass[i].descricao),
+            classificacao:         linhasClass[i].classificacao,
+            grupo:                 linhasClass[i].grupo,
+            tipo:                  linhasClass[i].tipo,
+            updated_at:            new Date().toISOString(),
+          })
+        })
+      const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
         const { error: histError } = await supabase.from('dre_classificacao_historico')
           .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
