@@ -1236,10 +1236,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Prioridade 2: regras locais de fallback
-      // Quando tipoDefinido=true (sinal do Valor ou coluna Tipo presente no arquivo),
-      // preserva o tipo original — não deixa a regra de descrição sobrescrever.
+      // Se tipoDefinido=true e o tipo do arquivo diverge do tipo da regra,
+      // ignora a regra (classificação seria de tipo errado) e cai na IA.
       const local = classificarLocal(linha.descricao)
-      if (local) {
+      if (local && (!linha.tipoDefinido || linha.tipo === local.tipo)) {
         classificadas[i] = {
           ...linha,
           tipo: linha.tipoDefinido ? linha.tipo : local.tipo,
@@ -1251,10 +1251,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Prioridade 3: histórico de correções manuais desta empresa
-      // Idem: preserva tipo do arquivo se ele é autoritativo.
+      // Idem: se o tipo do histórico diverge do tipo autoritativo do arquivo, ignora.
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
-      if (hist) {
+      if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         classificadas[i] = {
           ...linha,
           tipo: linha.tipoDefinido ? linha.tipo : hist.tipo,
