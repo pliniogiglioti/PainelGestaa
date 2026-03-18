@@ -968,9 +968,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setLinhasClass(prev => {
       const linha = prev[idx]
       if (!linha?.sugestaoIA) return prev
-      const novoGrupo = resolveGrupo(linha.sugestaoIA, linha.tipo)
+      const novoNome = linha.sugestaoIA!
+      const novoGrupo = resolveGrupo(novoNome, linha.tipo)
+      const similares = prev
+        .map((l, i) => ({ l, i }))
+        .filter(({ l, i }) => i !== idx && l.tipo === linha.tipo && descricaoParecida(l.descricao, linha.descricao))
+        .map(({ i }) => i)
+      setTimeout(() =>
+        setSugestaoParecidos(similares.length > 0 ? { classificacao: novoNome, grupo: novoGrupo, similares } : null)
+      , 0)
       return prev.map((l, i) =>
-        i === idx ? { ...l, classificacao: linha.sugestaoIA!, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined } : l
+        i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined } : l
       )
     })
   }, [])
