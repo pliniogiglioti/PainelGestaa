@@ -875,9 +875,14 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         .maybeSingle()
 
       if (histData?.classificacao) {
-        setForm(p => ({ ...p, classificacaoNome: histData.classificacao, grupo: histData.grupo ?? '' }))
-        setAiWarning('Classificado pelo histórico da empresa.')
-        return
+        // Valida contra o plano de contas oficial antes de usar o histórico
+        const nomesOficiais = new Set(classificacoes.map(c => c.nome))
+        if (nomesOficiais.has(histData.classificacao)) {
+          setForm(p => ({ ...p, classificacaoNome: histData.classificacao, grupo: histData.grupo ?? '' }))
+          setAiWarning('Classificado pelo histórico da empresa.')
+          return
+        }
+        // Classificação do histórico não está mais no plano — ignora e cai na IA
       }
 
       // Prioridade 2: IA
@@ -937,10 +942,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const dataLancamento     = form.data || today()
 
-    // Garante a classificação no banco (vindas da IA/plano de contas)
-    await supabase
-      .from('dre_classificacoes')
-      .upsert({ nome: classificacaoNome, tipo: tipoClassificacao, ativo: true }, { onConflict: 'nome' })
+    // Não upsert em dre_classificacoes — o plano de contas é gerenciado pelas
+    // migrations. Inserir qualquer sugestão da IA aqui poluiria o plano oficial.
 
     const resGrupo = await ensureGrupoCatalogado(grupoNome, form.tipo)
     if (!resGrupo.ok) {

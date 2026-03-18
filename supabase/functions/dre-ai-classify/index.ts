@@ -451,7 +451,7 @@ Formato obrigatório:
     const content: string = openaiData?.choices?.[0]?.message?.content ?? ''
     const parsed = parseAiResponse(content)
     if (!parsed) return { ...fallback, aviso: 'Resposta fora do formato esperado; usado fallback.' } as AiResult & { aviso: string }
-    return toFinalResult(parsed, classificacoesDisponiveis)
+    return toFinalResult(parsed, classificacoesDisponiveis, descricao)
   } catch (err) {
     return { ...fallback, aviso: `Erro na IA (${String(err)}); usado fallback.` } as AiResult & { aviso: string }
   }
