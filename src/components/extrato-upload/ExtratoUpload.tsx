@@ -1134,17 +1134,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // Fallback: comparação sem pontuação (trata "PIX / Transf." vs "PIX Transf", etc.)
     const nomesOficiaisAggrMap  = new Map(classificacoes.map(c => [normalizeAggr(c.nome), c.nome]))
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
-    // Usa comparação normalizada para tolerar variações de acento/case nos nomes salvos
+    // Aceita TODAS as entradas — a resolução para nome oficial é feita no lookup
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
-      histAll
-        .filter(h => nomesOficiaisSet.has(h.classificacao) || nomesOficiaisNormMap.has(normalize(h.classificacao)))
-        .map(h => {
-          // Resolve para o nome oficial correto (com acento) se necessário
-          const classOficial = nomesOficiaisSet.has(h.classificacao)
-            ? h.classificacao
-            : (nomesOficiaisNormMap.get(normalize(h.classificacao)) ?? h.classificacao)
-          return [normalize(h.descricao_normalizada), { classificacao: classOficial, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }]
-        })
+      histAll.map(h => [normalize(h.descricao_normalizada), { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
@@ -1195,6 +1187,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // ── Passo 1: classificar localmente (plano de contas + histórico) ─────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
     const indicesParaIA: number[] = []
+    const indicesDoHistorico = new Set<number>()
 
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i]
@@ -1226,11 +1219,19 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
       if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
+        // Resolve para nome oficial (com acento correto) se possível
+        const nomeOficial = nomesOficiaisSet.has(hist.classificacao)
+          ? hist.classificacao
+          : (nomesOficiaisNormMap.get(normalize(hist.classificacao)) ?? null)
+        // Usa nome oficial se disponível, senão usa exatamente o que estava no histórico
+        const classParaUsar = nomeOficial ?? hist.classificacao
+        const grupoParaUsar = hist.grupo || (nomeOficial ? resolveGrupo(nomeOficial, hist.tipo) : '')
+        indicesDoHistorico.add(i)  // marca para não ser sobrescrito pela validação
         classificadas[i] = {
           ...linha,
           tipo: hist.tipo,
-          classificacao: hist.classificacao,
-          grupo: hist.grupo,
+          classificacao: classParaUsar,
+          grupo: grupoParaUsar,
           status: 'ok',
           sugerida: undefined,
           sugestaoIA: undefined,
@@ -1258,6 +1259,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const validNomesNorm = new Map(classificacoes.map(c => [normalize(c.nome), c.nome]))
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
+      // Itens do histórico são aplicados diretamente, sem validação contra o plano
+      if (indicesDoHistorico.has(i)) continue
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
         // Descarta o nome inválido — nunca expõe como sugestão, pois não está no plano de contas
         classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
@@ -1464,8 +1467,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (error) throw new Error(error.message)
 
       // Aprende com este upload: upsert no histórico para classificações válidas
-      // Deduplica por empresa_id+descricao_normalizada para evitar o erro
-      // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+      // Salva/atualiza histórico: upsert garante que alterações do usuário sobrescrevem o DB
+      // O Map deduplica caso a mesma descrição apareça várias vezes no mesmo lote
       type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
       const historicoMap = new Map<string, HistoricoItem>()
       ;[...indices].sort((a, b) => a - b)
