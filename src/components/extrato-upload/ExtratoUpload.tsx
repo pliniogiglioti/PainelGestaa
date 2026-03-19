@@ -1071,7 +1071,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
-    // Mapa normalizado: nome_normalizado → nome_oficial (para comparação case/acento-insensitive com Categoria 1 do arquivo)
+    
     const nomesOficiaisNormMap = new Map(classificacoes.map(c => [normalize(c.nome), c.nome]))
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
@@ -1132,7 +1132,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-      // Encontrou no plano de contas (comparação normalizada) → usa e para. Não encontrou → cai no histórico/IA.
+
       if (linha.classificacaoArquivo) {
         const nomeOficial = nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo))
         if (nomeOficial) {
