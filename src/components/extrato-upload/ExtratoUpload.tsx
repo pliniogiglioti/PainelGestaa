@@ -785,8 +785,7 @@ const LancamentoRow = memo(function LancamentoRow({
         {l.sugerida && l.sugestaoIA && (
           <div
             className={styles.badgeSugestaoIA}
-            title={`Sugestão: ${l.sugestaoIA} — clique para aplicar`}
-            onClick={() => onAplicarSugestao(i)}
+            title={`Categoria no arquivo: ${l.sugestaoIA}`}
           >
             💡 {l.sugestaoIA}
           </div>
@@ -1226,12 +1225,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Não classificado localmente — marcado como pendente para IA
+      // sugestaoIA guarda a categoria do arquivo como lembrete visual (somente leitura)
       classificadas[i] = {
         ...linha,
         classificacao: 'Não Identificado',
         grupo: '',
         status: 'ok',
         sugerida: true,
+        sugestaoIA: linha.classificacaoArquivo || undefined,
       }
       indicesParaIA.push(i)
     }
