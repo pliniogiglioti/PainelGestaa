@@ -1102,7 +1102,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // Busca modelo e classificações em paralelo; histórico é paginado (sem limite server-side)
     const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single(),
-      supabase.from('dre_classificacoes').select('nome,tipo').neq('ativo', false),
+      supabase.from('dre_classificacoes').select('nome,tipo').or('ativo.is.null,ativo.eq.true'),
     ])
 
     // Pagina o histórico para garantir que tudo é lido, independente do max_rows do Supabase
@@ -1124,12 +1124,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
-
-    // 🔍 DIAGNÓSTICO — abra o console do navegador (F12)
-    console.group('[PainelGestaa] Plano de contas carregado')
-    console.log(`Total de classificações no plano: ${classificacoes.length}`)
-    console.log('Primeiros 10 nomes do plano:', classificacoes.slice(0, 10).map(c => c.nome))
-    console.groupEnd()
 
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
@@ -1250,7 +1244,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     }
 
     // Passo 1b: valida classificações locais contra o plano (descarta nomes inválidos)
-    const validNomes = new Set(classificacoes.map(c => c.nome))
+    const validNomes    = new Set(classificacoes.map(c => c.nome))
+    // Mapa normalizado para resolver casos onde IA retorna acento/capitalização ligeiramente diferente
+    const validNomesNorm = new Map(classificacoes.map(c => [normalize(c.nome), c.nome]))
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
@@ -1301,8 +1297,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           const mapeamento = data.mapeamento as Record<string, MapItem | null>
           for (const i of comCategoria) {
             const resultado = mapeamento[linhas[i].classificacaoArquivo!]
-            const nomeValido = resultado && validNomes.has(resultado.classificacao_nome)
-            if (nomeValido) {
+            const nomeRaw   = resultado?.classificacao_nome ?? ''
+            const nomeExato = validNomes.has(nomeRaw) ? nomeRaw : (validNomesNorm.get(normalize(nomeRaw)) ?? null)
+            if (nomeExato) {
               classificadas[i] = {
                 ...linhas[i],
                 classificacao:    'Não Identificado',
@@ -1310,7 +1307,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 tipo:             resultado!.tipo,
                 status:           'ok',
                 sugerida:         true,
-                sugestaoIA:       resultado!.classificacao_nome,
+                sugestaoIA:       nomeExato,
                 sugestaoIAValida: true,
               }
             } else {
@@ -1356,15 +1353,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         const resultados = data.resultados as { classificacao_nome?: string; grupo?: string; confianca?: string }[]
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
-          const nomeAI = String(r?.classificacao_nome ?? '').trim()
-          const sugestaoValida = nomeAI && nomeAI !== 'Não Identificado' && validNomes.has(nomeAI)
+          const nomeAI   = String(r?.classificacao_nome ?? '').trim()
+          // Resolve nome exato do plano (comparação normalizada para tolerância de acento/capitalização)
+          const nomeExato = validNomes.has(nomeAI) ? nomeAI : (validNomesNorm.get(normalize(nomeAI)) ?? null)
+          const sugestaoValida = nomeExato && nomeExato !== 'Não Identificado'
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
             classificacao:    'Não Identificado',
             grupo:            '',
             status:           'ok',
             sugerida:         true,
-            sugestaoIA:       sugestaoValida ? nomeAI : undefined,
+            sugestaoIA:       sugestaoValida ? nomeExato : undefined,
             sugestaoIAValida: !!sugestaoValida,
           }
         })
