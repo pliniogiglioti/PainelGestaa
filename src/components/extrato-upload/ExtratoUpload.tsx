@@ -1391,9 +1391,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
         classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
       }
-      // Limpa sugestaoIA inválida (ex: categoria do arquivo que não está no plano)
-      if (clf?.sugestaoIA && !validNomes.has(clf.sugestaoIA)) {
-        classificadas[i] = { ...clf, sugestaoIA: undefined, sugestaoIAValida: false }
+      // Limpa sugestaoIA inválida — usa classificadas[i] atual (IA pode ter atualizado depois de clf ser capturado)
+      const atual = classificadas[i]
+      if (atual?.sugestaoIA && !validNomes.has(atual.sugestaoIA)) {
+        classificadas[i] = { ...atual, sugestaoIA: undefined, sugestaoIAValida: false }
       }
     }
 
