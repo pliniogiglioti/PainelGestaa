@@ -1490,19 +1490,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       // O Map deduplica caso a mesma descrição apareça várias vezes no mesmo lote
       type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
       const historicoMap = new Map<string, HistoricoItem>()
-      ;[...indices].sort((a, b) => a - b)
-        .filter(i => linhasClass[i].classificacao && linhasClass[i].classificacao !== 'Não Identificado')
-        .forEach(i => {
-          const key = `${empresaId}|${normalize(linhasClass[i].descricao)}`
-          historicoMap.set(key, {
-            empresa_id:            empresaId,
-            descricao_normalizada: normalize(linhasClass[i].descricao),
-            classificacao:         linhasClass[i].classificacao,
-            grupo:                 linhasClass[i].grupo,
-            tipo:                  linhasClass[i].tipo,
-            updated_at:            new Date().toISOString(),
-          })
+      linhasClass.forEach((linha) => {
+        if (!linha.classificacao || linha.classificacao === 'Não Identificado') return
+        const key = `${empresaId}|${normalize(linha.descricao)}`
+        historicoMap.set(key, {
+          empresa_id:            empresaId,
+          descricao_normalizada: normalize(linha.descricao),
+          classificacao:         linha.classificacao,
+          grupo:                 linha.grupo,
+          tipo:                  linha.tipo,
+          updated_at:            new Date().toISOString(),
         })
+      })
       const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
         const { error: histError } = await supabase.from('dre_classificacao_historico')
