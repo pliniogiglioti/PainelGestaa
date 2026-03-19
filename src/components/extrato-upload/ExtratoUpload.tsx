@@ -1198,30 +1198,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i]
 
-      // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-      // 1a — match exato normalizado (remove acentos, BOM, invisible chars)
-      // 1b — match sem pontuação (fallback agressivo)
-      // 1c — match fuzzy por sobreposição de palavras
-      if (linha.classificacaoArquivo) {
-        const nomeOficial =
-          nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo)) ??
-          nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo)) ??
-          classificacoes.find(c => descricaoParecida(c.nome, linha.classificacaoArquivo!))?.nome
-        if (nomeOficial) {
-          classificadas[i] = {
-            ...linha,
-            classificacao: nomeOficial,
-            grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo),
-            status: 'ok',
-            sugerida: undefined,
-            sugestaoIA: undefined,
-            sugestaoIAValida: undefined,
-          }
-          continue
-        }
-      }
-
-      // Prioridade 2: histórico de correções manuais desta empresa
+      // Prioridade 1: histórico de correções manuais desta empresa (tem precedência sobre o arquivo)
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
       console.log(`[Histórico] "${chaveHist}" →`, hist ?? 'NÃO ENCONTRADO')
@@ -1245,6 +1222,29 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           sugestaoIAValida: undefined,
         }
         continue
+      }
+
+      // Prioridade 2: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
+      // 2a — match exato normalizado (remove acentos, BOM, invisible chars)
+      // 2b — match sem pontuação (fallback agressivo)
+      // 2c — match fuzzy por sobreposição de palavras
+      if (linha.classificacaoArquivo) {
+        const nomeOficial =
+          nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo)) ??
+          nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo)) ??
+          classificacoes.find(c => descricaoParecida(c.nome, linha.classificacaoArquivo!))?.nome
+        if (nomeOficial) {
+          classificadas[i] = {
+            ...linha,
+            classificacao: nomeOficial,
+            grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo),
+            status: 'ok',
+            sugerida: undefined,
+            sugestaoIA: undefined,
+            sugestaoIAValida: undefined,
+          }
+          continue
+        }
       }
 
       // Não classificado localmente — marcado como pendente para IA
