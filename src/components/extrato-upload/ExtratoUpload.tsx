@@ -1117,11 +1117,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         .select('descricao_normalizada, classificacao, grupo, tipo')
         .eq('empresa_id', empresaId)
         .range(histFrom, histFrom + HIST_PAGE - 1)
-      if (histErr) break
+      if (histErr) {
+        console.error('[Histórico] Erro ao carregar:', histErr)
+        break
+      }
       histAll = histAll.concat(page ?? [])
       if ((page ?? []).length < HIST_PAGE) break
       histFrom += HIST_PAGE
     }
+    console.log(`[Histórico] Carregado: ${histAll.length} entradas para empresa ${empresaId}`)
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     modeloIARef.current = modelo
@@ -1218,6 +1222,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       // Prioridade 2: histórico de correções manuais desta empresa
       const chaveHist = normalize(linha.descricao)
       const hist = historico.get(chaveHist)
+      console.log(`[Histórico] "${chaveHist}" →`, hist ?? 'NÃO ENCONTRADO')
       if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         // Resolve para nome oficial (com acento correto) se possível
         const nomeOficial = nomesOficiaisSet.has(hist.classificacao)
