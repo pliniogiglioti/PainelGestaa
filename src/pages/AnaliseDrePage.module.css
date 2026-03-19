@@ -59,6 +59,84 @@
   white-space: nowrap;
 }
 
+/* ── Botão Assistente IA (header) ── */
+.btnAssistente {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 14px;
+  background: rgba(213, 175, 69, 0.06);
+  border: 1px solid rgba(213, 175, 69, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btnAssistente:hover {
+  background: rgba(213, 175, 69, 0.14);
+  border-color: rgba(213, 175, 69, 0.55);
+}
+
+.btnAssistenteEyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #c9a22a;
+  text-transform: uppercase;
+}
+
+.btnAssistenteTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d5af45;
+}
+
+/* ── Modal Assistente ── */
+.assistenteOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+
+.assistenteModal {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 14px;
+}
+
+.assistenteModalClose {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 6px;
+  color: #888;
+  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.assistenteModalClose:hover {
+  background: rgba(255,255,255,0.12);
+  color: #eee;
+}
+
 /* ── Stats ── */
 
 .statsGrid {
