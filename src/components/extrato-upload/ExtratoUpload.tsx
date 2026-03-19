@@ -1641,12 +1641,16 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           {/* Cabeçalho da revisão */}
           <div className={styles.reviewHeader}>
             <div className={styles.reviewTitleWrap}>
-              <strong className={styles.reviewTitle}>
-                Revise os {linhasClass.length} lançamentos classificados
-              </strong>
+              <strong className={styles.reviewTitle}>Revise os lançamentos classificados</strong>
 
-              {/* Cards de origem + status — todos na mesma linha */}
+              {/* Todos os cards na mesma fileira */}
               <div className={styles.fonteCards}>
+                {/* Card total */}
+                <div className={`${styles.fonteCard} ${styles.fonteCardTotal}`}>
+                  <span className={styles.fonteCardNum}>{linhasClass.length}</span>
+                  <span className={styles.fonteCardLabel}>Total de lançamentos</span>
+                </div>
+
                 {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
@@ -1669,6 +1673,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                   <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida).length}</span>
                     <span className={styles.fonteCardLabel}>Não identificados — revise antes de salvar</span>
+                  </div>
+                )}
+                {pendentesIACount > 0 && fase === 'revisao' && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardPendente}`}>
+                    <span className={styles.fonteCardNum}>{pendentesIACount}</span>
+                    <span className={styles.fonteCardLabel}>
+                      Divergentes do plano de contas
+                      {linhasClass.some(l => l.sugestaoIAValida) && (
+                        <> — clique em <strong className={styles.badgeMiniIA}>IA</strong> para confirmar</>
+                      )}
+                    </span>
                   </div>
                 )}
                 {qtdErros > 0 && (
@@ -1703,17 +1718,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
           )}
 
-          {/* Card: resumo pós-IA */}
-          {pendentesIACount > 0 && fase === 'revisao' && (
-            <div className={styles.cardIA}>
-              <span className={styles.cardIATexto}>
-                Após a análise de IA, <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} {pendentesIACount > 1 ? 'estão' : 'está'} com classificação divergente do plano de contas dos nossos gestores especialistas.
-                {linhasClass.some(l => l.sugestaoIAValida) && (
-                  <> Clique no badge <strong className={styles.badgeMiniIA}>IA</strong> para confirmar a sugestão da IA.</>
-                )}
-              </span>
-            </div>
-          )}
 
           {/* Banner: aplicar classificação a lançamentos parecidos */}
           {sugestaoParecidos && (
