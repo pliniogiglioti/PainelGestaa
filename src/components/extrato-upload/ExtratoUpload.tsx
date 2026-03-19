@@ -1647,36 +1647,42 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <div className={styles.fonteCards}>
                 {/* Card total */}
                 <div className={`${styles.fonteCard} ${styles.fonteCardTotal}`}>
+                  <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe o total de lançamentos lidos no arquivo enviado. O sistema não lê o arquivo inteiro — ele extrai apenas as informações relevantes de cada linha: data, descrição, valor e tipo (receita ou despesa). Fique atento: se este número parecer muito diferente do esperado, pode indicar que o arquivo está com linhas em branco, cabeçalhos duplicados ou um formato não reconhecido corretamente.</span></span>
                   <span className={styles.fonteCardNum}>{linhasClass.length}</span>
                   <span className={styles.fonteCardLabel}>Total de lançamentos</span>
                 </div>
 
                 {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe a quantidade de sugestões que a IA fez para os lançamentos que ela conseguiu identificar. Cuidado: a IA não é 100% precisa — ela analisa a descrição do lançamento e tenta encaixar na categoria mais adequada do plano de contas, mas pode errar em descrições curtas, ambíguas ou fora do padrão. Revise cada classificação antes de salvar, especialmente as que parecerem fora do contexto da sua empresa.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
                     <span className={styles.fonteCardLabel}>Classificados pela IA</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe os lançamentos que foram classificados automaticamente com base no seu histórico — ou seja, em importações anteriores você corrigiu manualmente esses mesmos lançamentos e o sistema memorizou sua escolha. Desta vez, ao encontrar a mesma descrição, aplicou a classificação sem precisar da IA. São os mais confiáveis desta importação, pois a decisão partiu de você.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
                     <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe os lançamentos que já vieram com categoria definida no próprio arquivo — como acontece em exportações do Conta Azul, por exemplo. O sistema usou essa categoria diretamente, sem acionar a IA. Atenção: se você já tiver corrigido algum desses lançamentos manualmente em importações anteriores, a correção do seu histórico tem prioridade e vai sobrescrever a categoria do arquivo.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
                     <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.sugerida).length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe os lançamentos que nem o histórico, nem a categoria do arquivo, nem a IA conseguiram classificar corretamente. Isso acontece muito com descrições curtas, códigos do banco ou lançamentos incomuns que a IA não reconhece. Você precisa classificar cada um manualmente — use o campo de seleção na coluna "Classificação". Depois de salvar, o sistema memoriza sua escolha e na próxima importação classifica automaticamente.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida).length}</span>
                     <span className={styles.fonteCardLabel}>Não identificados — revise antes de salvar</span>
                   </div>
                 )}
                 {pendentesIACount > 0 && fase === 'revisao' && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardPendente}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe os lançamentos em que a IA fez uma sugestão, mas o nome que ela usou não existe exatamente no plano de contas desta empresa. Isso acontece quando a IA "cria" uma variação do nome em vez de usar o oficial. Para não salvar dados incorretos, o sistema não aplica essas sugestões automaticamente. Na tabela você verá o badge laranja IA em cada linha — clique nele para aceitar a sugestão adaptada ou selecione a categoria correta manualmente.</span></span>
                     <span className={styles.fonteCardNum}>{pendentesIACount}</span>
                     <span className={styles.fonteCardLabel}>
                       Divergentes do plano de contas
@@ -1688,6 +1694,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 )}
                 {qtdErros > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardErro}`}>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Aqui exibe os lançamentos que tiveram alguma falha durante o processamento — pode ser data inválida, valor corrompido no arquivo ou erro na comunicação com a IA. Para não salvar dados errados no relatório, eles foram desmarcados automaticamente. Você pode marcá-los de volta na tabela e corrigir manualmente, ou ajustar o arquivo original e reimportar.</span></span>
                     <span className={styles.fonteCardNum}>{qtdErros}</span>
                     <span className={styles.fonteCardLabel}>Com atenção — desmarcados</span>
                   </div>

@@ -33,6 +33,7 @@
 .uploadWarningRow {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
   margin-bottom: 18px;
@@ -296,14 +297,53 @@
 }
 
 .fonteCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-  padding: 10px 16px;
+  padding: 10px 28px 10px 16px;
   border-radius: 10px;
   border: 1px solid;
   min-width: 120px;
+}
+
+/* Ícone de info */
+.infoIcon {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  font-size: 13px;
+  opacity: 0.35;
+  cursor: help;
+  line-height: 1;
+}
+.infoIcon:hover {
+  opacity: 0.9;
+}
+
+/* Tooltip */
+.cardTooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 360px;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #cbd5e1;
+  line-height: 1.5;
+  z-index: 100;
+  pointer-events: none;
+  white-space: normal;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.infoIcon:hover .cardTooltip {
+  display: block;
 }
 
 .fonteCardNum {
