@@ -747,7 +747,7 @@ const LancamentoRow = memo(function LancamentoRow({
         {l.sugerida && l.sugestaoIA && (
           <div
             className={styles.badgeSugestaoIA}
-            title={`Sugestão da IA: ${l.sugestaoIA} — clique para aplicar`}
+            title={`Sugestão: ${l.sugestaoIA} — clique para aplicar`}
             onClick={() => onAplicarSugestao(i)}
           >
             💡 {l.sugestaoIA}
@@ -1132,7 +1132,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-
+      // Encontrou no plano de contas (comparação normalizada) → usa e para.
       if (linha.classificacaoArquivo) {
         const nomeOficial = nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo))
         if (nomeOficial) {
@@ -1156,6 +1156,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           classificacao: hist.classificacao,
           grupo: hist.grupo,
           status: 'ok',
+        }
+        continue
+      }
+
+      // Prioridade 3: se o arquivo já forneceu uma Categoria 1 (mesmo fora do plano),
+      // usa como sugestão para revisão manual — NÃO envia para IA.
+      // A IA só é chamada para itens sem nenhuma pista de classificação.
+      if (linha.classificacaoArquivo) {
+        classificadas[i] = {
+          ...linha,
+          classificacao: 'Não Identificado',
+          grupo: '',
+          status: 'ok',
+          sugerida: true,
+          sugestaoIA: linha.classificacaoArquivo,
         }
         continue
       }
