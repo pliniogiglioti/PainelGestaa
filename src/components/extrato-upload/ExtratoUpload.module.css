@@ -374,6 +374,30 @@
   color: #fbbf24;
 }
 
+/* Rótulo "IA" em negrito dentro do badge de sugestão */
+.badgeFonteLabel {
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+/* Badge de Histórico de Classificações (não clicável) */
+.badgeHistorico {
+  font-size: 10px;
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.25);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-top: 3px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  line-height: 1.4;
+  cursor: default;
+}
+
 /* Badge informativo — categoria do arquivo (antes da IA rodar), não clicável */
 .badgeCatArquivo {
   font-size: 10px;
