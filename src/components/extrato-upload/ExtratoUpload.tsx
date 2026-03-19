@@ -1637,6 +1637,23 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <strong className={styles.reviewTitle}>
                 Revise os {linhasClass.length} lançamentos classificados
               </strong>
+              <div className={styles.reviewFonteBadges}>
+                {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
+                  <span className={styles.reviewFonteIA}>
+                    IA: {linhasClass.filter(l => l.fonte === 'ia').length}
+                  </span>
+                )}
+                {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
+                  <span className={styles.reviewFonteHistorico}>
+                    Histórico: {linhasClass.filter(l => l.fonte === 'historico').length}
+                  </span>
+                )}
+                {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
+                  <span className={styles.reviewFonteArquivo}>
+                    Arquivo: {linhasClass.filter(l => l.fonte === 'arquivo').length}
+                  </span>
+                )}
+              </div>
               {linhasClass.filter(l => l.sugerida).length > 0 && (
                 <span className={styles.reviewNaoIdBadge}>
                   ⚠ {linhasClass.filter(l => l.sugerida).length} não identificado{linhasClass.filter(l => l.sugerida).length > 1 ? 's' : ''} — revise antes de salvar
