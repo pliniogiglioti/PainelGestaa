@@ -1290,9 +1290,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const semCategoria  = indicesParaIA.filter(i => !linhas[i].classificacaoArquivo)
     const totalPassos   = 1 + Math.ceil(semCategoria.length / 15) // 1 chamada de mapeamento + batches de descrição
 
+    // Set de nomes válidos do plano — usado para validar TODA sugestão da IA
+    const validNomes = new Set(classificacoes.map(c => c.nome))
+
     setProgresso({ atual: 0, total: totalPassos, label: 'Mapeando categorias' })
 
     // ── Etapa A: mapeamento de categorias únicas (1 chamada) ──────────────────
+    // IA mapeia a categoria do arquivo → classificação do plano.
+    // Resultado fica como SUGESTÃO (badge clicável), NÃO auto-aplica.
     if (comCategoria.length > 0) {
       const categoriasUnicas = [...new Set(comCategoria.map(i => linhas[i].classificacaoArquivo!))]
       try {
@@ -1310,17 +1315,19 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           const mapeamento = data.mapeamento as Record<string, MapItem | null>
           for (const i of comCategoria) {
             const resultado = mapeamento[linhas[i].classificacaoArquivo!]
-            if (resultado) {
+            if (resultado && validNomes.has(resultado.classificacao_nome)) {
+              // IA mapeou para classificação válida → sugestão clicável
               classificadas[i] = {
                 ...linhas[i],
-                classificacao: resultado.classificacao_nome,
-                grupo:         resultado.grupo,
+                classificacao: 'Não Identificado',
+                grupo:         '',
                 tipo:          resultado.tipo,
                 status:        'ok',
-                sugerida:      false,
+                sugerida:      true,
+                sugestaoIA:    resultado.classificacao_nome,
               }
             }
-            // Se null: permanece como "Não Identificado" (placeholder já definido)
+            // Se null ou inválido: permanece como "Não Identificado" (placeholder já definido)
           }
         }
       } catch { /* falha silenciosa — itens ficam como Não Identificado */ }
@@ -1329,6 +1336,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setProgresso({ atual: 1, total: totalPassos, label: 'Classificando por descrição' })
 
     // ── Etapa B: batch por descrição (só itens sem categoria) ─────────────────
+    // IA analisa a descrição → sugere classificação do plano.
+    // Resultado fica como SUGESTÃO (badge clicável), NÃO auto-aplica.
     const BATCH_IA = 15
     const DELAY    = 800
 
@@ -1352,16 +1361,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
           const nomeAI = String(r?.classificacao_nome ?? '').trim()
-          const temSugestaoValida = nomeAI && nomeAI !== 'Não Identificado'
-          // IA sugere → mantém "Não Identificado" + badge clicável para o usuário confirmar
-          // Só auto-aplica se vier de regras locais (confianca = 'confirmada' via fallback)
+          const sugestaoValida = nomeAI && nomeAI !== 'Não Identificado' && validNomes.has(nomeAI)
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
             classificacao: 'Não Identificado',
             grupo:         '',
             status:        'ok',
             sugerida:      true,
-            sugestaoIA:    temSugestaoValida ? nomeAI : undefined,
+            sugestaoIA:    sugestaoValida ? nomeAI : undefined,
           }
         })
       } catch {
@@ -1373,13 +1380,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       setProgresso({ atual: 1 + Math.ceil((b + BATCH_IA) / BATCH_IA), total: totalPassos, label: 'Classificando por descrição' })
     }
 
-    // Valida resultado da IA contra o plano
-    const validNomes = new Set(classificacoes.map(c => c.nome))
+    // Valida classificações locais (Passo 1) contra o plano — descarta nomes inválidos
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
-        // Nunca expõe como sugestão — não está no plano de contas
         classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
+      }
+      // Limpa sugestaoIA inválida (ex: categoria do arquivo que não está no plano)
+      if (clf?.sugestaoIA && !validNomes.has(clf.sugestaoIA)) {
+        classificadas[i] = { ...clf, sugestaoIA: undefined }
       }
     }
 
