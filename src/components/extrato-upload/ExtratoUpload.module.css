@@ -374,6 +374,24 @@
   color: #fbbf24;
 }
 
+/* Badge informativo — categoria do arquivo (antes da IA rodar), não clicável */
+.badgeCatArquivo {
+  font-size: 10px;
+  color: #94a3b8;
+  background: rgba(148, 163, 184, 0.08);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 4px;
+  padding: 1px 5px;
+  margin-top: 3px;
+  max-width: 170px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+  line-height: 1.4;
+  cursor: default;
+}
+
 /* Span usado na legenda abaixo da tabela */
 .clfSugerida {
   color: #4ade80;
