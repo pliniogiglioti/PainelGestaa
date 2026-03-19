@@ -859,7 +859,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
   const modeloIARef = useRef<string>(DEFAULT_OPENAI_MODEL)
-  const descricoesHistoricoRef = useRef<Set<string>>(new Set())
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
@@ -1126,7 +1125,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     modeloIARef.current = modelo
-    descricoesHistoricoRef.current = new Set(histAll.map(h => h.descricao_normalizada))
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
 
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
@@ -1469,13 +1467,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (error) throw new Error(error.message)
 
       // Aprende com este upload: upsert no histórico para classificações válidas
-      // Salva no histórico apenas entradas NOVAS (que ainda não existem no DB)
-      const descricoesNoHistorico = descricoesHistoricoRef.current
+      // Salva/atualiza histórico: upsert garante que alterações do usuário sobrescrevem o DB
+      // O Map deduplica caso a mesma descrição apareça várias vezes no mesmo lote
       type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
       const historicoMap = new Map<string, HistoricoItem>()
       ;[...indices].sort((a, b) => a - b)
         .filter(i => linhasClass[i].classificacao && linhasClass[i].classificacao !== 'Não Identificado')
-        .filter(i => !descricoesNoHistorico.has(normalize(linhasClass[i].descricao)))
         .forEach(i => {
           const key = `${empresaId}|${normalize(linhasClass[i].descricao)}`
           historicoMap.set(key, {
@@ -1490,7 +1487,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
         const { error: histError } = await supabase.from('dre_classificacao_historico')
-          .insert(historicoItems)
+          .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
         if (histError) throw new Error(histError.message)
       }
 
