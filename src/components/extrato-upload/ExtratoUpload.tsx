@@ -1538,29 +1538,39 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
   return (
     <section className={styles.section}>
-      <div className={styles.sectionHeader}>
-        <div>
-          <h2>Importar Extrato / Planilha</h2>
-          <p className={styles.sectionSubtitle}>
-            Envie uma planilha Excel (.xlsx/.xls) ou CSV — a IA classifica cada lançamento automaticamente.
-          </p>
-        </div>
-        {exemplosDb.some(e => e.arquivo) && (
-          <div className={styles.exemplosWrap}>
-            <span className={styles.exemplosLabel}>↓ Baixar modelo:</span>
-            {exemplosDb.filter(e => e.arquivo).map(ex => (
-              <a
-                key={ex.arquivo}
-                href={`/exemplos/${ex.arquivo}`}
-                download
-                className={styles.downloadBtn}
-              >
-                {ex.nome}
-              </a>
-            ))}
+      {/* ── Aviso de IA + cards de modelo (só no idle) ──────────────────────── */}
+      {fase === 'idle' && (
+        <>
+          <div className={styles.uploadWarning}>
+            <span className={styles.uploadWarningIcon}>⚠</span>
+            <span>
+              Ao enviar o arquivo, verifique a identificação dos lançamentos.{' '}
+              <strong>A Inteligência Artificial pode cometer erros.</strong>{' '}
+              Confira as informações antes de salvar.
+            </span>
           </div>
-        )}
-      </div>
+
+          {exemplosDb.some(e => e.arquivo) && (
+            <div className={styles.modelosSection}>
+              <span className={styles.modelosSectionLabel}>Modelos de planilha aceitos</span>
+              <div className={styles.modelosCards}>
+                {exemplosDb.filter(e => e.arquivo).map(ex => (
+                  <a
+                    key={ex.arquivo}
+                    href={`/exemplos/${ex.arquivo}`}
+                    download
+                    className={styles.modeloCard}
+                  >
+                    <span className={styles.modeloCardIcon}>📥</span>
+                    <span className={styles.modeloCardNome}>{ex.nome}</span>
+                    <span className={styles.modeloCardHint}>Baixar modelo</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* ── Drop zone (idle / processando) ──────────────────────────────────── */}
       {(fase === 'idle' || fase === 'processando') && (
@@ -1695,7 +1705,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <span className={styles.bannerParecidosTexto}>
                 Após a análise de IA, <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} {pendentesIACount > 1 ? 'estão' : 'está'} com classificação divergente do plano de contas dos nossos gestores especialistas.
                 {linhasClass.some(l => l.sugestaoIAValida) && (
-                  <> Clique no badge <strong>💡</strong> para confirmar a sugestão da IA.</>
+                  <> Clique no badge <strong className={styles.badgeFonteLabel} style={{color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'0 5px', fontSize:11}}>IA</strong> para confirmar a sugestão da IA.</>
                 )}
               </span>
             </div>
