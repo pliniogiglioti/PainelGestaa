@@ -1637,11 +1637,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
           )}
 
-          {/* Banner: itens ainda pendentes após a IA automática */}
+          {/* Banner: resumo pós-IA */}
           {pendentesIACount > 0 && fase === 'revisao' && (
             <div className={styles.bannerParecidos}>
               <span className={styles.bannerParecidosTexto}>
-                <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} ainda sem classificação — revise ou selecione manualmente
+                Após a análise de IA, <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} {pendentesIACount > 1 ? 'estão' : 'está'} com classificação divergente do plano de contas dos nossos gestores especialistas.
+                {linhasClass.some(l => l.sugestaoIAValida) && (
+                  <> Clique no badge <strong>💡</strong> para confirmar a sugestão da IA.</>
+                )}
               </span>
             </div>
           )}
