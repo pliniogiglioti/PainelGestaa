@@ -604,21 +604,24 @@ ${linhasJson}`
       .map((c, i) => `${i + 1}. "${c}"`)
       .join('\n')
 
-    const prompt = `Assistente contábil DRE Brasil.
-Para cada CATEGORIA DO ARQUIVO abaixo, encontre a classificação DRE EXATA da lista.
+    const prompt = `Você é um assistente contábil especializado em DRE para clínicas de saúde brasileiras.
 
-CLASSIFICAÇÕES DRE DISPONÍVEIS:
+Sua tarefa: mapear categorias de um software de gestão financeira (ex: Conta Azul) para as classificações DRE exatas do sistema.
+
+CLASSIFICAÇÕES DRE DISPONÍVEIS (use o nome EXATO, incluindo acentos e capitalização):
 ${listaClassificacoes}
 
-CATEGORIAS DO ARQUIVO:
+CATEGORIAS DO ARQUIVO A MAPEAR:
 ${listaCategorias}
 
-REGRAS:
-- Use o nome EXATO da lista de classificações disponíveis.
-- Se não houver correspondência clara, retorne null para aquela categoria.
-- Retorne SOMENTE um objeto JSON, sem texto adicional.
+INSTRUÇÕES:
+1. Para cada categoria, entenda o seu significado financeiro real e escolha a classificação DRE mais específica e adequada da lista acima.
+2. Use SOMENTE nomes copiados exatamente da lista — sem variações, abreviações ou traduções.
+3. Prefira sempre a classificação mais específica. Classificações genéricas como "Outras Despesas" ou "Outras Receitas" só devem ser usadas quando absolutamente nenhuma outra da lista se aplicar.
+4. Retorne null apenas quando a categoria não tiver correspondência possível com nenhum item da lista.
+5. Retorne SOMENTE um objeto JSON, sem texto adicional.
 
-FORMATO: {"categoria original": {"classificacao_nome":"nome exato","grupo":"grupo exato","tipo":"receita ou despesa"}, "outra sem match": null}`
+FORMATO: {"categoria original": {"classificacao_nome":"nome exato da lista","grupo":"grupo exato","tipo":"receita ou despesa"}, "outra sem match": null}`
 
     let res = await callOpenAI(openaiApiKey, modelo, prompt)
 
