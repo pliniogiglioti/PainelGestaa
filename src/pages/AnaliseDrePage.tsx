@@ -254,13 +254,14 @@ function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
 
 // ── Components ──
 
-function StatCard({ title, value, tone = 'default' }: {
-  title: string; value: string; tone?: 'default' | 'positive' | 'negative'
+function StatCard({ title, value, hint, tone = 'default' }: {
+  title: string; value: string; hint: string; tone?: 'default' | 'positive' | 'negative'
 }) {
   return (
     <article className={`${styles.statCard} ${tone === 'positive' ? styles.positiveCard : ''} ${tone === 'negative' ? styles.negativeCard : ''}`}>
-      <span>{title}</span>
-      <strong>{value}</strong>
+      <span className={styles.statInfoIcon}>ⓘ<span className={styles.statTooltip}>{hint}</span></span>
+      <span className={styles.statTitle}>{title}</span>
+      <strong className={styles.statValue}>{value}</strong>
     </article>
   )
 }
@@ -1056,9 +1057,27 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       {/* ── Stats ── */}
       <section className={styles.statsGrid}>
-        <StatCard title="Receitas"  value={moeda(totais.receitas)} tone="positive" />
-        <StatCard title="Despesas"  value={moeda(totais.despesas)} tone="negative" />
-        <StatCard title="Resultado" value={moeda(resultado)} tone={resultado >= 0 ? 'positive' : 'negative'} />
+        <StatCard
+          title="Receitas"
+          value={moeda(totais.receitas)}
+          tone="positive"
+          hint="Soma de todas as entradas financeiras do período selecionado — receitas de serviços, repasses, convênios e qualquer lançamento classificado como receita."
+        />
+        <StatCard
+          title="Despesas"
+          value={moeda(totais.despesas)}
+          tone="negative"
+          hint="Soma de todas as saídas financeiras do período — custos operacionais, folha, aluguel, insumos, impostos e qualquer lançamento classificado como despesa."
+        />
+        <StatCard
+          title="Resultado"
+          value={moeda(resultado)}
+          tone={resultado >= 0 ? 'positive' : 'negative'}
+          hint={resultado >= 0
+            ? 'Receitas superam as despesas — a empresa está no lucro neste período. Resultado = Receitas − Despesas.'
+            : 'Despesas superam as receitas — a empresa está no prejuízo neste período. Resultado = Receitas − Despesas.'
+          }
+        />
       </section>
 
       {/* ── KPI Cards ── */}
