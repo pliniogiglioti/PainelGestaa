@@ -728,7 +728,6 @@ interface LancamentoRowProps {
   onClassChange: (i: number, nome: string) => void
   onGrupoChange: (i: number, grupo: string) => void
   onAplicarSugestao: (i: number) => void
-  onClassificarComIA: (i: number) => void
   onRemover: (i: number) => void
   styles: Record<string, string>
 }
@@ -743,7 +742,6 @@ const LancamentoRow = memo(function LancamentoRow({
   onClassChange,
   onGrupoChange,
   onAplicarSugestao,
-  onClassificarComIA,
   onRemover,
   styles,
 }: LancamentoRowProps) {
@@ -786,13 +784,13 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
-        {l.sugerida && (
+        {l.sugerida && l.sugestaoIA && l.sugestaoIAValida && (
           <div
             className={styles.badgeSugestaoIA}
-            title={l.sugestaoIAValida && l.sugestaoIA ? `Sugestão da IA: clique para aplicar "${l.sugestaoIA}"` : 'Clique para classificar com IA'}
-            onClick={e => { e.stopPropagation(); l.sugestaoIAValida && l.sugestaoIA ? onAplicarSugestao(i) : onClassificarComIA(i) }}
+            title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
+            onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
           >
-            💡 {l.sugestaoIA ?? 'Classificar com IA'}
+            💡 {l.sugestaoIA}
           </div>
         )}
       </td>
@@ -944,37 +942,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       )
     })
   }, [])
-
-  const handleClassificarComIA = useCallback(async (idx: number) => {
-    const linha = linhasClass[idx]
-    if (!linha) return
-    setLinhasClass(prev => prev.map((l, i) => i === idx ? { ...l, status: 'ok', sugestaoIA: undefined, sugestaoIAValida: false } : l))
-    const validNomesNorm = new Map(classificacoesDisp.map(c => [normalize(c.nome), c.nome]))
-    try {
-      const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
-        body: {
-          lancamentos: [{ descricao: linha.descricao, valor: linha.valor, tipo: linha.tipo }],
-          modelo: modeloIARef.current,
-          classificacoes_disponiveis: classificacoesDisp.map(c => ({ nome: c.nome, tipo: c.tipo })),
-        },
-      })
-      if (error || !data?.resultados?.[0]) return
-      const r = data.resultados[0] as { classificacao_nome?: string }
-      const nomeAI   = String(r?.classificacao_nome ?? '').trim()
-      const validSet = new Set(classificacoesDisp.map(c => c.nome))
-      let nomeExato = validSet.has(nomeAI) ? nomeAI : (validNomesNorm.get(normalize(nomeAI)) ?? null)
-      // Fallback: se IA não retornou nome válido, usa "Outras Despesas" ou "Receita Dinheiro"
-      if (!nomeExato || nomeExato === 'Não Identificado') {
-        const fallbackNome = linha.tipo === 'receita' ? 'Receita Dinheiro' : 'Outras Despesas'
-        nomeExato = validNomesNorm.get(normalize(fallbackNome)) ?? null
-      }
-      if (!nomeExato) return
-      const novoGrupo = resolveGrupo(nomeExato, linha.tipo)
-      setLinhasClass(prev => prev.map((l, i) =>
-        i === idx ? { ...l, classificacao: nomeExato, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined, sugestaoIAValida: undefined } : l
-      ))
-    } catch { /* silencioso */ }
-  }, [linhasClass, classificacoesDisp])
 
   const aplicarClassificacaoParecidos = () => {
     if (!sugestaoParecidos) return
@@ -1417,10 +1384,22 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
         classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
       }
-      // Limpa sugestaoIA inválida — usa classificadas[i] atual (IA pode ter atualizado depois de clf ser capturado)
+      // Limpa sugestaoIA inválida
       const atual = classificadas[i]
       if (atual?.sugestaoIA && !validNomes.has(atual.sugestaoIA)) {
         classificadas[i] = { ...atual, sugestaoIA: undefined, sugestaoIAValida: false }
+      }
+    }
+
+    // Garante sugestão para TODOS os não-identificados — usa padrão por tipo como fallback final
+    for (let i = 0; i < classificadas.length; i++) {
+      const clf = classificadas[i]
+      if (clf?.sugerida && !clf.sugestaoIA) {
+        const fallbackNome = clf.tipo === 'receita' ? 'Receita Dinheiro' : 'Outras Despesas'
+        const nomeFinal = validNomes.has(fallbackNome) ? fallbackNome : (validNomesNorm.get(normalize(fallbackNome)) ?? null)
+        if (nomeFinal) {
+          classificadas[i] = { ...clf, sugestaoIA: nomeFinal, sugestaoIAValida: true }
+        }
       }
     }
 
@@ -1444,7 +1423,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       setShowSugeridaModal(true)
       return
     }
-    const indices = new Set(linhasClass.map((_, i) => i))
+    const indices = new Set<number>(linhasClass.map((_, i) => i))
     setSelecionados(indices)
     await salvarComIndices(indices)
   }
@@ -1727,7 +1706,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     onClassChange={handleClassChange}
                     onGrupoChange={handleGrupoChange}
                     onAplicarSugestao={handleAplicarSugestao}
-                    onClassificarComIA={handleClassificarComIA}
                     onRemover={removerLinha}
                     styles={styles}
                   />
