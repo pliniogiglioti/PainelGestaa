@@ -299,6 +299,24 @@ function detectarColunas(headers: string[]): {
   const idx = (keys: string[]) =>
     normHeaders.findIndex(h => keys.some(k => h.includes(k)))
 
+  // Para classificação: prioriza match exato (evita pegar "Categoria 2" quando quer "Categoria 1")
+  const idxClassificacao = (): number => {
+    // 1. Exato "categoria 1"
+    const i1 = normHeaders.findIndex(h => h === 'categoria 1')
+    if (i1 >= 0) return i1
+    // 2. Contém "categoria 1" (ex: "sub-categoria 1" não bate, mas "categoria 1 ..." bate)
+    const i2 = normHeaders.findIndex(h => h.startsWith('categoria 1'))
+    if (i2 >= 0) return i2
+    // 3. Contém "classificac"
+    const i3 = normHeaders.findIndex(h => h.includes('classificac'))
+    if (i3 >= 0) return i3
+    // 4. Exato "categoria" (sem número)
+    const i4 = normHeaders.findIndex(h => h === 'categoria')
+    if (i4 >= 0) return i4
+    // 5. Começa com "categoria" (último recurso — pega "categoria 1", "categoria 2", etc.)
+    return normHeaders.findIndex(h => h.startsWith('categoria'))
+  }
+
   return {
     data:          idx(['data', 'date', 'dt', 'vencimento']),
     descricao:     idx(['descric', 'historico', 'memo', 'description', 'complement', 'lancamento']),
@@ -306,7 +324,7 @@ function detectarColunas(headers: string[]): {
     tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'credito/debito', 'entrada/saida']),
     credito:       idx(['credit']),
     debito:        idx(['debit']),
-    classificacao: idx(['classificac', 'categoria 1', 'categoria']),
+    classificacao: idxClassificacao(),
     grupo:         idx(['grupo', 'group', 'agrupamento']),
   }
 }
@@ -383,6 +401,13 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   const headerIdx = encontrarLinhaCabecalho(rows)
   const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
   const cols = detectarColunas(headers)
+
+  // 🔍 DIAGNÓSTICO — abra o console do navegador (F12) para ver
+  console.group('[PainelGestaa] parsePlanilha — diagnóstico de colunas')
+  console.log('Headers detectados:', headers)
+  console.log('Índices de colunas:', cols)
+  console.log('Coluna classificação (índice):', cols.classificacao, '→', headers[cols.classificacao] ?? '(não encontrada)')
+  console.groupEnd()
 
   const usaSeparado = cols.credito >= 0 || cols.debito >= 0
 
@@ -1081,6 +1106,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+
+    // 🔍 DIAGNÓSTICO — abra o console do navegador (F12)
+    console.group('[PainelGestaa] Plano de contas carregado')
+    console.log(`Total de classificações no plano: ${classificacoes.length}`)
+    console.log('Primeiros 10 nomes do plano:', classificacoes.slice(0, 10).map(c => c.nome))
+    console.groupEnd()
+
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
     
@@ -1142,6 +1174,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
     const indicesParaIA: number[] = []
 
+    // 🔍 DIAGNÓSTICO — mostra primeiros valores de classificacaoArquivo vs plano
+    const arquivoNaoMatch: string[] = []
+
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i]
 
@@ -1180,6 +1215,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       // usa como sugestão para revisão manual — NÃO envia para IA.
       // A IA só é chamada para itens sem nenhuma pista de classificação.
       if (linha.classificacaoArquivo) {
+        if (arquivoNaoMatch.length < 20 && !arquivoNaoMatch.includes(linha.classificacaoArquivo)) {
+          arquivoNaoMatch.push(linha.classificacaoArquivo)
+        }
         classificadas[i] = {
           ...linha,
           classificacao: 'Não Identificado',
@@ -1192,6 +1230,20 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       indicesParaIA.push(i)
+    }
+
+    // 🔍 DIAGNÓSTICO — mostra os valores que não casaram com o plano
+    if (arquivoNaoMatch.length > 0) {
+      console.group('[PainelGestaa] Categorias do arquivo que NÃO casaram com o plano')
+      console.log('Primeiros valores distintos de "Categoria 1" não encontrados no plano:')
+      arquivoNaoMatch.forEach(v => {
+        console.log(`  Arquivo: "${v}"  →  normalizado: "${normalize(v)}"  →  aggr: "${normalizeAggr(v)}"`)
+      })
+      console.log('\nPlano de contas (normalizado):')
+      Array.from(nomesOficiaisNormMap.entries()).slice(0, 20).forEach(([k, v]) => {
+        console.log(`  "${k}"  →  "${v}"`)
+      })
+      console.groupEnd()
     }
 
     setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length, label: 'Classificando com IA' })
