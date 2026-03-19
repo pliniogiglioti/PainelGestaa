@@ -865,6 +865,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [fase, setFase]                             = useState<Fase>('idle')
   const [linhasClass, setLinhasClass]               = useState<LinhaClassificada[]>([])
   const [selecionados, setSelecionados]             = useState<Set<number>>(new Set())
+  const [filtroFonte, setFiltroFonte]               = useState<'total' | 'ia' | 'historico' | 'arquivo' | 'naoId' | 'pendente' | 'erro' | null>(null)
   const [erroSalvar, setErroSalvar]                 = useState<string>('')
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
@@ -881,6 +882,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     supabase.from('exemplos_upload').select('nome, arquivo').order('created_at')
       .then(({ data }) => setExemplosDb(data ?? []))
   }, [])
+
+  const linhasVisiveis: number[] = useMemo(() => {
+    const indices = linhasClass.map((_, i) => i)
+    if (!filtroFonte || filtroFonte === 'total') return indices
+    if (filtroFonte === 'ia')        return indices.filter(i => linhasClass[i].fonte === 'ia')
+    if (filtroFonte === 'historico') return indices.filter(i => linhasClass[i].fonte === 'historico')
+    if (filtroFonte === 'arquivo')   return indices.filter(i => linhasClass[i].fonte === 'arquivo')
+    if (filtroFonte === 'naoId')     return indices.filter(i => linhasClass[i].sugerida && !linhasClass[i].sugestaoIAValida)
+    if (filtroFonte === 'pendente')  return indices.filter(i => linhasClass[i].sugerida && linhasClass[i].sugestaoIAValida)
+    if (filtroFonte === 'erro')      return indices.filter(i => linhasClass[i].status === 'erro')
+    return indices
+  }, [linhasClass, filtroFonte])
 
   const qtdErros       = linhasClass.filter(l => l.status === 'erro').length
   const todosChecked   = selecionados.size === linhasClass.length && linhasClass.length > 0
@@ -1006,6 +1019,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setErroSalvar('')
     setSucessoSalvo(0)
     setMsgErroUpload('')
+    setFiltroFonte(null)
     iaContextRef.current = null
   }
 
@@ -1641,62 +1655,90 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               {/* Todos os cards na mesma fileira */}
               <div className={styles.fonteCards}>
                 {/* Card total */}
-                <div className={`${styles.fonteCard} ${styles.fonteCardTotal}`}>
+                <button
+                  className={`${styles.fonteCard} ${styles.fonteCardTotal}${filtroFonte === null || filtroFonte === 'total' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                  onClick={() => setFiltroFonte(filtroFonte === 'total' || filtroFonte === null ? null : 'total')}
+                  title="Filtrar: todos os lançamentos"
+                >
                   <span className={styles.infoIcon}>ⓘ</span>
                   <span className={styles.cardTooltip}>Aqui exibe o total de lançamentos lidos no arquivo enviado. O sistema não lê o arquivo inteiro — ele extrai apenas as informações relevantes de cada linha: data, descrição, valor e tipo (receita ou despesa). Fique atento: se este número parecer muito diferente do esperado, pode indicar que o arquivo está com linhas em branco, cabeçalhos duplicados ou um formato não reconhecido corretamente.</span>
                   <span className={styles.fonteCardNum}>{linhasClass.length}</span>
                   <span className={styles.fonteCardLabel}>Total de lançamentos</span>
-                </div>
+                </button>
 
                 {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardIA}${filtroFonte === 'ia' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'ia' ? null : 'ia')}
+                    title="Filtrar: classificados pela IA"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos em que a IA analisou a descrição e escolheu uma categoria diretamente do plano de contas oficial — a IA sempre trabalha dentro do plano, nunca inventa categorias. Porém, mesmo escolhendo do plano, ela pode errar na escolha da categoria mais adequada. Por isso o sistema exibe o badge laranja IA em cada linha para que você confirme. Após confirmar, o lançamento sai do card "Aguardando confirmação" e fica registrado como classificado.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
                     <span className={styles.fonteCardLabel}>Classificados pela IA</span>
-                  </div>
+                  </button>
                 )}
                 {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardHistorico}${filtroFonte === 'historico' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'historico' ? null : 'historico')}
+                    title="Filtrar: classificados pelo histórico"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos que foram classificados automaticamente com base no seu histórico — ou seja, em importações anteriores você corrigiu manualmente esses mesmos lançamentos e o sistema memorizou sua escolha. Desta vez, ao encontrar a mesma descrição, aplicou a classificação sem precisar da IA. São os mais confiáveis desta importação, pois a decisão partiu de você.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
                     <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
-                  </div>
+                  </button>
                 )}
                 {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardArquivo}${filtroFonte === 'arquivo' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'arquivo' ? null : 'arquivo')}
+                    title="Filtrar: classificação do arquivo"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos que já vieram com categoria definida no próprio arquivo — como acontece em exportações do Conta Azul, por exemplo. O sistema usou essa categoria diretamente, sem acionar a IA. Atenção: se você já tiver corrigido algum desses lançamentos manualmente em importações anteriores, a correção do seu histórico tem prioridade e vai sobrescrever a categoria do arquivo.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
                     <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
-                  </div>
+                  </button>
                 )}
                 {linhasClass.filter(l => l.sugerida && !l.sugestaoIAValida).length > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardNaoId}${filtroFonte === 'naoId' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'naoId' ? null : 'naoId')}
+                    title="Filtrar: sem classificação"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos que nenhuma das etapas conseguiu classificar — nem o histórico, nem a categoria do arquivo, nem a IA. Isso acontece quando a descrição é muito curta, é um código interno do banco ou quando a IA não conseguiu associar a nenhuma categoria do plano de contas. Você precisa classificar cada um manualmente — use o campo de seleção na coluna "Classificação". Depois de salvar, o sistema memoriza sua escolha e aplica automaticamente nas próximas importações.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida && !l.sugestaoIAValida).length}</span>
                     <span className={styles.fonteCardLabel}>Sem classificação — revisão obrigatória</span>
-                  </div>
+                  </button>
                 )}
                 {linhasClass.filter(l => l.sugerida && l.sugestaoIAValida).length > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardPendente}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardPendente}${filtroFonte === 'pendente' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'pendente' ? null : 'pendente')}
+                    title="Filtrar: sugeridos pela IA aguardando confirmação"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos que a IA identificou e sugeriu uma categoria válida do plano de contas — mas que ainda aguardam a sua confirmação. A IA sempre escolhe dentro do plano oficial, porém como pode errar na escolha, o sistema não aplica automaticamente: é você quem decide. Na tabela, cada uma dessas linhas exibe o badge laranja IA com a sugestão — clique nele para confirmar, ou selecione manualmente se preferir outra categoria.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida && l.sugestaoIAValida).length}</span>
                     <span className={styles.fonteCardLabel}>
                       Sugeridos pela IA — aguardando confirmação
                     </span>
-                  </div>
+                  </button>
                 )}
                 {qtdErros > 0 && (
-                  <div className={`${styles.fonteCard} ${styles.fonteCardErro}`}>
+                  <button
+                    className={`${styles.fonteCard} ${styles.fonteCardErro}${filtroFonte === 'erro' ? ` ${styles.fonteCardAtivo}` : ''}`}
+                    onClick={() => setFiltroFonte(filtroFonte === 'erro' ? null : 'erro')}
+                    title="Filtrar: com atenção"
+                  >
                     <span className={styles.infoIcon}>ⓘ</span>
                     <span className={styles.cardTooltip}>Aqui exibe os lançamentos que tiveram alguma falha durante o processamento — pode ser data inválida, valor corrompido no arquivo ou erro na comunicação com a IA. Para não salvar dados errados no relatório, eles foram desmarcados automaticamente. Você pode marcá-los de volta na tabela e corrigir manualmente, ou ajustar o arquivo original e reimportar.</span>
                     <span className={styles.fonteCardNum}>{qtdErros}</span>
                     <span className={styles.fonteCardLabel}>Com atenção — desmarcados</span>
-                  </div>
+                  </button>
                 )}
               </div>
             </div>
@@ -1768,13 +1810,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 </tr>
               </thead>
               <tbody>
-                {linhasClass.map((l, i) => (
+                {linhasVisiveis.map((i) => (
                   <LancamentoRow
                     key={i}
-                    linha={l}
+                    linha={linhasClass[i]}
                     index={i}
                     isSelecionado={selecionados.has(i)}
-                    classificacoesOrdenadas={l.tipo === 'receita' ? classificacoesReceita : classificacoesDespesa}
+                    classificacoesOrdenadas={linhasClass[i].tipo === 'receita' ? classificacoesReceita : classificacoesDespesa}
                     totalReceitasOp={totalReceitasOp}
                     onToggle={toggleItem}
                     onClassChange={handleClassChange}

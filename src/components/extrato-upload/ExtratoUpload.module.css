@@ -306,6 +306,22 @@
   border-radius: 10px;
   border: 1px solid;
   min-width: 120px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.fonteCard:hover {
+  opacity: 0.85;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+}
+.fonteCard:active {
+  transform: translateY(0);
+}
+.fonteCardAtivo {
+  box-shadow: 0 0 0 2px currentColor;
+  opacity: 1 !important;
 }
 
 /* Ícone de info */
