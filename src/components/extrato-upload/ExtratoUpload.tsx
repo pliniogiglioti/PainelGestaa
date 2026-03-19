@@ -1226,14 +1226,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Não classificado localmente — marcado como pendente para IA
-      // Mostra a categoria do arquivo como sugestão (visível na tabela)
       classificadas[i] = {
         ...linha,
         classificacao: 'Não Identificado',
         grupo: '',
         status: 'ok',
         sugerida: true,
-        sugestaoIA: linha.classificacaoArquivo,
       }
       indicesParaIA.push(i)
     }
@@ -1243,7 +1241,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
-        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: clf.classificacao }
+        // Descarta o nome inválido — nunca expõe como sugestão, pois não está no plano de contas
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
         if (!indicesParaIA.includes(i)) indicesParaIA.push(i)
       }
     }
@@ -1365,7 +1364,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
-        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: clf.classificacao }
+        // Nunca expõe como sugestão — não está no plano de contas
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
       }
     }
 
