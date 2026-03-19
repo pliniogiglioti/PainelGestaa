@@ -1543,32 +1543,27 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         <>
           <div className={styles.uploadWarning}>
             <span className={styles.uploadWarningIcon}>⚠</span>
-            <span>
+            <span className={styles.uploadWarningText}>
               Ao enviar o arquivo, verifique a identificação dos lançamentos.{' '}
               <strong>A Inteligência Artificial pode cometer erros.</strong>{' '}
               Confira as informações antes de salvar.
             </span>
-          </div>
-
-          {exemplosDb.some(e => e.arquivo) && (
-            <div className={styles.modelosSection}>
-              <span className={styles.modelosSectionLabel}>Modelos de planilha aceitos</span>
-              <div className={styles.modelosCards}>
+            {exemplosDb.some(e => e.arquivo) && (
+              <div className={styles.uploadWarningModelos}>
+                <span className={styles.uploadWarningModelosLabel}>↓ Baixar modelo:</span>
                 {exemplosDb.filter(e => e.arquivo).map(ex => (
                   <a
                     key={ex.arquivo}
                     href={`/exemplos/${ex.arquivo}`}
                     download
-                    className={styles.modeloCard}
+                    className={styles.downloadBtn}
                   >
-                    <span className={styles.modeloCardIcon}>📥</span>
-                    <span className={styles.modeloCardNome}>{ex.nome}</span>
-                    <span className={styles.modeloCardHint}>Baixar modelo</span>
+                    {ex.nome}
                   </a>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </>
       )}
 
@@ -1647,23 +1642,31 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <strong className={styles.reviewTitle}>
                 Revise os {linhasClass.length} lançamentos classificados
               </strong>
-              <div className={styles.reviewFonteBadges}>
-                {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
-                  <span className={styles.reviewFonteIA}>
-                    IA: {linhasClass.filter(l => l.fonte === 'ia').length}
-                  </span>
-                )}
-                {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
-                  <span className={styles.reviewFonteHistorico}>
-                    Histórico: {linhasClass.filter(l => l.fonte === 'historico').length}
-                  </span>
-                )}
-                {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
-                  <span className={styles.reviewFonteArquivo}>
-                    Arquivo: {linhasClass.filter(l => l.fonte === 'arquivo').length}
-                  </span>
-                )}
-              </div>
+
+              {/* Cards de origem */}
+              {(linhasClass.some(l => l.fonte === 'ia') || linhasClass.some(l => l.fonte === 'historico') || linhasClass.some(l => l.fonte === 'arquivo')) && (
+                <div className={styles.fonteCards}>
+                  {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
+                    <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
+                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
+                      <span className={styles.fonteCardLabel}>Classificados pela IA</span>
+                    </div>
+                  )}
+                  {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
+                    <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
+                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
+                      <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
+                    </div>
+                  )}
+                  {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
+                    <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
+                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
+                      <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {linhasClass.filter(l => l.sugerida).length > 0 && (
                 <span className={styles.reviewNaoIdBadge}>
                   ⚠ {linhasClass.filter(l => l.sugerida).length} não identificado{linhasClass.filter(l => l.sugerida).length > 1 ? 's' : ''} — revise antes de salvar
