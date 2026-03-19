@@ -1183,9 +1183,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
       // Tentativa 1: match normalizado; Tentativa 2: match sem pontuação (fallback agressivo)
       if (linha.classificacaoArquivo) {
+        // Prioridade 1a: match exato normalizado
         const nomeOficial =
           nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo)) ??
-          nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo))
+          nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo)) ??
+          // Prioridade 1b: match fuzzy por sobreposição de palavras (trata "Aluguel" vs "Aluguel",
+          // "Receita Pix" vs "Receita PIX / Transferencias", etc.)
+          classificacoes.find(c => descricaoParecida(c.nome, linha.classificacaoArquivo!))?.nome
         if (nomeOficial) {
           classificadas[i] = {
             ...linha,
@@ -1211,24 +1215,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         continue
       }
 
-      // Prioridade 3: se o arquivo já forneceu uma Categoria 1 (mesmo fora do plano),
-      // usa como sugestão para revisão manual — NÃO envia para IA.
-      // A IA só é chamada para itens sem nenhuma pista de classificação.
+      // Prioridade 3: vai para IA — passa categoria do arquivo como dica na descrição
+      // para que a IA possa mapear "Receita Crédito Getnet" → "Receita Cartão", etc.
       if (linha.classificacaoArquivo) {
         if (arquivoNaoMatch.length < 20 && !arquivoNaoMatch.includes(linha.classificacaoArquivo)) {
           arquivoNaoMatch.push(linha.classificacaoArquivo)
         }
-        classificadas[i] = {
-          ...linha,
-          classificacao: 'Não Identificado',
-          grupo: '',
-          status: 'ok',
-          sugerida: true,
-          sugestaoIA: linha.classificacaoArquivo,
-        }
-        continue
       }
-
       indicesParaIA.push(i)
     }
 
@@ -1261,7 +1254,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       try {
         const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
           body: {
-            lancamentos: lote.map(l => ({ descricao: l.descricao, valor: l.valor, tipo: l.tipo })),
+            lancamentos: lote.map(l => ({
+              descricao: l.classificacaoArquivo
+                ? `${l.descricao} [Categoria: ${l.classificacaoArquivo}]`
+                : l.descricao,
+              valor: l.valor,
+              tipo: l.tipo,
+            })),
             modelo,
             classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
           },
