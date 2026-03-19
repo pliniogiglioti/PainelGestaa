@@ -381,7 +381,7 @@ function AdminSettingsModal({ onClose }: { onClose: () => void }) {
   const adicionarClassificacao = async () => {
     if (!novaClassNome.trim()) return
     setAddingClass(true)
-    await supabase.from('dre_classificacoes').insert({ nome: novaClassNome.trim(), tipo: novaClassTipo })
+    await supabase.from('dre_classificacoes').insert({ nome: novaClassNome.trim(), tipo: novaClassTipo, ativo: true })
     setNovaClassNome('')
     await fetchClassificacoes()
     setAddingClass(false)
