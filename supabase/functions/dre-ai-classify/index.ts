@@ -288,13 +288,26 @@ const toFinalResult = (
   const nomeAi = String(parsed.classificacao_nome ?? '').trim()
   const grupo  = String(parsed.grupo ?? '').trim() || (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas')
 
-  // 1. Bate exatamente com o banco de classificações cadastradas
+  // 1. Bate exatamente com o banco de classificações cadastradas (normalizado)
   const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
   if (matched) {
     return { tipo, classificacao_nome: matched.nome, grupo, fonte: 'ia', confianca: 'confirmada' }
   }
 
-  // 2 & 3. IA não identificou uma classificação cadastrada (alucinação ou fora do banco) → não identificado
+  // 2. IA não encontrou exato → tenta fallback por regras locais
+  const fallback = pickFallback(descricaoOriginal, tipo, classificacoesDisponiveis)
+  if (fallback.classificacao_nome !== 'Não Identificado') {
+    return { ...fallback, fonte: 'fallback', confianca: 'confirmada' }
+  }
+
+  // 3. Sem match algum → usa "Outras Despesas" ou equivalente como último recurso
+  const outrasDespesas = classificacoesDisponiveis.find(c => normalize(c.nome) === 'outras despesas')
+  const receitaDinheiro = classificacoesDisponiveis.find(c => normalize(c.nome) === 'receita dinheiro')
+  const ultimoRecurso = tipo === 'receita' ? receitaDinheiro : outrasDespesas
+  if (ultimoRecurso) {
+    return { tipo, classificacao_nome: ultimoRecurso.nome, grupo: grupo || (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas'), fonte: 'fallback', confianca: 'sugerida' }
+  }
+
   return { tipo, classificacao_nome: 'Não Identificado', grupo: '', fonte: 'ia', confianca: 'sugerida' }
 }
 
@@ -330,43 +343,31 @@ async function handleBatch(
     return lancamentos.map(l => pickFallback(l.descricao, l.tipo, classificacoesDisponiveis))
   }
 
-  // Prompt compacto para o batch — omite o plano detalhado para economizar tokens.
-  // Os itens óbvios já foram resolvidos pelo fallback local no cliente; só chegam
-  // aqui os casos ambíguos, então uma referência resumida é suficiente.
-  const GRUPOS_COMPACTOS = `receita→ Receitas Operacionais(Receita Dinheiro,Receita Cartão,Receita PIX/Transferências) | Receitas Financeiras(Rendimento de Aplicação,Descontos Obtidos)
-despesa→ Deduções de Receita | Impostos sobre Faturamento | Despesas Operacionais | Despesas com Pessoal(Pró-labore,Salários,INSS,FGTS,VT,VR,Combustível) | Despesas Administrativas(Aluguel,Energia,Água,Telefonia,Seguros,Manutenção,Consultoria,Contabilidade,Jurídico,Limpeza,IOF,Juros/Multas,Material Escritório,Uniformes) | Despesas Comerciais e Marketing(Marketing Digital,Refeições,Agência) | Despesas com TI(Internet,Software,Hospedagem) | Despesas Financeiras(Despesas Bancárias,Financiamentos,Juros Passivos) | Investimentos(Máquinas,Computadores,Móveis,Instalações,Dividendos)`
+  // Usa os nomes EXATOS do banco de dados no prompt para que a IA retorne nomes que casam na validação
+  const listaReceitas = classificacoesDisponiveis.filter(c => c.tipo === 'receita').map(c => `"${c.nome}"`).join(', ')
+  const listaDespesas = classificacoesDisponiveis.filter(c => c.tipo === 'despesa').map(c => `"${c.nome}"`).join(', ')
 
   const itensTexto = lancamentos
     .map((l, i) => `${i + 1}. "${l.descricao}" | ${l.tipo}`)
     .join('\n')
 
-  const EXEMPLOS = `EXEMPLOS (use os nomes EXATOS abaixo):
-- "PAGTO BOLETO VIVO"         → despesa | Telefonia | Despesas Administrativas
-- "DAS SIMPLES NACIONAL"      → despesa | Impostos sobre Receitas - Presumido e Simples Nacional | Impostos sobre Faturamento
-- "PAGTO FGTS"                → despesa | FGTS | Despesas com Pessoal
-- "GPS INSS"                  → despesa | INSS | Despesas com Pessoal
-- "FOLHA SALARIOS"            → despesa | Salários e Ordenados | Despesas com Pessoal
-- "PRO LABORE SOCIO"          → despesa | Pró-labore | Despesas com Pessoal
-- "GETNET CREDITO"            → receita | Receita Cartão | Receitas Operacionais
-- "PIX RECEBIDO PACIENTE"     → receita | Receita PIX / Transferências | Receitas Operacionais
-- "NF LABORATORIO DENTAL"     → despesa | Serviços Técnicos para Laboratórios | Despesas Operacionais
-- "ENERGIA ENEL FATURA"       → despesa | Energia Elétrica | Despesas Administrativas
-- "ALUGUEL IMOVEL COMERCIAL"  → despesa | Aluguel | Despesas Administrativas
-- "IOF BANCO"                 → despesa | IOF | Despesas Administrativas
-- "TARIFA MANUT CONTA"        → despesa | Despesas Bancárias | Despesas Financeiras
-- "BOLETO CONTABILIDADE"      → despesa | Contabilidade | Despesas Administrativas`
+  const prompt = `Assistente contábil DRE Brasil. Classifique cada lançamento usando EXATAMENTE os nomes abaixo.
 
-  const prompt = `Assistente contábil DRE Brasil. Classifique cada lançamento.
-
-GRUPOS: ${GRUPOS_COMPACTOS}
-
-${EXEMPLOS}
+CLASSIFICAÇÕES DISPONÍVEIS (use o nome EXATO, incluindo acentos e capitalização):
+Receitas: ${listaReceitas || '"Receita Dinheiro"'}
+Despesas: ${listaDespesas || '"Outras Despesas"'}
 
 LANÇAMENTOS:
 ${itensTexto}
 
+REGRAS:
+- Use SOMENTE os nomes da lista acima (cópia exata, sem alterar nada)
+- Para "tipo" use "receita" ou "despesa" conforme o lançamento
+- Para "grupo" use o grupo DRE adequado (ex: "Despesas Administrativas", "Despesas com Pessoal", "Receitas Operacionais", etc.)
+- Se não souber, escolha o mais parecido da lista
+
 RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
-[{"tipo":"despesa","classificacao_nome":"Nome exato","grupo":"Grupo exato"}, ...]`
+[{"tipo":"despesa","classificacao_nome":"Nome exato da lista","grupo":"Grupo DRE"}, ...]`
 
   let res = await callOpenAI(openaiApiKey, modelo, prompt)
 
