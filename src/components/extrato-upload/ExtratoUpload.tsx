@@ -36,6 +36,8 @@ interface LinhaClassificada extends LinhaExtrato {
   sugestaoIA?: string
   /** true quando sugestaoIA é um nome válido do plano de contas e pode ser aplicado com 1 clique */
   sugestaoIAValida?: boolean
+  /** origem da classificação atual */
+  fonte?: 'ia' | 'historico' | 'arquivo'
 }
 
 type Fase = 'idle' | 'processando' | 'revisao' | 'salvando' | 'concluido'
@@ -790,7 +792,17 @@ const LancamentoRow = memo(function LancamentoRow({
             title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
             onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
           >
-            💡 {l.sugestaoIA}
+            <span className={styles.badgeFonteLabel}>IA</span> {l.sugestaoIA}
+          </div>
+        )}
+        {l.fonte === 'historico' && !l.sugerida && (
+          <div className={styles.badgeHistorico} title="Classificado com base no histórico de correções manuais">
+            Histórico de Classificações
+          </div>
+        )}
+        {l.fonte === 'arquivo' && !l.sugerida && (
+          <div className={styles.badgeCatArquivo} title="Classificação importada diretamente do arquivo">
+            Classificação do Arquivo
           </div>
         )}
       </td>
@@ -1220,6 +1232,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           sugerida: undefined,
           sugestaoIA: undefined,
           sugestaoIAValida: undefined,
+          fonte: 'historico',
         }
         continue
       }
@@ -1242,6 +1255,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             sugerida: undefined,
             sugestaoIA: undefined,
             sugestaoIAValida: undefined,
+            fonte: 'arquivo',
           }
           continue
         }
@@ -1328,6 +1342,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 sugerida:         true,
                 sugestaoIA:       nomeExato,
                 sugestaoIAValida: true,
+                fonte:            'ia',
               }
             } else {
               classificadas[i] = {
@@ -1384,6 +1399,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             sugerida:         true,
             sugestaoIA:       sugestaoValida ? nomeExato : undefined,
             sugestaoIAValida: !!sugestaoValida,
+            fonte:            sugestaoValida ? 'ia' : undefined,
           }
         })
       } catch {
