@@ -978,8 +978,15 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     // Só aprende quando o usuário edita um lançamento existente (correção manual).
     // Novos lançamentos não são gravados no histórico aqui.
     if (editingId) {
-      const descricaoNorm = (form.descricao.trim())
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+      const descricaoNorm = form.descricao
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^\x00-\x7F]/g, '')
+        .replace(/[\t\r\n]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .replace(/[-–—]+/g, '-')
+        .toLowerCase()
+        .trim()
       if (descricaoNorm && classificacaoNome !== 'Não Identificado') {
         await supabase.from('dre_classificacao_historico').upsert({
           empresa_id:            empresa.id,
@@ -1132,7 +1139,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       )}
 
       {/* ── Extrato Upload ── */}
-      <ExtratoUpload empresaId={empresa.id} onSaved={() => fetchLancamentos(usuarioFiltro || undefined)} />
+      <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos(usuarioFiltro || undefined)} />
 
       {/* ── Modal Assistente IA ── */}
       {showAssistente && (
