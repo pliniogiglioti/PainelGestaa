@@ -786,13 +786,13 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
-        {l.sugerida && (
+        {l.sugerida && l.sugestaoIA && l.sugestaoIAValida && (
           <div
             className={styles.badgeSugestaoIA}
-            title={l.sugestaoIAValida && l.sugestaoIA ? `Sugestão da IA: clique para aplicar "${l.sugestaoIA}"` : 'Clique para classificar com IA'}
-            onClick={e => { e.stopPropagation(); l.sugestaoIAValida && l.sugestaoIA ? onAplicarSugestao(i) : onClassificarComIA(i) }}
+            title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
+            onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
           >
-            💡 {l.sugestaoIA ?? 'Classificar com IA'}
+            💡 {l.sugestaoIA}
           </div>
         )}
       </td>
@@ -1417,10 +1417,22 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
         classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
       }
-      // Limpa sugestaoIA inválida — usa classificadas[i] atual (IA pode ter atualizado depois de clf ser capturado)
+      // Limpa sugestaoIA inválida
       const atual = classificadas[i]
       if (atual?.sugestaoIA && !validNomes.has(atual.sugestaoIA)) {
         classificadas[i] = { ...atual, sugestaoIA: undefined, sugestaoIAValida: false }
+      }
+    }
+
+    // Garante sugestão para TODOS os não-identificados — usa padrão por tipo como fallback final
+    for (let i = 0; i < classificadas.length; i++) {
+      const clf = classificadas[i]
+      if (clf?.sugerida && !clf.sugestaoIA) {
+        const fallbackNome = clf.tipo === 'receita' ? 'Receita Dinheiro' : 'Outras Despesas'
+        const nomeFinal = validNomes.has(fallbackNome) ? fallbackNome : (validNomesNorm.get(normalize(fallbackNome)) ?? null)
+        if (nomeFinal) {
+          classificadas[i] = { ...clf, sugestaoIA: nomeFinal, sugestaoIAValida: true }
+        }
       }
     }
 
