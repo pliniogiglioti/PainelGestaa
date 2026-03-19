@@ -1126,6 +1126,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       histFrom += HIST_PAGE
     }
     console.log(`[Histórico] Carregado: ${histAll.length} entradas para empresa ${empresaId}`)
+    console.log('[Histórico] Raw DB entries:', histAll)
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     modeloIARef.current = modelo
@@ -1142,6 +1143,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
       histAll.map(h => [normalize(h.descricao_normalizada), { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
+    console.log('[Histórico] Chaves no mapa:', [...historico.keys()])
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
     // Se o arquivo já tem coluna de categoria/classificação (ex: Conta Azul),
