@@ -566,6 +566,101 @@ ${linhasJson}`
     })
   }
 
+  // ── Mapear categorias mode ─────────────────────────────────────────────────
+  // Recebe uma lista de categorias únicas do arquivo (ex: Conta Azul "Categoria 1")
+  // e retorna um mapeamento { categoria → classificação DRE } em UMA única chamada.
+  if (body.mode === 'mapear_categorias' && Array.isArray(body.categorias)) {
+    const categorias = (body.categorias as string[]).filter(Boolean)
+
+    type MapeamentoItem = { classificacao_nome: string; grupo: string; tipo: 'receita' | 'despesa' }
+    type Mapeamento = Record<string, MapeamentoItem | null>
+
+    if (categorias.length === 0) {
+      return new Response(JSON.stringify({ mapeamento: {} }), {
+        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // Sem API key: tenta match local por normalize
+    if (!openaiApiKey) {
+      const mapeamento: Mapeamento = {}
+      for (const cat of categorias) {
+        const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(cat))
+        mapeamento[cat] = matched
+          ? { classificacao_nome: matched.nome, grupo: '', tipo: matched.tipo }
+          : null
+      }
+      return new Response(JSON.stringify({ mapeamento }), {
+        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const listaClassificacoes = classificacoesDisponiveis
+      .map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`)
+      .join('\n')
+
+    const listaCategorias = categorias
+      .map((c, i) => `${i + 1}. "${c}"`)
+      .join('\n')
+
+    const prompt = `Assistente contábil DRE Brasil.
+Para cada CATEGORIA DO ARQUIVO abaixo, encontre a classificação DRE EXATA da lista.
+
+CLASSIFICAÇÕES DRE DISPONÍVEIS:
+${listaClassificacoes}
+
+CATEGORIAS DO ARQUIVO:
+${listaCategorias}
+
+REGRAS:
+- Use o nome EXATO da lista de classificações disponíveis.
+- Se não houver correspondência clara, retorne null para aquela categoria.
+- Retorne SOMENTE um objeto JSON, sem texto adicional.
+
+FORMATO: {"categoria original": {"classificacao_nome":"nome exato","grupo":"grupo exato","tipo":"receita ou despesa"}, "outra sem match": null}`
+
+    let res = await callOpenAI(openaiApiKey, modelo, prompt)
+
+    if (!res.ok && modelo !== DEFAULT_MODEL) {
+      const errText = await res.text()
+      if (/model|not found|invalid/i.test(errText)) {
+        res = await callOpenAI(openaiApiKey, DEFAULT_MODEL, prompt)
+      }
+    }
+
+    if (!res.ok) {
+      return new Response(JSON.stringify({ mapeamento: {} }), {
+        status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const aiData = await res.json()
+    const content: string = aiData?.choices?.[0]?.message?.content ?? ''
+
+    let raw: Record<string, unknown> = {}
+    try {
+      const match = content.match(/\{[\s\S]*\}/)
+      if (match) raw = JSON.parse(match[0]) as Record<string, unknown>
+    } catch { /* mantém raw vazio */ }
+
+    // Valida cada resultado contra a lista de classificações cadastradas
+    const mapeamento: Mapeamento = {}
+    for (const cat of categorias) {
+      const val = raw[cat]
+      if (!val || typeof val !== 'object') { mapeamento[cat] = null; continue }
+      const v = val as { classificacao_nome?: string; grupo?: string; tipo?: string }
+      const nomeAi = String(v.classificacao_nome ?? '').trim()
+      const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
+      mapeamento[cat] = matched
+        ? { classificacao_nome: matched.nome, grupo: String(v.grupo ?? '').trim(), tipo: matched.tipo }
+        : null
+    }
+
+    return new Response(JSON.stringify({ mapeamento }), {
+      status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    })
+  }
+
   // ── Batch mode ──
   if (Array.isArray(body.lancamentos)) {
     const lancamentos = (body.lancamentos as LancamentoInput[]).map(l => ({
