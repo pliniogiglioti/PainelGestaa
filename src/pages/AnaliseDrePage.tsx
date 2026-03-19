@@ -259,9 +259,10 @@ function StatCard({ title, value, hint, tone = 'default' }: {
 }) {
   return (
     <article className={`${styles.statCard} ${tone === 'positive' ? styles.positiveCard : ''} ${tone === 'negative' ? styles.negativeCard : ''}`}>
-      <span className={styles.statInfoIcon}>ⓘ<span className={styles.statTooltip}>{hint}</span></span>
-      <span className={styles.statTitle}>{title}</span>
+      <span className={styles.statTooltip}>{hint}</span>
+      <span className={styles.statInfoIcon}>ⓘ</span>
       <strong className={styles.statValue}>{value}</strong>
+      <span className={styles.statTitle}>{title}</span>
     </article>
   )
 }
