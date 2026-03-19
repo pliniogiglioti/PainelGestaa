@@ -30,10 +30,12 @@ interface LinhaClassificada extends LinhaExtrato {
   classificacao: string
   grupo: string
   status: 'ok' | 'erro'
-  /** true quando a IA sugeriu uma classificação não cadastrada no banco */
+  /** true quando o lançamento ainda não tem classificação confirmada */
   sugerida?: boolean
-  /** Texto original sugerido pela IA quando não estava no catálogo */
+  /** Sugestão da IA (nome de classificação do plano) — clicável */
   sugestaoIA?: string
+  /** true quando sugestaoIA é um nome válido do plano de contas e pode ser aplicado com 1 clique */
+  sugestaoIAValida?: boolean
 }
 
 type Fase = 'idle' | 'processando' | 'revisao' | 'salvando' | 'concluido'
@@ -783,13 +785,22 @@ const LancamentoRow = memo(function LancamentoRow({
           )}
         </select>
         {l.sugerida && l.sugestaoIA && (
-          <div
-            className={styles.badgeSugestaoIA}
-            title={`Sugestão da IA: ${l.sugestaoIA} — clique para aplicar`}
-            onClick={() => onAplicarSugestao(i)}
-          >
-            💡 {l.sugestaoIA}
-          </div>
+          l.sugestaoIAValida ? (
+            <div
+              className={styles.badgeSugestaoIA}
+              title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
+              onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
+            >
+              💡 {l.sugestaoIA}
+            </div>
+          ) : (
+            <div
+              className={styles.badgeCatArquivo}
+              title={`Categoria no arquivo: ${l.sugestaoIA}`}
+            >
+              📋 {l.sugestaoIA}
+            </div>
+          )
         )}
       </td>
       <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
@@ -856,7 +867,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
-  const classificacoesDispRef = useRef<{ nome: string; tipo: string }[]>([])
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
@@ -879,9 +889,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     () => linhasClass.filter(l => l.grupo === 'Receitas Operacionais').reduce((s, l) => s + l.valor, 0),
     [linhasClass]
   )
-
-  // Mantém ref sincronizado com o estado para uso em callbacks (handleAplicarSugestao)
-  useEffect(() => { classificacoesDispRef.current = classificacoesDisp }, [classificacoesDisp])
 
   // Pré-computa listas de classificações ordenadas por tipo — evita sort a cada render de linha
   const classificacoesReceita = useMemo(() =>
@@ -927,11 +934,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const handleAplicarSugestao = useCallback((idx: number) => {
     setLinhasClass(prev => {
       const linha = prev[idx]
-      if (!linha?.sugestaoIA) return prev
-      const novoNome = linha.sugestaoIA!
-      // Só aplica se o valor estiver no plano de contas cadastrado
-      const valido = classificacoesDispRef.current.some(c => c.nome === novoNome)
-      if (!valido) return prev
+      // Só aplica se for uma sugestão válida da IA (do plano de contas)
+      if (!linha?.sugestaoIA || !linha.sugestaoIAValida) return prev
+      const novoNome = linha.sugestaoIA
       const novoGrupo = resolveGrupo(novoNome, linha.tipo)
       const similares = prev
         .map((l, i) => ({ l, i }))
@@ -1101,7 +1106,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setErroSalvar('')
     setMsgErroUpload('')
     setFase('processando')
-    setProgresso(null)
+    setProgresso({ atual: 0, total: 4, label: 'Buscando plano de contas' })
 
     // Busca modelo e classificações em paralelo; histórico é paginado (sem limite server-side)
     const [{ data: configData }, { data: classData }] = await Promise.all([
@@ -1110,6 +1115,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     ])
 
     // Pagina o histórico para garantir que tudo é lido, independente do max_rows do Supabase
+    setProgresso({ atual: 1, total: 4, label: 'Carregando histórico' })
     const HIST_PAGE = 1000
     let histAll: { descricao_normalizada: string; classificacao: string; grupo: string; tipo: string }[] = []
     let histFrom = 0
@@ -1150,14 +1156,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // ── Parse do arquivo ──────────────────────────────────────────────────────
     // Se o arquivo já tem coluna de categoria/classificação (ex: Conta Azul),
     // usa o parser local diretamente — sem custo de IA.
+    setProgresso({ atual: 2, total: 4, label: 'Lendo arquivo' })
     let linhas: LinhaExtrato[] = []
     const temCategoria = await arquivoTemColunaCategoria(file)
 
     if (!temCategoria) {
       try {
-        setProgresso({ atual: 0, total: 1, label: 'Lendo arquivo com IA' })
         linhas = await parseArquivoComIA(file, modelo, (atual, total) => {
-          setProgresso({ atual, total, label: 'Lendo arquivo com IA' })
+          setProgresso({ atual: 2 + atual / total, total: 4, label: 'Lendo arquivo com IA' })
         })
       } catch {
         // IA falhou — usa parser tradicional como fallback
@@ -1190,6 +1196,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       return
     }
     setClassificacoesDisp(classificacoes) // salva no estado para o dropdown de edição
+    setProgresso({ atual: 3, total: 4, label: 'Classificando lançamentos' })
 
     // ── Passo 1: classificar localmente (plano de contas + histórico) ─────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
@@ -1233,7 +1240,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Não classificado localmente — marcado como pendente para IA
-      // sugestaoIA guarda a categoria do arquivo como lembrete visual (somente leitura)
+      // sugestaoIA guarda a categoria do arquivo como lembrete visual (somente leitura — NÃO é do plano)
       classificadas[i] = {
         ...linha,
         classificacao: 'Não Identificado',
@@ -1241,6 +1248,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         status: 'ok',
         sugerida: true,
         sugestaoIA: linha.classificacaoArquivo || undefined,
+        sugestaoIAValida: false, // será true após a IA retornar um nome válido do plano
       }
       indicesParaIA.push(i)
     }
@@ -1316,15 +1324,16 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           for (const i of comCategoria) {
             const resultado = mapeamento[linhas[i].classificacaoArquivo!]
             if (resultado && validNomes.has(resultado.classificacao_nome)) {
-              // IA mapeou para classificação válida → sugestão clicável
+              // IA mapeou para classificação válida → badge clicável
               classificadas[i] = {
                 ...linhas[i],
-                classificacao: 'Não Identificado',
-                grupo:         '',
-                tipo:          resultado.tipo,
-                status:        'ok',
-                sugerida:      true,
-                sugestaoIA:    resultado.classificacao_nome,
+                classificacao:    'Não Identificado',
+                grupo:            '',
+                tipo:             resultado.tipo,
+                status:           'ok',
+                sugerida:         true,
+                sugestaoIA:       resultado.classificacao_nome,
+                sugestaoIAValida: true,
               }
             }
             // Se null ou inválido: permanece como "Não Identificado" (placeholder já definido)
@@ -1364,11 +1373,12 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           const sugestaoValida = nomeAI && nomeAI !== 'Não Identificado' && validNomes.has(nomeAI)
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
-            classificacao: 'Não Identificado',
-            grupo:         '',
-            status:        'ok',
-            sugerida:      true,
-            sugestaoIA:    sugestaoValida ? nomeAI : undefined,
+            classificacao:    'Não Identificado',
+            grupo:            '',
+            status:           'ok',
+            sugerida:         true,
+            sugestaoIA:       sugestaoValida ? nomeAI : undefined,
+            sugestaoIAValida: !!sugestaoValida,
           }
         })
       } catch {
