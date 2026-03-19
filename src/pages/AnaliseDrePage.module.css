@@ -60,6 +60,44 @@
 }
 
 /* ── Botão Assistente IA (header) ── */
+.btnAssistenteWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btnAssistenteInfo {
+  font-size: 13px;
+  opacity: 0.35;
+  cursor: help;
+  line-height: 1;
+  color: #d5af45;
+  user-select: none;
+}
+.btnAssistenteWrap:hover .btnAssistenteInfo { opacity: 0.9; }
+
+.btnAssistenteTooltip {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #cbd5e1;
+  line-height: 1.5;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: normal;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.btnAssistenteWrap:hover .btnAssistenteTooltip { display: block; }
+
 .btnAssistente {
   display: flex;
   flex-direction: column;
