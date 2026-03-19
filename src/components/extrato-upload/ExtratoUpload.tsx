@@ -1283,12 +1283,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     setProgresso({ atual: 4, total: totalPassosIA, label: 'Mapeando categorias da IA' })
 
-    console.log('[IA] indicesParaIA:', indicesParaIA.length, '| comCategoria:', comCategoria.length, '| semCategoria:', semCategoria.length)
-
     // ── Etapa A: mapeamento de categorias únicas (1 chamada) ──────────────────
     if (comCategoria.length > 0) {
       const categoriasUnicas = [...new Set(comCategoria.map(i => linhas[i].classificacaoArquivo!))]
-      console.log('[IA] Etapa A — categorias únicas:', categoriasUnicas)
       try {
         const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
           body: {
@@ -1298,7 +1295,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             modelo,
           },
         })
-        console.log('[IA] Etapa A — resposta:', { error, mapeamento: data?.mapeamento })
 
         if (!error && data?.mapeamento) {
           type MapItem = { classificacao_nome: string; grupo: string; tipo: 'receita' | 'despesa' }
@@ -1306,7 +1302,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           for (const i of comCategoria) {
             const resultado = mapeamento[linhas[i].classificacaoArquivo!]
             const nomeValido = resultado && validNomes.has(resultado.classificacao_nome)
-            console.log(`[IA] Etapa A — "${linhas[i].classificacaoArquivo}" → "${resultado?.classificacao_nome}" | válido: ${nomeValido}`)
             if (nomeValido) {
               classificadas[i] = {
                 ...linhas[i],
@@ -1331,7 +1326,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             }
           }
         }
-      } catch (e) { console.error('[IA] Etapa A falhou:', e) }
+      } catch { /* falha silenciosa */ }
     }
 
     setProgresso({ atual: 5, total: totalPassosIA, label: 'Classificando com IA' })
@@ -1359,12 +1354,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         if (error || !data?.resultados) throw new Error(error?.message ?? 'Sem resposta da IA')
 
         const resultados = data.resultados as { classificacao_nome?: string; grupo?: string; confianca?: string }[]
-        console.log('[IA] Etapa B — resultados:', resultados)
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
           const nomeAI = String(r?.classificacao_nome ?? '').trim()
           const sugestaoValida = nomeAI && nomeAI !== 'Não Identificado' && validNomes.has(nomeAI)
-          console.log(`[IA] Etapa B — "${linhas[linhaIdx].descricao}" → "${nomeAI}" | válido: ${!!sugestaoValida}`)
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
             classificacao:    'Não Identificado',
@@ -1375,8 +1368,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             sugestaoIAValida: !!sugestaoValida,
           }
         })
-      } catch (e) {
-        console.error('[IA] Etapa B falhou:', e)
+      } catch {
         fatia.forEach(linhaIdx => {
           classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não Identificado', grupo: '', status: 'erro', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
         })
