@@ -604,21 +604,31 @@ ${linhasJson}`
       .map((c, i) => `${i + 1}. "${c}"`)
       .join('\n')
 
-    const prompt = `Assistente contábil DRE Brasil.
-Para cada CATEGORIA DO ARQUIVO abaixo, encontre a classificação DRE EXATA da lista.
+    const prompt = `Você é um assistente contábil especializado em DRE para CLÍNICAS ODONTOLÓGICAS e de saúde brasileiras.
 
-CLASSIFICAÇÕES DRE DISPONÍVEIS:
+As categorias abaixo vêm de um software de gestão (ex: Conta Azul) e precisam ser mapeadas para as classificações DRE exatas do sistema.
+
+CLASSIFICAÇÕES DRE DISPONÍVEIS (use o nome EXATO, incluindo acentos e capitalização):
 ${listaClassificacoes}
 
-CATEGORIAS DO ARQUIVO:
+CATEGORIAS DO ARQUIVO A MAPEAR:
 ${listaCategorias}
 
-REGRAS:
-- Use o nome EXATO da lista de classificações disponíveis.
-- Se não houver correspondência clara, retorne null para aquela categoria.
-- Retorne SOMENTE um objeto JSON, sem texto adicional.
+REGRAS CRÍTICAS:
+1. Use SOMENTE nomes da lista acima, copiados exatamente como estão.
+2. PREFIRA classificações específicas. NUNCA use "Outras Despesas" se houver opção mais adequada.
+3. Contexto odontológico — exemplos de mapeamento obrigatório:
+   - Qualquer coisa com "material", "insumo", "implante", "componente", "produto aplicado", "material aplicado" → "Custo de Materiais e Insumos"
+   - Laboratório dental, prótese, molde → "Serviços Técnicos para Laboratórios"
+   - Dentista, associado, prestador PF → "Serviços Terceiros PF (dentistas)"
+   - Salário, folha, ordenado → "Salários e Ordenados"
+   - Aluguel, locação → "Aluguel"
+   - Conta de luz/energia → "Energia Elétrica"
+   - Imposto, DAS, simples → "Impostos sobre Receitas - Presumido e Simples Nacional"
+4. Retorne null SOMENTE quando realmente não houver nenhuma correspondência possível.
+5. Retorne SOMENTE um objeto JSON, sem texto adicional.
 
-FORMATO: {"categoria original": {"classificacao_nome":"nome exato","grupo":"grupo exato","tipo":"receita ou despesa"}, "outra sem match": null}`
+FORMATO: {"categoria original": {"classificacao_nome":"nome exato da lista","grupo":"grupo exato","tipo":"receita ou despesa"}, "outra sem match": null}`
 
     let res = await callOpenAI(openaiApiKey, modelo, prompt)
 
