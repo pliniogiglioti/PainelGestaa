@@ -120,10 +120,11 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
 
 const normalize = (s: string) =>
   s.normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')           // remove acentos
-    .replace(/[\u00a0\u2000-\u200f\u2028-\u202f\u205f-\u206f]/g, ' ')  // espaços especiais → espaço normal
-    .replace(/[\u2010-\u2015\u2212]/g, '-')    // vários tipos de travessão/dash → hífen
-    .replace(/\s+/g, ' ')                       // colapsa espaços múltiplos
+    .replace(/[\u0300-\u036f]/g, '')           // remove acentos (combining diacritics)
+    .replace(/[^\x00-\x7F]/g, '')              // remove qualquer não-ASCII restante (BOM, caracteres invisíveis, etc.)
+    .replace(/[\t\r\n]+/g, ' ')                // quebras de linha → espaço
+    .replace(/\s+/g, ' ')                      // colapsa espaços múltiplos
+    .replace(/[-–—]+/g, '-')                   // vários tipos de traço → hífen
     .toLowerCase()
     .trim()
 
@@ -834,6 +835,16 @@ interface ExtratoUploadProps {
 
 export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Contexto salvo para execução manual da IA (Passo 2)
+  const iaContextRef = useRef<{
+    linhas:          LinhaExtrato[]
+    classificadas:   LinhaClassificada[]
+    indicesParaIA:   number[]
+    classificacoes:  { nome: string; tipo: string }[]
+    modelo:          string
+  } | null>(null)
+
   const [dragging, setDragging]                     = useState(false)
   const [arquivo, setArquivo]                       = useState<string>('')
   const [progresso, setProgresso]                   = useState<{ atual: number; total: number; label?: string } | null>(null)
@@ -843,6 +854,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [erroSalvar, setErroSalvar]                 = useState<string>('')
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
+  const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
@@ -979,6 +991,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setErroSalvar('')
     setSucessoSalvo(0)
     setMsgErroUpload('')
+    setPendentesIACount(0)
+    iaContextRef.current = null
   }
 
   /** Parse do arquivo usando IA — entende qualquer formato de extrato bancário */
@@ -1170,25 +1184,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     }
     setClassificacoesDisp(classificacoes) // salva no estado para o dropdown de edição
 
-    // ── Passo 1: classificar localmente ───────────────────────────────────────
+    // ── Passo 1: classificar localmente (plano de contas + histórico) ─────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
     const indicesParaIA: number[] = []
-
-    // 🔍 DIAGNÓSTICO — mostra primeiros valores de classificacaoArquivo vs plano
-    const arquivoNaoMatch: string[] = []
 
     for (let i = 0; i < linhas.length; i++) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-      // Tentativa 1: match normalizado; Tentativa 2: match sem pontuação (fallback agressivo)
+      // 1a — match exato normalizado (remove acentos, BOM, invisible chars)
+      // 1b — match sem pontuação (fallback agressivo)
+      // 1c — match fuzzy por sobreposição de palavras
       if (linha.classificacaoArquivo) {
-        // Prioridade 1a: match exato normalizado
         const nomeOficial =
           nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo)) ??
           nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo)) ??
-          // Prioridade 1b: match fuzzy por sobreposição de palavras (trata "Aluguel" vs "Aluguel",
-          // "Receita Pix" vs "Receita PIX / Transferencias", etc.)
           classificacoes.find(c => descricaoParecida(c.nome, linha.classificacaoArquivo!))?.nome
         if (nomeOficial) {
           classificadas[i] = {
@@ -1215,39 +1225,61 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         continue
       }
 
-      // Prioridade 3: vai para IA — passa categoria do arquivo como dica na descrição
-      // para que a IA possa mapear "Receita Crédito Getnet" → "Receita Cartão", etc.
-      if (linha.classificacaoArquivo) {
-        if (arquivoNaoMatch.length < 20 && !arquivoNaoMatch.includes(linha.classificacaoArquivo)) {
-          arquivoNaoMatch.push(linha.classificacaoArquivo)
-        }
+      // Não classificado localmente — marcado como pendente para IA
+      // Mostra a categoria do arquivo como sugestão (visível na tabela)
+      classificadas[i] = {
+        ...linha,
+        classificacao: 'Não Identificado',
+        grupo: '',
+        status: 'ok',
+        sugerida: true,
+        sugestaoIA: linha.classificacaoArquivo,
       }
       indicesParaIA.push(i)
     }
 
-    // 🔍 DIAGNÓSTICO — mostra os valores que não casaram com o plano
-    if (arquivoNaoMatch.length > 0) {
-      console.group('[PainelGestaa] Categorias do arquivo que NÃO casaram com o plano')
-      console.log('Primeiros valores distintos de "Categoria 1" não encontrados no plano:')
-      arquivoNaoMatch.forEach(v => {
-        console.log(`  Arquivo: "${v}"  →  normalizado: "${normalize(v)}"  →  aggr: "${normalizeAggr(v)}"`)
-      })
-      console.log('\nPlano de contas (normalizado):')
-      Array.from(nomesOficiaisNormMap.entries()).slice(0, 20).forEach(([k, v]) => {
-        console.log(`  "${k}"  →  "${v}"`)
-      })
-      console.groupEnd()
+    // Passo 1b: valida classificações locais contra o plano (descarta nomes inválidos)
+    const validNomes = new Set(classificacoes.map(c => c.nome))
+    for (let i = 0; i < classificadas.length; i++) {
+      const clf = classificadas[i]
+      if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: clf.classificacao }
+        if (!indicesParaIA.includes(i)) indicesParaIA.push(i)
+      }
     }
 
-    setProgresso({ atual: linhas.length - indicesParaIA.length, total: linhas.length, label: 'Classificando com IA' })
+    // ── Mostra resultado local imediatamente (sem esperar IA) ─────────────────
+    // Itens "Não Identificado" mostram a categoria do arquivo como sugestão.
+    // O usuário pode revisar e depois apertar "Classificar com IA" para o Passo 2.
+    const final = Array.from(classificadas).sort((a, b) => {
+      if (a.sugerida && !b.sugerida) return -1
+      if (!a.sugerida && b.sugerida) return 1
+      return 0
+    })
+    setLinhasClass(final)
+    setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
+    setPendentesIACount(indicesParaIA.length)
 
-    // ── Passo 2: enviar em batch para IA (com delay para evitar rate limit) ───
-    const BATCH_IA = 15  // ~3-4K tokens por chamada, dentro do limite do Groq (12K/min)
-    const DELAY_ENTRE_BATCHES = 800  // ms — evita estourar o rate limit de tokens/min
+    // Salva contexto para quando o usuário acionar a IA
+    iaContextRef.current = { linhas, classificadas, indicesParaIA, classificacoes, modelo }
+
+    setFase('revisao')
+    setProgresso(null)
+  }, [])
+
+  /** Passo 2: envia itens não classificados para a IA e atualiza a tabela */
+  const classificarComIA = useCallback(async () => {
+    if (!iaContextRef.current) return
+    const { linhas, classificadas, indicesParaIA, classificacoes, modelo } = iaContextRef.current
+
+    setFase('processando')
+    setProgresso({ atual: 0, total: indicesParaIA.length, label: 'Classificando com IA' })
+
+    const BATCH_IA = 15
+    const DELAY    = 800
 
     for (let b = 0; b < indicesParaIA.length; b += BATCH_IA) {
-      if (b > 0) await sleep(DELAY_ENTRE_BATCHES)
-
+      if (b > 0) await sleep(DELAY)
       const fatia = indicesParaIA.slice(b, b + BATCH_IA)
       const lote  = fatia.map(i => linhas[i])
 
@@ -1259,7 +1291,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 ? `${l.descricao} [Categoria: ${l.classificacaoArquivo}]`
                 : l.descricao,
               valor: l.valor,
-              tipo: l.tipo,
+              tipo:  l.tipo,
             })),
             modelo,
             classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
@@ -1281,25 +1313,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         })
       } catch {
         fatia.forEach(linhaIdx => {
-          classificadas[linhaIdx] = {
-            ...linhas[linhaIdx],
-            classificacao: 'Não Identificado',
-            grupo: '',
-            status: 'erro',
-          }
+          classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não Identificado', grupo: '', status: 'erro' }
         })
       }
 
-      setProgresso({
-        atual: (linhas.length - indicesParaIA.length) + Math.min(b + BATCH_IA, indicesParaIA.length),
-        total: linhas.length,
-        label: 'Classificando com IA',
-      })
+      setProgresso({ atual: Math.min(b + BATCH_IA, indicesParaIA.length), total: indicesParaIA.length, label: 'Classificando com IA' })
     }
 
-    // ── Passo 3: valida TODAS as classificações contra o plano de contas ─────
-    // Qualquer resultado (Conta Azul, regras locais, histórico ou IA) que não
-    // estiver cadastrado em dre_classificacoes é descartado → Não Identificado.
+    // Valida resultado da IA contra o plano
     const validNomes = new Set(classificacoes.map(c => c.nome))
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
@@ -1308,15 +1329,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
     }
 
-    // Ordena: sugestões da IA primeiro (precisam de revisão), depois erros, depois ok
-    const final = Array.from(classificadas).sort((a, b) => {
+    const final = (Array.from(classificadas) as LinhaClassificada[]).sort((a, b) => {
       if (a.sugerida && !b.sugerida) return -1
       if (!a.sugerida && b.sugerida) return 1
       return 0
     })
     setLinhasClass(final)
-    // Pré-seleciona só os classificados com sucesso; erros ficam desmarcados
-    setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok')))
+    setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
+    setPendentesIACount(0)
+    iaContextRef.current = null
     setFase('revisao')
     setProgresso(null)
   }, [])
@@ -1542,6 +1563,20 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
           {erroSalvar && (
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
+          )}
+
+          {/* Banner: classificar itens pendentes com IA */}
+          {pendentesIACount > 0 && fase === 'revisao' && (
+            <div className={styles.bannerParecidos}>
+              <span className={styles.bannerParecidosTexto}>
+                <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} não encontrado{pendentesIACount > 1 ? 's' : ''} no plano de contas — a IA pode classificar pelos itens abaixo
+              </span>
+              <div className={styles.bannerParecidosBtns}>
+                <button className={styles.btnPrimary} onClick={classificarComIA}>
+                  ⚡ Classificar com IA ({pendentesIACount})
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Banner: aplicar classificação a lançamentos parecidos */}
