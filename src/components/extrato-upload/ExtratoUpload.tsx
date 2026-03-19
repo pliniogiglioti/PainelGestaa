@@ -1060,7 +1060,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // Busca modelo e classificações em paralelo; histórico é paginado (sem limite server-side)
     const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single(),
-      supabase.from('dre_classificacoes').select('nome,tipo').eq('ativo', true),
+      supabase.from('dre_classificacoes').select('nome,tipo').neq('ativo', false),
     ])
 
     // Pagina o histórico para garantir que tudo é lido, independente do max_rows do Supabase

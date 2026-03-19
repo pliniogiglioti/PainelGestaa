@@ -408,7 +408,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
   const fetchClassificacoes = async () => {
     const { data } = await supabase
-      .from('dre_classificacoes').select('*').eq('ativo', true).order('tipo').order('nome')
+      .from('dre_classificacoes').select('*').neq('ativo', false).order('tipo').order('nome')
     setClassificacoes(data ?? [])
   }
 
