@@ -728,6 +728,7 @@ interface LancamentoRowProps {
   onClassChange: (i: number, nome: string) => void
   onGrupoChange: (i: number, grupo: string) => void
   onAplicarSugestao: (i: number) => void
+  onClassificarComIA: (i: number) => void
   onRemover: (i: number) => void
   styles: Record<string, string>
 }
@@ -742,6 +743,7 @@ const LancamentoRow = memo(function LancamentoRow({
   onClassChange,
   onGrupoChange,
   onAplicarSugestao,
+  onClassificarComIA,
   onRemover,
   styles,
 }: LancamentoRowProps) {
@@ -787,11 +789,10 @@ const LancamentoRow = memo(function LancamentoRow({
         {l.sugerida && (
           <div
             className={styles.badgeSugestaoIA}
-            title={l.sugestaoIAValida && l.sugestaoIA ? `Sugestão da IA: clique para aplicar "${l.sugestaoIA}"` : 'Aguardando sugestão da IA'}
-            onClick={l.sugestaoIAValida && l.sugestaoIA ? (e => { e.stopPropagation(); onAplicarSugestao(i) }) : undefined}
-            style={!(l.sugestaoIAValida && l.sugestaoIA) ? { opacity: 0.45, cursor: 'default' } : undefined}
+            title={l.sugestaoIAValida && l.sugestaoIA ? `Sugestão da IA: clique para aplicar "${l.sugestaoIA}"` : 'Clique para classificar com IA'}
+            onClick={e => { e.stopPropagation(); l.sugestaoIAValida && l.sugestaoIA ? onAplicarSugestao(i) : onClassificarComIA(i) }}
           >
-            💡 {l.sugestaoIA ?? 'Sugestão IA'}
+            💡 {l.sugestaoIA ?? 'Classificar com IA'}
           </div>
         )}
       </td>
@@ -859,6 +860,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
+  const modeloIARef = useRef<string>(DEFAULT_OPENAI_MODEL)
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
@@ -942,6 +944,32 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       )
     })
   }, [])
+
+  const handleClassificarComIA = useCallback(async (idx: number) => {
+    const linha = linhasClass[idx]
+    if (!linha) return
+    setLinhasClass(prev => prev.map((l, i) => i === idx ? { ...l, status: 'ok', sugestaoIA: undefined, sugestaoIAValida: false } : l))
+    const validNomesNorm = new Map(classificacoesDisp.map(c => [normalize(c.nome), c.nome]))
+    try {
+      const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
+        body: {
+          lancamentos: [{ descricao: linha.descricao, valor: linha.valor, tipo: linha.tipo }],
+          modelo: modeloIARef.current,
+          classificacoes_disponiveis: classificacoesDisp.map(c => ({ nome: c.nome, tipo: c.tipo })),
+        },
+      })
+      if (error || !data?.resultados?.[0]) return
+      const r = data.resultados[0] as { classificacao_nome?: string }
+      const nomeAI   = String(r?.classificacao_nome ?? '').trim()
+      const validSet = new Set(classificacoesDisp.map(c => c.nome))
+      const nomeExato = validSet.has(nomeAI) ? nomeAI : (validNomesNorm.get(normalize(nomeAI)) ?? null)
+      if (!nomeExato || nomeExato === 'Não Identificado') return
+      const novoGrupo = resolveGrupo(nomeExato, linha.tipo)
+      setLinhasClass(prev => prev.map((l, i) =>
+        i === idx ? { ...l, classificacao: nomeExato, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined, sugestaoIAValida: undefined } : l
+      ))
+    } catch { /* silencioso */ }
+  }, [linhasClass, classificacoesDisp])
 
   const aplicarClassificacaoParecidos = () => {
     if (!sugestaoParecidos) return
@@ -1124,6 +1152,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     }
 
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
+    modeloIARef.current = modelo
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
 
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
@@ -1693,6 +1722,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     onClassChange={handleClassChange}
                     onGrupoChange={handleGrupoChange}
                     onAplicarSugestao={handleAplicarSugestao}
+                    onClassificarComIA={handleClassificarComIA}
                     onRemover={removerLinha}
                     styles={styles}
                   />
