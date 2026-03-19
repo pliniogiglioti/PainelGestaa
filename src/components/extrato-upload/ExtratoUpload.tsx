@@ -784,23 +784,14 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
-        {l.sugerida && l.sugestaoIA && (
-          l.sugestaoIAValida ? (
-            <div
-              className={styles.badgeSugestaoIA}
-              title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
-              onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
-            >
-              💡 {l.sugestaoIA}
-            </div>
-          ) : (
-            <div
-              className={styles.badgeCatArquivo}
-              title={`Categoria no arquivo: ${l.sugestaoIA}`}
-            >
-              📋 {l.sugestaoIA}
-            </div>
-          )
+        {l.sugerida && l.sugestaoIAValida && l.sugestaoIA && (
+          <div
+            className={styles.badgeSugestaoIA}
+            title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
+            onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
+          >
+            💡 {l.sugestaoIA}
+          </div>
         )}
       </td>
       <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
@@ -1142,7 +1133,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
-    
+
     const nomesOficiaisNormMap  = new Map(classificacoes.map(c => [normalize(c.nome),     c.nome]))
     // Fallback: comparação sem pontuação (trata "PIX / Transf." vs "PIX Transf", etc.)
     const nomesOficiaisAggrMap  = new Map(classificacoes.map(c => [normalizeAggr(c.nome), c.nome]))
@@ -1196,7 +1187,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       return
     }
     setClassificacoesDisp(classificacoes) // salva no estado para o dropdown de edição
-    setProgresso({ atual: 3, total: 4, label: 'Classificando lançamentos' })
+    setProgresso({ atual: 3, total: 4, label: 'Classificando localmente' })
 
     // ── Passo 1: classificar localmente (plano de contas + histórico) ─────────
     const classificadas: LinhaClassificada[] = new Array(linhas.length)
@@ -1220,6 +1211,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             classificacao: nomeOficial,
             grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo),
             status: 'ok',
+            sugerida: undefined,
+            sugestaoIA: undefined,
+            sugestaoIAValida: undefined,
           }
           continue
         }
@@ -1235,12 +1229,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           classificacao: hist.classificacao,
           grupo: hist.grupo,
           status: 'ok',
+          sugerida: undefined,
+          sugestaoIA: undefined,
+          sugestaoIAValida: undefined,
         }
         continue
       }
 
       // Não classificado localmente — marcado como pendente para IA
-      // sugestaoIA guarda a categoria do arquivo como lembrete visual (somente leitura — NÃO é do plano)
       classificadas[i] = {
         ...linha,
         classificacao: 'Não Identificado',
@@ -1259,49 +1255,33 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
         // Descarta o nome inválido — nunca expõe como sugestão, pois não está no plano de contas
-        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
         if (!indicesParaIA.includes(i)) indicesParaIA.push(i)
       }
     }
 
-    // ── Mostra resultado local imediatamente (sem esperar IA) ─────────────────
-    // Itens "Não Identificado" mostram a categoria do arquivo como sugestão.
-    // O usuário pode revisar e depois apertar "Classificar com IA" para o Passo 2.
-    const final = Array.from(classificadas).sort((a, b) => {
-      if (a.sugerida && !b.sugerida) return -1
-      if (!a.sugerida && b.sugerida) return 1
-      return 0
-    })
-    setLinhasClass(final)
-    setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
-    setPendentesIACount(indicesParaIA.length)
+    // ── Sem pendentes → revisão imediata ─────────────────────────────────────
+    if (indicesParaIA.length === 0) {
+      const final = Array.from(classificadas).sort((a, b) => {
+        if (a.sugerida && !b.sugerida) return -1
+        if (!a.sugerida && b.sugerida) return 1
+        return 0
+      })
+      setLinhasClass(final)
+      setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
+      setPendentesIACount(0)
+      setFase('revisao')
+      setProgresso(null)
+      return
+    }
 
-    // Salva contexto para quando o usuário acionar a IA
-    iaContextRef.current = { linhas, classificadas, indicesParaIA, classificacoes, modelo }
-
-    setFase('revisao')
-    setProgresso(null)
-  }, [])
-
-  /** Passo 2: classifica itens pendentes com IA de forma eficiente
-   *  - Itens com categoria do arquivo → 1 chamada para mapear N categorias únicas
-   *  - Itens sem categoria → batch por descrição (só para os restantes)
-   */
-  const classificarComIA = useCallback(async () => {
-    if (!iaContextRef.current) return
-    const { linhas, classificadas, indicesParaIA, classificacoes, modelo } = iaContextRef.current
-
-    setFase('processando')
-
+    // ── Passo 2: IA para itens pendentes ─────────────────────────────────────
     // Separa: itens com categoria do arquivo (Conta Azul, etc.) vs só descrição
-    const comCategoria  = indicesParaIA.filter(i => linhas[i].classificacaoArquivo)
-    const semCategoria  = indicesParaIA.filter(i => !linhas[i].classificacaoArquivo)
-    const totalPassos   = 1 + Math.ceil(semCategoria.length / 15) // 1 chamada de mapeamento + batches de descrição
+    const comCategoria = indicesParaIA.filter(i => linhas[i].classificacaoArquivo)
+    const semCategoria = indicesParaIA.filter(i => !linhas[i].classificacaoArquivo)
+    const totalPassosIA = 4 + 1 + Math.ceil(semCategoria.length / 15) // 4 locais + 1 etapa A + batches B
 
-    // Set de nomes válidos do plano — usado para validar TODA sugestão da IA
-    const validNomes = new Set(classificacoes.map(c => c.nome))
-
-    setProgresso({ atual: 0, total: totalPassos, label: 'Mapeando categorias' })
+    setProgresso({ atual: 4, total: totalPassosIA, label: 'Mapeando categorias da IA' })
 
     // ── Etapa A: mapeamento de categorias únicas (1 chamada) ──────────────────
     // IA mapeia a categoria do arquivo → classificação do plano.
@@ -1335,14 +1315,24 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 sugestaoIA:       resultado.classificacao_nome,
                 sugestaoIAValida: true,
               }
+            } else {
+              // IA retornou null/inválido — mantém categoria do arquivo como sugestão não-válida
+              classificadas[i] = {
+                ...linhas[i],
+                classificacao:    'Não Identificado',
+                grupo:            '',
+                status:           'ok',
+                sugerida:         true,
+                sugestaoIA:       linhas[i].classificacaoArquivo,
+                sugestaoIAValida: false,
+              }
             }
-            // Se null ou inválido: permanece como "Não Identificado" (placeholder já definido)
           }
         }
       } catch { /* falha silenciosa — itens ficam como Não Identificado */ }
     }
 
-    setProgresso({ atual: 1, total: totalPassos, label: 'Classificando por descrição' })
+    setProgresso({ atual: 5, total: totalPassosIA, label: 'Classificando com IA' })
 
     // ── Etapa B: batch por descrição (só itens sem categoria) ─────────────────
     // IA analisa a descrição → sugere classificação do plano.
@@ -1383,22 +1373,22 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         })
       } catch {
         fatia.forEach(linhaIdx => {
-          classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não Identificado', grupo: '', status: 'erro' }
+          classificadas[linhaIdx] = { ...linhas[linhaIdx], classificacao: 'Não Identificado', grupo: '', status: 'erro', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
         })
       }
 
-      setProgresso({ atual: 1 + Math.ceil((b + BATCH_IA) / BATCH_IA), total: totalPassos, label: 'Classificando por descrição' })
+      setProgresso({ atual: 5 + Math.ceil((b + BATCH_IA) / BATCH_IA), total: totalPassosIA, label: 'Classificando com IA' })
     }
 
-    // Valida classificações locais (Passo 1) contra o plano — descarta nomes inválidos
+    // Valida classificações (Passo 1) contra o plano — descarta nomes inválidos
     for (let i = 0; i < classificadas.length; i++) {
       const clf = classificadas[i]
       if (clf && clf.classificacao && clf.classificacao !== 'Não Identificado' && !validNomes.has(clf.classificacao)) {
-        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true }
+        classificadas[i] = { ...clf, classificacao: 'Não Identificado', grupo: '', status: 'ok', sugerida: true, sugestaoIA: undefined, sugestaoIAValida: false }
       }
       // Limpa sugestaoIA inválida (ex: categoria do arquivo que não está no plano)
       if (clf?.sugestaoIA && !validNomes.has(clf.sugestaoIA)) {
-        classificadas[i] = { ...clf, sugestaoIA: undefined }
+        classificadas[i] = { ...clf, sugestaoIA: undefined, sugestaoIAValida: false }
       }
     }
 
@@ -1409,7 +1399,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     })
     setLinhasClass(final)
     setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
-    setPendentesIACount(0)
+    setPendentesIACount(final.filter(l => l.sugerida).length)
     iaContextRef.current = null
     setFase('revisao')
     setProgresso(null)
@@ -1638,17 +1628,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
           )}
 
-          {/* Banner: classificar itens pendentes com IA */}
+          {/* Banner: resumo pós-IA */}
           {pendentesIACount > 0 && fase === 'revisao' && (
             <div className={styles.bannerParecidos}>
               <span className={styles.bannerParecidosTexto}>
-                <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} não encontrado{pendentesIACount > 1 ? 's' : ''} no plano de contas — a IA pode classificar pelos itens abaixo
+                Após a análise de IA, <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} {pendentesIACount > 1 ? 'estão' : 'está'} com classificação divergente do plano de contas dos nossos gestores especialistas.
+                {linhasClass.some(l => l.sugestaoIAValida) && (
+                  <> Clique no badge <strong>💡</strong> para confirmar a sugestão da IA.</>
+                )}
               </span>
-              <div className={styles.bannerParecidosBtns}>
-                <button className={styles.btnPrimary} onClick={classificarComIA}>
-                  ⚡ Classificar com IA ({pendentesIACount})
-                </button>
-              </div>
             </div>
           )}
 
