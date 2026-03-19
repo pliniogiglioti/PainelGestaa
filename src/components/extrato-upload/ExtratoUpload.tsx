@@ -784,23 +784,14 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
-        {l.sugerida && l.sugestaoIA && (
-          l.sugestaoIAValida ? (
-            <div
-              className={styles.badgeSugestaoIA}
-              title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
-              onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
-            >
-              💡 {l.sugestaoIA}
-            </div>
-          ) : (
-            <div
-              className={styles.badgeCatArquivo}
-              title={`Categoria no arquivo: ${l.sugestaoIA}`}
-            >
-              📋 {l.sugestaoIA}
-            </div>
-          )
+        {l.sugerida && l.sugestaoIAValida && l.sugestaoIA && (
+          <div
+            className={styles.badgeSugestaoIA}
+            title={`Sugestão da IA: clique para aplicar "${l.sugestaoIA}"`}
+            onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
+          >
+            💡 {l.sugestaoIA}
+          </div>
         )}
       </td>
       <td className={styles.tdGrupo} onClick={e => e.stopPropagation()}>
