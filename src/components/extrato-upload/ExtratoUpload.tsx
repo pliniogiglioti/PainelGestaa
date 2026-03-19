@@ -785,7 +785,7 @@ const LancamentoRow = memo(function LancamentoRow({
         {l.sugerida && l.sugestaoIA && (
           <div
             className={styles.badgeSugestaoIA}
-            title={`Sugestão: ${l.sugestaoIA} — clique para aplicar`}
+            title={`Sugestão da IA: ${l.sugestaoIA} — clique para aplicar`}
             onClick={() => onAplicarSugestao(i)}
           >
             💡 {l.sugestaoIA}
@@ -856,6 +856,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
+  const classificacoesDispRef = useRef<{ nome: string; tipo: string }[]>([])
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
@@ -878,6 +879,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     () => linhasClass.filter(l => l.grupo === 'Receitas Operacionais').reduce((s, l) => s + l.valor, 0),
     [linhasClass]
   )
+
+  // Mantém ref sincronizado com o estado para uso em callbacks (handleAplicarSugestao)
+  useEffect(() => { classificacoesDispRef.current = classificacoesDisp }, [classificacoesDisp])
 
   // Pré-computa listas de classificações ordenadas por tipo — evita sort a cada render de linha
   const classificacoesReceita = useMemo(() =>
@@ -925,6 +929,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = prev[idx]
       if (!linha?.sugestaoIA) return prev
       const novoNome = linha.sugestaoIA!
+      // Só aplica se o valor estiver no plano de contas cadastrado
+      const valido = classificacoesDispRef.current.some(c => c.nome === novoNome)
+      if (!valido) return prev
       const novoGrupo = resolveGrupo(novoNome, linha.tipo)
       const similares = prev
         .map((l, i) => ({ l, i }))
@@ -1226,12 +1233,14 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       }
 
       // Não classificado localmente — marcado como pendente para IA
+      // sugestaoIA guarda a categoria do arquivo como lembrete visual (somente leitura)
       classificadas[i] = {
         ...linha,
         classificacao: 'Não Identificado',
         grupo: '',
         status: 'ok',
         sugerida: true,
+        sugestaoIA: linha.classificacaoArquivo || undefined,
       }
       indicesParaIA.push(i)
     }
@@ -1342,12 +1351,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         const resultados = data.resultados as { classificacao_nome?: string; grupo?: string; confianca?: string }[]
         fatia.forEach((linhaIdx, ri) => {
           const r = resultados[ri]
+          const nomeAI = String(r?.classificacao_nome ?? '').trim()
+          const temSugestaoValida = nomeAI && nomeAI !== 'Não Identificado'
+          // IA sugere → mantém "Não Identificado" + badge clicável para o usuário confirmar
+          // Só auto-aplica se vier de regras locais (confianca = 'confirmada' via fallback)
           classificadas[linhaIdx] = {
             ...linhas[linhaIdx],
-            classificacao: String(r?.classificacao_nome ?? '').trim() || 'Não Identificado',
-            grupo:         String(r?.grupo ?? '').trim() || '',
-            status: 'ok',
-            sugerida: !r?.classificacao_nome || r?.confianca === 'sugerida',
+            classificacao: 'Não Identificado',
+            grupo:         '',
+            status:        'ok',
+            sugerida:      true,
+            sugestaoIA:    temSugestaoValida ? nomeAI : undefined,
           }
         })
       } catch {
