@@ -355,6 +355,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [anoFiltro,        setAnoFiltro]        = useState(String(new Date().getFullYear()))
   const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
   const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
+  const [showAssistente,   setShowAssistente]   = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
   const [usuarios,         setUsuarios]         = useState<PerfilUsuario[]>([])
@@ -1035,7 +1036,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             {empresa.cnpj ? ` · ${empresa.cnpj}` : ''} — Acompanhe receitas, despesas e o resultado do período.
           </p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <button onClick={onVoltar} className={styles.backLink} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar ao dashboard</button>
           <button
             onClick={onTrocarEmpresa}
@@ -1045,6 +1046,10 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             }}
           >
             Trocar empresa
+          </button>
+          <button className={styles.btnAssistente} onClick={() => setShowAssistente(true)}>
+            <span className={styles.btnAssistenteEyebrow}>• IA • OPENAI</span>
+            <span className={styles.btnAssistenteTitle}>Assistente de DFC</span>
           </button>
         </div>
       </header>
@@ -1106,8 +1111,15 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       {/* ── Extrato Upload ── */}
       <ExtratoUpload empresaId={empresa.id} onSaved={() => fetchLancamentos(usuarioFiltro || undefined)} />
 
-      {/* ── AI Assistant ── */}
-      <DreAssistentePanel lancamentos={lancamentosFiltrados} />
+      {/* ── Modal Assistente IA ── */}
+      {showAssistente && (
+        <div className={styles.assistenteOverlay} onClick={() => setShowAssistente(false)}>
+          <div className={styles.assistenteModal} onClick={e => e.stopPropagation()}>
+            <button className={styles.assistenteModalClose} onClick={() => setShowAssistente(false)}>✕</button>
+            <DreAssistentePanel lancamentos={lancamentosFiltrados} />
+          </div>
+        </div>
+      )}
 
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
