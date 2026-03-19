@@ -1443,7 +1443,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     iaContextRef.current = null
     setFase('revisao')
     setProgresso(null)
-  }, [])
+  }, [empresaId])
 
   const salvarTudo = async () => {
     const naoClass = linhasClass.filter(l => l.sugerida)
