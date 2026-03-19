@@ -119,7 +119,17 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
 ]
 
 const normalize = (s: string) =>
-  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+  s.normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')           // remove acentos
+    .replace(/[\u00a0\u2000-\u200f\u2028-\u202f\u205f-\u206f]/g, ' ')  // espaços especiais → espaço normal
+    .replace(/[\u2010-\u2015\u2212]/g, '-')    // vários tipos de travessão/dash → hífen
+    .replace(/\s+/g, ' ')                       // colapsa espaços múltiplos
+    .toLowerCase()
+    .trim()
+
+/** Normalização agressiva: remove toda pontuação para fallback de comparação */
+const normalizeAggr = (s: string) =>
+  normalize(s).replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
 
 /** Mapa exaustivo classificação → grupo (espelha o plano_de_contas_dre.md) */
 const CLASSIFICACAO_GRUPO: Record<string, string> = {
@@ -284,17 +294,19 @@ function detectarColunas(headers: string[]): {
   credito: number; debito: number
   classificacao: number; grupo: number
 } {
+  // Normaliza headers (remove acentos, espaços especiais, lowercase) para comparação robusta
+  const normHeaders = headers.map(h => normalize(h))
   const idx = (keys: string[]) =>
-    headers.findIndex(h => keys.some(k => h.toLowerCase().includes(k)))
+    normHeaders.findIndex(h => keys.some(k => h.includes(k)))
 
   return {
     data:          idx(['data', 'date', 'dt', 'vencimento']),
-    descricao:     idx(['descriç', 'descric', 'histórico', 'historico', 'memo', 'description', 'complement', 'lançamento', 'lancamento']),
-    valor:         headers.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.toLowerCase().includes(k)) && !h.toLowerCase().includes('saldo')),
-    tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'crédito/débito', 'entrada/saída']),
-    credito:       idx(['crédit', 'credit']),
-    debito:        idx(['débit', 'debit']),
-    classificacao: idx(['classificaç', 'classificac', 'categoria 1', 'categoria']),
+    descricao:     idx(['descric', 'historico', 'memo', 'description', 'complement', 'lancamento']),
+    valor:         normHeaders.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.includes(k)) && !h.includes('saldo')),
+    tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'credito/debito', 'entrada/saida']),
+    credito:       idx(['credit']),
+    debito:        idx(['debit']),
+    classificacao: idx(['classificac', 'categoria 1', 'categoria']),
     grupo:         idx(['grupo', 'group', 'agrupamento']),
   }
 }
@@ -1072,7 +1084,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
     
-    const nomesOficiaisNormMap = new Map(classificacoes.map(c => [normalize(c.nome), c.nome]))
+    const nomesOficiaisNormMap  = new Map(classificacoes.map(c => [normalize(c.nome),     c.nome]))
+    // Fallback: comparação sem pontuação (trata "PIX / Transf." vs "PIX Transf", etc.)
+    const nomesOficiaisAggrMap  = new Map(classificacoes.map(c => [normalizeAggr(c.nome), c.nome]))
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
       histAll
@@ -1132,9 +1146,11 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: classificação vinda do arquivo (ex: Conta Azul "Categoria 1")
-      // Encontrou no plano de contas (comparação normalizada) → usa e para.
+      // Tentativa 1: match normalizado; Tentativa 2: match sem pontuação (fallback agressivo)
       if (linha.classificacaoArquivo) {
-        const nomeOficial = nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo))
+        const nomeOficial =
+          nomesOficiaisNormMap.get(normalize(linha.classificacaoArquivo)) ??
+          nomesOficiaisAggrMap.get(normalizeAggr(linha.classificacaoArquivo))
         if (nomeOficial) {
           classificadas[i] = {
             ...linha,
