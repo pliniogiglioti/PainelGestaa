@@ -1267,32 +1267,72 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setProgresso(null)
   }, [])
 
-  /** Passo 2: envia itens não classificados para a IA e atualiza a tabela */
+  /** Passo 2: classifica itens pendentes com IA de forma eficiente
+   *  - Itens com categoria do arquivo → 1 chamada para mapear N categorias únicas
+   *  - Itens sem categoria → batch por descrição (só para os restantes)
+   */
   const classificarComIA = useCallback(async () => {
     if (!iaContextRef.current) return
     const { linhas, classificadas, indicesParaIA, classificacoes, modelo } = iaContextRef.current
 
     setFase('processando')
-    setProgresso({ atual: 0, total: indicesParaIA.length, label: 'Classificando com IA' })
 
+    // Separa: itens com categoria do arquivo (Conta Azul, etc.) vs só descrição
+    const comCategoria  = indicesParaIA.filter(i => linhas[i].classificacaoArquivo)
+    const semCategoria  = indicesParaIA.filter(i => !linhas[i].classificacaoArquivo)
+    const totalPassos   = 1 + Math.ceil(semCategoria.length / 15) // 1 chamada de mapeamento + batches de descrição
+
+    setProgresso({ atual: 0, total: totalPassos, label: 'Mapeando categorias' })
+
+    // ── Etapa A: mapeamento de categorias únicas (1 chamada) ──────────────────
+    if (comCategoria.length > 0) {
+      const categoriasUnicas = [...new Set(comCategoria.map(i => linhas[i].classificacaoArquivo!))]
+      try {
+        const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
+          body: {
+            mode: 'mapear_categorias',
+            categorias: categoriasUnicas,
+            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
+            modelo,
+          },
+        })
+
+        if (!error && data?.mapeamento) {
+          type MapItem = { classificacao_nome: string; grupo: string; tipo: 'receita' | 'despesa' }
+          const mapeamento = data.mapeamento as Record<string, MapItem | null>
+          for (const i of comCategoria) {
+            const resultado = mapeamento[linhas[i].classificacaoArquivo!]
+            if (resultado) {
+              classificadas[i] = {
+                ...linhas[i],
+                classificacao: resultado.classificacao_nome,
+                grupo:         resultado.grupo,
+                tipo:          resultado.tipo,
+                status:        'ok',
+                sugerida:      false,
+              }
+            }
+            // Se null: permanece como "Não Identificado" (placeholder já definido)
+          }
+        }
+      } catch { /* falha silenciosa — itens ficam como Não Identificado */ }
+    }
+
+    setProgresso({ atual: 1, total: totalPassos, label: 'Classificando por descrição' })
+
+    // ── Etapa B: batch por descrição (só itens sem categoria) ─────────────────
     const BATCH_IA = 15
     const DELAY    = 800
 
-    for (let b = 0; b < indicesParaIA.length; b += BATCH_IA) {
+    for (let b = 0; b < semCategoria.length; b += BATCH_IA) {
       if (b > 0) await sleep(DELAY)
-      const fatia = indicesParaIA.slice(b, b + BATCH_IA)
+      const fatia = semCategoria.slice(b, b + BATCH_IA)
       const lote  = fatia.map(i => linhas[i])
 
       try {
         const { data, error } = await supabase.functions.invoke('dre-ai-classify', {
           body: {
-            lancamentos: lote.map(l => ({
-              descricao: l.classificacaoArquivo
-                ? `${l.descricao} [Categoria: ${l.classificacaoArquivo}]`
-                : l.descricao,
-              valor: l.valor,
-              tipo:  l.tipo,
-            })),
+            lancamentos: lote.map(l => ({ descricao: l.descricao, valor: l.valor, tipo: l.tipo })),
             modelo,
             classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
           },
@@ -1317,7 +1357,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         })
       }
 
-      setProgresso({ atual: Math.min(b + BATCH_IA, indicesParaIA.length), total: indicesParaIA.length, label: 'Classificando com IA' })
+      setProgresso({ atual: 1 + Math.ceil((b + BATCH_IA) / BATCH_IA), total: totalPassos, label: 'Classificando por descrição' })
     }
 
     // Valida resultado da IA contra o plano
