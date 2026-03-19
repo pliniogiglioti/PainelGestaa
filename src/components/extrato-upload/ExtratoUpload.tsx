@@ -1134,10 +1134,17 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     // Fallback: comparação sem pontuação (trata "PIX / Transf." vs "PIX Transf", etc.)
     const nomesOficiaisAggrMap  = new Map(classificacoes.map(c => [normalizeAggr(c.nome), c.nome]))
     // Mapa de histórico: descricao_normalizada → classificação confirmada anteriormente
+    // Usa comparação normalizada para tolerar variações de acento/case nos nomes salvos
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
       histAll
-        .filter(h => nomesOficiaisSet.has(h.classificacao))
-        .map(h => [h.descricao_normalizada, { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
+        .filter(h => nomesOficiaisSet.has(h.classificacao) || nomesOficiaisNormMap.has(normalize(h.classificacao)))
+        .map(h => {
+          // Resolve para o nome oficial correto (com acento) se necessário
+          const classOficial = nomesOficiaisSet.has(h.classificacao)
+            ? h.classificacao
+            : (nomesOficiaisNormMap.get(normalize(h.classificacao)) ?? h.classificacao)
+          return [normalize(h.descricao_normalizada), { classificacao: classOficial, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }]
+        })
     )
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
