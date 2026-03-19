@@ -1057,9 +1057,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             Trocar empresa
           </button>
           <button className={styles.btnAssistente} onClick={() => setShowAssistente(true)}>
-            <span className={styles.btnAssistenteInfo}>ⓘ
-              <span className={styles.btnAssistenteTooltip}>Abre o Assistente de DFC — uma IA treinada para analisar seus lançamentos e responder perguntas como "qual meu maior custo?", "como está minha margem?" ou "onde posso reduzir despesas?". Powered by OpenAI.</span>
-            </span>
+            <span className={styles.btnAssistenteInfo}>ⓘ</span>
+            <span className={styles.btnAssistenteTooltip}>Abre o Assistente de DFC — uma IA treinada para analisar seus lançamentos e responder perguntas como "qual meu maior custo?", "como está minha margem?" ou "onde posso reduzir despesas?". Powered by OpenAI.</span>
             <span className={styles.btnAssistenteEyebrow}>• IA • OPENAI</span>
             <span className={styles.btnAssistenteTitle}>Assistente de DFC</span>
           </button>
