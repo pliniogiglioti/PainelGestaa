@@ -962,8 +962,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const r = data.resultados[0] as { classificacao_nome?: string }
       const nomeAI   = String(r?.classificacao_nome ?? '').trim()
       const validSet = new Set(classificacoesDisp.map(c => c.nome))
-      const nomeExato = validSet.has(nomeAI) ? nomeAI : (validNomesNorm.get(normalize(nomeAI)) ?? null)
-      if (!nomeExato || nomeExato === 'Não Identificado') return
+      let nomeExato = validSet.has(nomeAI) ? nomeAI : (validNomesNorm.get(normalize(nomeAI)) ?? null)
+      // Fallback: se IA não retornou nome válido, usa "Outras Despesas" ou "Receita Dinheiro"
+      if (!nomeExato || nomeExato === 'Não Identificado') {
+        const fallbackNome = linha.tipo === 'receita' ? 'Receita Dinheiro' : 'Outras Despesas'
+        nomeExato = validNomesNorm.get(normalize(fallbackNome)) ?? null
+      }
+      if (!nomeExato) return
       const novoGrupo = resolveGrupo(nomeExato, linha.tipo)
       setLinhasClass(prev => prev.map((l, i) =>
         i === idx ? { ...l, classificacao: nomeExato, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined, sugestaoIAValida: undefined } : l
