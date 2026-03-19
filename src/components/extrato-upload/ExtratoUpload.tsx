@@ -868,7 +868,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [erroSalvar, setErroSalvar]                 = useState<string>('')
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
-  const [pendentesIACount, setPendentesIACount]     = useState(0)
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
   const modeloIARef = useRef<string>(DEFAULT_OPENAI_MODEL)
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
@@ -1007,7 +1006,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setErroSalvar('')
     setSucessoSalvo(0)
     setMsgErroUpload('')
-    setPendentesIACount(0)
     iaContextRef.current = null
   }
 
@@ -1298,7 +1296,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       })
       setLinhasClass(final)
       setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
-      setPendentesIACount(0)
       setFase('revisao')
       setProgresso(null)
       return
@@ -1443,7 +1440,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     })
     setLinhasClass(final)
     setSelecionados(new Set(final.map((_, i) => i).filter(i => final[i].status === 'ok' && !final[i].sugerida)))
-    setPendentesIACount(final.filter(l => l.sugerida).length)
     iaContextRef.current = null
     setFase('revisao')
     setProgresso(null)
@@ -1656,7 +1652,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
                     <span className={styles.infoIcon}>ⓘ</span>
-                    <span className={styles.cardTooltip}>Aqui exibe a quantidade de sugestões que a IA fez para os lançamentos que ela conseguiu identificar. Cuidado: a IA não é 100% precisa — ela analisa a descrição do lançamento e tenta encaixar na categoria mais adequada do plano de contas, mas pode errar em descrições curtas, ambíguas ou fora do padrão. Revise cada classificação antes de salvar, especialmente as que parecerem fora do contexto da sua empresa.</span>
+                    <span className={styles.cardTooltip}>Aqui exibe os lançamentos em que a IA analisou a descrição e escolheu uma categoria diretamente do plano de contas oficial — a IA sempre trabalha dentro do plano, nunca inventa categorias. Porém, mesmo escolhendo do plano, ela pode errar na escolha da categoria mais adequada. Por isso o sistema exibe o badge laranja IA em cada linha para que você confirme. Após confirmar, o lançamento sai do card "Aguardando confirmação" e fica registrado como classificado.</span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
                     <span className={styles.fonteCardLabel}>Classificados pela IA</span>
                   </div>
@@ -1677,24 +1673,21 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                     <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
                   </div>
                 )}
-                {linhasClass.filter(l => l.sugerida).length > 0 && (
+                {linhasClass.filter(l => l.sugerida && !l.sugestaoIAValida).length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
                     <span className={styles.infoIcon}>ⓘ</span>
-                    <span className={styles.cardTooltip}>Aqui exibe os lançamentos que nem o histórico, nem a categoria do arquivo, nem a IA conseguiram classificar corretamente. Isso acontece muito com descrições curtas, códigos do banco ou lançamentos incomuns que a IA não reconhece. Você precisa classificar cada um manualmente — use o campo de seleção na coluna "Classificação". Depois de salvar, o sistema memoriza sua escolha e na próxima importação classifica automaticamente.</span>
-                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida).length}</span>
-                    <span className={styles.fonteCardLabel}>Não identificados — revise antes de salvar</span>
+                    <span className={styles.cardTooltip}>Aqui exibe os lançamentos que nenhuma das etapas conseguiu classificar — nem o histórico, nem a categoria do arquivo, nem a IA. Isso acontece quando a descrição é muito curta, é um código interno do banco ou quando a IA não conseguiu associar a nenhuma categoria do plano de contas. Você precisa classificar cada um manualmente — use o campo de seleção na coluna "Classificação". Depois de salvar, o sistema memoriza sua escolha e aplica automaticamente nas próximas importações.</span>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida && !l.sugestaoIAValida).length}</span>
+                    <span className={styles.fonteCardLabel}>Sem classificação — revisão obrigatória</span>
                   </div>
                 )}
-                {pendentesIACount > 0 && fase === 'revisao' && (
+                {linhasClass.filter(l => l.sugerida && l.sugestaoIAValida).length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardPendente}`}>
                     <span className={styles.infoIcon}>ⓘ</span>
-                    <span className={styles.cardTooltip}>Aqui exibe os lançamentos em que a IA fez uma sugestão, mas o nome que ela usou não existe exatamente no plano de contas desta empresa. Isso acontece quando a IA "cria" uma variação do nome em vez de usar o oficial. Para não salvar dados incorretos, o sistema não aplica essas sugestões automaticamente. Na tabela você verá o badge laranja IA em cada linha — clique nele para aceitar a sugestão adaptada ou selecione a categoria correta manualmente.</span>
-                    <span className={styles.fonteCardNum}>{pendentesIACount}</span>
+                    <span className={styles.cardTooltip}>Aqui exibe os lançamentos que a IA identificou e sugeriu uma categoria válida do plano de contas — mas que ainda aguardam a sua confirmação. A IA sempre escolhe dentro do plano oficial, porém como pode errar na escolha, o sistema não aplica automaticamente: é você quem decide. Na tabela, cada uma dessas linhas exibe o badge laranja IA com a sugestão — clique nele para confirmar, ou selecione manualmente se preferir outra categoria.</span>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida && l.sugestaoIAValida).length}</span>
                     <span className={styles.fonteCardLabel}>
-                      Divergentes do plano de contas
-                      {linhasClass.some(l => l.sugestaoIAValida) && (
-                        <> — clique em <strong className={styles.badgeMiniIA}>IA</strong> para confirmar</>
-                      )}
+                      Sugeridos pela IA — aguardando confirmação
                     </span>
                   </div>
                 )}
