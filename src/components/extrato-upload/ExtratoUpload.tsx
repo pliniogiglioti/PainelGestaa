@@ -1541,13 +1541,15 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       {/* ── Aviso de IA + cards de modelo (só no idle) ──────────────────────── */}
       {fase === 'idle' && (
         <>
-          <div className={styles.uploadWarning}>
-            <span className={styles.uploadWarningIcon}>⚠</span>
-            <span className={styles.uploadWarningText}>
-              Ao enviar o arquivo, verifique a identificação dos lançamentos.{' '}
-              <strong>A Inteligência Artificial pode cometer erros.</strong>{' '}
-              Confira as informações antes de salvar.
-            </span>
+          <div className={styles.uploadWarningRow}>
+            <div className={styles.uploadWarning}>
+              <span className={styles.uploadWarningIcon}>⚠</span>
+              <span>
+                Ao enviar o arquivo, verifique a identificação dos lançamentos.{' '}
+                <strong>A Inteligência Artificial pode cometer erros.</strong>{' '}
+                Confira as informações antes de salvar.
+              </span>
+            </div>
             {exemplosDb.some(e => e.arquivo) && (
               <div className={styles.uploadWarningModelos}>
                 <span className={styles.uploadWarningModelosLabel}>↓ Baixar modelo:</span>
@@ -1643,40 +1645,39 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 Revise os {linhasClass.length} lançamentos classificados
               </strong>
 
-              {/* Cards de origem */}
-              {(linhasClass.some(l => l.fonte === 'ia') || linhasClass.some(l => l.fonte === 'historico') || linhasClass.some(l => l.fonte === 'arquivo')) && (
-                <div className={styles.fonteCards}>
-                  {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
-                    <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
-                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
-                      <span className={styles.fonteCardLabel}>Classificados pela IA</span>
-                    </div>
-                  )}
-                  {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
-                    <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
-                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
-                      <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
-                    </div>
-                  )}
-                  {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
-                    <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
-                      <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
-                      <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {linhasClass.filter(l => l.sugerida).length > 0 && (
-                <span className={styles.reviewNaoIdBadge}>
-                  ⚠ {linhasClass.filter(l => l.sugerida).length} não identificado{linhasClass.filter(l => l.sugerida).length > 1 ? 's' : ''} — revise antes de salvar
-                </span>
-              )}
-              {qtdErros > 0 && (
-                <span className={styles.reviewErroBadge}>
-                  ⚠ {qtdErros} com atenção — desmarcados automaticamente
-                </span>
-              )}
+              {/* Cards de origem + status — todos na mesma linha */}
+              <div className={styles.fonteCards}>
+                {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
+                    <span className={styles.fonteCardLabel}>Classificados pela IA</span>
+                  </div>
+                )}
+                {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
+                    <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
+                  </div>
+                )}
+                {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
+                    <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
+                  </div>
+                )}
+                {linhasClass.filter(l => l.sugerida).length > 0 && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
+                    <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida).length}</span>
+                    <span className={styles.fonteCardLabel}>Não identificados — revise antes de salvar</span>
+                  </div>
+                )}
+                {qtdErros > 0 && (
+                  <div className={`${styles.fonteCard} ${styles.fonteCardErro}`}>
+                    <span className={styles.fonteCardNum}>{qtdErros}</span>
+                    <span className={styles.fonteCardLabel}>Com atenção — desmarcados</span>
+                  </div>
+                )}
+              </div>
             </div>
             <div className={styles.reviewActions}>
               {qtdErros > 0 && (
@@ -1702,13 +1703,13 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             <div className={styles.errosBox}><strong>⚠️ {erroSalvar}</strong></div>
           )}
 
-          {/* Banner: resumo pós-IA */}
+          {/* Card: resumo pós-IA */}
           {pendentesIACount > 0 && fase === 'revisao' && (
-            <div className={styles.bannerParecidos}>
-              <span className={styles.bannerParecidosTexto}>
+            <div className={styles.cardIA}>
+              <span className={styles.cardIATexto}>
                 Após a análise de IA, <strong>{pendentesIACount}</strong> lançamento{pendentesIACount > 1 ? 's' : ''} {pendentesIACount > 1 ? 'estão' : 'está'} com classificação divergente do plano de contas dos nossos gestores especialistas.
                 {linhasClass.some(l => l.sugestaoIAValida) && (
-                  <> Clique no badge <strong className={styles.badgeFonteLabel} style={{color:'#f59e0b', background:'rgba(245,158,11,0.12)', border:'1px solid rgba(245,158,11,0.3)', borderRadius:4, padding:'0 5px', fontSize:11}}>IA</strong> para confirmar a sugestão da IA.</>
+                  <> Clique no badge <strong className={styles.badgeMiniIA}>IA</strong> para confirmar a sugestão da IA.</>
                 )}
               </span>
             </div>
