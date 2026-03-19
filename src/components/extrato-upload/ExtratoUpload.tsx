@@ -1647,42 +1647,42 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
               <div className={styles.fonteCards}>
                 {/* Card total */}
                 <div className={`${styles.fonteCard} ${styles.fonteCardTotal}`}>
-                  <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Total de linhas importadas do arquivo após o processamento. É o ponto de partida — todos os outros cards são subdivisões deste número.</span></span>
+                  <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>O sistema leu o arquivo enviado e extraiu cada linha de movimentação financeira. Este número representa todos os lançamentos encontrados — independente de terem sido classificados com sucesso ou não. Os demais cards mostram como cada um foi tratado.</span></span>
                   <span className={styles.fonteCardNum}>{linhasClass.length}</span>
                   <span className={styles.fonteCardLabel}>Total de lançamentos</span>
                 </div>
 
                 {linhasClass.filter(l => l.fonte === 'ia').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardIA}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Lançamentos classificados automaticamente pela Inteligência Artificial com base no plano de contas. Confira cada um antes de salvar.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Esses lançamentos não tinham correspondência no histórico nem categoria definida no arquivo, então foram enviados para a IA. A IA analisou a descrição de cada um e sugeriu uma classificação dentro do plano de contas. A sugestão foi aceita automaticamente quando considerada válida — mas pode conter erros. Revise antes de salvar.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'ia').length}</span>
                     <span className={styles.fonteCardLabel}>Classificados pela IA</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.fonte === 'historico').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardHistorico}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Lançamentos reconhecidos pelo histórico de correções manuais feitas anteriormente nesta empresa. São os mais confiáveis — você mesmo definiu essas classificações.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Em importações anteriores, esses lançamentos foram classificados manualmente por você ou sua equipe. O sistema salvou essa decisão e, ao encontrar a mesma descrição novamente, aplicou a mesma classificação automaticamente — sem precisar de IA. Por isso são os mais confiáveis.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'historico').length}</span>
                     <span className={styles.fonteCardLabel}>Histórico de Classificações</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.fonte === 'arquivo').length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardArquivo}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Lançamentos que já vieram com categoria definida no próprio arquivo importado (ex: Conta Azul). A classificação foi usada diretamente sem necessidade de IA.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>O arquivo importado já continha uma coluna de categoria (como acontece em exportações do Conta Azul, por exemplo). O sistema leu essa coluna e usou a categoria informada diretamente, sem precisar acionar a IA. Caso você tenha corrigido algum lançamento manualmente antes, essa correção do histórico prevalece sobre a categoria do arquivo.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.fonte === 'arquivo').length}</span>
                     <span className={styles.fonteCardLabel}>Classificação do Arquivo</span>
                   </div>
                 )}
                 {linhasClass.filter(l => l.sugerida).length > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardNaoId}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Lançamentos que não foram classificados automaticamente. Nenhuma regra ou IA conseguiu identificá-los. É obrigatório revisá-los e classificar manualmente antes de salvar.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>O sistema tentou classificar esses lançamentos pelo histórico, pela categoria do arquivo e pela IA — mas nenhuma das tentativas retornou uma classificação válida dentro do plano de contas. Isso pode acontecer quando a descrição é muito genérica, incomum ou quando a IA não teve confiança suficiente. É obrigatório classificá-los manualmente antes de salvar.</span></span>
                     <span className={styles.fonteCardNum}>{linhasClass.filter(l => l.sugerida).length}</span>
                     <span className={styles.fonteCardLabel}>Não identificados — revise antes de salvar</span>
                   </div>
                 )}
                 {pendentesIACount > 0 && fase === 'revisao' && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardPendente}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>A IA sugeriu uma classificação para esses lançamentos, mas ela diverge do plano de contas oficial dos nossos gestores. Clique no badge IA em cada linha para aceitar ou corrija manualmente.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>A IA retornou uma sugestão de classificação para esses lançamentos, porém o nome sugerido não corresponde exatamente a nenhuma categoria do plano de contas oficial cadastrado. Isso pode ocorrer quando a IA "inventa" um nome parecido mas diferente do oficial. Você precisa revisar cada um: clique no badge IA na linha para aceitar a sugestão adaptada, ou selecione manualmente a categoria correta.</span></span>
                     <span className={styles.fonteCardNum}>{pendentesIACount}</span>
                     <span className={styles.fonteCardLabel}>
                       Divergentes do plano de contas
@@ -1694,7 +1694,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
                 )}
                 {qtdErros > 0 && (
                   <div className={`${styles.fonteCard} ${styles.fonteCardErro}`}>
-                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Lançamentos com erro de processamento — foram desmarcados automaticamente para não afetar o relatório. Verifique e corrija antes de salvar.</span></span>
+                    <span className={styles.infoIcon}>ⓘ<span className={styles.cardTooltip}>Ocorreu uma falha ao processar esses lançamentos — pode ter sido erro na leitura do arquivo, valor inválido ou problema na comunicação com a IA. Para evitar dados incorretos no relatório, eles foram automaticamente desmarcados e não serão salvos. Corrija os dados e tente importar novamente se necessário.</span></span>
                     <span className={styles.fonteCardNum}>{qtdErros}</span>
                     <span className={styles.fonteCardLabel}>Com atenção — desmarcados</span>
                   </div>
