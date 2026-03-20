@@ -779,7 +779,19 @@ const LancamentoRow = memo(function LancamentoRow({
         />
       </td>
       <td className={styles.tdData}>{l.data}</td>
-      <td className={styles.tdDesc} title={l.descricao}>{l.descricao}</td>
+      <td className={styles.tdDesc}>
+        {(l.fonte === 'historico' || l.fonte === 'arquivo') && (
+          <span
+            className={`${styles.fonteInfoIcon} ${l.fonte === 'historico' ? styles.fonteInfoHistorico : styles.fonteInfoArquivo}`}
+            title={
+              l.fonte === 'historico'
+                ? 'Você salvou isso anteriormente no histórico'
+                : 'Esse lançamento tem uma categoria no arquivo'
+            }
+          >ⓘ</span>
+        )}
+        <span title={l.descricao}>{l.descricao}</span>
+      </td>
       <td>
         <span className={`${styles.tipoPill} ${l.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
           {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
@@ -807,16 +819,6 @@ const LancamentoRow = memo(function LancamentoRow({
             onClick={e => { e.stopPropagation(); onAplicarSugestao(i) }}
           >
             <span className={styles.badgeFonteLabel}>IA</span> {l.sugestaoIA}
-          </div>
-        )}
-        {l.fonte === 'historico' && !l.sugerida && (
-          <div className={styles.badgeHistorico} title="Classificado com base no histórico de correções manuais">
-            Histórico de Classificações
-          </div>
-        )}
-        {l.fonte === 'arquivo' && !l.sugerida && (
-          <div className={styles.badgeCatArquivo} title="Classificação importada diretamente do arquivo">
-            Classificação do Arquivo
           </div>
         )}
       </td>
