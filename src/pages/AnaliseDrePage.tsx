@@ -29,6 +29,26 @@ const DEFAULT_AI_MODEL = 'gpt-4o-mini'
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
 
+/** Chave estável para o histórico: remove datas e tokens numéricos ≥ 4 dígitos.
+ *  Espelha normalizeKey de ExtratoUpload.tsx. */
+function normalizeKey(s: string): string {
+  const base = s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x00-\x7F]/g, '')
+    .replace(/[\t\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/[-–—]+/g, '-')
+    .toLowerCase()
+    .trim()
+  return base
+    .replace(/\b\d{2}[/\-]\d{2}[/\-]\d{4}\b/g, '')
+    .replace(/\b\d{2}[/\-]\d{2}\b/g, '')
+    .replace(/\b\d{4,}\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // ── Mapeamento oficial: classificação → grupo (plano de contas) ───────────────
 const CLASSIFICACAO_TO_GRUPO: Record<string, string> = {
   // Receitas Operacionais
@@ -890,15 +910,21 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
     try {
       // Prioridade 1: histórico da empresa (mesma lógica do ExtratoUpload)
-      const descNorm = form.descricao.trim()
+      const descNorm    = form.descricao.trim()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+      const descStripped = normalizeKey(form.descricao)
+      // Busca exata e stripped em uma só query
+      const chaves = [...new Set([descNorm, descStripped].filter(Boolean))]
 
-      const { data: histData } = await supabase
+      const { data: histRows } = await supabase
         .from('dre_classificacao_historico')
         .select('classificacao, grupo, tipo')
         .eq('empresa_id', empresa.id)
-        .eq('descricao_normalizada', descNorm)
-        .maybeSingle()
+        .in('descricao_normalizada', chaves)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+
+      const histData = histRows?.[0] ?? null
 
       if (histData?.classificacao) {
         // Valida contra o plano de contas oficial antes de usar o histórico
