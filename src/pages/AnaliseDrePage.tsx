@@ -120,6 +120,21 @@ const CLASSIFICACAO_TO_GRUPO: Record<string, string> = {
   'Dividendos e Despesas dos Sócios': 'Investimentos',
 }
 
+// ── Conjunto de grupos canônicos do DRE (evita double-counting no fallback) ──
+const GRUPOS_CANONICOS_DRE = new Set([
+  'receitas operacionais',
+  'receitas financeiras',
+  'deduções de receita',
+  'impostos sobre faturamento',
+  'despesas operacionais',
+  'despesas com pessoal',
+  'despesas administrativas',
+  'despesas comerciais e marketing',
+  'despesas com ti',
+  'despesas financeiras',
+  'investimentos',
+])
+
 // ── Helpers: soma por grupo exato (primary) + keywords (fallback) ─────────────
 
 function somaGrupos(
@@ -133,7 +148,7 @@ function somaGrupos(
       if (l.tipo !== 'despesa') return false
       const g = (l.grupo ?? '').toLowerCase().trim()
       if (alvoLower.some(a => g === a)) return true
-      if (keywordsFallback.length > 0) {
+      if (keywordsFallback.length > 0 && !GRUPOS_CANONICOS_DRE.has(g)) {
         const haystack = `${g} ${(l.classificacao ?? '').toLowerCase()}`
         return keywordsFallback.some(k => haystack.includes(k))
       }
@@ -158,7 +173,15 @@ function somaGruposReceita(
 
 // ── KPI calculations (seguindo plano_de_contas_dre.md seções 1–15) ────────────
 
-function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
+function calcularKpis(lancamentos: DreLancamento[]) {
+  // ── Seção 1: Receitas Operacionais (tipo receita, exceto Receitas Financeiras) ─
+  const receitasOp = lancamentos
+    .filter(l => {
+      const g = (l.grupo ?? '').toLowerCase().trim()
+      return l.tipo === 'receita' && g !== 'receitas financeiras'
+    })
+    .reduce((s, l) => s + Number(l.valor), 0)
+
   // ── Seção 2: Deduções de Receita ───────────────────────────────────────────
   const deducoes = somaGrupos(lancamentos, ['Deduções de Receita'], [
     'deduç', 'cancelamento', 'devolução', 'tarifa de cartão', 'tarifa de cartao',
@@ -171,7 +194,7 @@ function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
   ])
 
   // ── Receita Líquida ────────────────────────────────────────────────────────
-  const receitaLiquida = totalReceitas - deducoes - impostosReceita
+  const receitaLiquida = receitasOp - deducoes - impostosReceita
 
   // ── Seção 4: Despesas Operacionais (custos diretos de entrega) ─────────────
   const custosDir = somaGrupos(lancamentos, ['Despesas Operacionais'], [
@@ -235,10 +258,10 @@ function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
   // ── Seção 15: NOPAT / Resultado Operacional ────────────────────────────────
   const nopat = ebit - investimentos
 
-  const base = receitaLiquida > 0 ? receitaLiquida : (totalReceitas > 0 ? totalReceitas : 1)
+  const base = receitasOp > 0 ? receitasOp : 1
 
   return {
-    receitaOperacional: totalReceitas,
+    receitaOperacional: receitasOp,
     receitaLiquida,
     margemContrib,
     ebitda,
@@ -248,7 +271,7 @@ function calcularKpis(lancamentos: DreLancamento[], totalReceitas: number) {
     ebitdaPct:        (ebitda / base) * 100,
     ebitPct:          (ebit / base) * 100,
     nopatPct:         (nopat / base) * 100,
-    semDados:         receitaLiquida === 0 && totalReceitas === 0,
+    semDados:         receitasOp === 0 && receitaLiquida === 0,
   }
 }
 
@@ -529,8 +552,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const resultado = totais.receitas - totais.despesas
 
   const kpis = useMemo(
-    () => calcularKpis(lancamentosFiltrados, totais.receitas),
-    [lancamentosFiltrados, totais.receitas],
+    () => calcularKpis(lancamentosFiltrados),
+    [lancamentosFiltrados],
   )
 
   const lancamentosAgrupados = useMemo(() => {
@@ -692,7 +715,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       const desp = items.filter(l => (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') === 'despesa')
         .reduce((s, l) => s + Number(l.valor), 0)
       const agrupados = calcularAgrupados(items, tipoMap)
-      const k = calcularKpis(items, rec)
+      const k = calcularKpis(items)
       return {
         mes,
         label: formatter.format(new Date(`2000-${mes}-01T00:00:00Z`)),
