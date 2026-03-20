@@ -136,6 +136,20 @@ const normalize = (s: string) =>
 const normalizeAggr = (s: string) =>
   normalize(s).replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim()
 
+/** Chave estável para o histórico: remove tokens puramente numéricos (≥ 4 dígitos)
+ *  e fragmentos de data (dd/mm, dd/mm/aaaa) que variam por transação,
+ *  mas deixa o nome do estabelecimento/operação intacto.
+ *  Exemplos:
+ *    "pix recebido 12345 empresa xyz 10/03/2024" → "pix recebido empresa xyz"
+ *    "ted 67890 fornecedor abc 01-04-2024"       → "ted fornecedor abc" */
+const normalizeKey = (s: string): string =>
+  normalize(s)
+    .replace(/\b\d{2}[/\-]\d{2}[/\-]\d{4}\b/g, '') // datas completas dd/mm/aaaa
+    .replace(/\b\d{2}[/\-]\d{2}\b/g, '')             // datas parciais dd/mm
+    .replace(/\b\d{4,}\b/g, '')                       // tokens puramente numéricos ≥ 4 dígitos
+    .replace(/\s+/g, ' ')
+    .trim()
+
 /** Mapa exaustivo classificação → grupo (espelha o plano_de_contas_dre.md) */
 const CLASSIFICACAO_GRUPO: Record<string, string> = {
   'Receita Dinheiro': 'Receitas Operacionais',
@@ -1140,6 +1154,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         .from('dre_classificacao_historico')
         .select('descricao_normalizada, classificacao, grupo, tipo')
         .eq('empresa_id', empresaId)
+        .order('updated_at', { ascending: false })
         .range(histFrom, histFrom + HIST_PAGE - 1)
       if (histErr) {
         console.error('[Histórico] Erro ao carregar:', histErr)
@@ -1168,6 +1183,22 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       histAll.map(h => [normalize(h.descricao_normalizada), { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
     console.log('[Histórico] Chaves no mapa:', [...historico.keys()])
+
+    // Mapa secundário: chave sem tokens variáveis (números longos, datas) → classificação
+    // Permite reconhecer "PIX 67890 Empresa XYZ 15/04" quando "PIX 12345 Empresa XYZ 10/03" já foi classificado
+    type HistVal = { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }
+    const historicoKey = new Map<string, HistVal>()
+    const historicoEntries: { key: string; val: HistVal }[] = []
+    for (const h of histAll) {
+      const exato    = normalize(h.descricao_normalizada)
+      const stripped = normalizeKey(h.descricao_normalizada)
+      const val: HistVal = { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }
+      // Mapa stripped: só adiciona quando a chave difere da exata (entries já ordenados por updated_at desc)
+      if (stripped && stripped !== exato && !historicoKey.has(stripped)) {
+        historicoKey.set(stripped, val)
+      }
+      historicoEntries.push({ key: exato, val })
+    }
 
     // ── Parse do arquivo ──────────────────────────────────────────────────────
     // Se o arquivo já tem coluna de categoria/classificação (ex: Conta Azul),
@@ -1223,8 +1254,25 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const linha = linhas[i]
 
       // Prioridade 1: histórico de correções manuais desta empresa (tem precedência sobre o arquivo)
+      // 1a — chave exata normalizada
       const chaveHist = normalize(linha.descricao)
-      const hist = historico.get(chaveHist)
+      let hist = historico.get(chaveHist)
+      // 1b — chave stripped (remove datas e números de referência variáveis)
+      if (!hist) {
+        const chaveStripped = normalizeKey(linha.descricao)
+        if (chaveStripped && chaveStripped !== chaveHist) {
+          hist = historicoKey.get(chaveStripped)
+        }
+      }
+      // 1c — similaridade de tokens (usa descricaoParecida que já existe)
+      if (!hist) {
+        for (const entry of historicoEntries) {
+          if (descricaoParecida(linha.descricao, entry.key)) {
+            hist = entry.val
+            break
+          }
+        }
+      }
       console.log(`[Histórico] "${chaveHist}" →`, hist ?? 'NÃO ENCONTRADO')
       if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         // Resolve para nome oficial (com acento correto) se possível
@@ -1506,15 +1554,31 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const historicoMap = new Map<string, HistoricoItem>()
       linhasClass.forEach((linha) => {
         if (!linha.classificacao || linha.classificacao === 'Não Identificado') return
-        const key = `${empresaId}|${normalize(linha.descricao)}`
-        historicoMap.set(key, {
+        const now        = new Date().toISOString()
+        const exato      = normalize(linha.descricao)
+        const keyExato   = `${empresaId}|${exato}`
+        historicoMap.set(keyExato, {
           empresa_id:            empresaId,
-          descricao_normalizada: normalize(linha.descricao),
+          descricao_normalizada: exato,
           classificacao:         linha.classificacao,
           grupo:                 linha.grupo,
           tipo:                  linha.tipo,
-          updated_at:            new Date().toISOString(),
+          updated_at:            now,
         })
+        // Salva também a chave stripped para que próximos uploads com datas/referências
+        // diferentes sejam reconhecidos diretamente (tier 1b) sem scan linear
+        const stripped    = normalizeKey(linha.descricao)
+        const keyStripped = `${empresaId}|__strip__|${stripped}`
+        if (stripped && stripped !== exato && !historicoMap.has(keyStripped)) {
+          historicoMap.set(keyStripped, {
+            empresa_id:            empresaId,
+            descricao_normalizada: stripped,
+            classificacao:         linha.classificacao,
+            grupo:                 linha.grupo,
+            tipo:                  linha.tipo,
+            updated_at:            now,
+          })
+        }
       })
       const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
