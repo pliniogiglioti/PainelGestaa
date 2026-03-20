@@ -787,16 +787,6 @@ const LancamentoRow = memo(function LancamentoRow({
       </td>
       <td className={styles.tdClf} onClick={e => e.stopPropagation()}>
         <div className={styles.clfComFonte}>
-          {(l.fonte === 'historico' || l.fonte === 'arquivo') && (
-            <span
-              className={`${styles.fonteInfoIcon} ${l.fonte === 'historico' ? styles.fonteInfoHistorico : styles.fonteInfoArquivo}`}
-              title={
-                l.fonte === 'historico'
-                  ? 'Você salvou isso anteriormente no histórico'
-                  : 'Esse lançamento tem uma categoria no arquivo'
-              }
-            >ⓘ</span>
-          )}
           <select
           className={`${styles.selectClf} ${l.sugerida ? styles.selectClfSugerida : ''}`}
           value={l.classificacao}
@@ -811,6 +801,16 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
+          {(l.fonte === 'historico' || l.fonte === 'arquivo') && (
+            <span
+              className={`${styles.fonteInfoIcon} ${l.fonte === 'historico' ? styles.fonteInfoHistorico : styles.fonteInfoArquivo}`}
+              title={
+                l.fonte === 'historico'
+                  ? 'Você salvou isso anteriormente no histórico'
+                  : 'Esse lançamento tem uma categoria no arquivo'
+              }
+            >ⓘ</span>
+          )}
         </div>
         {l.sugerida && l.sugestaoIA && l.sugestaoIAValida && (
           <div
