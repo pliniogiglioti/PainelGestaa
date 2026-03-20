@@ -779,26 +779,25 @@ const LancamentoRow = memo(function LancamentoRow({
         />
       </td>
       <td className={styles.tdData}>{l.data}</td>
-      <td className={styles.tdDesc}>
-        {(l.fonte === 'historico' || l.fonte === 'arquivo') && (
-          <span
-            className={`${styles.fonteInfoIcon} ${l.fonte === 'historico' ? styles.fonteInfoHistorico : styles.fonteInfoArquivo}`}
-            title={
-              l.fonte === 'historico'
-                ? 'Você salvou isso anteriormente no histórico'
-                : 'Esse lançamento tem uma categoria no arquivo'
-            }
-          >ⓘ</span>
-        )}
-        <span title={l.descricao}>{l.descricao}</span>
-      </td>
+      <td className={styles.tdDesc} title={l.descricao}>{l.descricao}</td>
       <td>
         <span className={`${styles.tipoPill} ${l.tipo === 'receita' ? styles.pillReceita : styles.pillDespesa}`}>
           {l.tipo === 'receita' ? '↑ Rec' : '↓ Desp'}
         </span>
       </td>
       <td className={styles.tdClf} onClick={e => e.stopPropagation()}>
-        <select
+        <div className={styles.clfComFonte}>
+          {(l.fonte === 'historico' || l.fonte === 'arquivo') && (
+            <span
+              className={`${styles.fonteInfoIcon} ${l.fonte === 'historico' ? styles.fonteInfoHistorico : styles.fonteInfoArquivo}`}
+              title={
+                l.fonte === 'historico'
+                  ? 'Você salvou isso anteriormente no histórico'
+                  : 'Esse lançamento tem uma categoria no arquivo'
+              }
+            >ⓘ</span>
+          )}
+          <select
           className={`${styles.selectClf} ${l.sugerida ? styles.selectClfSugerida : ''}`}
           value={l.classificacao}
           title={l.sugerida ? 'Não identificado — selecione uma classificação para este lançamento.' : l.classificacao}
@@ -812,6 +811,7 @@ const LancamentoRow = memo(function LancamentoRow({
             <option value={l.classificacao}>{l.classificacao}</option>
           )}
         </select>
+        </div>
         {l.sugerida && l.sugestaoIA && l.sugestaoIAValida && (
           <div
             className={styles.badgeSugestaoIA}

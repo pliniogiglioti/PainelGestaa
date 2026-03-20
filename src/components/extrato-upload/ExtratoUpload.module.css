@@ -604,7 +604,18 @@
   cursor: default;
 }
 
-/* ⓘ inline na coluna de descrição — indica fonte da classificação */
+/* Wrapper flex — ⓘ + select de classificação lado a lado */
+.clfComFonte {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.clfComFonte .selectClf {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ⓘ inline na coluna de classificação — indica fonte */
 .fonteInfoIcon {
   display: inline-flex;
   align-items: center;
