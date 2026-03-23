@@ -981,7 +981,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined } : l
       )
     })
-    setSelecionados(prev => new Set([...prev, idx]))
   }, [])
 
   const aplicarClassificacaoParecidos = () => {
