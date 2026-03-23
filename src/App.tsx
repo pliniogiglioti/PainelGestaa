@@ -6,6 +6,8 @@ import RegisterPage from './pages/RegisterPage'
 import DashboardPage from './pages/DashboardPage'
 import AnaliseDrePage from './pages/AnaliseDrePage'
 import EmpresaGatePage from './pages/EmpresaGatePage'
+import AdminSettingsPage from './pages/AdminSettingsPage'
+import AcceptInvitePage from './pages/AcceptInvitePage'
 import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
@@ -28,6 +30,8 @@ function App() {
   const [loading,          setLoading]          = useState(true)
   const [showRegister,     setShowRegister]     = useState(false)
   const [pathname,         setPathname]         = useState(window.location.pathname)
+  const [isInviteFlow,     setIsInviteFlow]     = useState(false)
+  const [inviteEmail,      setInviteEmail]      = useState('')
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -49,15 +53,29 @@ function App() {
   const toggleTheme = () => setTheme(t => t === 'dark' ? 'light' : 'dark')
 
   useEffect(() => {
+    // Detecta fluxo de convite via hash da URL antes da primeira renderização
+    const hash = window.location.hash
+    if (hash.includes('type=invite')) {
+      setIsInviteFlow(true)
+    }
+
     // 1. Restore session that's already persisted in localStorage
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session ? sessionToUser(session) : null)
+      if (session?.user?.email && hash.includes('type=invite')) {
+        setInviteEmail(session.user.email)
+      }
       setLoading(false)
     })
 
     // 2. Keep state in sync whenever auth changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session ? sessionToUser(session) : null)
+      // Detecta quando o usuário chega pelo link de convite
+      if (event === 'SIGNED_IN' && session?.user?.email && window.location.hash.includes('type=invite')) {
+        setIsInviteFlow(true)
+        setInviteEmail(session.user.email)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -109,6 +127,23 @@ function App() {
   }
 
   if (user) {
+    // Fluxo de aceite de convite: usuário logou via link de convite
+    if (isInviteFlow) {
+      return (
+        <ErrorBoundary>
+          <AcceptInvitePage
+            email={inviteEmail || user.email}
+            onSuccess={() => {
+              setIsInviteFlow(false)
+              // Limpa o hash do convite da URL
+              window.history.replaceState({}, '', '/')
+              navigate('/')
+            }}
+          />
+        </ErrorBoundary>
+      )
+    }
+
     if (pathname === '/analise-dre') {
       if (!empresaSelecionada) {
         return (
@@ -130,13 +165,22 @@ function App() {
         </ErrorBoundary>
       )
     }
+
+    if (pathname === '/admin-settings') {
+      return (
+        <ErrorBoundary>
+          <AdminSettingsPage onVoltar={() => navigate('/')} />
+        </ErrorBoundary>
+      )
+    }
+
     // Redirect unknown routes to home
     if (pathname !== '/') {
       navigate('/')
     }
     return (
       <ErrorBoundary>
-        <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} />
+        <DashboardPage user={user} onLogout={handleLogout} theme={theme} onToggleTheme={toggleTheme} onNavigate={navigate} />
       </ErrorBoundary>
     )
   }

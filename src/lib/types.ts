@@ -13,6 +13,7 @@ export interface Database {
           role:       string
           plan:       string
           avatar_url: string | null
+          expires_at: string | null
           created_at: string
           updated_at: string
         }
@@ -23,6 +24,7 @@ export interface Database {
           role?:      string
           plan?:      string
           avatar_url?: string | null
+          expires_at?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -33,7 +35,31 @@ export interface Database {
           role?:      string
           plan?:      string
           avatar_url?: string | null
+          expires_at?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      user_invitations: {
+        Row: {
+          id:         string
+          email:      string
+          expires_at: string | null
+          invited_by: string | null
+          created_at: string
+          used_at:    string | null
+        }
+        Insert: {
+          id?:        string
+          email:      string
+          expires_at?: string | null
+          invited_by?: string | null
+          created_at?: string
+          used_at?:   string | null
+        }
+        Update: {
+          expires_at?: string | null
+          used_at?:    string | null
         }
         Relationships: []
       }
@@ -418,6 +444,7 @@ export type ForumCategory      = Database['public']['Tables']['forum_categories'
 export type ForumTopic         = Database['public']['Tables']['forum_topics']['Row']
 export type ForumReply                  = Database['public']['Tables']['forum_replies']['Row']
 export type DreClassificacaoHistorico  = Database['public']['Tables']['dre_classificacao_historico']['Row']
+export type UserInvitation             = Database['public']['Tables']['user_invitations']['Row']
 
 // ── Extended types with joined data ──────────────────────────────────────
 

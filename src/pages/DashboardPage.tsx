@@ -1,33 +1,20 @@
 import { ReactNode, useEffect, useRef, useState } from 'react'
-import { read, utils } from 'xlsx'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
-import type { App, AppCategory, DreClassificacao, ExemploUpload, ForumTopicWithMeta } from '../lib/types'
+import type { App, AppCategory, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 
 type Page = 'aplicativos' | 'comunidade' | 'perfil'
 
-const OPENAI_MODELS_FALLBACK = [
-  { value: 'gpt-4o-mini',       label: 'GPT-4o Mini (Recomendado)' },
-  { value: 'gpt-4o',            label: 'GPT-4o' },
-  { value: 'gpt-4-turbo',       label: 'GPT-4 Turbo' },
-  { value: 'gpt-4',             label: 'GPT-4' },
-  { value: 'gpt-3.5-turbo',     label: 'GPT-3.5 Turbo' },
-  { value: 'gpt-3.5-turbo-16k', label: 'GPT-3.5 Turbo 16K' },
-  { value: 'o1-mini',           label: 'O1 Mini' },
-  { value: 'o1-preview',        label: 'O1 Preview' },
-  { value: 'o3-mini',           label: 'O3 Mini' },
-]
-
-const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
 
 interface DashboardPageProps {
   user: User
   onLogout: () => void
   theme: 'dark' | 'light'
   onToggleTheme: () => void
+  onNavigate: (path: string) => void
 }
 
 interface AppCategoryRow extends AppCategory {
@@ -196,412 +183,7 @@ function CategoryChip({ label, active, onClick }: { label: string; active: boole
 }
 
 
-// ── Admin Settings Modal ──────────────────────────────────────────────────
 
-/** Lê cabeçalhos normalizados da primeira aba de um arquivo .xlsx/.csv */
-async function lerCabecalhosArquivo(file: File): Promise<string[]> {
-  const buffer = await file.arrayBuffer()
-  const wb = read(buffer, { type: 'array' })
-  if (!wb.SheetNames.length) return []
-  const ws = wb.Sheets[wb.SheetNames[0]]
-  const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
-  if (!rows.length) return []
-  // Encontra a primeira linha com pelo menos 2 células preenchidas
-  const headerIdx = rows.findIndex(r =>
-    (r as unknown[]).filter(c => String(c ?? '').trim()).length >= 2,
-  )
-  if (headerIdx < 0) return []
-  return (rows[headerIdx] as unknown[])
-    .map(h =>
-      String(h ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(),
-    )
-    .filter(Boolean)
-}
-
-/** Exemplos pré-definidos (estáticos em /public/exemplos/) para semeadura inicial */
-const EXEMPLOS_ESTATICOS = [
-  { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx'    },
-  { nome: 'Conta Azul',     arquivo: 'conta-azul.xlsx' },
-]
-
-function AdminSettingsModal({ onClose }: { onClose: () => void }) {
-  const [tab,            setTab]            = useState<'modelo' | 'classificacoes' | 'exemplos'>('modelo')
-  const [openaiModels,   setOpenaiModels]   = useState(OPENAI_MODELS_FALLBACK)
-  const [modelsLoading,  setModelsLoading]  = useState(false)
-  const [modeloAtual,    setModeloAtual]    = useState(DEFAULT_OPENAI_MODEL)
-  const [savingModelo,   setSavingModelo]   = useState(false)
-  const [savedModelo,    setSavedModelo]    = useState(false)
-  const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
-  const [novaClassNome,  setNovaClassNome]  = useState('')
-  const [novaClassTipo,  setNovaClassTipo]  = useState<'receita' | 'despesa'>('despesa')
-  const [addingClass,    setAddingClass]    = useState(false)
-
-  // ── Exemplos de upload ─────────────────────────────────────────────────────
-  const [exemplos,        setExemplos]        = useState<ExemploUpload[]>([])
-  const [exemplosLoading, setExemplosLoading] = useState(false)
-  const [novoExNome,      setNovoExNome]      = useState('')
-  const [novoExArquivo,   setNovoExArquivo]   = useState('')
-  const [novoExFile,      setNovoExFile]      = useState<File | null>(null)
-  const [addingEx,        setAddingEx]        = useState(false)
-  const [exErro,          setExErro]          = useState('')
-  const exFileRef = useRef<HTMLInputElement>(null)
-
-  const fetchClassificacoes = async () => {
-    const { data } = await supabase
-      .from('dre_classificacoes')
-      .select('*')
-      .order('tipo')
-      .order('nome')
-    setClassificacoes(data ?? [])
-  }
-
-  const fetchExemplos = async () => {
-    setExemplosLoading(true)
-    const { data } = await supabase
-      .from('exemplos_upload')
-      .select('*')
-      .order('created_at')
-    const lista = data ?? []
-
-    // Se o banco está vazio, semeia os exemplos estáticos automaticamente
-    if (lista.length === 0) {
-      for (const ex of EXEMPLOS_ESTATICOS) {
-        try {
-          const res = await fetch(`/exemplos/${ex.arquivo}`)
-          if (!res.ok) continue
-          const buffer = await res.arrayBuffer()
-          const wb = read(buffer, { type: 'array' })
-          if (!wb.SheetNames.length) continue
-          const ws = wb.Sheets[wb.SheetNames[0]]
-          const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
-          const headerIdx = rows.findIndex(r =>
-            (r as unknown[]).filter(c => String(c ?? '').trim()).length >= 2,
-          )
-          if (headerIdx < 0) continue
-          const cabecalhos = (rows[headerIdx] as unknown[])
-            .map(h =>
-              String(h ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim(),
-            )
-            .filter(Boolean)
-          await supabase.from('exemplos_upload').insert({
-            nome: ex.nome,
-            arquivo: ex.arquivo,
-            cabecalhos,
-          })
-        } catch { /* ignora erros de seed */ }
-      }
-      const { data: seeded } = await supabase
-        .from('exemplos_upload').select('*').order('created_at')
-      setExemplos(seeded ?? [])
-    } else {
-      setExemplos(lista)
-    }
-    setExemplosLoading(false)
-  }
-
-  const adicionarExemplo = async () => {
-    setExErro('')
-    if (!novoExNome.trim()) { setExErro('Informe um nome para o modelo.'); return }
-    if (!novoExFile)        { setExErro('Selecione um arquivo .xlsx ou .csv.'); return }
-
-    setAddingEx(true)
-    try {
-      const cabecalhos = await lerCabecalhosArquivo(novoExFile)
-      if (cabecalhos.length === 0) {
-        setExErro('Não foi possível ler os cabeçalhos do arquivo.')
-        setAddingEx(false)
-        return
-      }
-      const arquivo = novoExArquivo.trim() || null
-      const { error } = await supabase.from('exemplos_upload').insert({
-        nome: novoExNome.trim(),
-        arquivo,
-        cabecalhos,
-      })
-      if (error) { setExErro(error.message); setAddingEx(false); return }
-      setNovoExNome('')
-      setNovoExArquivo('')
-      setNovoExFile(null)
-      if (exFileRef.current) exFileRef.current.value = ''
-      await fetchExemplos()
-    } catch (e) {
-      setExErro(e instanceof Error ? e.message : 'Erro ao adicionar exemplo.')
-    }
-    setAddingEx(false)
-  }
-
-  const removerExemplo = async (id: string) => {
-    await supabase.from('exemplos_upload').delete().eq('id', id)
-    setExemplos(p => p.filter(e => e.id !== id))
-  }
-
-  useEffect(() => {
-    const fetchOpenAIModels = async () => {
-      setModelsLoading(true)
-      const { data, error } = await supabase.functions.invoke('openai-models', { method: 'GET' })
-      if (!error && Array.isArray(data?.models) && data.models.length > 0) {
-        setOpenaiModels(data.models.map((model: string) => ({ value: model, label: model })))
-      }
-      setModelsLoading(false)
-    }
-
-    fetchOpenAIModels()
-    fetchClassificacoes()
-    fetchExemplos()
-  }, [])
-
-  useEffect(() => {
-    supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single()
-      .then(({ data }) => {
-        if (!data) return
-        const existeNoCatalogo = openaiModels.some(model => model.value === data.valor)
-        if (existeNoCatalogo) {
-          setModeloAtual(data.valor)
-          return
-        }
-
-        if (data.valor) {
-          setOpenaiModels(p => [...p, { value: data.valor, label: `${data.valor} (configurado)` }])
-          setModeloAtual(data.valor)
-          return
-        }
-
-        setModeloAtual(DEFAULT_OPENAI_MODEL)
-      })
-  }, [openaiModels])
-
-  const salvarModelo = async () => {
-    setSavingModelo(true)
-    await supabase.from('configuracoes').upsert({ chave: 'modelo_openai', valor: modeloAtual })
-    setSavingModelo(false)
-    setSavedModelo(true)
-    setTimeout(() => setSavedModelo(false), 2000)
-  }
-
-  const adicionarClassificacao = async () => {
-    if (!novaClassNome.trim()) return
-    setAddingClass(true)
-    await supabase.from('dre_classificacoes').insert({ nome: novaClassNome.trim(), tipo: novaClassTipo, ativo: true })
-    setNovaClassNome('')
-    await fetchClassificacoes()
-    setAddingClass(false)
-  }
-
-  const removerClassificacao = async (id: string) => {
-    await supabase.from('dre_classificacoes').delete().eq('id', id)
-    setClassificacoes(p => p.filter(c => c.id !== id))
-  }
-
-  return (
-    <div className={styles.modalOverlay} onClick={onClose}>
-      <div className={`${styles.modal} ${styles.modalLg}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Configurações Admin</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
-        </div>
-
-        <div className={styles.settingsTabs}>
-          <button
-            className={`${styles.settingsTab} ${tab === 'modelo' ? styles.settingsTabActive : ''}`}
-            onClick={() => setTab('modelo')}
-          >
-            Modelo IA
-          </button>
-          <button
-            className={`${styles.settingsTab} ${tab === 'classificacoes' ? styles.settingsTabActive : ''}`}
-            onClick={() => setTab('classificacoes')}
-          >
-            Classificações DRE
-          </button>
-          <button
-            className={`${styles.settingsTab} ${tab === 'exemplos' ? styles.settingsTabActive : ''}`}
-            onClick={() => setTab('exemplos')}
-          >
-            Exemplos de Upload
-          </button>
-        </div>
-
-        {/* ── Tab: Modelo IA ── */}
-        {tab === 'modelo' && (
-          <div className={styles.settingsBody}>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Modelo OpenAI</label>
-              <select
-                className={styles.modalInput}
-                value={modeloAtual}
-                onChange={e => setModeloAtual(e.target.value)}
-              >
-                {openaiModels.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
-              <p className={styles.settingsHint}>
-                Modelo usado para sugerir a classificação automática nos lançamentos do DRE.
-              </p>
-              {modelsLoading && (
-                <p className={styles.settingsHint}>Atualizando catálogo de modelos disponíveis...</p>
-              )}
-            </div>
-            <div className={styles.modalActions}>
-              <button
-                className={styles.modalSubmit}
-                onClick={salvarModelo}
-                disabled={savingModelo}
-              >
-                {savingModelo ? 'Salvando...' : savedModelo ? 'Salvo ✓' : 'Salvar'}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Exemplos de Upload ── */}
-        {tab === 'exemplos' && (
-          <div className={styles.settingsBody}>
-            <p className={styles.settingsHint}>
-              Cada modelo abaixo define quais colunas são aceitas no upload de extratos.
-              O sistema identifica o arquivo pelo cabeçalho — não pelo nome do arquivo.
-            </p>
-
-            {exemplosLoading && <p className={styles.settingsHint}>Carregando...</p>}
-
-            <div className={styles.classListWrap}>
-              {!exemplosLoading && exemplos.length === 0 && (
-                <p className={styles.settingsHint}>Nenhum modelo cadastrado ainda.</p>
-              )}
-              {exemplos.map(ex => (
-                <div key={ex.id} className={styles.classItem}>
-                  <div className={styles.exemploInfo}>
-                    <span className={styles.classNome}>{ex.nome}</span>
-                    <span className={styles.exemploColunas}>
-                      {ex.cabecalhos.join(' · ')}
-                    </span>
-                  </div>
-                  {ex.arquivo && (
-                    <a
-                      href={`/exemplos/${ex.arquivo}`}
-                      download
-                      className={styles.exemploDownloadLink}
-                      title="Baixar arquivo de exemplo"
-                    >
-                      ↓
-                    </a>
-                  )}
-                  <button
-                    className={styles.classRemoveBtn}
-                    onClick={() => removerExemplo(ex.id)}
-                    title="Remover modelo"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className={styles.classAddForm}>
-              <p className={styles.modalLabel}>Novo modelo</p>
-              <div className={styles.classAddRow}>
-                <input
-                  className={styles.modalInput}
-                  placeholder="Nome do modelo (ex: Conta Azul)"
-                  value={novoExNome}
-                  onChange={e => setNovoExNome(e.target.value)}
-                />
-              </div>
-              <div className={styles.classAddRow} style={{ marginTop: 8 }}>
-                <input
-                  className={styles.modalInput}
-                  placeholder="Nome do arquivo estático (ex: conta-azul.xlsx) — opcional"
-                  value={novoExArquivo}
-                  onChange={e => setNovoExArquivo(e.target.value)}
-                />
-              </div>
-              <div className={styles.classAddRow} style={{ marginTop: 8 }}>
-                <input
-                  ref={exFileRef}
-                  type="file"
-                  accept=".xlsx,.xls,.csv"
-                  className={styles.modalInput}
-                  style={{ cursor: 'pointer' }}
-                  onChange={e => setNovoExFile(e.target.files?.[0] ?? null)}
-                />
-                <button
-                  className={styles.modalSubmit}
-                  onClick={adicionarExemplo}
-                  disabled={addingEx || !novoExNome.trim() || !novoExFile}
-                >
-                  {addingEx ? '...' : '+ Adicionar'}
-                </button>
-              </div>
-              {exErro && <p className={styles.settingsErro}>{exErro}</p>}
-            </div>
-          </div>
-        )}
-
-        {/* ── Tab: Classificações DRE ── */}
-        {tab === 'classificacoes' && (
-          <div className={styles.settingsBody}>
-            <div className={styles.classListWrap}>
-              {classificacoes.length === 0 && (
-                <p className={styles.settingsHint}>Nenhuma classificação cadastrada ainda.</p>
-              )}
-              {classificacoes.map(c => (
-                <div key={c.id} className={styles.classItem}>
-                  <span className={`${styles.classTipoBadge} ${c.tipo === 'receita' ? styles.classTipoReceita : styles.classTipoDespesa}`}>
-                    {c.tipo}
-                  </span>
-                  <span className={styles.classNome}>{c.nome}</span>
-                  <button
-                    className={styles.classRemoveBtn}
-                    onClick={() => removerClassificacao(c.id)}
-                    title="Remover"
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            <div className={styles.classAddForm}>
-              <p className={styles.modalLabel}>Nova classificação</p>
-              <div className={styles.linkTypeToggle}>
-                <button
-                  type="button"
-                  className={`${styles.linkTypeBtn} ${novaClassTipo === 'receita' ? styles.linkTypeBtnActive : ''}`}
-                  onClick={() => setNovaClassTipo('receita')}
-                >
-                  Receita
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.linkTypeBtn} ${novaClassTipo === 'despesa' ? styles.linkTypeBtnActive : ''}`}
-                  onClick={() => setNovaClassTipo('despesa')}
-                >
-                  Despesa
-                </button>
-              </div>
-              <div className={styles.classAddRow}>
-                <input
-                  className={styles.modalInput}
-                  placeholder="Ex: Receita sobre Serviço"
-                  value={novaClassNome}
-                  onChange={e => setNovaClassNome(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && adicionarClassificacao()}
-                />
-                <button
-                  className={styles.modalSubmit}
-                  onClick={adicionarClassificacao}
-                  disabled={addingClass || !novaClassNome.trim()}
-                >
-                  {addingClass ? '...' : '+ Adicionar'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ── Modals ────────────────────────────────────────────────────────────────
 
@@ -1007,7 +589,7 @@ function AppCard({
 
 // ── Main Component ────────────────────────────────────────────────────────
 
-export default function DashboardPage({ user, onLogout, theme, onToggleTheme }: DashboardPageProps) {
+export default function DashboardPage({ user, onLogout, theme, onToggleTheme, onNavigate }: DashboardPageProps) {
   const [activePage, setActivePage]   = useState<Page>('aplicativos')
   const [activeCategory, setActiveCategory] = useState('todos')
   const [forumFilter, setForumFilter] = useState('todos')
@@ -1025,7 +607,6 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme }: 
   const [showCreateApp,   setShowCreateApp]   = useState(false)
   const [showCreateCat,   setShowCreateCat]   = useState(false)
   const [showCreateTopic, setShowCreateTopic] = useState(false)
-  const [showSettings,    setShowSettings]    = useState(false)
   const [editingApp,      setEditingApp]      = useState<App | null>(null)
   const appsListRef = useRef<HTMLDivElement | null>(null)
   const categorySectionRefs = useRef<Record<string, HTMLElement | null>>({})
@@ -1153,7 +734,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme }: 
           activePage={activePage}
           onSelect={page => { setActivePage(page); setOpenTopicId(null) }}
           isAdmin={isAdmin}
-          onSettings={() => setShowSettings(true)}
+          onSettings={() => onNavigate('/admin-settings')}
           onLogout={onLogout}
           theme={theme}
           onToggleTheme={onToggleTheme}
@@ -1172,7 +753,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme }: 
         activePage={activePage}
         onSelect={setActivePage}
         isAdmin={isAdmin}
-        onSettings={() => setShowSettings(true)}
+        onSettings={() => onNavigate('/admin-settings')}
         onLogout={onLogout}
         theme={theme}
         onToggleTheme={onToggleTheme}
@@ -1348,7 +929,6 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme }: 
       )}
       {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
       {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
-      {showSettings   && <AdminSettingsModal  onClose={() => setShowSettings(false)} />}
     </div>
   )
 }
