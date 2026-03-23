@@ -106,7 +106,6 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
   const [isSystemAdmin, setIsSystemAdmin] = useState(false)
   const [empresaRoles, setEmpresaRoles]   = useState<EmpresaRoleMap>({})
-  const [empresaDonos, setEmpresaDonos]   = useState<Record<string, string>>({})
 
   useEffect(() => {
     carregarEmpresas()
@@ -158,23 +157,7 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
       }
     }
 
-    const ownerIds = [...new Set(empresasData.map(emp => emp.created_by).filter(Boolean))]
-    let donosMap: Record<string, string> = {}
-
-    if (ownerIds.length > 0) {
-      const { data: donos } = await supabase
-        .from('profiles')
-        .select('id, name, email')
-        .in('id', ownerIds)
-
-      donosMap = Object.fromEntries((donos ?? []).map(dono => [
-        dono.id,
-        dono.name?.trim() || dono.email?.trim() || 'Sem dono identificado',
-      ]))
-    }
-
     setEmpresaRoles(rolesMap)
-    setEmpresaDonos(donosMap)
     setEmpresas(empresasData)
     setLoading(false)
   }
@@ -234,7 +217,11 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
         return
       }
 
-      await carregarEmpresas()
+      setEmpresas(prev => prev.map(emp => (
+        emp.id === empresaEmEdicao.id
+          ? { ...emp, ...payload }
+          : emp
+      )))
       resetModalState()
       return
     }
@@ -319,7 +306,6 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
                 <span className={styles.cardLabel}>EMPRESA</span>
                 <div className={styles.cardInitiais}>{inicialEmpresa(emp.nome)}</div>
                 <h3 className={styles.cardNome}>{emp.nome}</h3>
-                <p className={styles.cardDono}>Dono: {empresaDonos[emp.created_by] ?? 'Sem dono identificado'}</p>
                 {emp.cnpj && <p className={styles.cardCnpj}>{emp.cnpj}</p>}
                 <div className={`${styles.cardExpandable} ${hoveredId === emp.id ? styles.cardExpandableOpen : ''}`}>
                   <button
