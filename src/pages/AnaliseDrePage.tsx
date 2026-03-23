@@ -365,8 +365,6 @@ function AiSpinner() {
   )
 }
 
-type PerfilUsuario = { id: string; name: string | null; email: string | null }
-
 type GrupoData = {
   nome: string
   total: number
@@ -403,11 +401,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [showAssistente,   setShowAssistente]   = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
-  const [usuarios,         setUsuarios]         = useState<PerfilUsuario[]>([])
-  const [usuarioFiltro,    setUsuarioFiltro]    = useState<string>('')
-  const [buscaUsuario,     setBuscaUsuario]     = useState('')
   const [buscaLancamento,  setBuscaLancamento]  = useState('')
-  const [showUserDropdown, setShowUserDropdown] = useState(false)
   const [showMesesListbox, setShowMesesListbox] = useState(false)
   // Accordion lançamentos
   const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())
@@ -416,6 +410,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
   const mesesListboxRef = useRef<HTMLDivElement | null>(null)
+  const usuarioFiltro = ''
 
  const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
   const { data: authData } = await supabase.auth.getUser()
@@ -495,12 +490,6 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             }
           }
 
-          if (admin) {
-            supabase.from('profiles')
-              .select('id, name, email')
-              .order('name', { ascending: true })
-              .then(({ data: users }) => setUsuarios(users ?? []))
-          }
           // Pass admin explicitly to avoid stale closure (React state not yet committed)
           fetchLancamentos(undefined, admin)
         })
@@ -1248,61 +1237,6 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             <span className={styles.stepIndicator}>{lancamentosFiltrados.length} registros</span>
           </div>
           <div className={styles.filtersRow}>
-            {/* Admin: busca de usuário */}
-            {isAdmin && (
-              <div className={styles.userSearchWrap}>
-                <label className={styles.filterLabel}>
-                  Buscar usuário
-                  <input
-                    type="text"
-                    className={styles.userSearchInput}
-                    placeholder="Nome ou e-mail..."
-                    value={buscaUsuario}
-                    onChange={e => { setBuscaUsuario(e.target.value); setShowUserDropdown(true) }}
-                    onFocus={() => setShowUserDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowUserDropdown(false), 150)}
-                  />
-                </label>
-                {showUserDropdown && (
-                  <div className={styles.userDropdown}>
-                    <button
-                      className={`${styles.userDropdownItem} ${!usuarioFiltro ? styles.userDropdownItemActive : ''}`}
-                      onMouseDown={() => {
-                        setUsuarioFiltro(''); setBuscaUsuario('')
-                        setShowUserDropdown(false); fetchLancamentos(undefined)
-                      }}
-                    >
-                      Meus lançamentos
-                    </button>
-                    {usuarios
-                      .filter(u =>
-                        !buscaUsuario ||
-                        (u.name ?? '').toLowerCase().includes(buscaUsuario.toLowerCase()) ||
-                        (u.email ?? '').toLowerCase().includes(buscaUsuario.toLowerCase())
-                      )
-                      .slice(0, 8)
-                      .map(u => (
-                        <button
-                          key={u.id}
-                          className={`${styles.userDropdownItem} ${usuarioFiltro === u.id ? styles.userDropdownItemActive : ''}`}
-                          onMouseDown={() => {
-                            setUsuarioFiltro(u.id)
-                            setBuscaUsuario(u.name ?? u.email ?? '')
-                            setShowUserDropdown(false)
-                            setAnoFiltro('todos'); setMesesFiltro([])
-                            fetchLancamentos(u.id)
-                          }}
-                        >
-                          <span className={styles.userDropdownName}>{u.name ?? u.email}</span>
-                          {u.name && u.email && <span className={styles.userDropdownEmail}>{u.email}</span>}
-                        </button>
-                      ))
-                    }
-                  </div>
-                )}
-              </div>
-            )}
-
             <label className={styles.filterLabel}>
               Buscar Lançamento
               <input

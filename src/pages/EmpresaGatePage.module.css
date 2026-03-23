@@ -194,6 +194,12 @@
   margin: 0;
 }
 
+.cardDono {
+  font-size: 10px;
+  color: rgba(255,255,255,0.76);
+  margin: 0;
+}
+
 .cardCnpj {
   font-size: 10px;
   color: var(--text-muted);
