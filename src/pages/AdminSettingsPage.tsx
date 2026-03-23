@@ -54,10 +54,6 @@ function formatDate(iso: string | null | undefined) {
 
 type Tab = 'modelo' | 'classificacoes' | 'exemplos' | 'usuarios'
 
-interface ProfileRow extends Profile {
-  expires_at?: string | null
-}
-
 // ── Componente principal ──────────────────────────────────────────────────
 
 interface AdminSettingsPageProps {
@@ -91,7 +87,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const exFileRef = useRef<HTMLInputElement>(null)
 
   // ── Tab: Usuarios ─────────────────────────────────────────────────────
-  const [usuarios,        setUsuarios]        = useState<ProfileRow[]>([])
+  const [usuarios,        setUsuarios]        = useState<Profile[]>([])
   const [usuariosLoading, setUsuariosLoading] = useState(false)
   const [showAddUser,     setShowAddUser]     = useState(false)
   const [novoEmail,       setNovoEmail]       = useState('')
@@ -242,7 +238,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       .from('profiles')
       .select('id, name, email, role, expires_at, created_at')
       .order('created_at', { ascending: false })
-    setUsuarios((data ?? []) as ProfileRow[])
+    setUsuarios((data ?? []) as Profile[])
     setUsuariosLoading(false)
   }
 
