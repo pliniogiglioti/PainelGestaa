@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Empresa, EmpresaMembro } from '../lib/types'
+import type { Empresa, EmpresaMembro, Profile } from '../lib/types'
 import styles from './EmpresaGatePage.module.css'
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
+type EmpresaCard = Empresa & { donoNome: string | null }
 
 type EmpresaFormModalProps = {
   modo: 'criar' | 'editar'
@@ -95,7 +96,7 @@ function EmpresaFormModal({
 }
 
 export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
-  const [empresas, setEmpresas]           = useState<Empresa[]>([])
+  const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
   const [empresaEmEdicao, setEmpresaEmEdicao] = useState<Empresa | null>(null)
@@ -157,8 +158,28 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
       }
     }
 
+    const ownerIds = [...new Set(empresasData.map(empresa => empresa.created_by).filter(Boolean))]
+    let ownerMap: Record<string, string | null> = {}
+
+    if (ownerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', ownerIds)
+
+      ownerMap = Object.fromEntries(
+        ((profiles ?? []) as Pick<Profile, 'id' | 'name' | 'email'>[]).map(profile => [
+          profile.id,
+          profile.name?.trim() || profile.email?.trim() || null,
+        ]),
+      )
+    }
+
     setEmpresaRoles(rolesMap)
-    setEmpresas(empresasData)
+    setEmpresas(empresasData.map(empresa => ({
+      ...empresa,
+      donoNome: ownerMap[empresa.created_by] ?? null,
+    })))
     setLoading(false)
   }
 
@@ -179,7 +200,7 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     setErro('')
   }
 
-  function abrirModalEdicao(empresa: Empresa) {
+  function abrirModalEdicao(empresa: EmpresaCard) {
     setModalModo('editar')
     setEmpresaEmEdicao(empresa)
     setNome(empresa.nome)
@@ -306,6 +327,9 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
                 <span className={styles.cardLabel}>EMPRESA</span>
                 <div className={styles.cardInitiais}>{inicialEmpresa(emp.nome)}</div>
                 <h3 className={styles.cardNome}>{emp.nome}</h3>
+                <p className={styles.cardDono}>
+                  Empresa de: {emp.donoNome ?? 'Usuário'}
+                </p>
                 {emp.cnpj && <p className={styles.cardCnpj}>{emp.cnpj}</p>}
                 <div className={`${styles.cardExpandable} ${hoveredId === emp.id ? styles.cardExpandableOpen : ''}`}>
                   <button
