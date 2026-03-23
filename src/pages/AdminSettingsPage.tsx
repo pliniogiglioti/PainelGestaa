@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
@@ -50,6 +50,11 @@ function formatDate(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString('pt-BR')
 }
 
+function toDateInputValue(iso: string | null | undefined) {
+  if (!iso) return ''
+  return new Date(iso).toISOString().slice(0, 10)
+}
+
 // ── Tipos locais ──────────────────────────────────────────────────────────
 
 type Tab = 'modelo' | 'classificacoes' | 'exemplos' | 'usuarios'
@@ -95,6 +100,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [addingUser,      setAddingUser]      = useState(false)
   const [addUserErro,     setAddUserErro]     = useState('')
   const [addUserOk,       setAddUserOk]       = useState('')
+  const [savingUserId,    setSavingUserId]    = useState<string | null>(null)
+  const [expiresDrafts,   setExpiresDrafts]   = useState<Record<string, string>>({})
+  const [savingExpiryId,  setSavingExpiryId]  = useState<string | null>(null)
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -236,10 +244,66 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setUsuariosLoading(true)
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, expires_at, created_at')
+      .select('id, name, email, role, ativo, expires_at, created_at')
       .order('created_at', { ascending: false })
     setUsuarios((data ?? []) as Profile[])
     setUsuariosLoading(false)
+  }
+
+  useEffect(() => {
+    setExpiresDrafts(Object.fromEntries(usuarios.map(usuario => [usuario.id, toDateInputValue(usuario.expires_at)])))
+  }, [usuarios])
+
+  const usuariosOrdenados = useMemo(
+    () => [...usuarios].sort((a, b) => {
+      if (a.role === b.role) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      return a.role === 'admin' ? -1 : 1
+    }),
+    [usuarios],
+  )
+
+  const alternarStatusUsuario = async (usuario: Profile) => {
+    if (usuario.role !== 'user') return
+
+    const proximoStatus = !(usuario.ativo ?? true)
+    setSavingUserId(usuario.id)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ ativo: proximoStatus })
+      .eq('id', usuario.id)
+
+    if (!error) {
+      setUsuarios(atual => atual.map(item => (
+        item.id === usuario.id ? { ...item, ativo: proximoStatus } : item
+      )))
+    }
+
+    setSavingUserId(null)
+  }
+
+
+  const salvarExpiracaoUsuario = async (usuario: Profile) => {
+    if (usuario.role !== 'user') return
+
+    const expires_at = expiresDrafts[usuario.id]
+      ? new Date(`${expiresDrafts[usuario.id]}T00:00:00.000Z`).toISOString()
+      : null
+
+    setSavingExpiryId(usuario.id)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ expires_at })
+      .eq('id', usuario.id)
+
+    if (!error) {
+      setUsuarios(atual => atual.map(item => (
+        item.id === usuario.id ? { ...item, expires_at } : item
+      )))
+    }
+
+    setSavingExpiryId(null)
   }
 
   const enviarConvite = async () => {
@@ -550,6 +614,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       <th className={styles.th}>Nome</th>
                       <th className={styles.th}>E-mail</th>
                       <th className={styles.th}>Função</th>
+                      <th className={styles.th}>Status</th>
                       <th className={styles.th}>Expiração</th>
                       <th className={styles.th}>Desde</th>
                     </tr>
@@ -557,12 +622,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                   <tbody>
                     {usuarios.length === 0 && (
                       <tr>
-                        <td className={styles.td} colSpan={5} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td className={styles.td} colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           Nenhum usuário encontrado.
                         </td>
                       </tr>
                     )}
-                    {usuarios.map(u => (
+                    {usuariosOrdenados.map(u => (
                       <tr key={u.id} className={styles.tr}>
                         <td className={styles.td}>{u.name ?? '—'}</td>
                         <td className={styles.td}>{u.email ?? '—'}</td>
@@ -571,7 +636,49 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                             {u.role}
                           </span>
                         </td>
-                        <td className={styles.td}>{formatDate(u.expires_at)}</td>
+                        <td className={styles.td}>
+                          {u.role === 'user' ? (
+                            <button
+                              type="button"
+                              className={`${styles.switch} ${(u.ativo ?? true) ? styles.switchActive : ''}`}
+                              onClick={() => alternarStatusUsuario(u)}
+                              disabled={savingUserId === u.id}
+                              aria-pressed={u.ativo ?? true}
+                              aria-label={`${(u.ativo ?? true) ? 'Desativar' : 'Ativar'} usuário ${u.email ?? u.name ?? ''}`.trim()}
+                              title={(u.ativo ?? true) ? 'Clique para desativar o usuário' : 'Clique para ativar o usuário'}
+                            >
+                              <span className={styles.switchTrack}>
+                                <span className={styles.switchThumb} />
+                              </span>
+                              <span className={styles.switchLabel}>{(u.ativo ?? true) ? 'Ativo' : 'Inativo'}</span>
+                            </button>
+                          ) : (
+                            <span className={styles.statusMuted}>Sempre ativo</span>
+                          )}
+                        </td>
+                        <td className={styles.td}>
+                          {u.role === 'user' ? (
+                            <div className={styles.expiryEditor}>
+                              <input
+                                type="date"
+                                className={`${styles.input} ${styles.expiryInput}`}
+                                value={expiresDrafts[u.id] ?? ''}
+                                onChange={e => setExpiresDrafts(atual => ({ ...atual, [u.id]: e.target.value }))}
+                                disabled={savingExpiryId === u.id}
+                              />
+                              <button
+                                type="button"
+                                className={styles.btnSecondary}
+                                onClick={() => salvarExpiracaoUsuario(u)}
+                                disabled={savingExpiryId === u.id}
+                              >
+                                {savingExpiryId === u.id ? 'Salvando...' : 'Salvar'}
+                              </button>
+                            </div>
+                          ) : (
+                            formatDate(u.expires_at)
+                          )}
+                        </td>
                         <td className={styles.td}>{formatDate(u.created_at)}</td>
                       </tr>
                     ))}

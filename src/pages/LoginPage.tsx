@@ -18,12 +18,27 @@ export default function LoginPage({ onRegister }: LoginPageProps) {
     setError('')
     setLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
       setError(error.message === 'Invalid login credentials'
         ? 'E-mail ou senha incorretos.'
         : error.message)
+      setLoading(false)
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, ativo')
+      .eq('id', data.user.id)
+      .single()
+
+    if (profile?.role === 'user' && profile.ativo === false) {
+      await supabase.auth.signOut()
+      setError('Seu acesso está desativado. Entre em contato com o administrador.')
+      setLoading(false)
+      return
     }
     // On success, App.tsx onAuthStateChange fires and switches to Dashboard automatically
 
