@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
@@ -406,13 +406,16 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [usuarios,         setUsuarios]         = useState<PerfilUsuario[]>([])
   const [usuarioFiltro,    setUsuarioFiltro]    = useState<string>('')
   const [buscaUsuario,     setBuscaUsuario]     = useState('')
+  const [buscaLancamento,  setBuscaLancamento]  = useState('')
   const [showUserDropdown, setShowUserDropdown] = useState(false)
+  const [showMesesListbox, setShowMesesListbox] = useState(false)
   // Accordion lançamentos
   const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())
   const [expandedClfs,     setExpandedClfs]     = useState<Set<string>>(new Set())
   // Excluir período
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
+  const mesesListboxRef = useRef<HTMLDivElement | null>(null)
 
  const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
   const { data: authData } = await supabase.auth.getUser()
@@ -545,6 +548,27 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       prev.includes(mes) ? prev.filter(m => m !== mes) : [...prev, mes].sort()
     )
 
+  const mesesFiltroLabel = useMemo(() => {
+    if (mesesFiltro.length === 0) return 'Todos os meses'
+    const selecionados = mesesOptions.filter(opt => mesesFiltro.includes(opt.value))
+    if (selecionados.length === 0) return 'Todos os meses'
+    if (selecionados.length <= 2) return selecionados.map(opt => opt.label).join(', ')
+    return `${selecionados.length} meses selecionados`
+  }, [mesesFiltro, mesesOptions])
+
+  useEffect(() => {
+    if (!showMesesListbox) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!mesesListboxRef.current?.contains(event.target as Node)) {
+        setShowMesesListbox(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showMesesListbox])
+
   const lancamentosFiltrados = useMemo(() => {
     return lancamentos.filter(item => {
       const tipoItem = item.tipo
@@ -554,9 +578,26 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       const src = item.data_lancamento ?? item.created_at
       if (anoFiltro !== 'todos' && (!src || src.slice(0, 4) !== anoFiltro)) return false
       if (mesesFiltro.length > 0 && (!src || !mesesFiltro.includes(src.slice(5, 7)))) return false
+
+      if (buscaLancamento.trim()) {
+        const termo = buscaLancamento.trim().toLowerCase()
+        const conteudo = [
+          item.descricao,
+          item.classificacao,
+          item.grupo,
+          tipoItem,
+          src,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        if (!conteudo.includes(termo)) return false
+      }
+
       return true
     })
-  }, [lancamentos, anoFiltro, mesesFiltro, tipoFiltro, tipoMap])
+  }, [lancamentos, anoFiltro, buscaLancamento, mesesFiltro, tipoFiltro, tipoMap])
 
   const totais = useMemo(() =>
     lancamentosFiltrados.reduce((acc, item) => {
@@ -1263,6 +1304,17 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             )}
 
             <label className={styles.filterLabel}>
+              Buscar Lançamento
+              <input
+                type="text"
+                className={styles.filterTextInput}
+                placeholder="Descrição, grupo ou classificação..."
+                value={buscaLancamento}
+                onChange={e => setBuscaLancamento(e.target.value)}
+              />
+            </label>
+
+            <label className={styles.filterLabel}>
               Ano
               <select
                 value={anoFiltro}
@@ -1276,20 +1328,53 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
             <div className={styles.filterLabel}>
               <span>Meses</span>
-              <div className={styles.mesFiltroChips}>
-                {mesesOptions.map(opt => (
-                  <button
-                    key={opt.value}
-                    className={`${styles.mesChip} ${mesesFiltro.includes(opt.value) ? styles.mesChipSelected : ''}`}
-                    onClick={() => toggleMes(opt.value)}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-                {mesesFiltro.length > 0 && (
-                  <button className={styles.mesChipClear} onClick={() => setMesesFiltro([])}>
-                    ✕ limpar
-                  </button>
+              <div className={styles.listboxWrap} ref={mesesListboxRef}>
+                <button
+                  type="button"
+                  className={`${styles.listboxTrigger} ${showMesesListbox ? styles.listboxTriggerOpen : ''}`}
+                  onClick={() => setShowMesesListbox(prev => !prev)}
+                  aria-haspopup="listbox"
+                  aria-expanded={showMesesListbox}
+                >
+                  <span>{mesesFiltroLabel}</span>
+                  <span className={styles.listboxChevron}>{showMesesListbox ? '▴' : '▾'}</span>
+                </button>
+
+                {showMesesListbox && (
+                  <div className={styles.listboxDropdown} role="listbox" aria-multiselectable="true">
+                    {mesesOptions.length === 0 ? (
+                      <div className={styles.listboxEmpty}>Nenhum mês disponível</div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className={styles.listboxAction}
+                          onClick={() => setMesesFiltro([])}
+                          disabled={mesesFiltro.length === 0}
+                        >
+                          Limpar seleção
+                        </button>
+                        <div className={styles.listboxOptions}>
+                          {mesesOptions.map(opt => {
+                            const selected = mesesFiltro.includes(opt.value)
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                role="option"
+                                aria-selected={selected}
+                                className={`${styles.listboxOption} ${selected ? styles.listboxOptionSelected : ''}`}
+                                onClick={() => toggleMes(opt.value)}
+                              >
+                                <span className={styles.listboxCheck}>{selected ? '✓' : ''}</span>
+                                <span>{opt.label}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
