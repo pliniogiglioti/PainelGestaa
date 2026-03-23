@@ -139,28 +139,31 @@
 
 .cardSettingsButton {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: 10px;
+  right: 10px;
   width: 34px;
   height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.12);
-  background: rgba(10, 10, 10, 0.58);
-  color: var(--text-muted);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.24);
+  background: rgba(0,0,0,0.46);
+  color: #fff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   z-index: 2;
-  opacity: 0.88;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.card:hover .cardSettingsButton {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .cardSettingsButton:hover {
-  border-color: var(--border-gold);
-  color: var(--gold);
-  background: rgba(201, 162, 42, 0.14);
-  transform: scale(1.04);
+  background: rgba(201, 162, 42, 0.32);
 }
 
 .cardLabel {
