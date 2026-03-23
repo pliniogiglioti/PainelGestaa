@@ -137,6 +137,32 @@
   gap: 4px;
 }
 
+.cardSettingsButton {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(10, 10, 10, 0.58);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0.88;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+
+.cardSettingsButton:hover {
+  border-color: var(--border-gold);
+  color: var(--gold);
+  background: rgba(201, 162, 42, 0.14);
+  transform: scale(1.04);
+}
+
 .cardLabel {
   font-size: 10px;
   font-weight: 600;
