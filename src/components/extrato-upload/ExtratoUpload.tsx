@@ -955,6 +955,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: novoNome === 'Não Identificado' } : l
       )
     })
+    if (novoNome !== 'Não Identificado') {
+      setSelecionados(prev => new Set([...prev, idx]))
+    }
   }, [])
 
   const handleGrupoChange = useCallback((idx: number, novoGrupo: string) => {
@@ -981,6 +984,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         i === idx ? { ...l, classificacao: novoNome, grupo: novoGrupo, sugerida: false, sugestaoIA: undefined } : l
       )
     })
+    setSelecionados(prev => new Set([...prev, idx]))
   }, [])
 
   const aplicarClassificacaoParecidos = () => {
@@ -989,6 +993,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setLinhasClass(prev => prev.map((l, i) =>
       similares.includes(i) ? { ...l, classificacao, grupo, sugerida: false } : l
     ))
+    setSelecionados(prev => new Set([...prev, ...similares]))
     setSugestaoParecidos(null)
   }
 
