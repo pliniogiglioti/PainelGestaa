@@ -217,7 +217,11 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
         return
       }
 
-      await carregarEmpresas()
+      setEmpresas(prev => prev.map(emp => (
+        emp.id === empresaEmEdicao.id
+          ? { ...emp, ...payload }
+          : emp
+      )))
       resetModalState()
       return
     }
