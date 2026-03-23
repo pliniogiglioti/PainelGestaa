@@ -25,6 +25,21 @@ function sessionToUser(session: Session): User {
   return { name, email }
 }
 
+async function validarUsuarioAtivo(session: Session) {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role, ativo')
+    .eq('id', session.user.id)
+    .single()
+
+  if (profile?.role === 'user' && profile.ativo === false) {
+    await supabase.auth.signOut()
+    return false
+  }
+
+  return true
+}
+
 function App() {
   const [user,             setUser]             = useState<User | null>(null)
   const [loading,          setLoading]          = useState(true)
@@ -60,22 +75,35 @@ function App() {
     }
 
     // 1. Restore session that's already persisted in localStorage
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session ? sessionToUser(session) : null)
-      if (session?.user?.email && hash.includes('type=invite')) {
-        setInviteEmail(session.user.email)
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session) {
+        const permitido = await validarUsuarioAtivo(session)
+        setUser(permitido ? sessionToUser(session) : null)
+        if (permitido && session.user.email && hash.includes('type=invite')) {
+          setInviteEmail(session.user.email)
+        }
+      } else {
+        setUser(null)
       }
       setLoading(false)
     })
 
     // 2. Keep state in sync whenever auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session ? sessionToUser(session) : null)
-      // Detecta quando o usuário chega pelo link de convite
-      if (event === 'SIGNED_IN' && session?.user?.email && window.location.hash.includes('type=invite')) {
-        setIsInviteFlow(true)
-        setInviteEmail(session.user.email)
+      if (!session) {
+        setUser(null)
+        return
       }
+
+      void (async () => {
+        const permitido = await validarUsuarioAtivo(session)
+        setUser(permitido ? sessionToUser(session) : null)
+        // Detecta quando o usuário chega pelo link de convite
+        if (permitido && event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
+          setIsInviteFlow(true)
+          setInviteEmail(session.user.email)
+        }
+      })()
     })
 
     return () => subscription.unsubscribe()

@@ -13,6 +13,7 @@ export interface Database {
           role:       string
           plan:       string
           avatar_url: string | null
+          ativo:      boolean
           expires_at: string | null
           created_at: string
           updated_at: string
@@ -24,6 +25,7 @@ export interface Database {
           role?:      string
           plan?:      string
           avatar_url?: string | null
+          ativo?:     boolean
           expires_at?: string | null
           created_at?: string
           updated_at?: string
@@ -35,6 +37,7 @@ export interface Database {
           role?:      string
           plan?:      string
           avatar_url?: string | null
+          ativo?:     boolean
           expires_at?: string | null
           updated_at?: string
         }
