@@ -201,23 +201,27 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     }
 
     if (modalModo === 'editar' && empresaEmEdicao) {
-      const { data, error } = await supabase
-        .from('empresas')
-        .update({
-          nome: nome.trim(),
-          cnpj: cnpj.trim() || null,
-        })
-        .eq('id', empresaEmEdicao.id)
-        .select()
-        .single()
+      const payload = {
+        nome: nome.trim(),
+        cnpj: cnpj.trim() || null,
+      }
 
-      if (error || !data) {
-        setErro(error?.message ?? 'Erro ao editar empresa.')
+      const { error } = await supabase
+        .from('empresas')
+        .update(payload)
+        .eq('id', empresaEmEdicao.id)
+
+      if (error) {
+        setErro(error.message ?? 'Erro ao editar empresa.')
         setSalvando(false)
         return
       }
 
-      setEmpresas(prev => prev.map(emp => emp.id === data.id ? data as Empresa : emp))
+      setEmpresas(prev => prev.map(emp => (
+        emp.id === empresaEmEdicao.id
+          ? { ...emp, ...payload }
+          : emp
+      )))
       resetModalState()
       return
     }
