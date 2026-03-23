@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import type { Empresa, EmpresaMembro } from '../lib/types'
+import type { Empresa, EmpresaMembro, Profile } from '../lib/types'
 import styles from './EmpresaGatePage.module.css'
 
 interface Props {
@@ -11,6 +11,7 @@ interface Props {
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
+type EmpresaCard = Empresa & { donoNome: string | null }
 
 type EmpresaFormModalProps = {
   modo: 'criar' | 'editar'
@@ -95,10 +96,11 @@ function EmpresaFormModal({
 }
 
 export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
-  const [empresas, setEmpresas]           = useState<Empresa[]>([])
+  const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
   const [empresaEmEdicao, setEmpresaEmEdicao] = useState<Empresa | null>(null)
+  const [busca, setBusca]                 = useState('')
   const [nome, setNome]                   = useState('')
   const [cnpj, setCnpj]                   = useState('')
   const [salvando, setSalvando]           = useState(false)
@@ -157,8 +159,28 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
       }
     }
 
+    const ownerIds = [...new Set(empresasData.map(empresa => empresa.created_by).filter(Boolean))]
+    let ownerMap: Record<string, string | null> = {}
+
+    if (ownerIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', ownerIds)
+
+      ownerMap = Object.fromEntries(
+        ((profiles ?? []) as Pick<Profile, 'id' | 'name' | 'email'>[]).map(profile => [
+          profile.id,
+          profile.name?.trim() || profile.email?.trim() || null,
+        ]),
+      )
+    }
+
     setEmpresaRoles(rolesMap)
-    setEmpresas(empresasData)
+    setEmpresas(empresasData.map(empresa => ({
+      ...empresa,
+      donoNome: ownerMap[empresa.created_by] ?? null,
+    })))
     setLoading(false)
   }
 
@@ -179,7 +201,7 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     setErro('')
   }
 
-  function abrirModalEdicao(empresa: Empresa) {
+  function abrirModalEdicao(empresa: EmpresaCard) {
     setModalModo('editar')
     setEmpresaEmEdicao(empresa)
     setNome(empresa.nome)
@@ -252,6 +274,18 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     (empresaId: string) => isSystemAdmin || empresaRoles[empresaId] === 'admin'
   ), [empresaRoles, isSystemAdmin])
 
+  const buscaNormalizada = busca.trim().toLocaleLowerCase('pt-BR')
+  const empresasFiltradas = useMemo(() => {
+    if (!buscaNormalizada) return empresas
+
+    return empresas.filter(empresa => {
+      const nomeEmpresa = empresa.nome.toLocaleLowerCase('pt-BR')
+      const nomeDono = empresa.donoNome?.toLocaleLowerCase('pt-BR') ?? ''
+
+      return nomeEmpresa.includes(buscaNormalizada) || nomeDono.includes(buscaNormalizada)
+    })
+  }, [buscaNormalizada, empresas])
+
   if (loading) {
     return (
       <div className={styles.loadingWrap}>
@@ -274,10 +308,28 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
             ? 'Para usar a Análise DRE, você precisa criar uma empresa.'
             : 'Escolha a empresa que deseja analisar ou crie uma nova.'}
         </p>
+        {empresas.length > 0 && (
+          <label className={styles.searchWrap}>
+            <span className={styles.searchLabel}>Buscar empresa</span>
+            <input
+              type="search"
+              className={styles.searchInput}
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Busque por empresa ou criador"
+            />
+          </label>
+        )}
       </header>
 
+      {empresas.length > 0 && empresasFiltradas.length === 0 && (
+        <p className={styles.emptyState}>
+          Nenhuma empresa encontrada para “{busca.trim()}”. Tente buscar pelo nome da empresa ou do criador.
+        </p>
+      )}
+
       <div className={styles.grade}>
-        {empresas.map(emp => {
+        {empresasFiltradas.map(emp => {
           const podeEditar = podeEditarEmpresa(emp.id)
 
           return (
@@ -306,6 +358,9 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
                 <span className={styles.cardLabel}>EMPRESA</span>
                 <div className={styles.cardInitiais}>{inicialEmpresa(emp.nome)}</div>
                 <h3 className={styles.cardNome}>{emp.nome}</h3>
+                <p className={styles.cardDono}>
+                  Empresa de: {emp.donoNome ?? 'Usuário'}
+                </p>
                 {emp.cnpj && <p className={styles.cardCnpj}>{emp.cnpj}</p>}
                 <div className={`${styles.cardExpandable} ${hoveredId === emp.id ? styles.cardExpandableOpen : ''}`}>
                   <button
