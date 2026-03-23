@@ -64,6 +64,50 @@
   margin: 0;
 }
 
+.searchWrap {
+  width: min(100%, 420px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.searchLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+}
+
+.searchInput {
+  width: 100%;
+  height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  padding: 0 14px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.searchInput:focus {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 42, 0.15);
+}
+
+.emptyState {
+  margin: -20px 0 0;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
 /* ── Grade de cards (mesmo estilo Netflix da home) ───────────────────────── */
 
 .grade {

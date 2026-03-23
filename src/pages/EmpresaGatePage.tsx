@@ -100,6 +100,7 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
   const [empresaEmEdicao, setEmpresaEmEdicao] = useState<Empresa | null>(null)
+  const [busca, setBusca]                 = useState('')
   const [nome, setNome]                   = useState('')
   const [cnpj, setCnpj]                   = useState('')
   const [salvando, setSalvando]           = useState(false)
@@ -273,6 +274,18 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     (empresaId: string) => isSystemAdmin || empresaRoles[empresaId] === 'admin'
   ), [empresaRoles, isSystemAdmin])
 
+  const buscaNormalizada = busca.trim().toLocaleLowerCase('pt-BR')
+  const empresasFiltradas = useMemo(() => {
+    if (!buscaNormalizada) return empresas
+
+    return empresas.filter(empresa => {
+      const nomeEmpresa = empresa.nome.toLocaleLowerCase('pt-BR')
+      const nomeDono = empresa.donoNome?.toLocaleLowerCase('pt-BR') ?? ''
+
+      return nomeEmpresa.includes(buscaNormalizada) || nomeDono.includes(buscaNormalizada)
+    })
+  }, [buscaNormalizada, empresas])
+
   if (loading) {
     return (
       <div className={styles.loadingWrap}>
@@ -295,10 +308,28 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
             ? 'Para usar a Análise DRE, você precisa criar uma empresa.'
             : 'Escolha a empresa que deseja analisar ou crie uma nova.'}
         </p>
+        {empresas.length > 0 && (
+          <label className={styles.searchWrap}>
+            <span className={styles.searchLabel}>Buscar empresa</span>
+            <input
+              type="search"
+              className={styles.searchInput}
+              value={busca}
+              onChange={e => setBusca(e.target.value)}
+              placeholder="Busque por empresa ou criador"
+            />
+          </label>
+        )}
       </header>
 
+      {empresas.length > 0 && empresasFiltradas.length === 0 && (
+        <p className={styles.emptyState}>
+          Nenhuma empresa encontrada para “{busca.trim()}”. Tente buscar pelo nome da empresa ou do criador.
+        </p>
+      )}
+
       <div className={styles.grade}>
-        {empresas.map(emp => {
+        {empresasFiltradas.map(emp => {
           const podeEditar = podeEditarEmpresa(emp.id)
 
           return (
