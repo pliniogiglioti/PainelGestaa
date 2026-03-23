@@ -783,6 +783,20 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
               )}
             </div>
 
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionLeft}>
+                <h2 className={styles.sectionTitle}>
+                  {activeCategory === 'todos' ? 'Todos os Aplicativos' : getCategoryLabel(activeCategory)}
+                </h2>
+                {!loadingApps && <span className={styles.sectionCount}>{filteredApps.length} apps</span>}
+              </div>
+              {isAdmin && (
+                <DesignButton variant="primary" onClick={() => setShowCreateApp(true)}>
+                  <span className={styles.topNavButtonContent}><IconPlus /><span>Novo App</span></span>
+                </DesignButton>
+              )}
+            </div>
+
             {loadingApps ? (
               <div className={styles.centeredSpinner}><Spinner /></div>
             ) : filteredApps.length === 0 ? (
