@@ -410,8 +410,6 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
   const mesesListboxRef = useRef<HTMLDivElement | null>(null)
-  const usuarioFiltro = ''
-
  const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
   const { data: authData } = await supabase.auth.getUser()
   const myId = authData.user?.id
@@ -841,7 +839,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     if (!confirmado) return
     const { error } = await supabase.from('dre_lancamentos').delete().eq('id', item.id)
     if (error) { alert(`Erro ao excluir: ${error.message}`); return }
-    fetchLancamentos(usuarioFiltro || undefined)
+    fetchLancamentos()
   }
 
   /** IDs dos lançamentos do período selecionado (ano + meses, ignora filtro de tipo) */
@@ -890,7 +888,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       setShowDeletePeriodo(false)
       setMesesFiltro([])
-      fetchLancamentos(usuarioFiltro || undefined)
+      fetchLancamentos()
     } catch (e) {
       alert(`Erro ao excluir: ${e instanceof Error ? e.message : 'Desconhecido'}`)
     } finally {
@@ -1080,7 +1078,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       }
     }
 
-    closeWizard(); fetchLancamentos(usuarioFiltro || undefined); fetchGrupos(); fetchClassificacoes()
+    closeWizard(); fetchLancamentos(); fetchGrupos(); fetchClassificacoes()
   }
 
   const formatDate = (item: DreLancamento) => {
@@ -1219,7 +1217,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       )}
 
       {/* ── Extrato Upload ── */}
-      <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos(usuarioFiltro || undefined)} />
+      <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos()} />
 
       {/* ── Modal Assistente IA ── */}
       {showAssistente && (

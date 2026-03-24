@@ -421,13 +421,6 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
   const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
   const cols = detectarColunas(headers)
 
-  // 🔍 DIAGNÓSTICO — abra o console do navegador (F12) para ver
-  console.group('[PainelGestaa] parsePlanilha — diagnóstico de colunas')
-  console.log('Headers detectados:', headers)
-  console.log('Índices de colunas:', cols)
-  console.log('Coluna classificação (índice):', cols.classificacao, '→', headers[cols.classificacao] ?? '(não encontrada)')
-  console.groupEnd()
-
   const usaSeparado = cols.credito >= 0 || cols.debito >= 0
 
   const linhas: LinhaExtrato[] = []
@@ -1172,9 +1165,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       if ((page ?? []).length < HIST_PAGE) break
       histFrom += HIST_PAGE
     }
-    console.log(`[Histórico] Carregado: ${histAll.length} entradas para empresa ${empresaId}`)
-    console.log('[Histórico] Raw DB entries:', histAll)
-
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     modeloIARef.current = modelo
     const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
@@ -1190,7 +1180,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     const historico = new Map<string, { classificacao: string; grupo: string; tipo: 'receita' | 'despesa' }>(
       histAll.map(h => [normalize(h.descricao_normalizada), { classificacao: h.classificacao, grupo: h.grupo, tipo: h.tipo as 'receita' | 'despesa' }])
     )
-    console.log('[Histórico] Chaves no mapa:', [...historico.keys()])
+
 
     // Mapa secundário: chave sem tokens variáveis (números longos, datas) → classificação
     // Permite reconhecer "PIX 67890 Empresa XYZ 15/04" quando "PIX 12345 Empresa XYZ 10/03" já foi classificado
@@ -1281,7 +1271,6 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
           }
         }
       }
-      console.log(`[Histórico] "${chaveHist}" →`, hist ?? 'NÃO ENCONTRADO')
       if (hist && (!linha.tipoDefinido || linha.tipo === hist.tipo)) {
         // Resolve para nome oficial (com acento correto) se possível
         const nomeOficial = nomesOficiaisSet.has(hist.classificacao)

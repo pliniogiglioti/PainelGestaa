@@ -389,7 +389,6 @@ export interface Database {
           classificacao:         string
           grupo:                 string
           tipo:                  'receita' | 'despesa'
-          frequencia:            number
           updated_at:            string
         }
         Insert: {
@@ -399,7 +398,7 @@ export interface Database {
           classificacao:         string
           grupo:                 string
           tipo:                  'receita' | 'despesa'
-          frequencia?:           number
+
           updated_at?:           string
         }
         Update: {
@@ -408,7 +407,6 @@ export interface Database {
           classificacao?:         string
           grupo?:                 string
           tipo?:                  'receita' | 'despesa'
-          frequencia?:            number
           updated_at?:            string
         }
         Relationships: []
