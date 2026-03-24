@@ -1592,9 +1592,10 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       })
       const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
-        const { error: histError } = await supabase.from('dre_classificacao_historico')
+        // Falha no histórico é ignorada intencionalmente: os lançamentos já foram
+        // salvos acima e reverter a fase causaria duplicatas na próxima tentativa.
+        await supabase.from('dre_classificacao_historico')
           .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
-        if (histError) throw new Error(histError.message)
       }
 
       setSucessoSalvo(toInsert.length)
