@@ -59,6 +59,22 @@
   white-space: nowrap;
 }
 
+.btnTrocarEmpresa {
+  background: none;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 7px 16px;
+  color: #aaa;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.btnTrocarEmpresa:hover {
+  border-color: rgba(213, 175, 69, 0.5);
+  color: var(--gold-light);
+  background: rgba(213, 175, 69, 0.07);
+}
+
 /* ── Botão Assistente IA (header) ── */
 .btnAssistente {
   position: relative;

@@ -1120,13 +1120,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <button onClick={onVoltar} className={styles.backLink} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar ao dashboard</button>
-            <button
-              onClick={onTrocarEmpresa}
-              style={{
-                background: 'none', border: '1px solid #2a2a2a', borderRadius: 6,
-                padding: '4px 12px', color: '#888', fontSize: 12, cursor: 'pointer',
-              }}
-            >
+            <button onClick={onTrocarEmpresa} className={styles.btnTrocarEmpresa}>
               Trocar empresa
             </button>
           </div>
