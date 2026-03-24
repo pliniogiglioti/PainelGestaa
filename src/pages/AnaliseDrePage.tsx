@@ -399,6 +399,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
   const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
   const [showAssistente,   setShowAssistente]   = useState(false)
+  const [showUpload,       setShowUpload]       = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
   const [buscaLancamento,  setBuscaLancamento]  = useState('')
@@ -1141,6 +1142,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             <span className={styles.btnAssistenteEyebrow}>• IA • OPENAI</span>
             <span className={styles.btnAssistenteTitle}>Assistente de DFC</span>
           </button>
+          <button className={styles.btnUpload} onClick={() => setShowUpload(true)}>
+            <span className={styles.btnUploadInfo}>ⓘ</span>
+            <span className={styles.btnUploadTooltip}>Importe um extrato bancário (.xlsx, .xls ou .csv). A IA classifica automaticamente os lançamentos.</span>
+            <span className={styles.btnUploadEyebrow}>• IA • OPENAI</span>
+            <span className={styles.btnUploadTitle}>Importar Extrato</span>
+          </button>
         </div>
       </header>
 
@@ -1216,8 +1223,15 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         </section>
       )}
 
-      {/* ── Extrato Upload ── */}
-      <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos()} />
+      {/* ── Modal Upload Extrato ── */}
+      {showUpload && (
+        <div className={styles.uploadOverlay} onClick={() => setShowUpload(false)}>
+          <div className={styles.uploadModal} onClick={e => e.stopPropagation()}>
+            <button className={styles.assistenteModalClose} onClick={() => setShowUpload(false)}>✕</button>
+            <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos()} />
+          </div>
+        </div>
+      )}
 
       {/* ── Modal Assistente IA ── */}
       {showAssistente && (
