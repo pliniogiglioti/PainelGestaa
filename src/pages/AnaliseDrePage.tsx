@@ -431,6 +431,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       .eq('empresa_id', empresa.id)
       .order('data_lancamento', { ascending: false })
       .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
       .range(from, from + PAGE_SIZE - 1)
 
     if (effectiveAdmin && targetUserId) {
@@ -447,7 +448,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     from += PAGE_SIZE
   }
 
-  setLancamentos(all)
+  const unique = [...new Map(all.map(item => [item.id, item])).values()]
+  setLancamentos(unique)
 }
 
   const fetchClassificacoes = async () => {
