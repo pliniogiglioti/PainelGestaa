@@ -27,6 +27,6 @@ UPDATE public.dre_lancamentos
 
 -- 5. Corrige histórico de classificação (se houver)
 UPDATE public.dre_classificacao_historico
-   SET classificacao_nome = 'Royalties',
-       grupo              = 'Despesas Operacionais'
- WHERE classificacao_nome = 'Royalties e Assistência Técnica';
+   SET classificacao = 'Royalties',
+       grupo         = 'Despesas Operacionais'
+ WHERE classificacao = 'Royalties e Assistência Técnica';
