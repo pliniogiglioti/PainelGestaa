@@ -127,6 +127,94 @@
   color: #d5af45;
 }
 
+/* ── Botão Importar Extrato (header) ── */
+.btnUpload {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 8px 28px 8px 14px;
+  background: rgba(213, 175, 69, 0.06);
+  border: 1px solid rgba(213, 175, 69, 0.3);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.btnUpload:hover {
+  background: rgba(213, 175, 69, 0.14);
+  border-color: rgba(213, 175, 69, 0.55);
+}
+
+.btnUploadInfo {
+  position: absolute;
+  top: 7px;
+  right: 9px;
+  font-size: 13px;
+  opacity: 0.35;
+  line-height: 1;
+  color: #d5af45;
+}
+.btnUpload:hover .btnUploadInfo { opacity: 0.9; }
+
+.btnUploadTooltip {
+  display: none;
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 300px;
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #cbd5e1;
+  line-height: 1.5;
+  z-index: 9999;
+  pointer-events: none;
+  white-space: normal;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+.btnUpload:hover .btnUploadTooltip { display: block; }
+
+.btnUploadEyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #c9a22a;
+  text-transform: uppercase;
+}
+
+.btnUploadTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: #d5af45;
+}
+
+/* ── Modal Upload Extrato ── */
+.uploadOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(3px);
+}
+
+.uploadModal {
+  position: relative;
+  width: 100%;
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 14px;
+}
+
 /* ── Modal Assistente ── */
 .assistenteOverlay {
   position: fixed;
