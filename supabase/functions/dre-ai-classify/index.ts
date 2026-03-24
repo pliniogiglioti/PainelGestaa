@@ -45,7 +45,7 @@ GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
   - Custo de Materiais e Insumos
   - Serviços Terceiros PF (dentistas)
   - Serviços Técnicos para Laboratórios
-  - Royalties e Assistência Técnica
+  - Royalties
   - Fundo Nacional de Marketing
 
 [Despesas com Pessoal] → tipo: despesa
@@ -178,7 +178,8 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(laboratorio|\blab\b|tecnico dental|dental.*lab|pag.*\blab\b|laborat)/i, tipo: 'despesa', classificacao: 'Serviços Técnicos para Laboratórios', grupo: 'Despesas Operacionais' },
   { pattern: /(material|insumo|implante|componente)/i, tipo: 'despesa', classificacao: 'Custo de Materiais e Insumos', grupo: 'Despesas Operacionais' },
   { pattern: /(dentista|terceiro pf|prestador|autonomo)/i, tipo: 'despesa', classificacao: 'Serviços Terceiros PF (dentistas)', grupo: 'Despesas Operacionais' },
-  { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties e Assistência Técnica', grupo: 'Despesas Operacionais' },
+  { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties', grupo: 'Despesas Operacionais' },
+  { pattern: /(\bfnp\b|fundo nacional.*marketing|fundo.*publicidade)/i, tipo: 'despesa', classificacao: 'Fundo Nacional de Marketing', grupo: 'Despesas Operacionais' },
   { pattern: /(comissao\b|gratificacao\b|bonus func)/i, tipo: 'despesa', classificacao: 'OP Gratificações', grupo: 'Despesas Operacionais' },
   // ── Marketing ──
   { pattern: /(marketing|midia|anuncio|google ads|meta ads|instagram|facebook ads)/i, tipo: 'despesa', classificacao: 'Marketing Digital', grupo: 'Despesas Comerciais e Marketing' },

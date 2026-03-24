@@ -72,7 +72,7 @@ const CLASSIFICACAO_TO_GRUPO: Record<string, string> = {
   'Custo de Materiais e Insumos': 'Despesas Operacionais',
   'Serviços Terceiros PF (dentistas)': 'Despesas Operacionais',
   'Serviços Técnicos para Laboratórios': 'Despesas Operacionais',
-  'Royalties e Assistência Técnica': 'Despesas Operacionais',
+  'Royalties': 'Despesas Operacionais',
   'Fundo Nacional de Marketing': 'Despesas Operacionais',
   // Despesas com Pessoal
   'Pró-labore': 'Despesas com Pessoal',
