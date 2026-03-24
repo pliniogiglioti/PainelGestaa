@@ -886,7 +886,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
-  const modeloIARef = useRef<string>(DEFAULT_OPENAI_MODEL)
+  const modeloIARef  = useRef<string>(DEFAULT_OPENAI_MODEL)
+  const isSavingRef  = useRef(false)
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
   const [naoClassificadosModal, setNaoClassificadosModal] = useState<LinhaClassificada[]>([])
   const [exemplosDb, setExemplosDb]                 = useState<{ nome: string; arquivo: string | null }[]>([])
@@ -1537,6 +1538,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
   }
 
   const salvarComIndices = async (indices: Set<number>) => {
+    if (isSavingRef.current) return
+    isSavingRef.current = true
     setFase('salvando')
     setErroSalvar('')
     try {
@@ -1600,6 +1603,8 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     } catch (e) {
       setErroSalvar(`Erro ao salvar: ${e instanceof Error ? e.message : 'Desconhecido'}`)
       setFase('revisao')
+    } finally {
+      isSavingRef.current = false
     }
   }
 
