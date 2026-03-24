@@ -70,7 +70,8 @@ const FALLBACK_RULES: Array<{ pattern: RegExp; tipo: 'receita' | 'despesa'; clas
   { pattern: /(laboratorio|\blab\b|tecnico dental|dental.*lab|pag.*\blab\b|laborat)/i, tipo: 'despesa', classificacao: 'Serviços Técnicos para Laboratórios', grupo: 'Despesas Operacionais' },
   { pattern: /(material|insumo|implante|componente)/i, tipo: 'despesa', classificacao: 'Custo de Materiais e Insumos', grupo: 'Despesas Operacionais' },
   { pattern: /(dentista|terceiro pf|prestador|autonomo)/i, tipo: 'despesa', classificacao: 'Serviços Terceiros PF (dentistas)', grupo: 'Despesas Operacionais' },
-  { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties e Assistência Técnica', grupo: 'Despesas Operacionais' },
+  { pattern: /(royalt|assistencia tecnica franquia)/i, tipo: 'despesa', classificacao: 'Royalties', grupo: 'Despesas Operacionais' },
+  { pattern: /(\bfnp\b|fundo nacional.*marketing|fundo.*publicidade)/i, tipo: 'despesa', classificacao: 'Fundo Nacional de Marketing', grupo: 'Despesas Operacionais' },
   // ── Marketing ──
   { pattern: /(marketing|midia|anuncio|google ads|meta ads|instagram|facebook ads)/i, tipo: 'despesa', classificacao: 'Marketing Digital', grupo: 'Despesas Comerciais e Marketing' },
   { pattern: /(agencia|assessoria)/i, tipo: 'despesa', classificacao: 'Agência e Assessoria', grupo: 'Despesas Comerciais e Marketing' },
@@ -168,7 +169,7 @@ const CLASSIFICACAO_GRUPO: Record<string, string> = {
   'Custo de Materiais e Insumos': 'Despesas Operacionais',
   'Serviços Terceiros PF (dentistas)': 'Despesas Operacionais',
   'Serviços Técnicos para Laboratórios': 'Despesas Operacionais',
-  'Royalties e Assistência Técnica': 'Despesas Operacionais',
+  'Royalties': 'Despesas Operacionais',
   'Fundo Nacional de Marketing': 'Despesas Operacionais',
   'Pró-labore': 'Despesas com Pessoal',
   'Salários e Ordenados': 'Despesas com Pessoal',
