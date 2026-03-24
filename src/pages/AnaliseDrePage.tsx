@@ -1118,7 +1118,18 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Financeiro • Aplicativo interno</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <button onClick={onVoltar} className={styles.backLink} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar ao dashboard</button>
+            <button
+              onClick={onTrocarEmpresa}
+              style={{
+                background: 'none', border: '1px solid #2a2a2a', borderRadius: 6,
+                padding: '4px 12px', color: '#888', fontSize: 12, cursor: 'pointer',
+              }}
+            >
+              Trocar empresa
+            </button>
+          </div>
           <h1>Análise DFC</h1>
           <p className={styles.subtitle}>
             <span style={{ color: '#c9a22a', fontWeight: 600 }}>{empresa.nome}</span>
@@ -1126,16 +1137,6 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           </p>
         </div>
         <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <button onClick={onVoltar} className={styles.backLink} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>← Voltar ao dashboard</button>
-          <button
-            onClick={onTrocarEmpresa}
-            style={{
-              background: 'none', border: '1px solid #2a2a2a', borderRadius: 6,
-              padding: '4px 12px', color: '#888', fontSize: 12, cursor: 'pointer',
-            }}
-          >
-            Trocar empresa
-          </button>
           <button className={styles.btnAssistente} onClick={() => setShowAssistente(true)}>
             <span className={styles.btnAssistenteInfo}>ⓘ</span>
             <span className={styles.btnAssistenteTooltip}>Abre o Assistente de DFC — uma IA treinada para analisar seus lançamentos e responder perguntas como "qual meu maior custo?", "como está minha margem?" ou "onde posso reduzir despesas?". Powered by OpenAI.</span>
