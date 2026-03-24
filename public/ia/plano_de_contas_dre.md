@@ -26,7 +26,7 @@
 - **4.2** — Custo de Materiais e Insumos (incluso implantes e componentes)
 - **4.3** — Serviços Terceiros PF (dentistas)
 - **4.4** — Serviços técnicos para Laboratórios
-- **4.5** — Royalties e FNP
+- **4.5** — Royalties
 - **4.6** — Fundo Nacional de Marketing
 ## 5. MARGEM DE CONTRIBUIÇÃO
 ## 6. DESPESAS COM PESSOAL
