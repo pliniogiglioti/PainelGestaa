@@ -658,7 +658,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     let addedDeducoes = false
     for (const nome of ['deduções de receita', 'impostos sobre faturamento']) {
       const g = gruposMap.get(nome)
-      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedDeducoes = true }
+      if (g && !used.has(nome)) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedDeducoes = true }
     }
     if (addedDeducoes) {
       result.push({ kind: 'totalizador', label: 'RECEITA LÍQUIDA', valor: kpis.receitaLiquida })
@@ -667,7 +667,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     // Seção 3: Despesas Operacionais diretas → MARGEM DE CONTRIBUIÇÃO
     let addedOp = false
     const g3 = gruposMap.get('despesas operacionais')
-    if (g3) { result.push({ kind: 'grupo', data: g3 }); used.add('despesas operacionais'); addedOp = true }
+    if (g3 && !used.has('despesas operacionais')) { result.push({ kind: 'grupo', data: g3 }); used.add('despesas operacionais'); addedOp = true }
     if (addedOp) {
       result.push({ kind: 'totalizador', label: 'MARGEM DE CONTRIBUIÇÃO', valor: kpis.margemContrib, pct: kpis.margemContribPct })
     }
@@ -676,7 +676,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     let addedIndir = false
     for (const nome of ['despesas com pessoal', 'despesas administrativas', 'despesas comerciais e marketing', 'despesas com ti']) {
       const g = gruposMap.get(nome)
-      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedIndir = true }
+      if (g && !used.has(nome)) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedIndir = true }
     }
     if (addedIndir) {
       result.push({ kind: 'totalizador', label: 'EBITDA', valor: kpis.ebitda, pct: kpis.ebitdaPct })
@@ -686,7 +686,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     let addedFin = false
     for (const nome of ['receitas financeiras', 'despesas financeiras']) {
       const g = gruposMap.get(nome)
-      if (g) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedFin = true }
+      if (g && !used.has(nome)) { result.push({ kind: 'grupo', data: g }); used.add(nome); addedFin = true }
     }
     if (addedFin) {
       result.push({ kind: 'totalizador', label: 'EBIT', valor: kpis.ebit, pct: kpis.ebitPct })
@@ -695,7 +695,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     // Seção 6: Investimentos → NOPAT
     let addedInvest = false
     const g6 = gruposMap.get('investimentos')
-    if (g6) { result.push({ kind: 'grupo', data: g6 }); used.add('investimentos'); addedInvest = true }
+    if (g6 && !used.has('investimentos')) { result.push({ kind: 'grupo', data: g6 }); used.add('investimentos'); addedInvest = true }
     if (addedInvest) {
       result.push({ kind: 'totalizador', label: 'NOPAT (RESULTADO OPERACIONAL)', valor: kpis.nopat, pct: kpis.nopatPct })
     }
