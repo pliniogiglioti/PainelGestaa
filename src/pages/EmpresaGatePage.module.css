@@ -184,7 +184,7 @@
 .cardSettingsButton {
   position: absolute;
   top: 10px;
-  right: 10px;
+  right: 50px;
   width: 34px;
   height: 34px;
   border-radius: 999px;
@@ -208,6 +208,36 @@
 
 .cardSettingsButton:hover {
   background: rgba(201, 162, 42, 0.32);
+}
+
+.cardDeleteButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.24);
+  background: rgba(0,0,0,0.46);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.card:hover .cardDeleteButton {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.cardDeleteButton:hover {
+  background: rgba(220, 38, 38, 0.40);
+  border-color: rgba(220, 38, 38, 0.50);
 }
 
 .cardLabel {
@@ -449,3 +479,25 @@
 
 .btnCriar:hover:not(:disabled) { background: var(--gold-light); }
 .btnCriar:disabled, .btnCancelar:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.deleteWarning {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.btnExcluir {
+  background: #dc2626;
+  border: none;
+  border-radius: 8px;
+  padding: 9px 22px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btnExcluir:hover:not(:disabled) { background: #b91c1c; }
+.btnExcluir:disabled { opacity: 0.5; cursor: not-allowed; }

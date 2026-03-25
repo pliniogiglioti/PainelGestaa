@@ -32,6 +32,15 @@ const IconSettings = () => (
   </svg>
 )
 
+const IconTrash = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <polyline points="3 6 5 6 21 6"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+    <path d="M10 11v6M14 11v6"/>
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+  </svg>
+)
+
 function EmpresaFormModal({
   modo,
   nome,
@@ -95,11 +104,60 @@ function EmpresaFormModal({
   )
 }
 
+function ConfirmDeleteModal({
+  empresa,
+  erro,
+  deletando,
+  onClose,
+  onConfirm,
+}: {
+  empresa: EmpresaCard
+  erro: string
+  deletando: boolean
+  onClose: () => void
+  onConfirm: () => void
+}) {
+  return (
+    <div className={styles.modalBackdrop} onClick={() => { if (!deletando) onClose() }}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <h2 className={styles.modalTitulo}>Excluir empresa</h2>
+        <p className={styles.deleteWarning}>
+          Tem certeza que deseja excluir a empresa <strong>{empresa.nome}</strong>?
+          Esta ação irá deletar a empresa e todos os seus lançamentos financeiros.
+          Esta operação é irreversível.
+        </p>
+        {erro && <p className={styles.erro}>{erro}</p>}
+        <div className={styles.formActions}>
+          <button
+            type="button"
+            className={styles.btnCancelar}
+            onClick={onClose}
+            disabled={deletando}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            className={styles.btnExcluir}
+            onClick={onConfirm}
+            disabled={deletando}
+          >
+            {deletando ? 'Excluindo…' : 'Excluir empresa'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
   const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
   const [empresaEmEdicao, setEmpresaEmEdicao] = useState<Empresa | null>(null)
+  const [empresaParaDeletar, setEmpresaParaDeletar] = useState<EmpresaCard | null>(null)
+  const [deletando, setDeletando]         = useState(false)
+  const [erroDelete, setErroDelete]       = useState('')
   const [busca, setBusca]                 = useState('')
   const [nome, setNome]                   = useState('')
   const [cnpj, setCnpj]                   = useState('')
@@ -191,6 +249,53 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
     setCnpj('')
     setErro('')
     setSalvando(false)
+  }
+
+  function abrirModalDelete(empresa: EmpresaCard) {
+    setEmpresaParaDeletar(empresa)
+    setErroDelete('')
+  }
+
+  function fecharModalDelete() {
+    if (deletando) return
+    setEmpresaParaDeletar(null)
+    setErroDelete('')
+  }
+
+  async function handleDeletarEmpresa() {
+    if (!empresaParaDeletar) return
+    setDeletando(true)
+    setErroDelete('')
+
+    // 1. Delete lançamentos da empresa
+    const { error: errLancamentos } = await supabase
+      .from('dre_lancamentos')
+      .delete()
+      .eq('empresa_id', empresaParaDeletar.id)
+
+    if (errLancamentos) {
+      console.error('Erro ao excluir lançamentos:', errLancamentos)
+      setErroDelete(errLancamentos.message ?? 'Erro ao excluir lançamentos.')
+      setDeletando(false)
+      return
+    }
+
+    // 2. Delete empresa (empresa_membros cascadeiam automaticamente)
+    const { error: errEmpresa } = await supabase
+      .from('empresas')
+      .delete()
+      .eq('id', empresaParaDeletar.id)
+
+    if (errEmpresa) {
+      console.error('Erro ao excluir empresa:', errEmpresa)
+      setErroDelete(errEmpresa.message ?? 'Erro ao excluir empresa.')
+      setDeletando(false)
+      return
+    }
+
+    setEmpresas(prev => prev.filter(e => e.id !== empresaParaDeletar.id))
+    setEmpresaParaDeletar(null)
+    setDeletando(false)
   }
 
   function abrirModalCriacao() {
@@ -341,18 +446,32 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
             >
               <div className={`${styles.overlay} ${hoveredId === emp.id ? styles.overlayHovered : ''}`} />
               {podeEditar && (
-                <button
-                  type="button"
-                  className={styles.cardSettingsButton}
-                  title={`Editar ${emp.nome}`}
-                  aria-label={`Editar ${emp.nome}`}
-                  onClick={event => {
-                    event.stopPropagation()
-                    abrirModalEdicao(emp)
-                  }}
-                >
-                  <IconSettings />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className={styles.cardSettingsButton}
+                    title={`Editar ${emp.nome}`}
+                    aria-label={`Editar ${emp.nome}`}
+                    onClick={event => {
+                      event.stopPropagation()
+                      abrirModalEdicao(emp)
+                    }}
+                  >
+                    <IconSettings />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.cardDeleteButton}
+                    title={`Excluir ${emp.nome}`}
+                    aria-label={`Excluir ${emp.nome}`}
+                    onClick={event => {
+                      event.stopPropagation()
+                      abrirModalDelete(emp)
+                    }}
+                  >
+                    <IconTrash />
+                  </button>
+                </>
               )}
               <div className={styles.cardContent}>
                 <span className={styles.cardLabel}>EMPRESA</span>
@@ -400,6 +519,16 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
           onSubmit={handleSalvarEmpresa}
           onNomeChange={setNome}
           onCnpjChange={setCnpj}
+        />
+      )}
+
+      {empresaParaDeletar && (
+        <ConfirmDeleteModal
+          empresa={empresaParaDeletar}
+          erro={erroDelete}
+          deletando={deletando}
+          onClose={fecharModalDelete}
+          onConfirm={handleDeletarEmpresa}
         />
       )}
     </div>
