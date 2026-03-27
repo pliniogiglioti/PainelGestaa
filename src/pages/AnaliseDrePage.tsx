@@ -864,7 +864,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
     const classificacaoNome = editClassForm.classificacaoNome.trim()
     const grupoNome         = editClassForm.grupo.trim()
-    const tipo              = editClassForm.tipo
+    const tipo              = editClassForm.tipo as 'receita' | 'despesa'
 
     const { error: errUpdate } = await supabase
       .from('dre_lancamentos')
