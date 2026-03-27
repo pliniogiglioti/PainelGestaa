@@ -377,6 +377,10 @@ function parseTipo(raw: unknown, valor: number): 'receita' | 'despesa' {
 /** Formata data de vários formatos para DD/MM/AAAA */
 function formatarData(raw: unknown): string {
   if (!raw) return new Date().toLocaleDateString('pt-BR')
+  // Objeto Date retornado pela lib xlsx para células do tipo 'd' (ISO date no XML)
+  if (raw instanceof Date) {
+    return raw.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+  }
   if (typeof raw === 'number') {
     const d = new Date(Math.round((raw - 25569) * 86400 * 1000))
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
@@ -386,6 +390,12 @@ function formatarData(raw: unknown): string {
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
     const [y, m, d] = s.split('-')
     return `${d.slice(0,2)}/${m}/${y}`
+  }
+  // D/M/AAAA ou D/M/AA sem zeros à esquerda (ex: locale EUA, Google Sheets)
+  if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) {
+    const [d, m, y] = s.split('/')
+    const year = y.length === 2 ? '20' + y : y
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${year}`
   }
   return s
 }
@@ -397,7 +407,7 @@ function formatarData(raw: unknown): string {
 async function arquivoTemColunaCategoria(file: File): Promise<boolean> {
   try {
     const buffer = await file.arrayBuffer()
-    const wb = read(buffer, { type: 'array' })
+    const wb = read(buffer, { type: 'array', cellDates: false })
     const ws = wb.Sheets[wb.SheetNames[0]]
     const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
     const headerIdx = encontrarLinhaCabecalho(rows)
@@ -410,7 +420,7 @@ async function arquivoTemColunaCategoria(file: File): Promise<boolean> {
 
 /** Parse planilha → lista de linhas brutas */
 function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
-  const wb = read(buffer, { type: 'array' })
+  const wb = read(buffer, { type: 'array', cellDates: false })
   const ws = wb.Sheets[wb.SheetNames[0]]
   const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
 
@@ -513,7 +523,7 @@ async function validarEstruturaArquivo(
 ): Promise<{ ok: true } | { ok: false; motivo: string }> {
   try {
     const buffer = await file.arrayBuffer()
-    const wb = read(buffer, { type: 'array' })
+    const wb = read(buffer, { type: 'array', cellDates: false })
 
     if (!wb.SheetNames.length) {
       return { ok: false, motivo: 'O arquivo não contém nenhuma planilha.' }
@@ -1059,7 +1069,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
         chunks.push(linhas.slice(i, i + LINHAS_POR_CHUNK))
       }
     } else {
-      const wb = read(buffer, { type: 'array' })
+      const wb = read(buffer, { type: 'array', cellDates: false })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
       // Normaliza células: número → string com 2 casas decimais, resto → string
