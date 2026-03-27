@@ -23,6 +23,7 @@ const DEFAULT_OPENAI_MODEL = 'gpt-4o-mini'
 const EXEMPLOS_ESTATICOS = [
   { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx'    },
   { nome: 'Conta Azul',     arquivo: 'conta-azul.xlsx' },
+  { nome: 'CliniCorp',      arquivo: 'clinicorp.xlsx'  },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────
@@ -176,8 +177,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     const { data } = await supabase.from('exemplos_upload').select('*').order('created_at')
     const lista = data ?? []
 
-    if (lista.length === 0) {
-      for (const ex of EXEMPLOS_ESTATICOS) {
+    const nomesExistentes = new Set(lista.map(e => e.nome))
+    const faltantes = EXEMPLOS_ESTATICOS.filter(ex => !nomesExistentes.has(ex.nome))
+    if (faltantes.length > 0) {
+      for (const ex of faltantes) {
         try {
           const res = await fetch(`/exemplos/${ex.arquivo}`)
           if (!res.ok) continue

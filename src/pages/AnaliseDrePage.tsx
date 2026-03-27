@@ -410,6 +410,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   // Excluir período
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
+  // Editar Classificação
+  const [showEditClassModal, setShowEditClassModal] = useState(false)
+  const [editClassItem,      setEditClassItem]      = useState<DreLancamento | null>(null)
+  const [editClassForm,      setEditClassForm]      = useState<{ tipo: string; classificacaoNome: string; grupo: string }>({ tipo: '', classificacaoNome: '', grupo: '' })
+  const [editClassSaving,    setEditClassSaving]    = useState(false)
+  const [editClassError,     setEditClassError]     = useState('')
   const mesesListboxRef = useRef<HTMLDivElement | null>(null)
  const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
   const { data: authData } = await supabase.auth.getUser()
@@ -831,6 +837,75 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     setError('')
     setAiError('')
     setAiWarning('')
+  }
+
+  const openEditClassModal = (item: DreLancamento) => {
+    setEditClassItem(item)
+    setEditClassForm({ tipo: item.tipo, classificacaoNome: item.classificacao, grupo: item.grupo })
+    setEditClassError('')
+    setShowEditClassModal(true)
+  }
+
+  const closeEditClassModal = () => {
+    setShowEditClassModal(false)
+    setEditClassItem(null)
+    setEditClassForm({ tipo: '', classificacaoNome: '', grupo: '' })
+    setEditClassError('')
+  }
+
+  const salvarClassificacao = async () => {
+    if (!editClassItem) return
+    if (!editClassForm.classificacaoNome || !editClassForm.grupo.trim() || !editClassForm.tipo) {
+      setEditClassError('Preencha todos os campos.')
+      return
+    }
+    setEditClassSaving(true)
+    setEditClassError('')
+
+    const classificacaoNome = editClassForm.classificacaoNome.trim()
+    const grupoNome         = editClassForm.grupo.trim()
+    const tipo              = editClassForm.tipo as 'receita' | 'despesa'
+
+    const { error: errUpdate } = await supabase
+      .from('dre_lancamentos')
+      .update({ tipo, classificacao: classificacaoNome, grupo: grupoNome })
+      .eq('id', editClassItem.id)
+
+    if (errUpdate) { setEditClassError(errUpdate.message); setEditClassSaving(false); return }
+
+    // Busca outros lançamentos da mesma empresa com descrição normalizada idêntica
+    const descNorm = normalizeKey(editClassItem.descricao ?? '')
+    if (descNorm) {
+      const outros = lancamentos.filter(l =>
+        l.id !== editClassItem.id && normalizeKey(l.descricao ?? '') === descNorm,
+      )
+      if (outros.length > 0) {
+        const confirmar = window.confirm(
+          `Encontramos ${outros.length} outro${outros.length > 1 ? 's' : ''} lançamento${outros.length > 1 ? 's' : ''} com a mesma descrição "${editClassItem.descricao?.slice(0, 60)}". Deseja atualizar a classificação deles também?`,
+        )
+        if (confirmar) {
+          await supabase
+            .from('dre_lancamentos')
+            .update({ tipo, classificacao: classificacaoNome, grupo: grupoNome })
+            .in('id', outros.map(l => l.id))
+        }
+      }
+
+      // Salva no histórico para aprendizado futuro
+      await supabase.from('dre_classificacao_historico').upsert({
+        empresa_id:            empresa.id,
+        descricao_normalizada: descNorm,
+        classificacao:         classificacaoNome,
+        grupo:                 grupoNome,
+        tipo,
+        updated_at:            new Date().toISOString(),
+      }, { onConflict: 'empresa_id,descricao_normalizada' })
+    }
+
+    setEditClassSaving(false)
+    closeEditClassModal()
+    fetchLancamentos()
+    fetchGrupos()
   }
 
   const deleteLancamento = async (item: DreLancamento) => {
@@ -1512,6 +1587,9 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
                                           : '—'}
                                       </td>
                                       <td className={styles.actionCell}>
+                                        <button className={styles.editClassBtn} onClick={() => openEditClassModal(item)}>
+                                          Editar Classificação
+                                        </button>
                                         <button className={styles.editBtn} onClick={() => openEditWizard(item)}>
                                           Editar
                                         </button>
@@ -1811,6 +1889,91 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
                 {deletingPeriodo ? 'Excluindo…' : `Excluir ${idsPeriodoSelecionado.length} lançamento${idsPeriodoSelecionado.length !== 1 ? 's' : ''}`}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Editar Classificação ── */}
+      {showEditClassModal && editClassItem && (
+        <div className={styles.modalOverlay} onClick={closeEditClassModal}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+
+            <div className={styles.modalHeader}>
+              <h2>Editar Classificação</h2>
+              <button className={styles.closeBtn} onClick={closeEditClassModal} aria-label="Fechar">✕</button>
+            </div>
+
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 16 }}>
+              {editClassItem.descricao ?? '—'}
+            </p>
+
+            {/* Tipo */}
+            <label className={styles.wizardLabel}>Tipo</label>
+            <div className={styles.tipoGrid} style={{ marginBottom: 20 }}>
+              <button
+                className={`${styles.tipoBtn} ${styles.tipoBtnReceita} ${editClassForm.tipo === 'receita' ? styles.tipoBtnSelected : ''}`}
+                onClick={() => setEditClassForm(p => ({ ...p, tipo: 'receita', classificacaoNome: '', grupo: '' }))}
+              >
+                <div className={styles.tipoBtnText}>
+                  <strong>Receita</strong>
+                </div>
+              </button>
+              <button
+                className={`${styles.tipoBtn} ${styles.tipoBtnDespesa} ${editClassForm.tipo === 'despesa' ? styles.tipoBtnSelected : ''}`}
+                onClick={() => setEditClassForm(p => ({ ...p, tipo: 'despesa', classificacaoNome: '', grupo: '' }))}
+              >
+                <div className={styles.tipoBtnText}>
+                  <strong>Despesa</strong>
+                </div>
+              </button>
+            </div>
+
+            {/* Classificação */}
+            {editClassForm.tipo && (
+              <>
+                <label className={styles.wizardLabel}>Classificação</label>
+                <div className={styles.listbox} style={{ marginBottom: 20 }}>
+                  {classificacoes.filter(c => c.tipo === editClassForm.tipo).map(c => (
+                    <button
+                      key={c.id}
+                      className={`${styles.listboxItem} ${editClassForm.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
+                      onClick={() => {
+                        const grupoSugerido = CLASSIFICACAO_TO_GRUPO[c.nome] ?? ''
+                        setEditClassForm(p => ({ ...p, classificacaoNome: c.nome, grupo: grupoSugerido }))
+                      }}
+                    >
+                      <span className={styles.listboxRadio}>{editClassForm.classificacaoNome === c.nome ? '●' : '○'}</span>
+                      {c.nome}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Grupo */}
+                <label className={styles.wizardLabel}>Grupo</label>
+                <div className={styles.listbox} style={{ marginBottom: 20 }}>
+                  {grupos.filter(g => g.tipo === editClassForm.tipo).map(g => (
+                    <button
+                      key={g.id}
+                      className={`${styles.listboxItem} ${editClassForm.grupo === g.nome ? styles.listboxItemSelected : ''}`}
+                      onClick={() => setEditClassForm(p => ({ ...p, grupo: g.nome }))}
+                    >
+                      <span className={styles.listboxRadio}>{editClassForm.grupo === g.nome ? '●' : '○'}</span>
+                      {g.nome}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {editClassError && <p className={styles.error}>{editClassError}</p>}
+
+            <button
+              className={styles.submit}
+              disabled={editClassSaving || !editClassForm.tipo || !editClassForm.classificacaoNome || !editClassForm.grupo.trim()}
+              onClick={salvarClassificacao}
+            >
+              {editClassSaving ? 'Salvando…' : 'Salvar classificação'}
+            </button>
           </div>
         </div>
       )}

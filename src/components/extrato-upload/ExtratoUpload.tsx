@@ -327,11 +327,11 @@ function detectarColunas(headers: string[]): {
     // 2. Contém "categoria 1" (ex: "sub-categoria 1" não bate, mas "categoria 1 ..." bate)
     const i2 = normHeaders.findIndex(h => h.startsWith('categoria 1'))
     if (i2 >= 0) return i2
-    // 3. Contém "classificac"
-    const i3 = normHeaders.findIndex(h => h.includes('classificac'))
+    // 3. Exato "categoria" (sem número) — ex: CliniCorp usa coluna "Categoria"
+    const i3 = normHeaders.findIndex(h => h === 'categoria')
     if (i3 >= 0) return i3
-    // 4. Exato "categoria" (sem número)
-    const i4 = normHeaders.findIndex(h => h === 'categoria')
+    // 4. Contém "classificac"
+    const i4 = normHeaders.findIndex(h => h.includes('classificac'))
     if (i4 >= 0) return i4
     // 5. Começa com "categoria" (último recurso — pega "categoria 1", "categoria 2", etc.)
     return normHeaders.findIndex(h => h.startsWith('categoria'))
