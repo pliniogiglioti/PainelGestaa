@@ -635,7 +635,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       classificacoes: Map<string, { total: number; items: DreLancamento[] }>
     }>()
     for (const l of lancamentosFiltrados) {
-      const gKey = l.grupo || 'Sem grupo'
+      const gKey = CLASSIFICACAO_TO_GRUPO[l.classificacao] ?? l.grupo ?? 'Sem grupo'
       const cKey = l.classificacao || 'Sem classificação'
       const tipo = (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') as 'receita' | 'despesa'
       if (!grupoMap.has(gKey)) grupoMap.set(gKey, { total: 0, tipo, classificacoes: new Map() })
