@@ -785,6 +785,93 @@
 .userDropdownName { font-weight: 600; }
 .userDropdownEmail { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
+/* ── Skeleton loading (shimmer) ── */
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 0 8px;
+}
+
+.skeletonRow {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  height: 56px;
+  background: var(--bg-elevated);
+  overflow: hidden;
+  position: relative;
+}
+
+.skeletonRow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.055) 38%,
+    rgba(255,255,255,0.11) 50%,
+    rgba(255,255,255,0.055) 62%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position:  200% 0; }
+}
+
+.skeletonInner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 100%;
+}
+
+.skeletonBadge {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.07);
+  flex-shrink: 0;
+}
+
+.skeletonLine {
+  height: 11px;
+  border-radius: 6px;
+  background: rgba(255,255,255,0.07);
+}
+
+.skeletonLineWide  { width: 200px; }
+.skeletonLineShort { width: 90px; margin-left: auto; }
+
+/* ── "Últimos 3 meses" shortcut button ── */
+
+.shortcutBtn {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  align-self: flex-end;
+}
+
+.shortcutBtn:hover {
+  border-color: var(--gold);
+  color: var(--gold);
+  background: rgba(201,162,42,0.06);
+}
+
 /* ── Accordion lançamentos ── */
 
 .emptyAccordion {
