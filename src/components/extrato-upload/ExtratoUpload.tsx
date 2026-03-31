@@ -386,17 +386,72 @@ function formatarData(raw: unknown): string {
     return d.toLocaleDateString('pt-BR', { timeZone: 'UTC' })
   }
   const s = String(raw).trim()
+
+  // Já no formato correto DD/MM/AAAA
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s
+
+  // ISO YYYY-MM-DD (pode ter hora no final)
   if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
     const [y, m, d] = s.split('-')
-    return `${d.slice(0,2)}/${m}/${y}`
+    return `${d.slice(0, 2)}/${m}/${y}`
   }
+
+  // YYYY/MM/DD ou YYYY.MM.DD
+  if (/^\d{4}[\/\.]\d{2}[\/\.]\d{2}$/.test(s)) {
+    const parts = s.split(/[\/\.]/)
+    return `${parts[2]}/${parts[1]}/${parts[0]}`
+  }
+
+  // DD-MM-YYYY, D-M-YY, DD.MM.YYYY, D.M.YY
+  if (/^\d{1,2}[-\.]\d{1,2}[-\.](\d{2}|\d{4})$/.test(s)) {
+    const parts = s.split(/[-\.]/)
+    const year = parts[2].length === 2 ? '20' + parts[2] : parts[2]
+    return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${year}`
+  }
+
+  // Meses textuais PT/EN (abreviados e por extenso)
+  const mesesMap: Record<string, string> = {
+    jan: '01', fev: '02', feb: '02', mar: '03', abr: '04', apr: '04',
+    mai: '05', may: '05', jun: '06', jul: '07', ago: '08', aug: '08',
+    set: '09', sep: '09', out: '10', oct: '10', nov: '11', dez: '12', dec: '12',
+    janeiro: '01', fevereiro: '02', marco: '03', abril: '04',
+    maio: '05', junho: '06', julho: '07', agosto: '08', setembro: '09',
+    outubro: '10', novembro: '11', dezembro: '12',
+    january: '01', february: '02', march: '03', april: '04',
+    june: '06', july: '07', august: '08', september: '09',
+    october: '10', november: '11', december: '12',
+  }
+  const normMes = (m: string) =>
+    m.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+
+  // "01 jan 2026", "01 Jan 2026", "1 de janeiro de 2026", "01-Jan-2026"
+  const textDateMatch = s
+    .replace(/\s+de\s+/gi, ' ')
+    .match(/^(\d{1,2})[\s\-\/]+([a-z\u00c0-\u00ff]+)[\s\-\/,]+(\d{2,4})$/i)
+  if (textDateMatch) {
+    const [, dia, mon, ano] = textDateMatch
+    const m = mesesMap[normMes(mon)]
+    if (m) {
+      const year = ano.length === 2 ? '20' + ano : ano
+      return `${dia.padStart(2, '0')}/${m}/${year}`
+    }
+  }
+
+  // "Jan 01, 2026" / "January 1, 2026"
+  const enDateMatch = s.match(/^([a-z\u00c0-\u00ff]+)[\s\-\/]+(\d{1,2})[,\s]+(\d{4})$/i)
+  if (enDateMatch) {
+    const [, mon, dia, ano] = enDateMatch
+    const m = mesesMap[normMes(mon)]
+    if (m) return `${dia.padStart(2, '0')}/${m}/${ano}`
+  }
+
   // D/M/AAAA ou D/M/AA sem zeros à esquerda (ex: locale EUA, Google Sheets)
   if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) {
-    const [d, m, y] = s.split('/')
+    const [a, b, y] = s.split('/')
     const year = y.length === 2 ? '20' + y : y
-    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${year}`
+    return `${a.padStart(2, '0')}/${b.padStart(2, '0')}/${year}`
   }
+
   return s
 }
 
