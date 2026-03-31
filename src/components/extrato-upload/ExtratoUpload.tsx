@@ -1127,9 +1127,18 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       const wb = read(buffer, { type: 'array', cellDates: false })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows: unknown[][] = utils.sheet_to_json(ws, { header: 1, defval: '' })
-      // Normaliza células: número → string com 2 casas decimais, resto → string
-      const rowsNorm = rows.map(row =>
-        (row as unknown[]).map(c => typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim())
+      // Detecta a coluna de data para converter seriais Excel corretamente
+      const headerIdxIA = encontrarLinhaCabecalho(rows)
+      const headersIA = (rows[headerIdxIA] as unknown[]).map(h => String(h ?? '').trim())
+      const colsIA = detectarColunas(headersIA)
+      const dataColIdx = colsIA.data
+      // Normaliza células: coluna de data → DD/MM/AAAA; outros números → string decimal; resto → string
+      const rowsNorm = rows.map((row, rowIdx) =>
+        (row as unknown[]).map((c, colIdx) => {
+          if (rowIdx <= headerIdxIA) return String(c ?? '').trim() // preserva cabeçalho e metadados
+          if (colIdx === dataColIdx) return formatarData(c)        // converte serial/data → DD/MM/AAAA
+          return typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim()
+        })
       ).filter(row => row.some(c => c))  // remove linhas totalmente vazias
 
       for (let i = 0; i < rowsNorm.length; i += LINHAS_POR_CHUNK) {
