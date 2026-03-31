@@ -499,8 +499,16 @@ serve(async (req: Request) => {
         return arr.filter((item: unknown) => {
           if (!item || typeof item !== 'object') return false
           const o = item as Record<string, unknown>
-          return o.data && o.descricao && typeof o.valor === 'number' &&
+          const valorOk = typeof o.valor === 'number'
+            || (typeof o.valor === 'string' && parseFloat(String(o.valor).replace(',', '.')) > 0)
+          return o.data && o.descricao && valorOk &&
             (o.tipo === 'receita' || o.tipo === 'despesa')
+        }).map((item: unknown) => {
+          const o = item as Record<string, unknown>
+          return {
+            ...o,
+            valor: typeof o.valor === 'number' ? o.valor : parseFloat(String(o.valor).replace(',', '.')),
+          }
         }) as LancamentoParsed[]
       } catch { return [] }
     }
