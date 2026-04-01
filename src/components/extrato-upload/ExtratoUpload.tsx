@@ -1279,8 +1279,25 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
     setProgresso({ atual: 2, total: 4, label: 'Lendo arquivo' })
     let linhas: LinhaExtrato[] = []
     const temCategoria = await arquivoTemColunaCategoria(file)
+    const isPDF = file.name.toLowerCase().endsWith('.pdf')
 
-    if (!temCategoria) {
+    // Para xlsx/csv: tenta parsePlanilha primeiro — é determinístico e não pula linhas válidas.
+    // A IA só é usada se o parser tradicional não encontrar nenhuma linha (headers não reconhecidos).
+    if (!isPDF) {
+      try {
+        const buffer = await file.arrayBuffer()
+        const linhasBruto = parsePlanilha(buffer)
+        const linhasFiltradas = linhasBruto.filter(l => {
+          if (!/^\d{2}\/\d{2}\/\d{4}$/.test(l.data)) return false
+          const d = l.descricao.toLowerCase().trim()
+          return !/^(total|subtotal|saldo|s\.a\.|resultado|resumo|consolidado)/.test(d)
+        })
+        if (linhasFiltradas.length > 0) linhas = linhasFiltradas
+      } catch { /* segue para IA */ }
+    }
+
+    // IA como fallback: arquivos PDF ou planilhas com estrutura não reconhecida pelo parser local
+    if (linhas.length === 0 && !temCategoria) {
       try {
         linhas = await parseArquivoComIA(file, modelo, (atual, total) => {
           setProgresso({ atual: 2 + atual / total, total: 4, label: 'Lendo arquivo com IA' })
