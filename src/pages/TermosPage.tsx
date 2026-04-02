@@ -2,16 +2,31 @@ import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
 interface TermosPageProps {
-  userId: string
+  userId:   string
+  userName: string
   onAceitar: () => void
 }
 
-export default function TermosPage({ userId, onAceitar }: TermosPageProps) {
-  const [lido,    setLido]    = useState(false)
-  const [aceito,  setAceito]  = useState(false)
-  const [loading, setLoading] = useState(false)
-  const [erro,    setErro]    = useState('')
+export default function TermosPage({ userId, userName, onAceitar }: TermosPageProps) {
+  const [lido,       setLido]       = useState(false)
+  const [aceito,     setAceito]     = useState(false)
+  const [loading,    setLoading]    = useState(false)
+  const [erro,       setErro]       = useState('')
+  const [aceitoEm,   setAceitoEm]   = useState<string | null>(null) // data do aceite já registrado
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Busca aceite existente para exibir data/nome
+  useEffect(() => {
+    supabase
+      .from('termos_aceite')
+      .select('accepted_at')
+      .eq('user_id', userId)
+      .eq('app', 'dfc-clinicscale')
+      .maybeSingle()
+      .then(({ data }) => {
+        if (data?.accepted_at) setAceitoEm(data.accepted_at)
+      })
+  }, [userId])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -34,13 +49,26 @@ export default function TermosPage({ userId, onAceitar }: TermosPageProps) {
       app:        'dfc-clinicscale',
       user_agent: navigator.userAgent,
     })
-    if (error && error.code !== '23505') { // 23505 = unique violation (já aceitou)
+    if (error && error.code !== '23505') {
       setErro('Erro ao registrar aceite. Tente novamente.')
       setLoading(false)
       return
     }
     setLoading(false)
     onAceitar()
+  }
+
+  const formatarData = (iso: string) => {
+    const d = new Date(iso)
+    return d.toLocaleString('pt-BR', {
+      day:    '2-digit',
+      month:  '2-digit',
+      year:   'numeric',
+      hour:   '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'America/Sao_Paulo',
+    }) + ' (horário de Brasília)'
   }
 
   return (
@@ -78,17 +106,44 @@ export default function TermosPage({ userId, onAceitar }: TermosPageProps) {
             </p>
           </div>
         </div>
-        <div style={{
-          background: '#1a1506',
-          border: '1px solid #c9a22a40',
-          borderRadius: 8,
-          padding: '10px 14px',
-          fontSize: 13,
-          color: '#c9a22a',
-          lineHeight: 1.5,
-        }}>
-          Leia os termos abaixo por completo antes de prosseguir. Role até o fim para habilitar o botão de aceite.
-        </div>
+        {aceitoEm ? (
+          <div style={{
+            background: '#0d1a0d',
+            border: '1px solid #2e7d3260',
+            borderLeft: '3px solid #4caf50',
+            borderRadius: 8,
+            padding: '12px 16px',
+            fontSize: 13,
+            color: '#81c784',
+            lineHeight: 1.6,
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: 10,
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4caf50" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+              <polyline points="22 4 12 14.01 9 11.01"/>
+            </svg>
+            <div>
+              <strong style={{ color: '#a5d6a7' }}>Termos aceitos</strong>
+              <br />
+              Assinado por <strong style={{ color: '#a5d6a7' }}>{userName}</strong> em{' '}
+              <strong style={{ color: '#a5d6a7' }}>{formatarData(aceitoEm)}</strong>
+            </div>
+          </div>
+        ) : (
+          <div style={{
+            background: '#1a1506',
+            border: '1px solid #c9a22a40',
+            borderRadius: 8,
+            padding: '10px 14px',
+            fontSize: 13,
+            color: '#c9a22a',
+            lineHeight: 1.5,
+          }}>
+            Leia os termos abaixo por completo antes de prosseguir. Role até o fim para habilitar o botão de aceite.
+          </div>
+        )}
       </div>
 
       {/* Corpo com scroll */}

@@ -213,6 +213,7 @@ function App() {
         <ErrorBoundary>
           <TermosPage
             userId={userId!}
+            userName={user.name}
             onAceitar={() => {
               setTermosAceitos(true)
               navigate('/analise-dre')
