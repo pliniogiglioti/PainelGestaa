@@ -254,6 +254,7 @@ function App() {
             <EmpresaGatePage
               onSelecionar={selecionarEmpresa}
               onVoltar={() => navigate('/')}
+              onVerTermos={() => navigate('/analise-dre/termospage')}
             />
           </ErrorBoundary>
         )

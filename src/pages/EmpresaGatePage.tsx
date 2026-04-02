@@ -8,6 +8,8 @@ interface Props {
   onSelecionar: (empresa: Empresa) => void
   /** Voltar para a home */
   onVoltar: () => void
+  /** Navegar para os termos de uso deste app */
+  onVerTermos: () => void
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
@@ -150,7 +152,7 @@ function ConfirmDeleteModal({
   )
 }
 
-export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
+export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }: Props) {
   const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
@@ -531,6 +533,25 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar }: Props) {
           onConfirm={handleDeletarEmpresa}
         />
       )}
+
+      <footer style={{ textAlign: 'center', padding: '24px 0 32px', marginTop: 8 }}>
+        <button
+          type="button"
+          onClick={onVerTermos}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 12,
+            color: '#555',
+            textDecoration: 'underline',
+            textUnderlineOffset: 3,
+            padding: 0,
+          }}
+        >
+          Termos de Uso e Política de Privacidade — DFC ClinicScale
+        </button>
+      </footer>
     </div>
   )
 }
