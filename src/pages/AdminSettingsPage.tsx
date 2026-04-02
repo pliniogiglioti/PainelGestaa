@@ -104,6 +104,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [savingUserId,    setSavingUserId]    = useState<string | null>(null)
   const [expiresDrafts,   setExpiresDrafts]   = useState<Record<string, string>>({})
   const [savingExpiryId,  setSavingExpiryId]  = useState<string | null>(null)
+  const [confirmDelete,   setConfirmDelete]   = useState<Profile | null>(null)
+  const [deleteCheck,     setDeleteCheck]     = useState(false)
+  const [deletingId,      setDeletingId]      = useState<string | null>(null)
+  const [deleteErro,      setDeleteErro]      = useState('')
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -307,6 +311,29 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     }
 
     setSavingExpiryId(null)
+  }
+
+  const deletarUsuario = async (usuario: Profile) => {
+    setDeletingId(usuario.id)
+    setDeleteErro('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const { data, error } = await supabase.functions.invoke('delete-user', {
+        body: { userId: usuario.id },
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      if (error || data?.error) {
+        setDeleteErro(data?.error ?? error?.message ?? 'Erro ao deletar usuário.')
+        setDeletingId(null)
+        return
+      }
+      setUsuarios(atual => atual.filter(u => u.id !== usuario.id))
+      setConfirmDelete(null)
+      setDeleteCheck(false)
+    } catch (e) {
+      setDeleteErro(e instanceof Error ? e.message : 'Erro ao deletar usuário.')
+    }
+    setDeletingId(null)
   }
 
   const enviarConvite = async () => {
@@ -606,6 +633,57 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
             {addUserOk && <p className={styles.ok}>{addUserOk}</p>}
 
+            {/* Modal de confirmação de delete */}
+            {confirmDelete && (
+              <div className={styles.modalOverlay}>
+                <div className={styles.modalBox}>
+                  <div className={styles.modalIcon}>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff453a" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="3 6 5 6 21 6"/>
+                      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                      <path d="M10 11v6"/>
+                      <path d="M14 11v6"/>
+                      <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                    </svg>
+                  </div>
+                  <h3 className={styles.modalTitle}>Deletar usuário</h3>
+                  <p className={styles.modalDesc}>
+                    Você está prestes a deletar permanentemente a conta de{' '}
+                    <strong>{confirmDelete.name ?? confirmDelete.email ?? 'este usuário'}</strong>.
+                  </p>
+                  <div className={styles.modalWarning}>
+                    <p>⚠ Todos os dados do usuário serão perdidos permanentemente.</p>
+                    <p>⚠ Esta ação não poderá ser revertida.</p>
+                  </div>
+                  <label className={styles.modalCheckLabel}>
+                    <input
+                      type="checkbox"
+                      checked={deleteCheck}
+                      onChange={e => setDeleteCheck(e.target.checked)}
+                    />
+                    Entendo que todos os dados serão perdidos permanentemente e que esta ação não pode ser desfeita.
+                  </label>
+                  {deleteErro && <p className={styles.erro}>{deleteErro}</p>}
+                  <div className={styles.modalActions}>
+                    <button
+                      className={styles.btnSecondary}
+                      onClick={() => { setConfirmDelete(null); setDeleteCheck(false); setDeleteErro('') }}
+                      disabled={!!deletingId}
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      className={styles.btnDanger}
+                      onClick={() => deletarUsuario(confirmDelete)}
+                      disabled={!deleteCheck || !!deletingId}
+                    >
+                      {deletingId === confirmDelete.id ? 'Deletando...' : 'Deletar permanentemente'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Tabela de usuários */}
             {usuariosLoading && <p className={styles.hint}>Carregando usuários...</p>}
 
@@ -620,12 +698,13 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       <th className={styles.th}>Status</th>
                       <th className={styles.th}>Expiração</th>
                       <th className={styles.th}>Desde</th>
+                      <th className={styles.th}>Ações</th>
                     </tr>
                   </thead>
                   <tbody>
                     {usuarios.length === 0 && (
                       <tr>
-                        <td className={styles.td} colSpan={6} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td className={styles.td} colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           Nenhum usuário encontrado.
                         </td>
                       </tr>
@@ -683,6 +762,18 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           )}
                         </td>
                         <td className={styles.td}>{formatDate(u.created_at)}</td>
+                        <td className={styles.td}>
+                          {u.role === 'user' && (
+                            <button
+                              type="button"
+                              className={styles.deleteBtn}
+                              onClick={() => { setConfirmDelete(u); setDeleteCheck(false); setDeleteErro('') }}
+                              title="Deletar usuário"
+                            >
+                              Deletar
+                            </button>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>

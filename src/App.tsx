@@ -143,6 +143,13 @@ function App() {
       .then(({ data }) => setTermosAceitos(!!data))
   }, [userId])
 
+  // Redireciona para termos quando usuário tenta acessar DFC sem ter aceitado
+  useEffect(() => {
+    if (termosAceitos === false && pathname === '/analise-dre') {
+      navigate('/analise-dre/termospage')
+    }
+  }, [termosAceitos, pathname])
+
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname)
     window.addEventListener('popstate', onPopState)
@@ -224,8 +231,8 @@ function App() {
     }
 
     if (pathname === '/analise-dre') {
-      // Aguarda verificação de termos
-      if (termosAceitos === null) {
+      // Aguarda verificação de termos ou redireciona (via useEffect abaixo)
+      if (termosAceitos === null || termosAceitos === false) {
         return (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -241,12 +248,6 @@ function App() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         )
-      }
-
-      // Redireciona para aceitar termos se ainda não aceitou
-      if (!termosAceitos) {
-        navigate('/analise-dre/termospage')
-        return null
       }
 
       if (!empresaSelecionada) {
