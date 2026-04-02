@@ -40,6 +40,7 @@ export default function TermosPage({ userId, userName, onAceitar }: TermosPagePr
   }, [])
 
   const handleAceitar = async () => {
+    if (aceitoEm) { onAceitar(); return }
     if (!aceito) return
     setLoading(true)
     setErro('')
@@ -180,14 +181,14 @@ export default function TermosPage({ userId, userName, onAceitar }: TermosPagePr
           display: 'flex',
           alignItems: 'flex-start',
           gap: 10,
-          cursor: lido ? 'pointer' : 'not-allowed',
-          opacity: lido ? 1 : 0.45,
+          cursor: aceitoEm ? 'default' : lido ? 'pointer' : 'not-allowed',
+          opacity: aceitoEm || lido ? 1 : 0.45,
           userSelect: 'none',
         }}>
           <input
             type="checkbox"
-            checked={aceito}
-            disabled={!lido}
+            checked={aceitoEm ? true : aceito}
+            disabled={aceitoEm ? true : !lido}
             onChange={e => setAceito(e.target.checked)}
             style={{ marginTop: 3, accentColor: '#c9a22a', width: 16, height: 16, flexShrink: 0, cursor: 'inherit' }}
           />
@@ -204,27 +205,27 @@ export default function TermosPage({ userId, userName, onAceitar }: TermosPagePr
 
         <button
           onClick={handleAceitar}
-          disabled={!aceito || loading}
+          disabled={aceitoEm ? false : (!aceito || loading)}
           style={{
             width: '100%',
             padding: '14px 0',
             borderRadius: 8,
             border: 'none',
-            background: aceito && !loading
+            background: (aceitoEm || (aceito && !loading))
               ? 'linear-gradient(135deg, #c9a22a, #a07c1a)'
               : '#1e1e1e',
-            color: aceito && !loading ? '#fff' : '#555',
+            color: (aceitoEm || (aceito && !loading)) ? '#fff' : '#555',
             fontSize: 15,
             fontWeight: 600,
-            cursor: aceito && !loading ? 'pointer' : 'not-allowed',
+            cursor: (aceitoEm || (aceito && !loading)) ? 'pointer' : 'not-allowed',
             transition: 'all 0.2s',
             letterSpacing: '0.2px',
           }}
         >
-          {loading ? 'Registrando aceite...' : 'Aceitar e Acessar a Plataforma'}
+          {loading ? 'Registrando aceite...' : aceitoEm ? 'Acessar a Plataforma' : 'Aceitar e Acessar a Plataforma'}
         </button>
 
-        {!lido && (
+        {!lido && !aceitoEm && (
           <p style={{ margin: 0, fontSize: 12, color: '#555', textAlign: 'center' }}>
             Role até o fim do documento para habilitar o aceite.
           </p>
