@@ -381,6 +381,30 @@ export interface Database {
         }
         Relationships: []
       }
+      termos_aceite: {
+        Row: {
+          id:          string
+          user_id:     string
+          version:     string
+          app:         string
+          accepted_at: string
+          ip_address:  string | null
+          user_agent:  string | null
+        }
+        Insert: {
+          id?:         string
+          user_id:     string
+          version?:    string
+          app?:        string
+          accepted_at?: string
+          ip_address?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          accepted_at?: string
+        }
+        Relationships: []
+      }
       dre_classificacao_historico: {
         Row: {
           id:                    string
@@ -446,6 +470,7 @@ export type ForumTopic         = Database['public']['Tables']['forum_topics']['R
 export type ForumReply                  = Database['public']['Tables']['forum_replies']['Row']
 export type DreClassificacaoHistorico  = Database['public']['Tables']['dre_classificacao_historico']['Row']
 export type UserInvitation             = Database['public']['Tables']['user_invitations']['Row']
+export type TermosAceite               = Database['public']['Tables']['termos_aceite']['Row']
 
 // ── Extended types with joined data ──────────────────────────────────────
 

@@ -8,6 +8,7 @@ import AnaliseDrePage from './pages/AnaliseDrePage'
 import EmpresaGatePage from './pages/EmpresaGatePage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
+import TermosPage from './pages/TermosPage'
 import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
@@ -42,11 +43,13 @@ async function validarUsuarioAtivo(session: Session) {
 
 function App() {
   const [user,             setUser]             = useState<User | null>(null)
+  const [userId,           setUserId]           = useState<string | null>(null)
   const [loading,          setLoading]          = useState(true)
   const [showRegister,     setShowRegister]     = useState(false)
   const [pathname,         setPathname]         = useState(window.location.pathname)
   const [isInviteFlow,     setIsInviteFlow]     = useState(false)
   const [inviteEmail,      setInviteEmail]      = useState('')
+  const [termosAceitos,    setTermosAceitos]    = useState<boolean | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -78,12 +81,19 @@ function App() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
         const permitido = await validarUsuarioAtivo(session)
-        setUser(permitido ? sessionToUser(session) : null)
-        if (permitido && session.user.email && hash.includes('type=invite')) {
-          setInviteEmail(session.user.email)
+        if (permitido) {
+          setUser(sessionToUser(session))
+          setUserId(session.user.id)
+          if (session.user.email && hash.includes('type=invite')) {
+            setInviteEmail(session.user.email)
+          }
+        } else {
+          setUser(null)
+          setUserId(null)
         }
       } else {
         setUser(null)
+        setUserId(null)
       }
       setLoading(false)
     })
@@ -92,22 +102,46 @@ function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!session) {
         setUser(null)
+        setUserId(null)
+        setTermosAceitos(null)
         return
       }
 
       void (async () => {
         const permitido = await validarUsuarioAtivo(session)
-        setUser(permitido ? sessionToUser(session) : null)
-        // Detecta quando o usuário chega pelo link de convite
-        if (permitido && event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
-          setIsInviteFlow(true)
-          setInviteEmail(session.user.email)
+        if (permitido) {
+          setUser(sessionToUser(session))
+          setUserId(session.user.id)
+          // Detecta quando o usuário chega pelo link de convite
+          if (event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
+            setIsInviteFlow(true)
+            setInviteEmail(session.user.email)
+          }
+        } else {
+          setUser(null)
+          setUserId(null)
+          setTermosAceitos(null)
         }
       })()
     })
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // Verifica aceite de termos sempre que o userId mudar
+  useEffect(() => {
+    if (!userId) {
+      setTermosAceitos(null)
+      return
+    }
+    supabase
+      .from('termos_aceite')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('app', 'dfc-clinicscale')
+      .maybeSingle()
+      .then(({ data }) => setTermosAceitos(!!data))
+  }, [userId])
 
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname)
@@ -118,6 +152,8 @@ function App() {
   const handleLogout = async () => {
     localStorage.removeItem('empresa_selecionada')
     await supabase.auth.signOut()
+    setTermosAceitos(null)
+    setUserId(null)
     // onAuthStateChange will set user to null automatically
   }
 
@@ -172,7 +208,46 @@ function App() {
       )
     }
 
+    if (pathname === '/analise-dre/termospage') {
+      return (
+        <ErrorBoundary>
+          <TermosPage
+            userId={userId!}
+            onAceitar={() => {
+              setTermosAceitos(true)
+              navigate('/analise-dre')
+            }}
+          />
+        </ErrorBoundary>
+      )
+    }
+
     if (pathname === '/analise-dre') {
+      // Aguarda verificação de termos
+      if (termosAceitos === null) {
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            height: '100vh', background: '#080808',
+          }}>
+            <div style={{
+              width: 28, height: 28,
+              border: '3px solid #1e1e1e',
+              borderTopColor: '#c9a22a',
+              borderRadius: '50%',
+              animation: 'spin 0.7s linear infinite',
+            }} />
+            <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+          </div>
+        )
+      }
+
+      // Redireciona para aceitar termos se ainda não aceitou
+      if (!termosAceitos) {
+        navigate('/analise-dre/termospage')
+        return null
+      }
+
       if (!empresaSelecionada) {
         return (
           <ErrorBoundary>
