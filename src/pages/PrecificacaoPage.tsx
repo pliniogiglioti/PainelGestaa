@@ -996,20 +996,17 @@ function VendaModal({
 
 function ApresentacaoVendaModal({
   venda,
-  precos,
   taxaMaquinaPercent,
   taxaBoletoPercent,
   onClose,
 }: {
   venda: VendaCard
-  precos: EmpresaPreco[]
   taxaMaquinaPercent: number
   taxaBoletoPercent: number
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
-  const [itensApresentacao, setItensApresentacao] = useState(venda.itens)
-  const subtotal = calculateSubtotal(itensApresentacao)
+  const subtotal = calculateSubtotal(venda.itens)
   const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'boleto'>('cartao')
   const [parcelasSelecionadas, setParcelasSelecionadas] = useState(String(venda.max_parcelas))
   const [precoAvista, setPrecoAvista] = useState(
@@ -1027,30 +1024,6 @@ function ApresentacaoVendaModal({
   const taxaAplicada = usandoCartao ? taxaMaquinaPercent : taxaBoletoPercent
   const resumo = buildFormaPagamento(baseApresentacao, qtdParcelas, taxaAplicada, entradaAplicada)
   const parcelasApresentacao = buildParcelas(baseApresentacao, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
-  const sugestoesUpsell = precos
-    .filter(item => !itensApresentacao.some(vendaItem => vendaItem.empresa_preco_id === item.id))
-    .sort((a, b) => b.preco - a.preco)
-    .slice(0, 3)
-
-  const handleAddUpsell = (item: EmpresaPreco) => {
-    setItensApresentacao(prev => ([
-      ...prev,
-      {
-        id: `upsell-${item.id}`,
-        venda_id: venda.id,
-        empresa_preco_id: item.id,
-        descricao: item.nome_produto,
-        preco_unitario: item.preco,
-        quantidade: 1,
-        created_at: new Date().toISOString(),
-      },
-    ]))
-    setPrecoAvista(prev => {
-      const valorAtual = parsePreco(prev)
-      const proximoValor = valorAtual > 0 ? valorAtual + item.preco : subtotal + item.preco
-      return proximoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    })
-  }
 
   return (
     <div
@@ -1137,26 +1110,6 @@ function ApresentacaoVendaModal({
               </div>
             )}
           </div>
-
-          {sugestoesUpsell.length > 0 && (
-            <div className={styles.presentationBlock}>
-              <h3 className={styles.sectionTitle}>Sugestões para aumentar a venda</h3>
-              <div className={styles.anchorGrid}>
-                {sugestoesUpsell.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={styles.anchorCard}
-                    onClick={() => handleAddUpsell(item)}
-                  >
-                    <span>{item.nome_produto}</span>
-                    <strong>{formatCurrency(item.preco)}</strong>
-                    <small>Adicionar agora</small>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
 
           <div className={styles.presentationTotals}>
             {resumo.entradaAplicada > 0 && (
@@ -1860,7 +1813,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {vendaApresentacao && (
         <ApresentacaoVendaModal
           venda={vendaApresentacao}
-          precos={precos}
           taxaMaquinaPercent={taxaMaquinaPercent}
           taxaBoletoPercent={taxaBoletoPercent}
           onClose={() => setVendaApresentacao(null)}
