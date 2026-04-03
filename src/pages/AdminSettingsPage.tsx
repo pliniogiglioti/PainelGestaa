@@ -891,9 +891,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                         </span>
                       </div>
 
-                      <div className={styles.userMetaRow}>
-                        <div className={styles.userMetaItem}>
-                          <span className={styles.userCardLabel}>Status</span>
+                      <div className={styles.userMetaInlineRow}>
+                        <div className={styles.userMetaInlineItem}>
+                          <span className={styles.userCardLabel}>Status -</span>
                           {u.role !== 'admin' ? (
                             <button
                               type="button"
@@ -914,8 +914,8 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           )}
                         </div>
 
-                        <div className={styles.userMetaItem}>
-                          <span className={styles.userCardLabel}>Expiração</span>
+                        <div className={styles.userMetaInlineItem}>
+                          <span className={styles.userCardLabel}>Expiração -</span>
                           {u.role !== 'admin' ? (
                             <div className={styles.expiryEditor}>
                               <input
@@ -939,8 +939,8 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           )}
                         </div>
 
-                        <div className={styles.userMetaItem}>
-                          <span className={styles.userCardLabel}>Desde</span>
+                        <div className={styles.userMetaInlineItem}>
+                          <span className={styles.userCardLabel}>Desde -</span>
                           <span className={styles.userCardValue}>{formatDate(u.created_at)}</span>
                         </div>
                       </div>

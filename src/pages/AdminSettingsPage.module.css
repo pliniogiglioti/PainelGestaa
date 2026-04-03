@@ -466,20 +466,22 @@
   background: rgba(255,255,255,0.02);
 }
 
-.userMetaRow {
-  display: grid;
-  grid-template-columns: 1fr 1.2fr auto;
-  gap: 12px;
-}
-
-.userMetaItem {
+.userMetaInlineRow {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.02);
+}
+
+.userMetaInlineItem {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -846,8 +848,12 @@
     max-width: none;
   }
 
-  .userMetaRow {
-    grid-template-columns: 1fr;
+  .userMetaInlineRow {
+    align-items: flex-start;
+  }
+
+  .userMetaInlineItem {
+    width: 100%;
   }
 
   .deleteBtn {
