@@ -519,6 +519,416 @@
   background: rgba(201, 73, 73, 0.12);
 }
 
+.saleModal {
+  max-width: 1120px;
+}
+
+.saleForm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.saleFormMain,
+.saleFormSidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.saleForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 340px);
+  gap: 18px;
+}
+
+.modalTextarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.addItemPanel,
+.saleSummaryCard {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.02);
+  padding: 14px;
+}
+
+.addItemHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sectionHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.addItemRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 86px auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.qtyInput {
+  text-align: center;
+}
+
+.saleItemList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.saleItemRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.saleItemRow:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.saleItemName {
+  display: block;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.saleItemMeta {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.saleItemActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.saleItemTotal {
+  color: var(--gold-light);
+  white-space: nowrap;
+}
+
+.removeButton,
+.dangerButton {
+  border: 1px solid rgba(201, 73, 73, 0.28);
+  background: rgba(201, 73, 73, 0.1);
+  color: #ffadad;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.removeButton:hover,
+.dangerButton:hover {
+  background: rgba(201, 73, 73, 0.16);
+  border-color: rgba(201, 73, 73, 0.42);
+}
+
+.summaryLine,
+.parcelaRow,
+.presentationItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summaryLine {
+  padding: 8px 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.summaryLine strong {
+  color: var(--gold-light);
+}
+
+.parcelasList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.parcelaRow {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+}
+
+.parcelaValues {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.parcelaValues strong {
+  color: var(--gold-light);
+}
+
+.parcelaValues small {
+  color: var(--text-muted);
+}
+
+.salesGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.saleCard {
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(201, 162, 42, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.saleCardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.saleCardEyebrow {
+  margin: 0 0 4px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+}
+
+.saleClient {
+  margin: 0;
+  font-size: 20px;
+  color: var(--text);
+}
+
+.saleBadge {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 7px 10px;
+  background: rgba(201, 162, 42, 0.12);
+  border: 1px solid rgba(201, 162, 42, 0.28);
+  color: var(--gold-light);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.saleMetrics {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.saleMetric {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.saleMetric span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.saleMetric strong {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.saleItemsPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saleItemPreviewRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.saleItemPreviewRow strong {
+  white-space: nowrap;
+}
+
+.saleParcelasPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saleParcelaBadge {
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(201, 162, 42, 0.08);
+  border: 1px solid rgba(201, 162, 42, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.saleParcelaBadge span {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.saleParcelaBadge strong {
+  font-size: 13px;
+  color: var(--gold-light);
+}
+
+.saleCardActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.presentationModal {
+  max-width: 920px;
+}
+
+.presentationHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.presentationEyebrow {
+  margin: 0 0 8px;
+  color: var(--gold);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.presentationTitle {
+  margin: 0;
+  font-size: 28px;
+  color: var(--text);
+}
+
+.presentationBody {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.presentationBlock {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(255,255,255,0.02);
+}
+
+.presentationItems {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.presentationItem {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.presentationTotals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.presentationTotalCard {
+  border-radius: 18px;
+  padding: 18px;
+  background: rgba(201, 162, 42, 0.12);
+  border: 1px solid rgba(201, 162, 42, 0.24);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presentationTotalCard span {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.presentationTotalCard strong {
+  font-size: 28px;
+  color: var(--text);
+}
+
+.presentationOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.presentationOption {
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.presentationOption span,
+.presentationOption small {
+  color: var(--text-muted);
+}
+
+.presentationOption strong {
+  font-size: 22px;
+  color: var(--gold-light);
+}
+
 .modalCancel,
 .modalSubmit {
   padding: 10px 16px;
@@ -577,6 +987,15 @@
   .headerActions {
     margin-left: 0;
   }
+
+  .saleForm {
+    grid-template-columns: 1fr;
+  }
+
+  .saleMetrics,
+  .presentationTotals {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 640px) {
@@ -619,6 +1038,34 @@
 
   .calcLayout,
   .calcHighlights {
+    grid-template-columns: 1fr;
+  }
+
+  .addItemHeader,
+  .saleCardHeader,
+  .saleItemRow,
+  .presentationHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .addItemRow {
+    grid-template-columns: 1fr;
+  }
+
+  .saleItemActions,
+  .saleCardActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .saleMetrics,
+  .presentationTotals,
+  .presentationOptions {
+    grid-template-columns: 1fr;
+  }
+
+  .salesGrid {
     grid-template-columns: 1fr;
   }
 

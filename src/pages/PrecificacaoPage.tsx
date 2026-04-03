@@ -2,7 +2,13 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
-import type { Empresa, EmpresaPreco, EmpresaPrecificacaoConfig } from '../lib/types'
+import type {
+  Empresa,
+  EmpresaPreco,
+  EmpresaPrecificacaoConfig,
+  EmpresaVenda,
+  EmpresaVendaItem,
+} from '../lib/types'
 
 interface PrecificacaoPageProps {
   empresa: Empresa
@@ -10,7 +16,7 @@ interface PrecificacaoPageProps {
   onVoltar: () => void
 }
 
-type ViewMode = 'home' | 'lista'
+type ViewMode = 'vendas' | 'lista'
 
 type CalculadoraForm = {
   custoInsumos: string
@@ -29,6 +35,18 @@ type ConfiguracaoGeralForm = {
   impostosPercent: string
   comissoesPercent: string
   taxaMaquinaPercent: string
+}
+
+type VendaItemDraft = {
+  id: string
+  empresaPrecoId: string | null
+  descricao: string
+  precoUnitario: number
+  quantidade: number
+}
+
+type VendaCard = EmpresaVenda & {
+  itens: EmpresaVendaItem[]
 }
 
 const IconBack = () => (
@@ -53,9 +71,25 @@ const IconUpload = () => (
 )
 
 const IconTag = () => (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M20.59 13.41 13.41 20.6a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
     <line x1="7" y1="7" x2="7.01" y2="7" />
+  </svg>
+)
+
+const IconEye = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+)
+
+const IconReceipt = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-3 2V3Z" />
+    <line x1="8" y1="7" x2="16" y2="7" />
+    <line x1="8" y1="11" x2="16" y2="11" />
+    <line x1="8" y1="15" x2="13" y2="15" />
   </svg>
 )
 
@@ -144,6 +178,37 @@ function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
     comissoesPercent: config.comissoesPercent,
     taxaMaquinaPercent: config.taxaMaquinaPercent,
   }
+}
+
+function calculateSubtotal(itens: Array<{ preco_unitario: number; quantidade: number }>) {
+  return itens.reduce((total, item) => total + item.preco_unitario * item.quantidade, 0)
+}
+
+function buildParcelas(subtotal: number, maxParcelas: number, taxaMaquinaPercent: number) {
+  const parcelas = Math.max(1, Math.floor(maxParcelas || 1))
+  const taxa = taxaMaquinaPercent > 0 && taxaMaquinaPercent < 100
+    ? taxaMaquinaPercent / 100
+    : 0
+
+  return Array.from({ length: parcelas }, (_, index) => {
+    const parcela = index + 1
+    const totalCobrado = taxa > 0 ? subtotal / (1 - taxa) : subtotal
+    return {
+      parcela,
+      totalCobrado,
+      valorParcela: totalCobrado / parcela,
+    }
+  })
+}
+
+function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
+  return itens.map(item => ({
+    id: item.id,
+    empresaPrecoId: item.empresa_preco_id,
+    descricao: item.descricao,
+    precoUnitario: item.preco_unitario,
+    quantidade: item.quantidade,
+  }))
 }
 
 function PrecoModal({
@@ -553,19 +618,352 @@ function ConfiguracaoGeralModal({
   )
 }
 
+function VendaModal({
+  precos,
+  taxaMaquinaPercent,
+  initialVenda,
+  saving,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  precos: EmpresaPreco[]
+  taxaMaquinaPercent: number
+  initialVenda?: VendaCard | null
+  saving: boolean
+  error: string
+  onClose: () => void
+  onSubmit: (payload: {
+    id?: string
+    clienteNome: string
+    observacoes: string
+    maxParcelas: number
+    itens: VendaItemDraft[]
+  }) => Promise<void>
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
+  const [clienteNome, setClienteNome] = useState(initialVenda?.cliente_nome ?? '')
+  const [observacoes, setObservacoes] = useState(initialVenda?.observacoes ?? '')
+  const [maxParcelas, setMaxParcelas] = useState(String(initialVenda?.max_parcelas ?? 1))
+  const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
+  const [selectedPrecoId, setSelectedPrecoId] = useState('')
+  const [selectedQtd, setSelectedQtd] = useState('1')
+  const [erroLocal, setErroLocal] = useState('')
+
+  const subtotal = calculateSubtotal(itens.map(item => ({
+    preco_unitario: item.precoUnitario,
+    quantidade: item.quantidade,
+  })))
+  const parcelasPreview = buildParcelas(subtotal, Number(maxParcelas) || 1, taxaMaquinaPercent)
+
+  const handleAddItem = () => {
+    const precoSelecionado = precos.find(item => item.id === selectedPrecoId)
+    if (!precoSelecionado) {
+      setErroLocal('Selecione um produto da lista.')
+      return
+    }
+
+    const quantidade = Math.max(1, Number(selectedQtd) || 1)
+
+    setItens(prev => [
+      ...prev,
+      {
+        id: `draft-${Date.now()}-${prev.length}`,
+        empresaPrecoId: precoSelecionado.id,
+        descricao: precoSelecionado.nome_produto,
+        precoUnitario: precoSelecionado.preco,
+        quantidade,
+      },
+    ])
+    setSelectedPrecoId('')
+    setSelectedQtd('1')
+    setErroLocal('')
+  }
+
+  const handleRemoveItem = (id: string) => {
+    setItens(prev => prev.filter(item => item.id !== id))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!clienteNome.trim()) {
+      setErroLocal('Informe o nome do cliente.')
+      return
+    }
+
+    if (itens.length === 0) {
+      setErroLocal('Adicione ao menos um produto ou serviço.')
+      return
+    }
+
+    setErroLocal('')
+
+    await onSubmit({
+      id: initialVenda?.id,
+      clienteNome: clienteNome.trim(),
+      observacoes: observacoes.trim(),
+      maxParcelas: Math.max(1, Math.floor(Number(maxParcelas) || 1)),
+      itens,
+    })
+  }
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.saleModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div>
+            <h2 className={styles.modalTitle}>{initialVenda ? 'Editar venda' : 'Nova venda'}</h2>
+            <p className={styles.calcItemName}>Monte a proposta do cliente com os produtos e serviços da sua lista.</p>
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <form className={styles.saleForm} onSubmit={handleSubmit}>
+          <div className={styles.saleFormMain}>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Nome do cliente</span>
+              <input
+                className={styles.modalInput}
+                value={clienteNome}
+                onChange={e => {
+                  setClienteNome(e.target.value)
+                  setErroLocal('')
+                }}
+                placeholder="Ex: Maria Silva"
+                autoFocus
+                disabled={saving}
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Observações</span>
+              <textarea
+                className={`${styles.modalInput} ${styles.modalTextarea}`}
+                value={observacoes}
+                onChange={e => setObservacoes(e.target.value)}
+                placeholder="Anotações para a proposta"
+                rows={3}
+                disabled={saving}
+              />
+            </label>
+
+            <div className={styles.addItemPanel}>
+              <div className={styles.addItemHeader}>
+                <h3 className={styles.sectionTitle}>Produtos e serviços</h3>
+                <span className={styles.sectionHint}>Adicione itens da sua lista de preços</span>
+              </div>
+
+              <div className={styles.addItemRow}>
+                <select
+                  className={styles.modalInput}
+                  value={selectedPrecoId}
+                  onChange={e => setSelectedPrecoId(e.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">Selecione um produto</option>
+                  {precos.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome_produto} - {formatCurrency(item.preco)}
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  className={`${styles.modalInput} ${styles.qtyInput}`}
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={selectedQtd}
+                  onChange={e => setSelectedQtd(e.target.value)}
+                  disabled={saving}
+                />
+
+                <button type="button" className={styles.btnSecondary} onClick={handleAddItem} disabled={saving}>
+                  <IconPlus /> Adicionar
+                </button>
+              </div>
+
+              {itens.length === 0 ? (
+                <p className={styles.sectionHint}>Nenhum item adicionado ainda.</p>
+              ) : (
+                <div className={styles.saleItemList}>
+                  {itens.map(item => (
+                    <div key={item.id} className={styles.saleItemRow}>
+                      <div>
+                        <strong className={styles.saleItemName}>{item.descricao}</strong>
+                        <span className={styles.saleItemMeta}>
+                          {item.quantidade}x {formatCurrency(item.precoUnitario)}
+                        </span>
+                      </div>
+                      <div className={styles.saleItemActions}>
+                        <strong className={styles.saleItemTotal}>
+                          {formatCurrency(item.precoUnitario * item.quantidade)}
+                        </strong>
+                        <button type="button" className={styles.removeButton} onClick={() => handleRemoveItem(item.id)}>
+                          Remover
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.saleFormSidebar}>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Divisão de preço</span>
+              <select
+                className={styles.modalInput}
+                value={maxParcelas}
+                onChange={e => setMaxParcelas(e.target.value)}
+                disabled={saving}
+              >
+                {Array.from({ length: 12 }, (_, index) => index + 1).map(parcela => (
+                  <option key={parcela} value={parcela}>
+                    Até {parcela}x
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className={styles.saleSummaryCard}>
+              <h3 className={styles.sectionTitle}>Resumo da venda</h3>
+              <div className={styles.summaryLine}>
+                <span>Subtotal</span>
+                <strong>{formatCurrency(subtotal)}</strong>
+              </div>
+              <div className={styles.summaryLine}>
+                <span>Taxa da maquininha</span>
+                <strong>{formatPercent(taxaMaquinaPercent)}</strong>
+              </div>
+            </div>
+
+            <div className={styles.saleSummaryCard}>
+              <h3 className={styles.sectionTitle}>Preços por parcela</h3>
+              <div className={styles.parcelasList}>
+                {parcelasPreview.map(opcao => (
+                  <div key={opcao.parcela} className={styles.parcelaRow}>
+                    <span>{opcao.parcela}x</span>
+                    <div className={styles.parcelaValues}>
+                      <strong>{formatCurrency(opcao.valorParcela)}</strong>
+                      <small>Total {formatCurrency(opcao.totalCobrado)}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
+
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : initialVenda ? 'Salvar venda' : 'Criar venda'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function ApresentacaoVendaModal({
+  venda,
+  taxaMaquinaPercent,
+  onClose,
+}: {
+  venda: VendaCard
+  taxaMaquinaPercent: number
+  onClose: () => void
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose)
+  const subtotal = calculateSubtotal(venda.itens)
+  const parcelas = buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent)
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.presentationModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.presentationHeader}>
+          <div>
+            <p className={styles.presentationEyebrow}>Apresentação</p>
+            <h2 className={styles.presentationTitle}>{venda.cliente_nome}</h2>
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <div className={styles.presentationBody}>
+          <div className={styles.presentationBlock}>
+            <h3 className={styles.sectionTitle}>Itens da proposta</h3>
+            <div className={styles.presentationItems}>
+              {venda.itens.map(item => (
+                <div key={item.id} className={styles.presentationItem}>
+                  <span>{item.descricao}</span>
+                  <strong>{formatCurrency(item.preco_unitario * item.quantidade)}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className={styles.presentationTotals}>
+            <div className={styles.presentationTotalCard}>
+              <span>Subtotal</span>
+              <strong>{formatCurrency(subtotal)}</strong>
+            </div>
+            <div className={styles.presentationTotalCard}>
+              <span>Preço sugerido no cartão</span>
+              <strong>{formatCurrency(parcelas[0]?.totalCobrado ?? subtotal)}</strong>
+            </div>
+          </div>
+
+          <div className={styles.presentationBlock}>
+            <h3 className={styles.sectionTitle}>Opções para o cliente</h3>
+            <div className={styles.presentationOptions}>
+              {parcelas.map(opcao => (
+                <div key={opcao.parcela} className={styles.presentationOption}>
+                  <span>{opcao.parcela}x de</span>
+                  <strong>{formatCurrency(opcao.valorParcela)}</strong>
+                  <small>Total {formatCurrency(opcao.totalCobrado)}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
-  const [view, setView] = useState<ViewMode>('home')
+  const [view, setView] = useState<ViewMode>('vendas')
   const [showPrecoModal, setShowPrecoModal] = useState(false)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [showVendaModal, setShowVendaModal] = useState(false)
   const [precos, setPrecos] = useState<EmpresaPreco[]>([])
+  const [vendas, setVendas] = useState<VendaCard[]>([])
   const [savingPreco, setSavingPreco] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
-  const [loadingPrecos, setLoadingPrecos] = useState(false)
+  const [savingVenda, setSavingVenda] = useState(false)
+  const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
-  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [vendaEditando, setVendaEditando] = useState<VendaCard | null>(null)
+  const [vendaApresentacao, setVendaApresentacao] = useState<VendaCard | null>(null)
   const [configGeral, setConfigGeral] = useState<EmpresaPrecificacaoConfig | null>(null)
   const [configForm, setConfigForm] = useState<ConfiguracaoGeralForm>({
     royaltiesPercent: '',
@@ -574,11 +972,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     comissoesPercent: '',
     taxaMaquinaPercent: '',
   })
+  const taxaMaquinaPercent = configGeral?.taxa_maquina_percent ?? parsePreco(configForm.taxaMaquinaPercent)
 
   useEffect(() => {
     let active = true
 
-    const validarAcesso = async () => {
+    const carregarWorkspace = async () => {
       setLoading(true)
 
       const { data: authData } = await supabase.auth.getUser()
@@ -617,9 +1016,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         setCanManage(true)
       }
 
-      if (active) {
-        setLoadingPrecos(true)
-      }
+      if (!active) return
+
+      setLoadingWorkspace(true)
+      setError('')
 
       const { data: precosData, error: precosError } = await supabase
         .from('empresa_precos')
@@ -628,41 +1028,122 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         .eq('ativo', true)
         .order('nome_produto', { ascending: true })
 
-      if (!precosError && active) {
-        setPrecos(precosData ?? [])
-      }
-
-      if (precosError && active) {
-        setError(precosError.message ?? 'Não foi possível carregar a lista de preços.')
-      }
-
       const { data: configData, error: configError } = await supabase
         .from('empresa_precificacao_config')
         .select('*')
         .eq('empresa_id', empresa.id)
         .maybeSingle()
 
-      if (!configError && active) {
-        setConfigGeral(configData)
-        setConfigForm(configToForm(configData))
-      }
+      const { data: vendasData, error: vendasError } = await supabase
+        .from('empresa_vendas')
+        .select('*')
+        .eq('empresa_id', empresa.id)
+        .eq('ativo', true)
+        .order('created_at', { ascending: false })
 
-      if (configError && active) {
-        setError(configError.message ?? 'Não foi possível carregar a configuração geral da precificação.')
+      let itensAgrupados = new Map<string, EmpresaVendaItem[]>()
+
+      if (!vendasError && vendasData && vendasData.length > 0) {
+        const vendaIds = vendasData.map(item => item.id)
+        const { data: itensData, error: itensError } = await supabase
+          .from('empresa_venda_itens')
+          .select('*')
+          .in('venda_id', vendaIds)
+          .order('created_at', { ascending: true })
+
+        if (itensError && active) {
+          setError(itensError.message ?? 'Não foi possível carregar os itens das vendas.')
+        } else {
+          itensAgrupados = (itensData ?? []).reduce((map, item) => {
+            const atual = map.get(item.venda_id) ?? []
+            atual.push(item)
+            map.set(item.venda_id, atual)
+            return map
+          }, new Map<string, EmpresaVendaItem[]>())
+        }
       }
 
       if (active) {
-        setLoadingPrecos(false)
+        if (precosError) {
+          setError(precosError.message ?? 'Não foi possível carregar a lista de preços.')
+        } else {
+          setPrecos(precosData ?? [])
+        }
+
+        if (configError) {
+          setError(configError.message ?? 'Não foi possível carregar a configuração geral da precificação.')
+        } else {
+          setConfigGeral(configData)
+          setConfigForm(configToForm(configData))
+        }
+
+        if (vendasError) {
+          setError(vendasError.message ?? 'Não foi possível carregar as vendas.')
+        } else {
+          setVendas(
+            (vendasData ?? []).map(venda => ({
+              ...venda,
+              itens: itensAgrupados.get(venda.id) ?? [],
+            })),
+          )
+        }
+
+        setLoadingWorkspace(false)
         setLoading(false)
       }
     }
 
-    void validarAcesso()
+    void carregarWorkspace()
 
     return () => {
       active = false
     }
   }, [empresa.id, onTrocarEmpresa])
+
+  const refreshVendas = async () => {
+    const { data: vendasData, error: vendasError } = await supabase
+      .from('empresa_vendas')
+      .select('*')
+      .eq('empresa_id', empresa.id)
+      .eq('ativo', true)
+      .order('created_at', { ascending: false })
+
+    if (vendasError) {
+      setError(vendasError.message ?? 'Não foi possível recarregar as vendas.')
+      return
+    }
+
+    if (!vendasData || vendasData.length === 0) {
+      setVendas([])
+      return
+    }
+
+    const vendaIds = vendasData.map(item => item.id)
+    const { data: itensData, error: itensError } = await supabase
+      .from('empresa_venda_itens')
+      .select('*')
+      .in('venda_id', vendaIds)
+      .order('created_at', { ascending: true })
+
+    if (itensError) {
+      setError(itensError.message ?? 'Não foi possível recarregar os itens das vendas.')
+      return
+    }
+
+    const itensAgrupados = (itensData ?? []).reduce((map, item) => {
+      const atual = map.get(item.venda_id) ?? []
+      atual.push(item)
+      map.set(item.venda_id, atual)
+      return map
+    }, new Map<string, EmpresaVendaItem[]>())
+
+    setVendas(
+      vendasData.map(venda => ({
+        ...venda,
+        itens: itensAgrupados.get(venda.id) ?? [],
+      })),
+    )
+  }
 
   const handleAddPreco = async (item: { nome: string; preco: number }) => {
     setSavingPreco(true)
@@ -732,6 +1213,113 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setSavingConfig(false)
   }
 
+  const handleSaveVenda = async (payload: {
+    id?: string
+    clienteNome: string
+    observacoes: string
+    maxParcelas: number
+    itens: VendaItemDraft[]
+  }) => {
+    setSavingVenda(true)
+    setError('')
+    setFeedback('')
+
+    let vendaId = payload.id
+
+    if (vendaId) {
+      const { error: updateError } = await supabase
+        .from('empresa_vendas')
+        .update({
+          cliente_nome: payload.clienteNome,
+          observacoes: payload.observacoes || null,
+          max_parcelas: payload.maxParcelas,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', vendaId)
+
+      if (updateError) {
+        setError(updateError.message ?? 'Não foi possível atualizar a venda.')
+        setSavingVenda(false)
+        return
+      }
+
+      const { error: deleteError } = await supabase
+        .from('empresa_venda_itens')
+        .delete()
+        .eq('venda_id', vendaId)
+
+      if (deleteError) {
+        setError(deleteError.message ?? 'Não foi possível atualizar os itens da venda.')
+        setSavingVenda(false)
+        return
+      }
+    } else {
+      const { data, error: insertError } = await supabase
+        .from('empresa_vendas')
+        .insert({
+          empresa_id: empresa.id,
+          cliente_nome: payload.clienteNome,
+          observacoes: payload.observacoes || null,
+          max_parcelas: payload.maxParcelas,
+        })
+        .select('*')
+        .single()
+
+      if (insertError || !data) {
+        setError(insertError?.message ?? 'Não foi possível criar a venda.')
+        setSavingVenda(false)
+        return
+      }
+
+      vendaId = data.id
+    }
+
+    const itensInsert = payload.itens.map(item => ({
+      venda_id: vendaId!,
+      empresa_preco_id: item.empresaPrecoId,
+      descricao: item.descricao,
+      preco_unitario: item.precoUnitario,
+      quantidade: item.quantidade,
+    }))
+
+    const { error: itensInsertError } = await supabase
+      .from('empresa_venda_itens')
+      .insert(itensInsert)
+
+    if (itensInsertError) {
+      setError(itensInsertError.message ?? 'Não foi possível salvar os itens da venda.')
+      setSavingVenda(false)
+      return
+    }
+
+    await refreshVendas()
+    setFeedback(payload.id ? 'Venda atualizada com sucesso.' : 'Venda criada com sucesso.')
+    setShowVendaModal(false)
+    setVendaEditando(null)
+    setSavingVenda(false)
+  }
+
+  const handleDeleteVenda = async (vendaId: string) => {
+    setError('')
+    setFeedback('')
+
+    const { error: deleteError } = await supabase
+      .from('empresa_vendas')
+      .update({
+        ativo: false,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', vendaId)
+
+    if (deleteError) {
+      setError(deleteError.message ?? 'Não foi possível remover a venda.')
+      return
+    }
+
+    await refreshVendas()
+    setFeedback('Venda removida com sucesso.')
+  }
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -762,96 +1350,94 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
             Trocar empresa
           </button>
-          {canManage && view === 'home' && (
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={() => {
-                setError('')
-                setFeedback('')
-                setView('lista')
-              }}
-            >
-              <IconPlus /> Minha lista de preço
-            </button>
-          )}
         </div>
       </div>
 
-      {view === 'home' ? (
-        <div className={styles.emptyState}>
-          <IconTag />
-          <p className={styles.emptyTitle}>Minha lista de preço</p>
-          <p className={styles.emptyText}>
-            Comece criando seus preços manualmente ou, depois, importe uma lista pronta.
-          </p>
-          {canManage ? (
+      <div className={styles.workspace}>
+        <div className={styles.workspaceHeader}>
+          <div>
+            <p className={styles.workspaceEyebrow}>Precificação</p>
+            <h2 className={styles.workspaceTitle}>{view === 'vendas' ? 'Vendas' : 'Minha lista de preço'}</h2>
+          </div>
+          <div className={styles.workspaceActions}>
             <button
               type="button"
-              className={styles.btnPrimary}
+              className={view === 'vendas' ? styles.btnPrimary : styles.btnSecondary}
+              onClick={() => {
+                setError('')
+                setFeedback('')
+                setView('vendas')
+              }}
+            >
+              <IconReceipt /> Vendas
+            </button>
+            <button
+              type="button"
+              className={view === 'lista' ? styles.btnPrimary : styles.btnSecondary}
               onClick={() => {
                 setError('')
                 setFeedback('')
                 setView('lista')
               }}
             >
-              <IconPlus /> Abrir minha lista de preço
+              <IconTag /> Minha lista de preço
             </button>
-          ) : (
-            <p className={styles.emptyHint}>
-              Você pode visualizar a empresa, mas a gestão da lista de preços ficará disponível para o titular.
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className={styles.workspace}>
-          <div className={styles.workspaceHeader}>
-            <div>
-              <p className={styles.workspaceEyebrow}>Precificação</p>
-              <h2 className={styles.workspaceTitle}>Minha lista de preço</h2>
-            </div>
-            <div className={styles.workspaceActions}>
-              <button type="button" className={styles.btnSecondary} disabled>
-                <IconUpload /> Importar lista
+            <button type="button" className={styles.btnSecondary} disabled>
+              <IconUpload /> Importar lista
+            </button>
+            {canManage && (
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => {
+                  setError('')
+                  setFeedback('')
+                  setConfigForm(configToForm(configGeral))
+                  setShowConfigModal(true)
+                }}
+              >
+                Configuração geral
               </button>
-              {canManage && (
-                <button
-                  type="button"
-                  className={styles.btnSecondary}
-                  onClick={() => {
-                    setError('')
-                    setFeedback('')
-                    setConfigForm(configToForm(configGeral))
-                    setShowConfigModal(true)
-                  }}
-                >
-                  Configuração geral
-                </button>
-              )}
-              {canManage && (
-                <button
-                  type="button"
-                  className={styles.btnPrimary}
-                  onClick={() => {
-                    setError('')
-                    setFeedback('')
-                    setShowPrecoModal(true)
-                  }}
-                >
-                  <IconPlus /> Criar preços
-                </button>
-              )}
-            </div>
+            )}
+            {canManage && view === 'lista' && (
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={() => {
+                  setError('')
+                  setFeedback('')
+                  setShowPrecoModal(true)
+                }}
+              >
+                <IconPlus /> Criar preços
+              </button>
+            )}
+            {canManage && view === 'vendas' && (
+              <button
+                type="button"
+                className={styles.btnPrimary}
+                onClick={() => {
+                  setError('')
+                  setFeedback('')
+                  setVendaEditando(null)
+                  setShowVendaModal(true)
+                }}
+              >
+                <IconPlus /> Nova venda
+              </button>
+            )}
           </div>
+        </div>
 
-          {feedback && <p className={styles.feedbackSuccess}>{feedback}</p>}
-          {error && <p className={styles.feedbackError}>{error}</p>}
+        {feedback && <p className={styles.feedbackSuccess}>{feedback}</p>}
+        {error && <p className={styles.feedbackError}>{error}</p>}
 
-          {loadingPrecos ? (
-            <div className={styles.blankCanvas}>
-              <p className={styles.blankTitle}>Carregando preços...</p>
-            </div>
-          ) : precos.length === 0 ? (
+        {loadingWorkspace ? (
+          <div className={styles.blankCanvas}>
+            <p className={styles.blankTitle}>Carregando dados...</p>
+          </div>
+        ) : view === 'lista' ? (
+          precos.length === 0 ? (
             <div className={styles.blankCanvas}>
               <p className={styles.blankTitle}>Nenhum preço cadastrado ainda.</p>
               <p className={styles.blankText}>
@@ -881,9 +1467,104 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 ))}
               </div>
             </div>
-          )}
-        </div>
-      )}
+          )
+        ) : vendas.length === 0 ? (
+          <div className={styles.blankCanvas}>
+            <p className={styles.blankTitle}>Nenhuma venda montada ainda.</p>
+            <p className={styles.blankText}>
+              Crie cards com o nome do cliente, adicione produtos da lista e apresente opções de parcelamento.
+            </p>
+          </div>
+        ) : (
+          <div className={styles.salesGrid}>
+            {vendas.map(venda => {
+              const subtotal = calculateSubtotal(venda.itens)
+              const parcelas = buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent)
+
+              return (
+                <article key={venda.id} className={styles.saleCard}>
+                  <div className={styles.saleCardHeader}>
+                    <div>
+                      <p className={styles.saleCardEyebrow}>Cliente</p>
+                      <h3 className={styles.saleClient}>{venda.cliente_nome}</h3>
+                    </div>
+                    <span className={styles.saleBadge}>Até {venda.max_parcelas}x</span>
+                  </div>
+
+                  <div className={styles.saleMetrics}>
+                    <div className={styles.saleMetric}>
+                      <span>Itens</span>
+                      <strong>{venda.itens.length}</strong>
+                    </div>
+                    <div className={styles.saleMetric}>
+                      <span>Subtotal</span>
+                      <strong>{formatCurrency(subtotal)}</strong>
+                    </div>
+                    <div className={styles.saleMetric}>
+                      <span>Preço no cartão</span>
+                      <strong>{formatCurrency(parcelas[0]?.totalCobrado ?? subtotal)}</strong>
+                    </div>
+                  </div>
+
+                  <div className={styles.saleItemsPreview}>
+                    {venda.itens.slice(0, 4).map(item => (
+                      <div key={item.id} className={styles.saleItemPreviewRow}>
+                        <span>{item.descricao}</span>
+                        <strong>{formatCurrency(item.preco_unitario * item.quantidade)}</strong>
+                      </div>
+                    ))}
+                    {venda.itens.length > 4 && (
+                      <p className={styles.sectionHint}>+ {venda.itens.length - 4} itens na proposta</p>
+                    )}
+                  </div>
+
+                  <div className={styles.saleParcelasPreview}>
+                    {parcelas.slice(0, 3).map(opcao => (
+                      <div key={opcao.parcela} className={styles.saleParcelaBadge}>
+                        <span>{opcao.parcela}x</span>
+                        <strong>{formatCurrency(opcao.valorParcela)}</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className={styles.saleCardActions}>
+                    <button
+                      type="button"
+                      className={styles.calcButton}
+                      onClick={() => setVendaApresentacao(venda)}
+                    >
+                      <IconEye /> Modo apresentação
+                    </button>
+                    {canManage && (
+                      <button
+                        type="button"
+                        className={styles.btnSecondary}
+                        onClick={() => {
+                          setError('')
+                          setFeedback('')
+                          setVendaEditando(venda)
+                          setShowVendaModal(true)
+                        }}
+                      >
+                        Editar
+                      </button>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        onClick={() => void handleDeleteVenda(venda.id)}
+                      >
+                        Remover
+                      </button>
+                    )}
+                  </div>
+                </article>
+              )
+            })}
+          </div>
+        )}
+      </div>
 
       {showPrecoModal && (
         <PrecoModal
@@ -910,6 +1591,29 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           onChange={handleConfigChange}
           onClose={() => setShowConfigModal(false)}
           onSubmit={handleSaveConfig}
+        />
+      )}
+
+      {showVendaModal && (
+        <VendaModal
+          precos={precos}
+          taxaMaquinaPercent={taxaMaquinaPercent}
+          initialVenda={vendaEditando}
+          saving={savingVenda}
+          error={error}
+          onClose={() => {
+            setShowVendaModal(false)
+            setVendaEditando(null)
+          }}
+          onSubmit={handleSaveVenda}
+        />
+      )}
+
+      {vendaApresentacao && (
+        <ApresentacaoVendaModal
+          venda={vendaApresentacao}
+          taxaMaquinaPercent={taxaMaquinaPercent}
+          onClose={() => setVendaApresentacao(null)}
         />
       )}
     </div>
