@@ -108,6 +108,8 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [deleteCheck,     setDeleteCheck]     = useState(false)
   const [deletingId,      setDeletingId]      = useState<string | null>(null)
   const [deleteErro,      setDeleteErro]      = useState('')
+  const [savingRoleId,    setSavingRoleId]    = useState<string | null>(null)
+  const [currentUserId,   setCurrentUserId]   = useState<string | null>(null)
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -120,10 +122,15 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       }
       setModelsLoading(false)
     }
+    const fetchCurrentUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setCurrentUserId(user?.id ?? null)
+    }
     fetchModels()
     fetchClassificacoes()
     fetchExemplos()
     fetchUsuarios()
+    fetchCurrentUser()
   }, [])
 
   useEffect(() => {
@@ -311,6 +318,25 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     }
 
     setSavingExpiryId(null)
+  }
+
+  const alternarFuncaoUsuario = async (usuario: Profile) => {
+    if (usuario.id === currentUserId) return
+    const novaFuncao = usuario.role === 'admin' ? 'user' : 'admin'
+    setSavingRoleId(usuario.id)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: novaFuncao })
+      .eq('id', usuario.id)
+
+    if (!error) {
+      setUsuarios(atual => atual.map(item => (
+        item.id === usuario.id ? { ...item, role: novaFuncao } : item
+      )))
+    }
+
+    setSavingRoleId(null)
   }
 
   const deletarUsuario = async (usuario: Profile) => {
@@ -714,9 +740,21 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                         <td className={styles.td}>{u.name ?? '—'}</td>
                         <td className={styles.td}>{u.email ?? '—'}</td>
                         <td className={styles.td}>
-                          <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : styles.roleUser}`}>
-                            {u.role}
-                          </span>
+                          {u.id === currentUserId ? (
+                            <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : styles.roleUser}`}>
+                              {u.role}
+                            </span>
+                          ) : (
+                            <button
+                              type="button"
+                              className={`${styles.roleBadge} ${styles.roleBadgeBtn} ${u.role === 'admin' ? styles.roleAdmin : styles.roleUser}`}
+                              onClick={() => alternarFuncaoUsuario(u)}
+                              disabled={savingRoleId === u.id}
+                              title={`Clique para tornar ${u.role === 'admin' ? 'usuário' : 'admin'}`}
+                            >
+                              {savingRoleId === u.id ? '...' : u.role}
+                            </button>
+                          )}
                         </td>
                         <td className={styles.td}>
                           {u.role === 'user' ? (

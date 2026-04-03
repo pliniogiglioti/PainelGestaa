@@ -437,6 +437,21 @@
   border: 1px solid var(--border);
 }
 
+.roleBadgeBtn {
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.roleBadgeBtn:hover:not(:disabled) {
+  opacity: 0.75;
+  transform: scale(1.05);
+}
+
+.roleBadgeBtn:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
 
 .switch {
   display: inline-flex;
