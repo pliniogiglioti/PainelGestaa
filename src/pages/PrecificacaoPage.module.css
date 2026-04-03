@@ -303,6 +303,12 @@
   transform: translateY(-1px);
 }
 
+.calcButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .priceValue {
   font-size: 14px;
   color: var(--gold-light);

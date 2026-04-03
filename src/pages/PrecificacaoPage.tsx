@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
-import type { Empresa, EmpresaPreco } from '../lib/types'
+import type { Empresa, EmpresaPreco, EmpresaPrecificacaoConfig } from '../lib/types'
 
 interface PrecificacaoPageProps {
   empresa: Empresa
@@ -16,6 +16,14 @@ type CalculadoraForm = {
   custoInsumos: string
   custoMaterialAplicado: string
   custoLaboratorio: string
+  royaltiesPercent: string
+  custoProfissionaisPercent: string
+  impostosPercent: string
+  comissoesPercent: string
+  taxaMaquinaPercent: string
+}
+
+type ConfiguracaoGeralForm = {
   royaltiesPercent: string
   custoProfissionaisPercent: string
   impostosPercent: string
@@ -112,6 +120,29 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoTotal,
     margem,
     resultadoMargem: margem < 50 ? 'Baixa - Rever Preço' : 'Adequada',
+  }
+}
+
+function configToForm(config: EmpresaPrecificacaoConfig | null): ConfiguracaoGeralForm {
+  return {
+    royaltiesPercent: config ? String(config.royalties_percent) : '',
+    custoProfissionaisPercent: config ? String(config.custo_profissionais_percent) : '',
+    impostosPercent: config ? String(config.impostos_percent) : '',
+    comissoesPercent: config ? String(config.comissoes_percent) : '',
+    taxaMaquinaPercent: config ? String(config.taxa_maquina_percent) : '',
+  }
+}
+
+function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
+  CalculadoraForm,
+  'royaltiesPercent' | 'custoProfissionaisPercent' | 'impostosPercent' | 'comissoesPercent' | 'taxaMaquinaPercent'
+> {
+  return {
+    royaltiesPercent: config.royaltiesPercent,
+    custoProfissionaisPercent: config.custoProfissionaisPercent,
+    impostosPercent: config.impostosPercent,
+    comissoesPercent: config.comissoesPercent,
+    taxaMaquinaPercent: config.taxaMaquinaPercent,
   }
 }
 
@@ -214,9 +245,11 @@ function PrecoModal({
 
 function CalculadoraPrecificacaoModal({
   item,
+  configPadrao,
   onClose,
 }: {
   item: EmpresaPreco
+  configPadrao: ConfiguracaoGeralForm
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
@@ -224,11 +257,7 @@ function CalculadoraPrecificacaoModal({
     custoInsumos: '',
     custoMaterialAplicado: '',
     custoLaboratorio: '',
-    royaltiesPercent: '',
-    custoProfissionaisPercent: '',
-    impostosPercent: '',
-    comissoesPercent: '',
-    taxaMaquinaPercent: '',
+    ...configFormToCalculadoraForm(configPadrao),
   })
 
   const calculo = calcularPrecificacao(item.preco, form)
@@ -418,6 +447,112 @@ function CalculadoraPrecificacaoModal({
   )
 }
 
+function ConfiguracaoGeralModal({
+  form,
+  saving,
+  error,
+  onChange,
+  onClose,
+  onSubmit,
+}: {
+  form: ConfiguracaoGeralForm
+  saving: boolean
+  error: string
+  onChange: (field: keyof ConfiguracaoGeralForm, value: string) => void
+  onClose: () => void
+  onSubmit: (e: React.FormEvent) => Promise<void>
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Configuração geral</h2>
+          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <form className={styles.modalForm} onSubmit={onSubmit}>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+            <input
+              className={styles.modalInput}
+              value={form.royaltiesPercent}
+              onChange={e => onChange('royaltiesPercent', e.target.value)}
+              inputMode="decimal"
+              placeholder="Ex: 9"
+              disabled={saving}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Custo profissionais (%)</span>
+            <input
+              className={styles.modalInput}
+              value={form.custoProfissionaisPercent}
+              onChange={e => onChange('custoProfissionaisPercent', e.target.value)}
+              inputMode="decimal"
+              placeholder="Ex: 30"
+              disabled={saving}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Impostos (%)</span>
+            <input
+              className={styles.modalInput}
+              value={form.impostosPercent}
+              onChange={e => onChange('impostosPercent', e.target.value)}
+              inputMode="decimal"
+              placeholder="Ex: 8"
+              disabled={saving}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Comissões vendas (%)</span>
+            <input
+              className={styles.modalInput}
+              value={form.comissoesPercent}
+              onChange={e => onChange('comissoesPercent', e.target.value)}
+              inputMode="decimal"
+              placeholder="Ex: 3"
+              disabled={saving}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Taxa máquina (%)</span>
+            <input
+              className={styles.modalInput}
+              value={form.taxaMaquinaPercent}
+              onChange={e => onChange('taxaMaquinaPercent', e.target.value)}
+              inputMode="decimal"
+              placeholder="Ex: 2"
+              disabled={saving}
+            />
+          </label>
+
+          {error && <p className={styles.formError}>{error}</p>}
+
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar configuração'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
@@ -425,10 +560,20 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [showPrecoModal, setShowPrecoModal] = useState(false)
   const [precos, setPrecos] = useState<EmpresaPreco[]>([])
   const [savingPreco, setSavingPreco] = useState(false)
+  const [savingConfig, setSavingConfig] = useState(false)
   const [loadingPrecos, setLoadingPrecos] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
+  const [showConfigModal, setShowConfigModal] = useState(false)
+  const [configGeral, setConfigGeral] = useState<EmpresaPrecificacaoConfig | null>(null)
+  const [configForm, setConfigForm] = useState<ConfiguracaoGeralForm>({
+    royaltiesPercent: '',
+    custoProfissionaisPercent: '',
+    impostosPercent: '',
+    comissoesPercent: '',
+    taxaMaquinaPercent: '',
+  })
 
   useEffect(() => {
     let active = true
@@ -491,6 +636,21 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         setError(precosError.message ?? 'Não foi possível carregar a lista de preços.')
       }
 
+      const { data: configData, error: configError } = await supabase
+        .from('empresa_precificacao_config')
+        .select('*')
+        .eq('empresa_id', empresa.id)
+        .maybeSingle()
+
+      if (!configError && active) {
+        setConfigGeral(configData)
+        setConfigForm(configToForm(configData))
+      }
+
+      if (configError && active) {
+        setError(configError.message ?? 'Não foi possível carregar a configuração geral da precificação.')
+      }
+
       if (active) {
         setLoadingPrecos(false)
         setLoading(false)
@@ -532,6 +692,44 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setShowPrecoModal(false)
     setSavingPreco(false)
     setView('lista')
+  }
+
+  const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
+    setConfigForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSaveConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingConfig(true)
+    setError('')
+    setFeedback('')
+
+    const payload = {
+      empresa_id: empresa.id,
+      royalties_percent: parsePreco(configForm.royaltiesPercent),
+      custo_profissionais_percent: parsePreco(configForm.custoProfissionaisPercent),
+      impostos_percent: parsePreco(configForm.impostosPercent),
+      comissoes_percent: parsePreco(configForm.comissoesPercent),
+      taxa_maquina_percent: parsePreco(configForm.taxaMaquinaPercent),
+    }
+
+    const { data, error: saveError } = await supabase
+      .from('empresa_precificacao_config')
+      .upsert(payload)
+      .select('*')
+      .single()
+
+    if (saveError) {
+      setError(saveError.message ?? 'Não foi possível salvar a configuração geral.')
+      setSavingConfig(false)
+      return
+    }
+
+    setConfigGeral(data)
+    setConfigForm(configToForm(data))
+    setFeedback('Configuração geral salva com sucesso.')
+    setShowConfigModal(false)
+    setSavingConfig(false)
   }
 
   if (loading) {
@@ -619,6 +817,20 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
               {canManage && (
                 <button
                   type="button"
+                  className={styles.btnSecondary}
+                  onClick={() => {
+                    setError('')
+                    setFeedback('')
+                    setConfigForm(configToForm(configGeral))
+                    setShowConfigModal(true)
+                  }}
+                >
+                  Configuração geral
+                </button>
+              )}
+              {canManage && (
+                <button
+                  type="button"
                   className={styles.btnPrimary}
                   onClick={() => {
                     setError('')
@@ -685,7 +897,19 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {itemCalculadora && (
         <CalculadoraPrecificacaoModal
           item={itemCalculadora}
+          configPadrao={configToForm(configGeral)}
           onClose={() => setItemCalculadora(null)}
+        />
+      )}
+
+      {showConfigModal && (
+        <ConfiguracaoGeralModal
+          form={configForm}
+          saving={savingConfig}
+          error={error}
+          onChange={handleConfigChange}
+          onClose={() => setShowConfigModal(false)}
+          onSubmit={handleSaveConfig}
         />
       )}
     </div>

@@ -207,6 +207,38 @@ export interface Database {
         }
         Relationships: []
       }
+      empresa_precificacao_config: {
+        Row: {
+          empresa_id:                  string
+          royalties_percent:           number
+          custo_profissionais_percent: number
+          impostos_percent:            number
+          comissoes_percent:           number
+          taxa_maquina_percent:        number
+          created_at:                  string
+          updated_at:                  string
+        }
+        Insert: {
+          empresa_id:                  string
+          royalties_percent?:          number
+          custo_profissionais_percent?: number
+          impostos_percent?:           number
+          comissoes_percent?:          number
+          taxa_maquina_percent?:       number
+          created_at?:                 string
+          updated_at?:                 string
+        }
+        Update: {
+          empresa_id?:                  string
+          royalties_percent?:           number
+          custo_profissionais_percent?: number
+          impostos_percent?:            number
+          comissoes_percent?:           number
+          taxa_maquina_percent?:        number
+          updated_at?:                  string
+        }
+        Relationships: []
+      }
       dre_lancamentos: {
         Row: {
           id:                string
@@ -661,6 +693,7 @@ export type App                = Database['public']['Tables']['apps']['Row']
 export type Empresa            = Database['public']['Tables']['empresas']['Row']
 export type EmpresaMembro      = Database['public']['Tables']['empresa_membros']['Row']
 export type EmpresaPreco       = Database['public']['Tables']['empresa_precos']['Row']
+export type EmpresaPrecificacaoConfig = Database['public']['Tables']['empresa_precificacao_config']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
 export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']['Row']
