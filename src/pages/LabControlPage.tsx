@@ -54,6 +54,48 @@ function addBusinessDays(startDate: string, businessDays: number) {
   return formatIsoDate(date)
 }
 
+function normalizeWhatsAppNumber(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return null
+
+  if (digits.startsWith('55')) {
+    return digits.length === 12 || digits.length === 13 ? digits : null
+  }
+
+  return digits.length === 10 || digits.length === 11 ? `55${digits}` : null
+}
+
+function formatWhatsAppNumber(value: string) {
+  const normalized = normalizeWhatsAppNumber(value)
+  if (!normalized) return value
+
+  const country = normalized.slice(0, 2)
+  const area = normalized.slice(2, 4)
+  const number = normalized.slice(4)
+
+  if (number.length === 9) {
+    return `+${country} (${area}) ${number.slice(0, 5)}-${number.slice(5)}`
+  }
+
+  return `+${country} (${area}) ${number.slice(0, 4)}-${number.slice(4)}`
+}
+
+function formatWhatsAppInput(value: string) {
+  const digits = value.replace(/\D/g, '').slice(0, 13)
+  if (!digits) return ''
+
+  const withoutCountry = digits.startsWith('55') ? digits.slice(2) : digits
+  if (withoutCountry.length <= 2) return `(${withoutCountry}`
+  if (withoutCountry.length <= 6) return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2)}`
+  if (withoutCountry.length <= 10) return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2, 6)}-${withoutCountry.slice(6)}`
+  return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2, 7)}-${withoutCountry.slice(7, 11)}`
+}
+
+function buildWhatsAppUrl(value: string) {
+  const normalized = normalizeWhatsAppNumber(value)
+  return normalized ? `https://wa.me/${normalized}` : null
+}
+
 function formatDate(d: string | null) {
   if (!d) return '—'
   const [y, m, day] = d.split('-')
@@ -179,7 +221,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
   const [form, setForm] = useState<LabFormState>({
     nome:             lab?.nome ?? '',
     cnpj:             lab?.cnpj ?? '',
-    telefone:         lab?.telefone ?? '',
+    telefone:         formatWhatsAppInput(lab?.telefone ?? ''),
     email:            lab?.email ?? '',
     endereco:         lab?.endereco ?? '',
     prazo_medio_dias: String(lab?.prazo_medio_dias ?? 7),
@@ -192,16 +234,24 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [f]: e.target.value }))
 
+  const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setForm(prev => ({ ...prev, telefone: formatWhatsAppInput(e.target.value) }))
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!form.nome.trim()) { setError('Nome é obrigatório.'); return }
+    const telefoneNormalizado = form.telefone.trim() ? normalizeWhatsAppNumber(form.telefone) : null
+    if (form.telefone.trim() && !telefoneNormalizado) {
+      setError('Informe um WhatsApp válido com DDD. Ex.: (11) 99999-9999'); return
+    }
     setSaving(true); setError('')
 
     const payload = {
       empresa_id:       empresaId,
       nome:             form.nome.trim(),
       cnpj:             form.cnpj.trim()     || null,
-      telefone:         form.telefone.trim() || null,
+      telefone:         telefoneNormalizado,
       email:            form.email.trim()    || null,
       endereco:         form.endereco.trim() || null,
       prazo_medio_dias: parseInt(form.prazo_medio_dias) || 7,
@@ -232,8 +282,8 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
             <input className={styles.input} value={form.cnpj} onChange={set('cnpj')} placeholder="00.000.000/0000-00" />
           </div>
           <div className={styles.formField}>
-            <label className={styles.label}>Telefone</label>
-            <input className={styles.input} value={form.telefone} onChange={set('telefone')} placeholder="(00) 00000-0000" />
+            <label className={styles.label}>WhatsApp</label>
+            <input className={styles.input} value={form.telefone} onChange={handleTelefoneChange} placeholder="(11) 99999-9999" />
           </div>
           <div className={styles.formField}>
             <label className={styles.label}>E-mail</label>
@@ -1135,6 +1185,7 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
   const active  = enviosEmAndamento.length
   const valorEmAndamento = enviosEmAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
   const recent  = [...envios].slice(0, 5)
+  const whatsappUrl = lab.telefone ? buildWhatsAppUrl(lab.telefone) : null
 
   return (
     <div className={styles.labCard} onClick={onClick}>
@@ -1148,7 +1199,18 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
       </div>
 
       <div className={styles.labCardContact}>
-        {lab.telefone && <span className={styles.labCardContactItem}><IconPhone /> {lab.telefone}</span>}
+        {lab.telefone && whatsappUrl && (
+          <a
+            className={`${styles.labCardContactItem} ${styles.labCardContactLink}`}
+            href={whatsappUrl}
+            target="_blank"
+            rel="noreferrer"
+            onClick={e => e.stopPropagation()}
+          >
+            <IconPhone /> {formatWhatsAppNumber(lab.telefone)}
+          </a>
+        )}
+        {lab.telefone && !whatsappUrl && <span className={styles.labCardContactItem}><IconPhone /> {lab.telefone}</span>}
         {lab.email    && <span className={styles.labCardContactItem}><IconMail /> {lab.email}</span>}
         {lab.prazo_medio_dias > 0 && (
           <span className={styles.labCardContactItem}><IconClock /> {lab.prazo_medio_dias}d prazo médio</span>
