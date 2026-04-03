@@ -1095,20 +1095,18 @@ function ApresentacaoVendaModal({
           </div>
 
           <div className={styles.presentationTotals}>
+            {resumo.entradaAplicada > 0 && (
+              <div className={styles.presentationTotalCard}>
+                <span>Entrada</span>
+                <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
+              </div>
+            )}
             <div className={styles.presentationTotalCard}>
-              <span>Total dos produtos</span>
-              <strong>{formatCurrency(subtotal)}</strong>
-            </div>
-            <div className={styles.presentationTotalCard}>
-              <span>Entrada</span>
-              <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
-            </div>
-            <div className={styles.presentationTotalCard}>
-              <span>Total da proposta</span>
+              <span>{usandoCartao ? 'Total no cartão' : 'Total no boleto'}</span>
               <strong>{formatCurrency(resumo.totalCobrado)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
-              <span>{usandoCartao ? `Valor em ${resumo.parcelas}x` : 'Pagamento à vista'}</span>
+              <span>{usandoCartao ? `${resumo.parcelas}x no cartão` : 'Boleto à vista'}</span>
               <strong>{formatCurrency(resumo.valorParcela)}</strong>
             </div>
           </div>
@@ -1135,7 +1133,7 @@ function ApresentacaoVendaModal({
                 <div className={`${styles.presentationOption} ${styles.presentationOptionActive}`}>
                   <span>Boleto à vista</span>
                   <strong>{formatCurrency(resumo.totalCobrado)}</strong>
-                  <small>Total com entrada abatida</small>
+                  <small>Pagamento único</small>
                 </div>
               </div>
             )}
