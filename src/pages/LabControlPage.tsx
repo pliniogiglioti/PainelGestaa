@@ -478,6 +478,13 @@ interface EnvioFormState {
   data_envio: string; data_entrega_prometida: string
 }
 
+interface ServicoSelecionado {
+  key: string
+  nome: string
+  preco: number | null
+  origem: 'catalogo' | 'manual'
+}
+
 function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, onSaved }: {
   lab: Lab; precos: LabPreco[]; empresaId: string; userId: string
   envio: LabEnvio | null; colunas: LabKanbanColuna[]
@@ -486,6 +493,28 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   const [step,   setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
+  const [manualNome, setManualNome] = useState('')
+  const [manualPreco, setManualPreco] = useState('')
+  const [servicosSelecionados, setServicosSelecionados] = useState<ServicoSelecionado[]>(() => {
+    if (!envio?.tipo_trabalho?.trim()) return []
+
+    const precoCadastrado = precos.find(p => p.nome_servico === envio.tipo_trabalho)
+    if (precoCadastrado && (envio.preco_servico == null || precoCadastrado.preco === envio.preco_servico)) {
+      return [{
+        key: `preco:${precoCadastrado.id}`,
+        nome: precoCadastrado.nome_servico,
+        preco: precoCadastrado.preco,
+        origem: 'catalogo',
+      }]
+    }
+
+    return [{
+      key: `manual:${envio.id}`,
+      nome: envio.tipo_trabalho,
+      preco: envio.preco_servico ?? null,
+      origem: 'manual',
+    }]
+  })
   const [usarPrazoAutomatico, setUsarPrazoAutomatico] = useState(!envio)
   const [form,   setForm]   = useState<EnvioFormState>({
     tipo_trabalho:          envio?.tipo_trabalho ?? '',
@@ -503,6 +532,23 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       setForm(p => ({ ...p, [f]: e.target.value }))
 
   useEffect(() => {
+    const trabalho = servicosSelecionados
+      .map(servico => servico.nome.trim())
+      .filter(Boolean)
+      .join(' + ')
+
+    const possuiPreco = servicosSelecionados.some(servico => servico.preco != null)
+    const valorTotal = servicosSelecionados.reduce((total, servico) => total + (servico.preco ?? 0), 0)
+    const precoServico = possuiPreco ? String(valorTotal) : ''
+
+    setForm(prev => (
+      prev.tipo_trabalho === trabalho && prev.preco_servico === precoServico
+        ? prev
+        : { ...prev, tipo_trabalho: trabalho, preco_servico: precoServico }
+    ))
+  }, [servicosSelecionados])
+
+  useEffect(() => {
     if (!usarPrazoAutomatico) return
 
     const prazoCalculado = addBusinessDays(form.data_envio, lab.prazo_medio_dias)
@@ -518,19 +564,53 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
     setForm(prev => ({ ...prev, data_entrega_prometida: e.target.value }))
   }
 
-  const selectPreco = (p: LabPreco | null) => {
-    if (!p) {
-      setForm(prev => ({ ...prev, tipo_trabalho: '__custom__', preco_servico: '' }))
-    } else {
-      setForm(prev => ({ ...prev, tipo_trabalho: p.nome_servico, preco_servico: String(p.preco) }))
+  const togglePreco = (p: LabPreco) => {
+    const key = `preco:${p.id}`
+    setServicosSelecionados(prev => (
+      prev.some(servico => servico.key === key)
+        ? prev.filter(servico => servico.key !== key)
+        : [...prev, { key, nome: p.nome_servico, preco: p.preco, origem: 'catalogo' }]
+    ))
+    setError('')
+  }
+
+  const addManualServico = () => {
+    if (!manualNome.trim()) {
+      setError('Informe o nome do serviço manual.')
+      return
     }
+
+    const precoNormalizado = manualPreco.trim().replace(',', '.')
+    const precoConvertido = precoNormalizado === '' ? null : Number(precoNormalizado)
+
+    if (precoNormalizado !== '' && !Number.isFinite(precoConvertido)) {
+      setError('Informe um valor válido para o serviço manual.')
+      return
+    }
+
+    setServicosSelecionados(prev => [
+      ...prev,
+      {
+        key: `manual:${Date.now()}:${prev.length}`,
+        nome: manualNome.trim(),
+        preco: precoConvertido,
+        origem: 'manual',
+      },
+    ])
+    setManualNome('')
+    setManualPreco('')
+    setError('')
+  }
+
+  const removeServico = (key: string) => {
+    setServicosSelecionados(prev => prev.filter(servico => servico.key !== key))
+    setError('')
   }
 
   const nextStep = () => {
     if (step === 1) {
-      const trabalho = form.tipo_trabalho === '__custom__' ? '' : form.tipo_trabalho
-      if (!trabalho.trim() && form.tipo_trabalho !== '__custom__') {
-        setError('Selecione ou informe o tipo de trabalho.'); return
+      if (servicosSelecionados.length === 0) {
+        setError('Selecione ao menos um serviço.'); return
       }
     }
     if (step === 2 && !form.paciente_nome.trim()) {
@@ -540,11 +620,12 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   }
 
   const handleSubmit = async () => {
-    const trabalho = form.tipo_trabalho === '__custom__'
-      ? (document.getElementById('customService') as HTMLInputElement)?.value ?? ''
-      : form.tipo_trabalho
+    const trabalho = form.tipo_trabalho
 
     if (!trabalho.trim()) { setError('Informe o tipo de trabalho.'); return }
+
+    const precoNormalizado = form.preco_servico.trim().replace(',', '.')
+    const precoConvertido = precoNormalizado === '' ? null : Number(precoNormalizado)
 
     setSaving(true); setError('')
     const payload = {
@@ -552,7 +633,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       empresa_id:             empresaId,
       user_id:                userId,
       tipo_trabalho:          trabalho.trim(),
-      preco_servico:          parseFloat(form.preco_servico.replace(',', '.')) || null,
+      preco_servico:          Number.isFinite(precoConvertido) ? precoConvertido : null,
       paciente_nome:          form.paciente_nome.trim(),
       dentes:                 form.dentes.trim() || null,
       cor:                    form.cor || null,
@@ -574,9 +655,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   }
 
   const stepTitles = ['Tipo de Trabalho', 'Dados do Caso', 'Datas', 'Revisão']
-  const displayTrabalho = form.tipo_trabalho === '__custom__'
-    ? (document.getElementById('customService') as HTMLInputElement)?.value ?? ''
-    : form.tipo_trabalho
+  const displayTrabalho = form.tipo_trabalho
 
   return (
     <Modal title={envio ? 'Editar Envio' : `Novo Envio — ${lab.nome}`} onClose={onClose} wide>
@@ -593,14 +672,14 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       {/* ── Step 1: Tipo de trabalho ── */}
       {step === 1 && (
         <div className={styles.stepContent}>
-          <p className={styles.stepHint}>Selecione um serviço da lista de preços ou escolha "Outro" para inserir manualmente.</p>
+          <p className={styles.stepHint}>Selecione um ou mais serviços da lista de preços. Se precisar, adicione também um serviço manual.</p>
           <div className={styles.precosGrid}>
             {precos.map(p => (
               <button
                 key={p.id}
                 type="button"
-                className={`${styles.precoOption} ${form.tipo_trabalho === p.nome_servico ? styles.precoOptionActive : ''}`}
-                onClick={() => selectPreco(p)}
+                className={`${styles.precoOption} ${servicosSelecionados.some(servico => servico.key === `preco:${p.id}`) ? styles.precoOptionActive : ''}`}
+                onClick={() => togglePreco(p)}
               >
                 <span className={styles.precoOptionNome}>{p.nome_servico}</span>
                 <span className={styles.precoOptionValor}>
@@ -608,30 +687,53 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
                 </span>
               </button>
             ))}
-            <button
-              type="button"
-              className={`${styles.precoOption} ${form.tipo_trabalho === '__custom__' ? styles.precoOptionActive : ''}`}
-              onClick={() => selectPreco(null)}
-            >
-              <span className={styles.precoOptionNome}>Outro</span>
-              <span className={styles.precoOptionValor}>Personalizado</span>
-            </button>
           </div>
-          {form.tipo_trabalho === '__custom__' && (
-            <div className={styles.formGrid2} style={{ marginTop: 16 }}>
+          <div className={styles.manualServiceBox}>
+            <div className={styles.manualServiceHeader}>
+              <span>Adicionar serviço manual</span>
+              <span>{servicosSelecionados.length} selecionado(s)</span>
+            </div>
+            <div className={styles.formGrid2}>
               <div className={styles.formField}>
-                <label className={styles.label}>Descrição do serviço *</label>
-                <input id="customService" className={styles.input} placeholder="Ex: Coroa de zircônia" />
+                <label className={styles.label}>Descrição do serviço</label>
+                <input className={styles.input} value={manualNome} onChange={e => setManualNome(e.target.value)} placeholder="Ex: Coroa de zircônia" />
               </div>
               <div className={styles.formField}>
                 <label className={styles.label}>Valor (R$)</label>
-                <input className={styles.input} value={form.preco_servico} onChange={set('preco_servico')} placeholder="0,00" />
+                <input className={styles.input} value={manualPreco} onChange={e => setManualPreco(e.target.value)} placeholder="0,00" />
               </div>
+            </div>
+            <div className={styles.manualServiceActions}>
+              <button type="button" className={styles.btnSecondary} onClick={addManualServico}>
+                <IconPlus /> Adicionar serviço manual
+              </button>
+              <strong className={styles.manualServiceTotal}>
+                Total: {(form.preco_servico.trim() === '' ? 0 : Number(form.preco_servico)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </strong>
+            </div>
+          </div>
+          {servicosSelecionados.length > 0 && (
+            <div className={styles.selectedServicesList}>
+              {servicosSelecionados.map(servico => (
+                <div key={servico.key} className={styles.selectedServiceItem}>
+                  <div className={styles.selectedServiceMeta}>
+                    <span className={styles.selectedServiceName}>{servico.nome}</span>
+                    <span className={styles.selectedServicePrice}>
+                      {servico.preco != null
+                        ? servico.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                        : 'Sem valor'}
+                    </span>
+                  </div>
+                  <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => removeServico(servico.key)} title="Remover serviço">
+                    <IconTrash />
+                  </button>
+                </div>
+              ))}
             </div>
           )}
           {precos.length === 0 && (
             <p className={styles.stepHint} style={{ marginTop: 12 }}>
-              Nenhum serviço na lista de preços. Use "Outro" ou peça ao administrador para cadastrar os serviços.
+              Nenhum serviço na lista de preços. Adicione um serviço manual ou peça ao administrador para cadastrar os serviços.
             </p>
           )}
         </div>
