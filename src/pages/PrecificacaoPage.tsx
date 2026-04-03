@@ -1096,7 +1096,7 @@ function ApresentacaoVendaModal({
 
           <div className={styles.presentationTotals}>
             <div className={styles.presentationTotalCard}>
-              <span>Subtotal</span>
+              <span>Total dos produtos</span>
               <strong>{formatCurrency(subtotal)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
@@ -1104,8 +1104,8 @@ function ApresentacaoVendaModal({
               <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
-              <span>{usandoCartao ? 'Saldo financiado' : 'Saldo no boleto'}</span>
-              <strong>{formatCurrency(resumo.totalCobradoParcelado)}</strong>
+              <span>Total da proposta</span>
+              <strong>{formatCurrency(resumo.totalCobrado)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
               <span>{usandoCartao ? `Valor em ${resumo.parcelas}x` : 'Pagamento à vista'}</span>
@@ -1126,7 +1126,7 @@ function ApresentacaoVendaModal({
                   >
                     <span>{opcao.parcela}x de</span>
                     <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                    <small>Saldo {formatCurrency(opcao.totalCobradoParcelado)}</small>
+                    <small>Total {formatCurrency(opcao.totalProposta)}</small>
                   </button>
                 ))}
               </div>
@@ -1134,8 +1134,8 @@ function ApresentacaoVendaModal({
               <div className={styles.presentationOptions}>
                 <div className={`${styles.presentationOption} ${styles.presentationOptionActive}`}>
                   <span>Boleto à vista</span>
-                  <strong>{formatCurrency(resumo.totalCobradoParcelado)}</strong>
-                  <small>Saldo após a entrada</small>
+                  <strong>{formatCurrency(resumo.totalCobrado)}</strong>
+                  <small>Total com entrada abatida</small>
                 </div>
               </div>
             )}

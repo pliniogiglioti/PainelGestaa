@@ -876,7 +876,7 @@
 }
 
 .presentationModal {
-  max-width: 920px;
+  max-width: 760px;
 }
 
 .presentationHeader {
@@ -896,7 +896,7 @@
 
 .presentationTitle {
   margin: 0;
-  font-size: 28px;
+  font-size: 22px;
   color: var(--text);
 }
 
@@ -973,7 +973,7 @@
 .presentationBlock {
   border: 1px solid var(--border);
   border-radius: 18px;
-  padding: 18px;
+  padding: 14px;
   background: rgba(255,255,255,0.02);
 }
 
@@ -985,24 +985,24 @@
 }
 
 .presentationItem {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text);
 }
 
 .presentationTotals {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
+  gap: 10px;
 }
 
 .presentationTotalCard {
   border-radius: 18px;
-  padding: 18px;
+  padding: 14px;
   background: rgba(201, 162, 42, 0.12);
   border: 1px solid rgba(201, 162, 42, 0.24);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .presentationTotalCard span {
@@ -1011,7 +1011,7 @@
 }
 
 .presentationTotalCard strong {
-  font-size: 28px;
+  font-size: 20px;
   color: var(--text);
 }
 
@@ -1025,11 +1025,11 @@
 .presentationOption {
   border: 1px solid rgba(255,255,255,0.05);
   border-radius: 16px;
-  padding: 16px;
+  padding: 14px;
   background: rgba(255,255,255,0.03);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
@@ -1051,7 +1051,7 @@
 }
 
 .presentationOption strong {
-  font-size: 22px;
+  font-size: 18px;
   color: var(--gold-light);
 }
 
