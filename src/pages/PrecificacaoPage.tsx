@@ -1015,9 +1015,12 @@ function ApresentacaoVendaModal({
   const [precoAvista, setPrecoAvista] = useState(
     subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
   )
+  const [entradaApresentacao, setEntradaApresentacao] = useState(
+    venda.entrada_valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  )
   const precoAvistaCalculado = parsePreco(precoAvista)
   const baseApresentacao = precoAvistaCalculado > 0 ? precoAvistaCalculado : subtotal
-  const entradaAplicada = sanitizeEntrada(baseApresentacao, venda.entrada_valor)
+  const entradaAplicada = sanitizeEntrada(baseApresentacao, parsePreco(entradaApresentacao))
 
   const usandoCartao = formaPagamento === 'cartao'
   const qtdParcelas = usandoCartao ? Math.max(1, Number(parcelasSelecionadas) || 1) : 1
@@ -1074,6 +1077,19 @@ function ApresentacaoVendaModal({
                   onChange={e => setPrecoAvista(e.target.value)}
                   inputMode="decimal"
                   placeholder="Ex: 3.500,00"
+                />
+              </div>
+            </div>
+
+            <div className={styles.presentationSelectorBlock}>
+              <span className={styles.modalLabel}>Entrada</span>
+              <div className={styles.presentationPriceCard}>
+                <input
+                  className={styles.presentationPriceInput}
+                  value={entradaApresentacao}
+                  onChange={e => setEntradaApresentacao(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex: 1.000,00"
                 />
               </div>
             </div>
