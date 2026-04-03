@@ -248,6 +248,7 @@ export interface Database {
           empresa_id:   string
           cliente_nome: string
           observacoes:  string | null
+          entrada_valor: number
           max_parcelas: number
           ativo:        boolean
           created_at:   string
@@ -258,6 +259,7 @@ export interface Database {
           empresa_id:    string
           cliente_nome:  string
           observacoes?:  string | null
+          entrada_valor?: number
           max_parcelas?: number
           ativo?:        boolean
           created_at?:   string
@@ -268,6 +270,7 @@ export interface Database {
           empresa_id?:   string
           cliente_nome?: string
           observacoes?:  string | null
+          entrada_valor?: number
           max_parcelas?: number
           ativo?:        boolean
           updated_at?:   string

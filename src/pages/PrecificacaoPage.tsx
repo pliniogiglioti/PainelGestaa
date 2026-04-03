@@ -186,31 +186,50 @@ function calculateSubtotal(itens: Array<{ preco_unitario: number; quantidade: nu
   return itens.reduce((total, item) => total + item.preco_unitario * item.quantidade, 0)
 }
 
-function buildParcelas(subtotal: number, maxParcelas: number, taxaMaquinaPercent: number) {
+function sanitizeEntrada(subtotal: number, entradaValor: number) {
+  return Math.min(Math.max(entradaValor, 0), subtotal)
+}
+
+function buildParcelas(
+  subtotal: number,
+  maxParcelas: number,
+  taxaMaquinaPercent: number,
+  entradaValor = 0,
+) {
   const parcelas = Math.max(1, Math.floor(maxParcelas || 1))
+  const entradaAplicada = sanitizeEntrada(subtotal, entradaValor)
+  const saldoParcelado = Math.max(subtotal - entradaAplicada, 0)
   const taxa = taxaMaquinaPercent > 0 && taxaMaquinaPercent < 100
     ? taxaMaquinaPercent / 100
     : 0
 
   return Array.from({ length: parcelas }, (_, index) => {
     const parcela = index + 1
-    const totalCobrado = taxa > 0 ? subtotal / (1 - taxa) : subtotal
+    const totalCobradoParcelado = taxa > 0 ? saldoParcelado / (1 - taxa) : saldoParcelado
     return {
       parcela,
-      totalCobrado,
-      valorParcela: totalCobrado / parcela,
+      entradaAplicada,
+      saldoParcelado,
+      totalCobradoParcelado,
+      valorParcela: totalCobradoParcelado / parcela,
+      totalProposta: entradaAplicada + totalCobradoParcelado,
     }
   })
 }
 
-function buildFormaPagamento(subtotal: number, parcelas: number, taxaPercent: number) {
+function buildFormaPagamento(subtotal: number, parcelas: number, taxaPercent: number, entradaValor = 0) {
   const qtdParcelas = Math.max(1, Math.floor(parcelas || 1))
+  const entradaAplicada = sanitizeEntrada(subtotal, entradaValor)
+  const saldoParcelado = Math.max(subtotal - entradaAplicada, 0)
   const taxa = taxaPercent > 0 && taxaPercent < 100 ? taxaPercent / 100 : 0
-  const totalCobrado = taxa > 0 ? subtotal / (1 - taxa) : subtotal
+  const totalCobradoParcelado = taxa > 0 ? saldoParcelado / (1 - taxa) : saldoParcelado
 
   return {
-    totalCobrado,
-    valorParcela: totalCobrado / qtdParcelas,
+    entradaAplicada,
+    saldoParcelado,
+    totalCobradoParcelado,
+    totalCobrado: entradaAplicada + totalCobradoParcelado,
+    valorParcela: totalCobradoParcelado / qtdParcelas,
     parcelas: qtdParcelas,
   }
 }
@@ -673,6 +692,7 @@ function VendaModal({
     id?: string
     clienteNome: string
     observacoes: string
+    entradaValor: number
     maxParcelas: number
     itens: VendaItemDraft[]
   }) => Promise<void>
@@ -680,6 +700,7 @@ function VendaModal({
   const backdropDismiss = useBackdropDismiss(onClose, saving)
   const [clienteNome, setClienteNome] = useState(initialVenda?.cliente_nome ?? '')
   const [observacoes, setObservacoes] = useState(initialVenda?.observacoes ?? '')
+  const [entradaValor, setEntradaValor] = useState(initialVenda ? String(initialVenda.entrada_valor ?? 0) : '')
   const [maxParcelas, setMaxParcelas] = useState(String(initialVenda?.max_parcelas ?? 1))
   const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
   const [selectedPrecoId, setSelectedPrecoId] = useState('')
@@ -690,17 +711,18 @@ function VendaModal({
     preco_unitario: item.precoUnitario,
     quantidade: item.quantidade,
   })))
-  const parcelasPreview = getParcelasCompactas(buildParcelas(subtotal, Number(maxParcelas) || 1, taxaMaquinaPercent))
+  const entradaNumerica = parsePreco(entradaValor)
+  const entradaAplicada = sanitizeEntrada(subtotal, entradaNumerica)
+  const parcelasPreview = getParcelasCompactas(
+    buildParcelas(subtotal, Number(maxParcelas) || 1, taxaMaquinaPercent, entradaAplicada),
+  )
+  const produtosSelecionadosIds = new Set(itens.map(item => item.empresaPrecoId).filter(Boolean))
+  const sugestoesAncoragem = [...precos]
+    .filter(item => !produtosSelecionadosIds.has(item.id))
+    .sort((a, b) => b.preco - a.preco)
+    .slice(0, 4)
 
-  const handleAddItem = () => {
-    const precoSelecionado = precos.find(item => item.id === selectedPrecoId)
-    if (!precoSelecionado) {
-      setErroLocal('Selecione um produto da lista.')
-      return
-    }
-
-    const quantidade = Math.max(1, Number(selectedQtd) || 1)
-
+  const addProduto = (precoSelecionado: EmpresaPreco, quantidade = 1) => {
     setItens(prev => [
       ...prev,
       {
@@ -711,6 +733,18 @@ function VendaModal({
         quantidade,
       },
     ])
+  }
+
+  const handleAddItem = () => {
+    const precoSelecionado = precos.find(item => item.id === selectedPrecoId)
+    if (!precoSelecionado) {
+      setErroLocal('Selecione um produto da lista.')
+      return
+    }
+
+    const quantidade = Math.max(1, Number(selectedQtd) || 1)
+
+    addProduto(precoSelecionado, quantidade)
     setSelectedPrecoId('')
     setSelectedQtd('1')
     setErroLocal('')
@@ -739,6 +773,7 @@ function VendaModal({
       id: initialVenda?.id,
       clienteNome: clienteNome.trim(),
       observacoes: observacoes.trim(),
+      entradaValor: entradaAplicada,
       maxParcelas: Math.max(1, Math.floor(Number(maxParcelas) || 1)),
       itens,
     })
@@ -788,6 +823,18 @@ function VendaModal({
               />
             </label>
 
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Entrada</span>
+              <input
+                className={styles.modalInput}
+                value={entradaValor}
+                onChange={e => setEntradaValor(e.target.value)}
+                placeholder="Ex: 300,00"
+                inputMode="decimal"
+                disabled={saving}
+              />
+            </label>
+
             <div className={styles.addItemPanel}>
               <div className={styles.addItemHeader}>
                 <h3 className={styles.sectionTitle}>Produtos e serviços</h3>
@@ -823,6 +870,34 @@ function VendaModal({
                   <IconPlus /> Adicionar
                 </button>
               </div>
+
+              <p className={styles.sectionHint}>Você pode adicionar mais de um produto ou serviço na mesma venda.</p>
+
+              {sugestoesAncoragem.length > 0 && (
+                <div className={styles.anchorPanel}>
+                  <div className={styles.addItemHeader}>
+                    <h4 className={styles.sectionTitle}>Sugestões de ancoragem</h4>
+                    <span className={styles.sectionHint}>Produtos de maior valor para apoiar a proposta</span>
+                  </div>
+                  <div className={styles.anchorGrid}>
+                    {sugestoesAncoragem.map(item => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={styles.anchorCard}
+                        onClick={() => {
+                          addProduto(item, 1)
+                          setErroLocal('')
+                        }}
+                      >
+                        <span>{item.nome_produto}</span>
+                        <strong>{formatCurrency(item.preco)}</strong>
+                        <small>Adicionar na proposta</small>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {itens.length === 0 ? (
                 <p className={styles.sectionHint}>Nenhum item adicionado ainda.</p>
@@ -875,6 +950,14 @@ function VendaModal({
                 <strong>{formatCurrency(subtotal)}</strong>
               </div>
               <div className={styles.summaryLine}>
+                <span>Entrada</span>
+                <strong>{formatCurrency(entradaAplicada)}</strong>
+              </div>
+              <div className={styles.summaryLine}>
+                <span>Saldo parcelado</span>
+                <strong>{formatCurrency(Math.max(subtotal - entradaAplicada, 0))}</strong>
+              </div>
+              <div className={styles.summaryLine}>
                 <span>Taxa da maquininha</span>
                 <strong>{formatPercent(taxaMaquinaPercent)}</strong>
               </div>
@@ -887,7 +970,7 @@ function VendaModal({
                   <div key={opcao.parcela} className={styles.parcelaRow}>
                     <span className={styles.parcelaMain}>{opcao.parcela}x {formatCurrency(opcao.valorParcela)}</span>
                     <div className={styles.parcelaValues}>
-                      <small>Total {formatCurrency(opcao.totalCobrado)}</small>
+                      <small>Total parcelado {formatCurrency(opcao.totalCobradoParcelado)}</small>
                     </div>
                   </div>
                 ))}
@@ -926,12 +1009,13 @@ function ApresentacaoVendaModal({
   const subtotal = calculateSubtotal(venda.itens)
   const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'boleto'>('cartao')
   const [parcelasSelecionadas, setParcelasSelecionadas] = useState(String(venda.max_parcelas))
+  const entradaAplicada = sanitizeEntrada(subtotal, venda.entrada_valor)
 
   const usandoCartao = formaPagamento === 'cartao'
   const qtdParcelas = usandoCartao ? Math.max(1, Number(parcelasSelecionadas) || 1) : 1
   const taxaAplicada = usandoCartao ? taxaMaquinaPercent : taxaBoletoPercent
-  const resumo = buildFormaPagamento(subtotal, qtdParcelas, taxaAplicada)
-  const opcoesCartao = buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent)
+  const resumo = buildFormaPagamento(subtotal, qtdParcelas, taxaAplicada, entradaAplicada)
+  const opcoesCartao = buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
 
   return (
     <div
@@ -950,40 +1034,52 @@ function ApresentacaoVendaModal({
 
         <div className={styles.presentationBody}>
           <div className={styles.presentationControls}>
-            <label className={styles.modalField}>
+            <div className={styles.presentationSelectorBlock}>
               <span className={styles.modalLabel}>Forma de pagamento</span>
-              <select
-                className={styles.modalInput}
-                value={formaPagamento}
-                onChange={e => setFormaPagamento(e.target.value as 'cartao' | 'boleto')}
-              >
-                <option value="cartao">Cartão</option>
-                <option value="boleto">Boleto</option>
-              </select>
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Parcelas</span>
-              <select
-                className={styles.modalInput}
-                value={parcelasSelecionadas}
-                onChange={e => setParcelasSelecionadas(e.target.value)}
-                disabled={!usandoCartao}
-              >
-                {Array.from({ length: venda.max_parcelas }, (_, index) => index + 1).map(parcela => (
-                  <option key={parcela} value={parcela}>
-                    {parcela}x
-                  </option>
-                ))}
-              </select>
-              {!usandoCartao && <span className={styles.fieldHint}>No boleto a proposta fica à vista.</span>}
-            </label>
-
-            <div className={styles.presentationControlCard}>
-              <span>Taxa aplicada</span>
-              <strong>{formatPercent(taxaAplicada)}</strong>
-              <small>{usandoCartao ? 'Taxa da maquininha' : 'Taxa de boleto'}</small>
+              <div className={styles.presentationSelectorGrid}>
+                <button
+                  type="button"
+                  className={`${styles.presentationSelectCard} ${usandoCartao ? styles.presentationSelectCardActive : ''}`}
+                  onClick={() => setFormaPagamento('cartao')}
+                >
+                  <span>Cartão</span>
+                  <strong>{formatCurrency(buildFormaPagamento(subtotal, qtdParcelas, taxaMaquinaPercent, entradaAplicada).valorParcela)}</strong>
+                  <small>{qtdParcelas}x disponível</small>
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.presentationSelectCard} ${!usandoCartao ? styles.presentationSelectCardActive : ''}`}
+                  onClick={() => setFormaPagamento('boleto')}
+                >
+                  <span>Boleto</span>
+                  <strong>{formatCurrency(buildFormaPagamento(subtotal, 1, taxaBoletoPercent, entradaAplicada).totalCobrado)}</strong>
+                  <small>Pagamento à vista</small>
+                </button>
+              </div>
             </div>
+
+            {usandoCartao && (
+              <div className={styles.presentationSelectorBlock}>
+                <span className={styles.modalLabel}>Parcelas</span>
+                <div className={styles.presentationParcelasGrid}>
+                  {Array.from({ length: venda.max_parcelas }, (_, index) => index + 1).map(parcela => {
+                    const opcao = buildFormaPagamento(subtotal, parcela, taxaMaquinaPercent)
+
+                    return (
+                      <button
+                        key={parcela}
+                        type="button"
+                        className={`${styles.presentationParcelaCard} ${parcela === resumo.parcelas ? styles.presentationParcelaCardActive : ''}`}
+                        onClick={() => setParcelasSelecionadas(String(parcela))}
+                      >
+                        <span>{parcela}x</span>
+                        <strong>{formatCurrency(opcao.valorParcela)}</strong>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className={styles.presentationBlock}>
@@ -1004,8 +1100,12 @@ function ApresentacaoVendaModal({
               <strong>{formatCurrency(subtotal)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
-              <span>{usandoCartao ? 'Total no cartão' : 'Total no boleto'}</span>
-              <strong>{formatCurrency(resumo.totalCobrado)}</strong>
+              <span>Entrada</span>
+              <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
+            </div>
+            <div className={styles.presentationTotalCard}>
+              <span>{usandoCartao ? 'Saldo financiado' : 'Saldo no boleto'}</span>
+              <strong>{formatCurrency(resumo.totalCobradoParcelado)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
               <span>{usandoCartao ? `Valor em ${resumo.parcelas}x` : 'Pagamento à vista'}</span>
@@ -1026,7 +1126,7 @@ function ApresentacaoVendaModal({
                   >
                     <span>{opcao.parcela}x de</span>
                     <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                    <small>Total {formatCurrency(opcao.totalCobrado)}</small>
+                    <small>Saldo {formatCurrency(opcao.totalCobradoParcelado)}</small>
                   </button>
                 ))}
               </div>
@@ -1034,8 +1134,8 @@ function ApresentacaoVendaModal({
               <div className={styles.presentationOptions}>
                 <div className={`${styles.presentationOption} ${styles.presentationOptionActive}`}>
                   <span>Boleto à vista</span>
-                  <strong>{formatCurrency(resumo.totalCobrado)}</strong>
-                  <small>Taxa {formatPercent(taxaBoletoPercent)}</small>
+                  <strong>{formatCurrency(resumo.totalCobradoParcelado)}</strong>
+                  <small>Saldo após a entrada</small>
                 </div>
               </div>
             )}
@@ -1320,6 +1420,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     id?: string
     clienteNome: string
     observacoes: string
+    entradaValor: number
     maxParcelas: number
     itens: VendaItemDraft[]
   }) => {
@@ -1335,6 +1436,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         .update({
           cliente_nome: payload.clienteNome,
           observacoes: payload.observacoes || null,
+          entrada_valor: payload.entradaValor,
           max_parcelas: payload.maxParcelas,
           updated_at: new Date().toISOString(),
         })
@@ -1363,6 +1465,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           empresa_id: empresa.id,
           cliente_nome: payload.clienteNome,
           observacoes: payload.observacoes || null,
+          entrada_valor: payload.entradaValor,
           max_parcelas: payload.maxParcelas,
         })
         .select('*')
@@ -1582,7 +1685,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           <div className={styles.salesGrid}>
             {vendas.map(venda => {
               const subtotal = calculateSubtotal(venda.itens)
-              const parcelas = getParcelasCompactas(buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent))
+              const entradaAplicada = sanitizeEntrada(subtotal, venda.entrada_valor)
+              const parcelas = getParcelasCompactas(
+                buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada),
+              )
 
               return (
                 <article key={venda.id} className={styles.saleCard}>
@@ -1604,8 +1710,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                       <strong>{formatCurrency(subtotal)}</strong>
                     </div>
                     <div className={styles.saleMetric}>
-                      <span>Preço no cartão</span>
-                      <strong>{formatCurrency(parcelas[0]?.totalCobrado ?? subtotal)}</strong>
+                      <span>Entrada</span>
+                      <strong>{formatCurrency(entradaAplicada)}</strong>
+                    </div>
+                    <div className={styles.saleMetric}>
+                      <span>Saldo parcelado</span>
+                      <strong>{formatCurrency(parcelas[0]?.totalCobradoParcelado ?? subtotal)}</strong>
                     </div>
                   </div>
 

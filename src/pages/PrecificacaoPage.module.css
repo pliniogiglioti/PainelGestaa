@@ -756,7 +756,7 @@
 
 .saleMetrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -831,6 +831,50 @@
   flex-wrap: wrap;
 }
 
+.anchorPanel {
+  margin-top: 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.anchorGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.anchorCard {
+  border: 1px solid rgba(201, 162, 42, 0.22);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(201, 162, 42, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.anchorCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 162, 42, 0.36);
+  background: rgba(201, 162, 42, 0.13);
+}
+
+.anchorCard span,
+.anchorCard small {
+  color: var(--text-muted);
+}
+
+.anchorCard strong {
+  font-size: 16px;
+  color: var(--gold-light);
+}
+
 .presentationModal {
   max-width: 920px;
 }
@@ -863,29 +907,67 @@
 }
 
 .presentationControls {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(180px, 220px);
+  display: flex;
+  flex-direction: column;
   gap: 14px;
 }
 
-.presentationControlCard {
+.presentationSelectorBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.presentationSelectorGrid,
+.presentationParcelasGrid {
+  display: grid;
+  gap: 12px;
+}
+
+.presentationSelectorGrid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.presentationParcelasGrid {
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.presentationSelectCard,
+.presentationParcelaCard {
+  border: 1px solid rgba(255,255,255,0.06);
   border-radius: 16px;
   padding: 16px;
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
 }
 
-.presentationControlCard span,
-.presentationControlCard small {
+.presentationSelectCard:hover,
+.presentationParcelaCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 162, 42, 0.22);
+}
+
+.presentationSelectCard span,
+.presentationParcelaCard span,
+.presentationSelectCard small {
   color: var(--text-muted);
 }
 
-.presentationControlCard strong {
-  font-size: 22px;
+.presentationSelectCard strong,
+.presentationParcelaCard strong {
+  font-size: 20px;
   color: var(--gold-light);
+}
+
+.presentationSelectCardActive,
+.presentationParcelaCardActive {
+  border-color: rgba(201, 162, 42, 0.34);
+  background: rgba(201, 162, 42, 0.12);
 }
 
 .presentationBlock {
@@ -1037,8 +1119,7 @@
   }
 
   .saleMetrics,
-  .presentationTotals,
-  .presentationControls {
+  .presentationTotals {
     grid-template-columns: 1fr;
   }
 }
@@ -1107,7 +1188,9 @@
   .saleMetrics,
   .presentationTotals,
   .presentationOptions,
-  .presentationControls,
+  .presentationSelectorGrid,
+  .presentationParcelasGrid,
+  .anchorGrid,
   .parcelasList {
     grid-template-columns: 1fr;
   }
