@@ -15,9 +15,18 @@ interface Props {
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
 type EmpresaCard = Empresa & { donoNome: string | null }
+type EmpresaMembroResumo = {
+  user_id: string
+  name: string | null
+  email: string | null
+  tipo_usuario: 'titular' | 'colaborador'
+  empresa_role: 'admin' | 'membro'
+  created_at: string
+}
 
 type EmpresaFormModalProps = {
   modo: 'criar' | 'editar'
+  empresaId?: string | null
   nome: string
   cnpj: string
   erro: string
@@ -46,6 +55,7 @@ const IconTrash = () => (
 
 function EmpresaFormModal({
   modo,
+  empresaId,
   nome,
   cnpj,
   erro,
@@ -55,9 +65,45 @@ function EmpresaFormModal({
   onNomeChange,
   onCnpjChange,
 }: EmpresaFormModalProps) {
+  const [membros, setMembros] = useState<EmpresaMembroResumo[]>([])
+  const [loadingMembros, setLoadingMembros] = useState(false)
+  const [erroMembros, setErroMembros] = useState('')
+
+  useEffect(() => {
+    if (modo !== 'editar' || !empresaId) return
+
+    let ativo = true
+
+    const carregarMembros = async () => {
+      setLoadingMembros(true)
+      setErroMembros('')
+
+      const { data, error } = await supabase.rpc('listar_membros_empresa', {
+        p_empresa_id: empresaId,
+      })
+
+      if (!ativo) return
+
+      if (error) {
+        setErroMembros(error.message ?? 'Nao foi possivel carregar os acessos da empresa.')
+        setLoadingMembros(false)
+        return
+      }
+
+      setMembros((data ?? []) as EmpresaMembroResumo[])
+      setLoadingMembros(false)
+    }
+
+    void carregarMembros()
+
+    return () => {
+      ativo = false
+    }
+  }, [empresaId, modo])
+
   return (
     <div className={styles.modalBackdrop} onClick={() => { if (!salvando) onClose() }}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div className={`${styles.modal} ${modo === 'editar' ? styles.modalWide : ''}`} onClick={e => e.stopPropagation()}>
         <h2 className={styles.modalTitulo}>{modo === 'criar' ? 'Nova empresa' : 'Editar empresa'}</h2>
         <form onSubmit={onSubmit} className={styles.form}>
           <label className={styles.label}>
@@ -82,6 +128,47 @@ function EmpresaFormModal({
             />
           </label>
           {erro && <p className={styles.erro}>{erro}</p>}
+
+          {modo === 'editar' && (
+            <section className={styles.membersSection}>
+              <div className={styles.membersHeader}>
+                <div>
+                  <p className={styles.membersEyebrow}>Acessos da empresa</p>
+                  <h3 className={styles.membersTitle}>
+                    {loadingMembros ? 'Carregando colaboradores...' : `${membros.length} acesso${membros.length === 1 ? '' : 's'}`}
+                  </h3>
+                </div>
+              </div>
+
+              {erroMembros && <p className={styles.erro}>{erroMembros}</p>}
+
+              {!erroMembros && (
+                <div className={styles.membersList}>
+                  {membros.map(membro => (
+                    <div key={membro.user_id} className={styles.memberItem}>
+                      <div className={styles.memberIdentity}>
+                        <strong className={styles.memberName}>{membro.name?.trim() || membro.email || 'Usuario'}</strong>
+                        <span className={styles.memberEmail}>{membro.email || 'E-mail nao informado'}</span>
+                      </div>
+                      <div className={styles.memberBadges}>
+                        <span className={`${styles.memberBadge} ${membro.empresa_role === 'admin' ? styles.memberBadgeAdmin : styles.memberBadgeMember}`}>
+                          {membro.empresa_role === 'admin' ? 'Titular' : 'Colaborador'}
+                        </span>
+                        <span className={`${styles.memberBadge} ${membro.tipo_usuario === 'titular' ? styles.memberBadgeAdmin : styles.memberBadgeNeutral}`}>
+                          {membro.tipo_usuario === 'titular' ? 'Titular' : 'Colaborador'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+
+                  {!loadingMembros && membros.length === 0 && (
+                    <p className={styles.membersHint}>Nenhum acesso encontrado para esta empresa.</p>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+
           <div className={styles.formActions}>
             <button
               type="button"
@@ -555,6 +642,7 @@ export default function EmpresaGatePage({
       {modalModo && (
         <EmpresaFormModal
           modo={modalModo}
+          empresaId={empresaEmEdicao?.id ?? null}
           nome={nome}
           cnpj={cnpj}
           erro={erro}
