@@ -589,6 +589,31 @@ export interface Database {
         Args: { topic_id: string }
         Returns: undefined
       }
+      listar_membros_empresa: {
+        Args: { p_empresa_id: string }
+        Returns: {
+          user_id: string
+          name: string | null
+          email: string | null
+          tipo_usuario: 'titular' | 'colaborador'
+          empresa_role: 'admin' | 'membro'
+          created_at: string
+        }[]
+      }
+      vincular_colaborador_empresa: {
+        Args: { p_empresa_id: string; p_email: string }
+        Returns: {
+          user_id: string
+          name: string | null
+          email: string | null
+          tipo_usuario: 'titular' | 'colaborador'
+          empresa_role: 'admin' | 'membro'
+        }[]
+      }
+      remover_colaborador_empresa: {
+        Args: { p_empresa_id: string; p_user_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
