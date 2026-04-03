@@ -9,6 +9,7 @@ import EmpresaGatePage from './pages/EmpresaGatePage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
 import TermosPage from './pages/TermosPage'
+import LabControlPage from './pages/LabControlPage'
 import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
@@ -276,6 +277,14 @@ function App() {
       return (
         <ErrorBoundary>
           <AdminSettingsPage onVoltar={() => navigate('/')} />
+        </ErrorBoundary>
+      )
+    }
+
+    if (pathname === '/lab-control') {
+      return (
+        <ErrorBoundary>
+          <LabControlPage userId={userId!} onVoltar={() => navigate('/')} />
         </ErrorBoundary>
       )
     }

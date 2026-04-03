@@ -1,0 +1,863 @@
+/* ── Page ─────────────────────────────────────────────────────────────────── */
+
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  padding: 28px 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.backBtn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.labDetailTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.overdueBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Tabs ─────────────────────────────────────────────────────────────────── */
+
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); }
+.tabActive {
+  color: var(--gold-light);
+  border-bottom-color: var(--gold-light);
+  font-weight: 700;
+}
+
+/* ── Labs Grid ────────────────────────────────────────────────────────────── */
+
+.labsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.labCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.labCard:hover {
+  border-color: var(--border-gold);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-1px);
+}
+
+.labCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.labCardName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.labCardContact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.labCardContactItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.labCardStats {
+  display: flex;
+  gap: 12px;
+}
+.labCardStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-width: 60px;
+}
+.labCardStatOverdue {
+  border-color: rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.08);
+}
+.labCardStatNum {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.labCardStatOverdue .labCardStatNum { color: #f87171; }
+.labCardStatLabel {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+  white-space: nowrap;
+}
+
+/* Status bar (mini kanban visualization) */
+.labCardStatusBar {
+  display: flex;
+  height: 4px;
+  border-radius: 4px;
+  overflow: hidden;
+  gap: 2px;
+}
+.labCardStatusSegment {
+  border-radius: 4px;
+  min-width: 4px;
+  transition: flex 0.3s ease;
+}
+
+/* Recent envios list inside card */
+.labCardEnvios {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.labCardEnvioItem {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  font-size: 11.5px;
+}
+.labCardEnvioOverdue { background: rgba(239, 68, 68, 0.07); }
+.labCardEnvioPatient { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labCardEnvioType    { color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.labCardEnvioDate    { color: var(--text-dim); white-space: nowrap; font-size: 11px; }
+.labCardMore         { font-size: 11px; color: var(--text-dim); text-align: center; padding: 2px 0; }
+.labCardEmpty        { font-size: 12px; color: var(--text-dim); text-align: center; padding: 8px 0; }
+
+/* ── Kanban Board ─────────────────────────────────────────────────────────── */
+
+.kanban {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 16px;
+  align-items: flex-start;
+  min-height: 400px;
+}
+
+.kanbanCol {
+  flex: 0 0 260px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 220px);
+  transition: border-color 0.15s, background 0.15s;
+}
+.kanbanColDragOver {
+  border-color: var(--border-gold);
+  background: var(--bg-hover);
+}
+
+.kanbanColHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  background: var(--bg-surface);
+  border-radius: var(--radius) var(--radius) 0 0;
+  z-index: 1;
+}
+.kanbanColIndicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kanbanColName {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+  flex: 1;
+}
+.kanbanColCount {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 1px 7px;
+}
+
+.kanbanCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.kanbanCard {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color 0.15s, box-shadow 0.15s, opacity 0.15s;
+  user-select: none;
+}
+.kanbanCard:hover {
+  border-color: var(--border-gold);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+}
+.kanbanCard:active { cursor: grabbing; }
+.kanbanCardDragging { opacity: 0.4; }
+.kanbanCardOverdue  { border-color: rgba(239, 68, 68, 0.4) !important; }
+
+.kanbanCardAlert {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.1);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+.kanbanCardPatient {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kanbanCardService {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kanbanCardDetails {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.kanbanCardDate {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.kanbanCardDateOverdue { color: #f87171; }
+.kanbanCardPrice {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gold);
+}
+.kanbanCardActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+  margin-top: 2px;
+}
+
+.kanbanEmpty {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 20px 0;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+}
+
+/* ── Lab Info (detail view) ───────────────────────────────────────────────── */
+
+.labInfoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: flex-start;
+}
+@media (max-width: 720px) {
+  .labInfoGrid { grid-template-columns: 1fr; }
+}
+
+.labInfoCard {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.labInfoCardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.infoSectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.infoRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.infoRow:last-child { border-bottom: none; }
+.infoLabel {
+  color: var(--text-muted);
+  min-width: 110px;
+  flex-shrink: 0;
+}
+.infoValue {
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+.infoIcon {
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+}
+
+/* ── Kanban Config ────────────────────────────────────────────────────────── */
+
+.kanbanConfigWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.kanbanColList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.kanbanColRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.kanbanColDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kanbanColNome {
+  flex: 1;
+  font-size: 13px;
+  color: var(--text);
+}
+.kanbanColActions {
+  display: flex;
+  gap: 4px;
+}
+.kanbanAddRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ── Price list ───────────────────────────────────────────────────────────── */
+
+.precosWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.precosAddRow {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.precosList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.precosRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.precosNome  { flex: 1; color: var(--text); }
+.precosValor { font-weight: 600; color: var(--gold); white-space: nowrap; }
+.xlsxHint    { font-size: 11.5px; color: var(--text-dim); }
+
+/* ── Steps wizard ─────────────────────────────────────────────────────────── */
+
+.stepIndicator {
+  display: flex;
+  gap: 0;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 16px;
+}
+.stepItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  position: relative;
+}
+.stepItem:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 1px;
+  background: var(--border);
+}
+.stepDot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  flex-shrink: 0;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.stepActive .stepDot {
+  background: var(--gold-glow);
+  border-color: var(--gold);
+  color: var(--gold);
+}
+.stepDone .stepDot {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+}
+.stepLabel {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.stepActive .stepLabel { color: var(--text); font-weight: 700; }
+.stepDone   .stepLabel { color: var(--text-muted); }
+
+.stepContent {
+  min-height: 120px;
+  margin-bottom: 16px;
+}
+.stepHint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  line-height: 1.5;
+}
+
+/* Price selection grid (step 1) */
+.precosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+}
+.precoOption {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.precoOption:hover { border-color: var(--border-gold); background: var(--bg-hover); }
+.precoOptionActive {
+  border-color: var(--gold) !important;
+  background: var(--gold-glow) !important;
+}
+.precoOptionNome  { font-size: 13px; font-weight: 600; color: var(--text); }
+.precoOptionValor { font-size: 12px; color: var(--gold); font-weight: 600; }
+
+/* Review (step 4) */
+.reviewGrid { display: flex; flex-direction: column; gap: 0; }
+.reviewRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.reviewRow:last-child { border-bottom: none; }
+.reviewLabel { color: var(--text-muted); min-width: 140px; flex-shrink: 0; }
+.reviewValue { color: var(--text); font-weight: 500; flex: 1; }
+
+/* ── Modal ────────────────────────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+.modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 520px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-modal);
+}
+.modalWide { max-width: 720px; }
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.modalTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.modalClose:hover { color: var(--text); background: var(--bg-hover); }
+.modalBody {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* ── Form ─────────────────────────────────────────────────────────────────── */
+
+.form { display: flex; flex-direction: column; gap: 0; }
+.formGrid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 500px) { .formGrid2 { grid-template-columns: 1fr; } }
+
+.formField { display: flex; flex-direction: column; gap: 5px; }
+.colSpan2  { grid-column: 1 / -1; }
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+}
+
+.input, .select, .textarea {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 9px 12px;
+  outline: none;
+  width: 100%;
+  font-family: inherit;
+  transition: border-color 0.15s;
+}
+.input:focus, .select:focus, .textarea:focus {
+  border-color: var(--border-gold);
+}
+.input::placeholder, .textarea::placeholder { color: var(--text-dim); }
+.textarea { resize: vertical; }
+.select { appearance: none; cursor: pointer; }
+.inputSmall { max-width: 130px; }
+
+.colorInput {
+  width: 40px;
+  height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  cursor: pointer;
+  background: var(--bg-elevated);
+  flex-shrink: 0;
+}
+
+.formActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.errorMsg {
+  color: #f87171;
+  font-size: 12.5px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 7px;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────── */
+
+.btnPrimary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--gold-glow);
+  border: 1px solid var(--border-gold);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btnPrimary:hover:not(:disabled) { background: var(--gold); color: var(--bg); }
+.btnPrimary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+  font-family: inherit;
+}
+.btnSecondary:hover { border-color: var(--text-dim); color: var(--text); background: var(--bg-hover); }
+
+.btnIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  flex-shrink: 0;
+  font-size: 14px;
+}
+.btnIcon:hover:not(:disabled) { border-color: var(--border-gold); color: var(--gold); background: var(--gold-glow); }
+.btnIcon:disabled { opacity: 0.3; cursor: not-allowed; }
+
+.btnIconDanger:hover { border-color: rgba(239,68,68,0.4) !important; color: #f87171 !important; background: rgba(239,68,68,0.08) !important; }
+
+.labelBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+/* ── Empty state ──────────────────────────────────────────────────────────── */
+
+.emptyState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 320px;
+  color: var(--text-dim);
+  text-align: center;
+}
+.emptyState p { font-size: 14px; color: var(--text-muted); }
+
+.emptyMsg {
+  font-size: 13px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 12px 0;
+}
+
+/* ── Spinner ──────────────────────────────────────────────────────────────── */
+
+.spinnerWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px;
+}
+.spinner {
+  width: 26px;
+  height: 26px;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
