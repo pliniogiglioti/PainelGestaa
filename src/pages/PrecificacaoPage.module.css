@@ -1010,10 +1010,15 @@
   color: var(--text-muted);
 }
 
-.presentationSelectCard strong,
-.presentationParcelaCard strong {
+.presentationSelectCard strong {
   font-size: 20px;
   color: var(--gold-light);
+}
+
+.presentationParcelaCard strong {
+  font-size: 13px;
+  color: var(--gold-light);
+  line-height: 1.1;
 }
 
 .presentationSelectCardActive,
