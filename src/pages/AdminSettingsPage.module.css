@@ -374,46 +374,106 @@
   justify-content: flex-end;
 }
 
-/* ── Tabela de usuários ─────────────────────────────────────────────────── */
+/* ── Usuários em cards ─────────────────────────────────────────────────── */
 
-.tableWrap {
-  overflow-x: auto;
-  border-radius: 10px;
+.userCards {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.userCardEmpty {
+  padding: 18px;
+  border-radius: 14px;
   border: 1px solid var(--border);
-}
-
-.table {
-  width: 100%;
-  min-width: 1280px;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.th {
-  text-align: left;
-  padding: 10px 14px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  background: rgba(255,255,255,0.03);
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-
-.tr:not(:last-child) {
-  border-bottom: 1px solid var(--border);
-}
-
-.tr:hover {
   background: rgba(255,255,255,0.02);
+  color: var(--text-muted);
+  text-align: center;
 }
 
-.td {
-  padding: 10px 14px;
+.userCard {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(213, 175, 69, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+
+.userCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.userCardIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.userCardName {
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text);
-  vertical-align: middle;
+}
+
+.userCardEmail {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.userCardBadges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.userCardBody {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.userCardSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+  min-width: 0;
+}
+
+.userCardSectionWide {
+  grid-column: 1 / -1;
+}
+
+.userCardLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.userCardValue {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.userCardActions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .roleBadge {
@@ -498,7 +558,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 260px;
+  min-width: 0;
 }
 
 .userLinksLine {
@@ -570,16 +630,16 @@
 
 
 .expiryEditor {
-  display: inline-flex;
+  display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: nowrap;
-  min-width: max-content;
+  flex-wrap: wrap;
+  min-width: 0;
 }
 
 .expiryInput {
-  min-width: 160px;
-  flex: 0 0 170px;
+  min-width: 0;
+  flex: 1 1 170px;
 }
 
 .deleteBtn {
@@ -732,13 +792,27 @@
     align-items: flex-start;
   }
 
-  .expiryEditor {
-    display: flex;
-    flex-wrap: wrap;
-    min-width: 0;
+  .userCardTop {
+    flex-direction: column;
   }
 
-  .table {
-    min-width: 0;
+  .userCardBadges {
+    justify-content: flex-start;
+  }
+
+  .userCardBody {
+    grid-template-columns: 1fr;
+  }
+
+  .userCardSectionWide {
+    grid-column: auto;
+  }
+
+  .userCardActions {
+    justify-content: stretch;
+  }
+
+  .deleteBtn {
+    width: 100%;
   }
 }
