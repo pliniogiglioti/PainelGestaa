@@ -965,7 +965,7 @@
 }
 
 .presentationParcelasGrid {
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
 }
 
 .presentationSelectCard,
@@ -986,6 +986,21 @@
 .presentationParcelaCard:hover {
   transform: translateY(-1px);
   border-color: rgba(201, 162, 42, 0.22);
+}
+
+.presentationParcelaCard {
+  padding: 12px;
+  gap: 4px;
+  border-radius: 12px;
+}
+
+.presentationParcelaCard span {
+  font-size: 11px;
+}
+
+.presentationParcelaCard strong {
+  font-size: 16px;
+  line-height: 1.1;
 }
 
 .presentationSelectCard span,
