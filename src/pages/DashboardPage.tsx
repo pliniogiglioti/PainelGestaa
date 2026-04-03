@@ -222,7 +222,6 @@ function TopNavigation({
             <span className={styles.userMenuAvatar}>{userInitial}</span>
             <span className={styles.userMenuTriggerText}>
               <span className={styles.userMenuTriggerName}>{user.name}</span>
-              <span className={styles.userMenuTriggerRole}>{getTipoUsuarioLabel(tipoUsuario)}</span>
             </span>
             <span className={styles.userMenuChevron}><IconChevronDown /></span>
           </button>
