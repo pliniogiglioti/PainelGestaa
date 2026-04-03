@@ -215,6 +215,7 @@ export interface Database {
           impostos_percent:            number
           comissoes_percent:           number
           taxa_maquina_percent:        number
+          taxa_boleto_percent:         number
           created_at:                  string
           updated_at:                  string
         }
@@ -225,6 +226,7 @@ export interface Database {
           impostos_percent?:           number
           comissoes_percent?:          number
           taxa_maquina_percent?:       number
+          taxa_boleto_percent?:        number
           created_at?:                 string
           updated_at?:                 string
         }
@@ -235,6 +237,7 @@ export interface Database {
           impostos_percent?:            number
           comissoes_percent?:           number
           taxa_maquina_percent?:        number
+          taxa_boleto_percent?:         number
           updated_at?:                  string
         }
         Relationships: []

@@ -670,8 +670,8 @@
 }
 
 .parcelasList {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
   margin-top: 10px;
 }
@@ -681,17 +681,22 @@
   border-radius: 12px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.04);
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.parcelaMain {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gold-light);
 }
 
 .parcelaValues {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 2px;
-}
-
-.parcelaValues strong {
-  color: var(--gold-light);
 }
 
 .parcelaValues small {
@@ -857,6 +862,32 @@
   gap: 18px;
 }
 
+.presentationControls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(180px, 220px);
+  gap: 14px;
+}
+
+.presentationControlCard {
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.presentationControlCard span,
+.presentationControlCard small {
+  color: var(--text-muted);
+}
+
+.presentationControlCard strong {
+  font-size: 22px;
+  color: var(--gold-light);
+}
+
 .presentationBlock {
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -910,13 +941,26 @@
 }
 
 .presentationOption {
+  border: 1px solid rgba(255,255,255,0.05);
   border-radius: 16px;
   padding: 16px;
   background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.05);
   display: flex;
   flex-direction: column;
   gap: 6px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.15s ease;
+}
+
+.presentationOption:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 162, 42, 0.22);
+}
+
+.presentationOptionActive {
+  border-color: rgba(201, 162, 42, 0.34);
+  background: rgba(201, 162, 42, 0.12);
 }
 
 .presentationOption span,
@@ -993,7 +1037,8 @@
   }
 
   .saleMetrics,
-  .presentationTotals {
+  .presentationTotals,
+  .presentationControls {
     grid-template-columns: 1fr;
   }
 }
@@ -1061,7 +1106,9 @@
 
   .saleMetrics,
   .presentationTotals,
-  .presentationOptions {
+  .presentationOptions,
+  .presentationControls,
+  .parcelasList {
     grid-template-columns: 1fr;
   }
 
