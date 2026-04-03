@@ -239,6 +239,67 @@ export interface Database {
         }
         Relationships: []
       }
+      empresa_vendas: {
+        Row: {
+          id:           string
+          empresa_id:   string
+          cliente_nome: string
+          observacoes:  string | null
+          max_parcelas: number
+          ativo:        boolean
+          created_at:   string
+          updated_at:   string
+        }
+        Insert: {
+          id?:           string
+          empresa_id:    string
+          cliente_nome:  string
+          observacoes?:  string | null
+          max_parcelas?: number
+          ativo?:        boolean
+          created_at?:   string
+          updated_at?:   string
+        }
+        Update: {
+          id?:           string
+          empresa_id?:   string
+          cliente_nome?: string
+          observacoes?:  string | null
+          max_parcelas?: number
+          ativo?:        boolean
+          updated_at?:   string
+        }
+        Relationships: []
+      }
+      empresa_venda_itens: {
+        Row: {
+          id:               string
+          venda_id:         string
+          empresa_preco_id: string | null
+          descricao:        string
+          preco_unitario:   number
+          quantidade:       number
+          created_at:       string
+        }
+        Insert: {
+          id?:               string
+          venda_id:          string
+          empresa_preco_id?: string | null
+          descricao:         string
+          preco_unitario?:   number
+          quantidade?:       number
+          created_at?:       string
+        }
+        Update: {
+          id?:               string
+          venda_id?:         string
+          empresa_preco_id?: string | null
+          descricao?:        string
+          preco_unitario?:   number
+          quantidade?:       number
+        }
+        Relationships: []
+      }
       dre_lancamentos: {
         Row: {
           id:                string
@@ -694,6 +755,8 @@ export type Empresa            = Database['public']['Tables']['empresas']['Row']
 export type EmpresaMembro      = Database['public']['Tables']['empresa_membros']['Row']
 export type EmpresaPreco       = Database['public']['Tables']['empresa_precos']['Row']
 export type EmpresaPrecificacaoConfig = Database['public']['Tables']['empresa_precificacao_config']['Row']
+export type EmpresaVenda       = Database['public']['Tables']['empresa_vendas']['Row']
+export type EmpresaVendaItem   = Database['public']['Tables']['empresa_venda_itens']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
 export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']['Row']
