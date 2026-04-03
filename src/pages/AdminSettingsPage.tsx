@@ -60,6 +60,11 @@ function toDateInputValue(iso: string | null | undefined) {
 
 type Tab = 'modelo' | 'classificacoes' | 'exemplos' | 'usuarios'
 
+interface AdminUsuario extends Profile {
+  empresasAcesso: string[]
+  titularesResponsaveis: string[]
+}
+
 // ── Componente principal ──────────────────────────────────────────────────
 
 interface AdminSettingsPageProps {
@@ -93,7 +98,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const exFileRef = useRef<HTMLInputElement>(null)
 
   // ── Tab: Usuarios ─────────────────────────────────────────────────────
-  const [usuarios,        setUsuarios]        = useState<Profile[]>([])
+  const [usuarios,        setUsuarios]        = useState<AdminUsuario[]>([])
   const [usuariosLoading, setUsuariosLoading] = useState(false)
   const [showAddUser,     setShowAddUser]     = useState(false)
   const [novoEmail,       setNovoEmail]       = useState('')
@@ -258,9 +263,69 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setUsuariosLoading(true)
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, ativo, expires_at, created_at')
+      .select('id, name, email, role, tipo_usuario, ativo, expires_at, created_at, updated_at, plan, avatar_url')
       .order('created_at', { ascending: false })
-    setUsuarios((data ?? []) as Profile[])
+
+    const perfis = (data ?? []) as Profile[]
+
+    const { data: membrosData } = await supabase
+      .from('empresa_membros')
+      .select('user_id, role, empresas(id, nome, created_by)')
+
+    const membros = (membrosData ?? []) as Array<{
+      user_id: string
+      role: 'admin' | 'membro'
+      empresas: { id: string; nome: string; created_by: string } | null
+    }>
+
+    const titularIds = [...new Set(
+      membros
+        .map(item => item.empresas?.created_by)
+        .filter((id): id is string => !!id),
+    )]
+
+    let titularesMap: Record<string, string> = {}
+
+    if (titularIds.length > 0) {
+      const { data: titulares } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', titularIds)
+
+      titularesMap = Object.fromEntries(
+        ((titulares ?? []) as Pick<Profile, 'id' | 'name' | 'email'>[]).map(titular => [
+          titular.id,
+          titular.name?.trim() || titular.email?.trim() || 'Titular',
+        ]),
+      )
+    }
+
+    const vinculosPorUsuario = new Map<string, { empresasAcesso: string[]; titularesResponsaveis: string[] }>()
+
+    membros.forEach(item => {
+      const atual = vinculosPorUsuario.get(item.user_id) ?? { empresasAcesso: [], titularesResponsaveis: [] }
+      const nomeEmpresa = item.empresas?.nome?.trim()
+      const titularResponsavel = item.empresas?.created_by ? titularesMap[item.empresas.created_by] : null
+
+      if (nomeEmpresa && !atual.empresasAcesso.includes(nomeEmpresa)) {
+        atual.empresasAcesso.push(nomeEmpresa)
+      }
+
+      if (item.role === 'membro' && titularResponsavel && !atual.titularesResponsaveis.includes(titularResponsavel)) {
+        atual.titularesResponsaveis.push(titularResponsavel)
+      }
+
+      vinculosPorUsuario.set(item.user_id, atual)
+    })
+
+    setUsuarios(perfis.map(profile => {
+      const vinculos = vinculosPorUsuario.get(profile.id)
+      return {
+        ...profile,
+        empresasAcesso: vinculos?.empresasAcesso ?? [],
+        titularesResponsaveis: vinculos?.titularesResponsaveis ?? [],
+      }
+    }))
     setUsuariosLoading(false)
   }
 
@@ -724,6 +789,8 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       <th className={styles.th}>Nome</th>
                       <th className={styles.th}>E-mail</th>
                       <th className={styles.th}>Função</th>
+                      <th className={styles.th}>Classificação</th>
+                      <th className={styles.th}>Vínculos</th>
                       <th className={styles.th}>Status</th>
                       <th className={styles.th}>Expiração</th>
                       <th className={styles.th}>Desde</th>
@@ -733,7 +800,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                   <tbody>
                     {usuarios.length === 0 && (
                       <tr>
-                        <td className={styles.td} colSpan={7} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <td className={styles.td} colSpan={9} style={{ textAlign: 'center', color: 'var(--text-muted)' }}>
                           Nenhum usuário encontrado.
                         </td>
                       </tr>
@@ -759,6 +826,25 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                               <option value="user">user</option>
                             </select>
                           )}
+                        </td>
+                        <td className={styles.td}>
+                          <span className={`${styles.userTypeBadge} ${u.tipo_usuario === 'colaborador' ? styles.userTypeColaborador : styles.userTypeTitular}`}>
+                            {u.tipo_usuario === 'colaborador' ? 'Colaborador' : 'Titular'}
+                          </span>
+                        </td>
+                        <td className={styles.td}>
+                          <div className={styles.userLinksCell}>
+                            {u.tipo_usuario === 'colaborador' && (
+                              <p className={styles.userLinksLine}>
+                                <span className={styles.userLinksLabel}>Titular:</span>{' '}
+                                {u.titularesResponsaveis.length > 0 ? u.titularesResponsaveis.join(', ') : 'Não identificado'}
+                              </p>
+                            )}
+                            <p className={styles.userLinksLine}>
+                              <span className={styles.userLinksLabel}>Empresas:</span>{' '}
+                              {u.empresasAcesso.length > 0 ? u.empresasAcesso.join(', ') : 'Sem acesso'}
+                            </p>
+                          </div>
                         </td>
                         <td className={styles.td}>
                           {u.role !== 'admin' ? (
