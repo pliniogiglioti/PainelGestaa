@@ -12,6 +12,17 @@ interface PrecificacaoPageProps {
 
 type ViewMode = 'home' | 'lista'
 
+type CalculadoraForm = {
+  custoInsumos: string
+  custoMaterialAplicado: string
+  custoLaboratorio: string
+  royaltiesPercent: string
+  custoProfissionaisPercent: string
+  impostosPercent: string
+  comissoesPercent: string
+  taxaMaquinaPercent: string
+}
+
 const IconBack = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6" />
@@ -43,6 +54,9 @@ const IconTag = () => (
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
+const formatPercent = (value: number) =>
+  `${value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+
 function Spinner() {
   return <div className={styles.spinner} />
 }
@@ -51,6 +65,54 @@ function parsePreco(value: string) {
   const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.]/g, '')
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : 0
+}
+
+function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
+  const custoInsumos = parsePreco(form.custoInsumos)
+  const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
+  const custoLaboratorio = parsePreco(form.custoLaboratorio)
+  const royaltiesPercent = parsePreco(form.royaltiesPercent)
+  const custoProfissionaisPercent = parsePreco(form.custoProfissionaisPercent)
+  const impostosPercent = parsePreco(form.impostosPercent)
+  const comissoesPercent = parsePreco(form.comissoesPercent)
+  const taxaMaquinaPercent = parsePreco(form.taxaMaquinaPercent)
+
+  const royalties = precoVenda * (royaltiesPercent / 100)
+  const custoProfissionais = precoVenda * (custoProfissionaisPercent / 100)
+  const impostos = precoVenda * (impostosPercent / 100)
+  const comissoes = precoVenda * (comissoesPercent / 100)
+  const taxaMaquina = precoVenda * (taxaMaquinaPercent / 100)
+
+  const custoTotal =
+    custoInsumos +
+    custoMaterialAplicado +
+    custoLaboratorio +
+    royalties +
+    custoProfissionais +
+    impostos +
+    comissoes +
+    taxaMaquina
+
+  const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
+
+  return {
+    custoInsumos,
+    custoMaterialAplicado,
+    custoLaboratorio,
+    royaltiesPercent,
+    custoProfissionaisPercent,
+    impostosPercent,
+    comissoesPercent,
+    taxaMaquinaPercent,
+    royalties,
+    custoProfissionais,
+    impostos,
+    comissoes,
+    taxaMaquina,
+    custoTotal,
+    margem,
+    resultadoMargem: margem < 50 ? 'Baixa - Rever Preço' : 'Adequada',
+  }
 }
 
 function PrecoModal({
@@ -150,6 +212,212 @@ function PrecoModal({
   )
 }
 
+function CalculadoraPrecificacaoModal({
+  item,
+  onClose,
+}: {
+  item: EmpresaPreco
+  onClose: () => void
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose)
+  const [form, setForm] = useState<CalculadoraForm>({
+    custoInsumos: '',
+    custoMaterialAplicado: '',
+    custoLaboratorio: '',
+    royaltiesPercent: '',
+    custoProfissionaisPercent: '',
+    impostosPercent: '',
+    comissoesPercent: '',
+    taxaMaquinaPercent: '',
+  })
+
+  const calculo = calcularPrecificacao(item.preco, form)
+
+  const handleChange = (field: keyof CalculadoraForm, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.calcModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div>
+            <h2 className={styles.modalTitle}>Verificar cálculo de precificação</h2>
+            <p className={styles.calcItemName}>{item.nome_produto}</p>
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <div className={styles.calcLayout}>
+          <div className={styles.calcForm}>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Custo insumos (R$)</span>
+              <input
+                className={styles.modalInput}
+                value={form.custoInsumos}
+                onChange={e => handleChange('custoInsumos', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 40,00"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+              <input
+                className={styles.modalInput}
+                value={form.custoMaterialAplicado}
+                onChange={e => handleChange('custoMaterialAplicado', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 700,00"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+              <input
+                className={styles.modalInput}
+                value={form.custoLaboratorio}
+                onChange={e => handleChange('custoLaboratorio', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 120,00"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+              <input
+                className={styles.modalInput}
+                value={form.royaltiesPercent}
+                onChange={e => handleChange('royaltiesPercent', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 9"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Custo profissionais (%)</span>
+              <input
+                className={styles.modalInput}
+                value={form.custoProfissionaisPercent}
+                onChange={e => handleChange('custoProfissionaisPercent', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 30"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Impostos (%)</span>
+              <input
+                className={styles.modalInput}
+                value={form.impostosPercent}
+                onChange={e => handleChange('impostosPercent', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 8"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Comissões vendas (%)</span>
+              <input
+                className={styles.modalInput}
+                value={form.comissoesPercent}
+                onChange={e => handleChange('comissoesPercent', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 3"
+              />
+            </label>
+
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Taxa máquina (%)</span>
+              <input
+                className={styles.modalInput}
+                value={form.taxaMaquinaPercent}
+                onChange={e => handleChange('taxaMaquinaPercent', e.target.value)}
+                inputMode="decimal"
+                placeholder="Ex: 2"
+              />
+            </label>
+          </div>
+
+          <div className={styles.calcSummary}>
+            <div className={styles.calcTable}>
+              <div className={styles.calcTableHead}>
+                <span>Procedimento</span>
+                <span>Referência</span>
+                <span>Custo</span>
+              </div>
+
+              <div className={styles.calcRow}>
+                <span>Custo insumos</span>
+                <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
+                <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Custo material aplicado</span>
+                <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
+                <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Custo laboratório</span>
+                <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
+                <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Royalties e FNP</span>
+                <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
+                <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Custo profissionais</span>
+                <span>{calculo.custoProfissionaisPercent > 0 ? formatPercent(calculo.custoProfissionaisPercent) : '-'}</span>
+                <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Impostos</span>
+                <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
+                <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Comissões vendas</span>
+                <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
+                <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
+              </div>
+              <div className={styles.calcRow}>
+                <span>Taxa máquina</span>
+                <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
+                <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
+              </div>
+            </div>
+
+            <div className={styles.calcHighlights}>
+              <div className={styles.calcHighlight}>
+                <span>Custo total</span>
+                <strong>{formatCurrency(calculo.custoTotal)}</strong>
+              </div>
+              <div className={styles.calcHighlight}>
+                <span>Margem</span>
+                <strong>{formatPercent(calculo.margem)}</strong>
+              </div>
+              <div className={styles.calcHighlight}>
+                <span>Preço de venda</span>
+                <strong>{formatCurrency(item.preco)}</strong>
+              </div>
+              <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+                <span>Resultado da margem</span>
+                <strong>{calculo.resultadoMargem}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
@@ -160,6 +428,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [loadingPrecos, setLoadingPrecos] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
 
   useEffect(() => {
     let active = true
@@ -381,12 +650,20 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             <div className={styles.priceTable}>
               <div className={styles.priceTableHead}>
                 <span>Produto</span>
+                <span>Ação</span>
                 <span>Preço</span>
               </div>
               <div className={styles.priceTableBody}>
                 {precos.map(item => (
                   <div key={item.id} className={styles.priceRow}>
                     <span className={styles.priceName}>{item.nome_produto}</span>
+                    <button
+                      type="button"
+                      className={styles.calcButton}
+                      onClick={() => setItemCalculadora(item)}
+                    >
+                      Verificar cálculo de precificação
+                    </button>
                     <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                   </div>
                 ))}
@@ -402,6 +679,13 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           onSubmit={handleAddPreco}
           saving={savingPreco}
           error={error}
+        />
+      )}
+
+      {itemCalculadora && (
+        <CalculadoraPrecificacaoModal
+          item={itemCalculadora}
+          onClose={() => setItemCalculadora(null)}
         />
       )}
     </div>
