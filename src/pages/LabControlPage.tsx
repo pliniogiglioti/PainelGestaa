@@ -84,11 +84,21 @@ function formatWhatsAppInput(value: string) {
   const digits = value.replace(/\D/g, '').slice(0, 13)
   if (!digits) return ''
 
-  const withoutCountry = digits.startsWith('55') ? digits.slice(2) : digits
-  if (withoutCountry.length <= 2) return `(${withoutCountry}`
-  if (withoutCountry.length <= 6) return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2)}`
-  if (withoutCountry.length <= 10) return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2, 6)}-${withoutCountry.slice(6)}`
-  return `(${withoutCountry.slice(0, 2)}) ${withoutCountry.slice(2, 7)}-${withoutCountry.slice(7, 11)}`
+  if (digits.startsWith('55')) {
+    const country = digits.slice(0, 2)
+    const area = digits.slice(2, 4)
+    const number = digits.slice(4)
+
+    if (digits.length <= 2) return `(${country}`
+    if (digits.length <= 4) return `(${country}) ${area}`
+    if (number.length <= 5) return `(${country}) ${area} ${number}`
+    return `(${country}) ${area} ${number.slice(0, 5)}-${number.slice(5, 9)}`
+  }
+
+  if (digits.length <= 2) return `(${digits}`
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`
+  if (digits.length <= 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 4)} ${digits.slice(4, 9)}-${digits.slice(9, 13)}`
 }
 
 function buildWhatsAppUrl(value: string) {
@@ -138,6 +148,11 @@ const IconTrash = () => (
 const IconPhone = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.53 3.49 2 2 0 0 1 3.5 1.28h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+  </svg>
+)
+const IconWhatsApp = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+    <path d="M19.05 4.94A9.86 9.86 0 0 0 12.03 2C6.54 2 2.08 6.46 2.08 11.95c0 1.76.46 3.47 1.34 4.97L2 22l5.24-1.37a9.93 9.93 0 0 0 4.76 1.21h.01c5.49 0 9.95-4.46 9.95-9.95a9.86 9.86 0 0 0-2.91-6.95ZM12.01 20.16h-.01a8.27 8.27 0 0 1-4.21-1.15l-.3-.18-3.11.81.83-3.03-.2-.31a8.24 8.24 0 0 1-1.28-4.35c0-4.56 3.71-8.27 8.28-8.27 2.21 0 4.29.86 5.85 2.42a8.22 8.22 0 0 1 2.42 5.85c0 4.56-3.71 8.27-8.27 8.27Zm4.54-6.2c-.25-.12-1.46-.72-1.69-.8-.23-.08-.4-.12-.57.12-.17.25-.65.8-.8.96-.15.17-.29.19-.54.06-.25-.12-1.04-.38-1.98-1.2-.73-.65-1.23-1.45-1.37-1.69-.14-.25-.02-.38.1-.5.11-.11.25-.29.37-.43.12-.15.17-.25.25-.42.08-.17.04-.31-.02-.43-.06-.12-.57-1.37-.78-1.88-.21-.5-.42-.43-.57-.43h-.49c-.17 0-.43.06-.66.31-.23.25-.88.86-.88 2.1 0 1.23.9 2.43 1.02 2.6.12.17 1.77 2.7 4.28 3.79.6.26 1.07.41 1.44.53.6.19 1.15.16 1.58.1.48-.07 1.46-.6 1.67-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.17-.48-.29Z"/>
   </svg>
 )
 const IconMail = () => (
@@ -243,7 +258,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
     if (!form.nome.trim()) { setError('Nome é obrigatório.'); return }
     const telefoneNormalizado = form.telefone.trim() ? normalizeWhatsAppNumber(form.telefone) : null
     if (form.telefone.trim() && !telefoneNormalizado) {
-      setError('Informe um WhatsApp válido com DDD. Ex.: (11) 99999-9999'); return
+      setError('Informe um WhatsApp válido. Ex.: (55) 11 99999-9999 ou (11) 99999-9999'); return
     }
     setSaving(true); setError('')
 
@@ -283,7 +298,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
           </div>
           <div className={styles.formField}>
             <label className={styles.label}>WhatsApp</label>
-            <input className={styles.input} value={form.telefone} onChange={handleTelefoneChange} placeholder="(11) 99999-9999" />
+            <input className={styles.input} value={form.telefone} onChange={handleTelefoneChange} placeholder="(55) 11 99999-9999" inputMode="tel" />
           </div>
           <div className={styles.formField}>
             <label className={styles.label}>E-mail</label>
@@ -1102,7 +1117,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
           <div className={styles.labInfoCard}>
             <h3 className={styles.infoSectionTitle}>Dados do laboratório</h3>
             {lab.cnpj     && <InfoRow label="CNPJ"      value={lab.cnpj} />}
-            {lab.telefone && <InfoRow label="Telefone"   icon={<IconPhone />} value={lab.telefone} />}
+            {lab.telefone && <InfoRow label="WhatsApp"   icon={<IconPhone />} value={formatWhatsAppNumber(lab.telefone)} />}
             {lab.email    && <InfoRow label="E-mail"     icon={<IconMail />}  value={lab.email} />}
             {lab.endereco && <InfoRow label="Endereço"   value={lab.endereco} />}
             <InfoRow label="Prazo médio" icon={<IconClock />} value={`${lab.prazo_medio_dias} dias`} />
@@ -1191,11 +1206,26 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
     <div className={styles.labCard} onClick={onClick}>
       <div className={styles.labCardHeader}>
         <div className={styles.labCardName}>{lab.nome}</div>
-        {isAdmin && (
-          <button type="button" className={styles.btnIcon} onClick={onEdit} title="Editar laboratório">
-            <IconEdit />
-          </button>
-        )}
+        <div className={styles.labCardHeaderActions}>
+          {whatsappUrl && (
+            <button
+              type="button"
+              className={`${styles.btnIcon} ${styles.btnIconWhatsApp}`}
+              onClick={e => {
+                e.stopPropagation()
+                window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
+              }}
+              title="Abrir no WhatsApp"
+            >
+              <IconWhatsApp />
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={styles.btnIcon} onClick={onEdit} title="Editar laboratório">
+              <IconEdit />
+            </button>
+          )}
+        </div>
       </div>
 
       <div className={styles.labCardContact}>
