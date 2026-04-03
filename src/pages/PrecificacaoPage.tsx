@@ -1124,18 +1124,6 @@ function ApresentacaoVendaModal({
             )}
           </div>
 
-          <div className={styles.presentationBlock}>
-            <h3 className={styles.sectionTitle}>Itens da proposta</h3>
-            <div className={styles.presentationItems}>
-              {itensApresentacao.map(item => (
-                <div key={item.id} className={styles.presentationItem}>
-                  <span>{item.descricao}</span>
-                  <strong>{formatCurrency(item.preco_unitario * item.quantidade)}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {sugestoesUpsell.length > 0 && (
             <div className={styles.presentationBlock}>
               <h3 className={styles.sectionTitle}>Sugestões para aumentar a venda</h3>
@@ -1149,7 +1137,7 @@ function ApresentacaoVendaModal({
                   >
                     <span>{item.nome_produto}</span>
                     <strong>{formatCurrency(item.preco)}</strong>
-                    <small>Adicionar à apresentação</small>
+                    <small>Adicionar agora</small>
                   </button>
                 ))}
               </div>

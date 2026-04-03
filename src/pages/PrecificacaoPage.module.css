@@ -995,11 +995,12 @@
 }
 
 .presentationParcelaCard span {
-  font-size: 11px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .presentationParcelaCard strong {
-  font-size: 16px;
+  font-size: 13px;
   line-height: 1.1;
 }
 
