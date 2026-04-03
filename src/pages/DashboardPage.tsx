@@ -36,6 +36,11 @@ interface EmpresaMembroListItem {
   created_at: string
 }
 
+interface CompanyFormState {
+  nome: string
+  cnpj: string
+}
+
 const getTipoUsuarioLabel = (tipo: TipoUsuario) => tipo === 'titular' ? 'Titular' : 'Colaborador'
 const getEmpresaRoleLabel = (role: EmpresaListItem['role'] | EmpresaMembroListItem['empresa_role']) => (
   role === 'admin' ? 'Titular' : 'Colaborador'
@@ -45,6 +50,33 @@ const getTipoUsuarioDescricao = (tipo: TipoUsuario) => (
     ? 'Pode criar empresas e liberar acesso para colaboradores.'
     : 'Recebe acesso as empresas concedidas por um titular.'
 )
+
+const normalizarCnpj = (value: string) => value.replace(/\D/g, '')
+
+const formatarCnpj = (value: string) => {
+  const digits = normalizarCnpj(value).slice(0, 14)
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+}
+
+const validarCnpj = (value: string) => {
+  const cnpj = normalizarCnpj(value)
+
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) return false
+
+  const calcularDigito = (base: string, pesos: number[]) => {
+    const soma = base.split('').reduce((total, numero, index) => total + Number(numero) * pesos[index], 0)
+    const resto = soma % 11
+    return resto < 2 ? 0 : 11 - resto
+  }
+
+  const digito1 = calcularDigito(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  const digito2 = calcularDigito(cnpj.slice(0, 12) + String(digito1), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  return cnpj === `${cnpj.slice(0, 12)}${digito1}${digito2}`
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────
 
@@ -664,6 +696,66 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 // ── Netflix App Card ──────────────────────────────────────────────────────
 
+function CompanyFormModal({
+  mode,
+  form,
+  error,
+  saving,
+  onClose,
+  onSubmit,
+  onChange,
+}: {
+  mode: 'create' | 'edit'
+  form: CompanyFormState
+  error: string
+  saving: boolean
+  onClose: () => void
+  onSubmit: (e: React.FormEvent) => void
+  onChange: (field: keyof CompanyFormState, value: string) => void
+}) {
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>{mode === 'create' ? 'Nova empresa' : 'Editar empresa'}</h2>
+          <button className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+        <form className={styles.modalForm} onSubmit={onSubmit}>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Nome da empresa</label>
+            <input
+              className={styles.modalInput}
+              placeholder="Ex: Clinica Sorriso Ltda"
+              value={form.nome}
+              onChange={e => onChange('nome', e.target.value)}
+              required
+              autoFocus
+            />
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>CNPJ</label>
+            <input
+              className={styles.modalInput}
+              placeholder="00.000.000/0000-00"
+              value={form.cnpj}
+              onChange={e => onChange('cnpj', formatarCnpj(e.target.value))}
+              inputMode="numeric"
+              required
+            />
+          </div>
+          {error && <p className={styles.formError}>{error}</p>}
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>Cancelar</button>
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : mode === 'create' ? 'Criar empresa' : 'Salvar alterações'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function AppCard({
   app,
   categoryLabel,
@@ -752,6 +844,11 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [empresaMemberErrors, setEmpresaMemberErrors] = useState<Record<string, string>>({})
   const [empresaMemberSuccess, setEmpresaMemberSuccess] = useState<Record<string, string>>({})
   const [empresaAberta, setEmpresaAberta] = useState<string | null>(null)
+  const [companyModalMode, setCompanyModalMode] = useState<'create' | 'edit' | null>(null)
+  const [editingCompany, setEditingCompany] = useState<EmpresaListItem | null>(null)
+  const [companyForm, setCompanyForm] = useState<CompanyFormState>({ nome: '', cnpj: '' })
+  const [companyFormError, setCompanyFormError] = useState('')
+  const [savingCompany, setSavingCompany] = useState(false)
 
   // Modals
   const [showCreateApp,   setShowCreateApp]   = useState(false)
@@ -954,6 +1051,126 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
     await fetchEmpresaMembros(empresaId)
     setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+  }
+
+  const podeCriarEmpresa = isAdmin || tipoUsuario === 'titular'
+  const podeEditarEmpresa = (empresa: EmpresaListItem) => isAdmin || empresa.role === 'admin'
+
+  const openCreateCompanyModal = () => {
+    setCompanyModalMode('create')
+    setEditingCompany(null)
+    setCompanyForm({ nome: '', cnpj: '' })
+    setCompanyFormError('')
+  }
+
+  const openEditCompanyModal = (empresa: EmpresaListItem) => {
+    setCompanyModalMode('edit')
+    setEditingCompany(empresa)
+    setCompanyForm({
+      nome: empresa.nome,
+      cnpj: formatarCnpj(empresa.cnpj ?? ''),
+    })
+    setCompanyFormError('')
+  }
+
+  const closeCompanyModal = () => {
+    if (savingCompany) return
+    setCompanyModalMode(null)
+    setEditingCompany(null)
+    setCompanyForm({ nome: '', cnpj: '' })
+    setCompanyFormError('')
+  }
+
+  const handleCompanyFormChange = (field: keyof CompanyFormState, value: string) => {
+    setCompanyForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleSubmitCompany = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (companyModalMode === 'create' && !podeCriarEmpresa) {
+      setCompanyFormError('Somente titulares podem criar empresas.')
+      return
+    }
+
+    if (!companyForm.nome.trim()) {
+      setCompanyFormError('Informe o nome da empresa.')
+      return
+    }
+
+    if (!companyForm.cnpj.trim()) {
+      setCompanyFormError('Informe o CNPJ da empresa.')
+      return
+    }
+
+    if (!validarCnpj(companyForm.cnpj)) {
+      setCompanyFormError('Informe um CNPJ valido.')
+      return
+    }
+
+    const cnpj = normalizarCnpj(companyForm.cnpj)
+    setSavingCompany(true)
+    setCompanyFormError('')
+
+    if (companyModalMode === 'edit' && editingCompany) {
+      if (!podeEditarEmpresa(editingCompany)) {
+        setCompanyFormError('Voce nao pode editar esta empresa.')
+        setSavingCompany(false)
+        return
+      }
+
+      const { error } = await supabase
+        .from('empresas')
+        .update({
+          nome: companyForm.nome.trim(),
+          cnpj,
+        })
+        .eq('id', editingCompany.id)
+
+      if (error) {
+        setCompanyFormError(error.message ?? 'Nao foi possivel editar a empresa.')
+        setSavingCompany(false)
+        return
+      }
+
+      setEmpresas(prev => prev.map(empresa => (
+        empresa.id === editingCompany.id
+          ? { ...empresa, nome: companyForm.nome.trim(), cnpj }
+          : empresa
+      )))
+      setSavingCompany(false)
+      closeCompanyModal()
+      return
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession()
+    const sessionUser = sessionData.session?.user
+
+    if (!sessionUser) {
+      setCompanyFormError('Sessao expirada. Faca login novamente.')
+      setSavingCompany(false)
+      return
+    }
+
+    const { data, error } = await supabase
+      .from('empresas')
+      .insert({
+        nome: companyForm.nome.trim(),
+        cnpj,
+        created_by: sessionUser.id,
+      })
+      .select('id, nome, cnpj, created_at')
+      .single()
+
+    if (error || !data) {
+      setCompanyFormError(error?.message ?? 'Nao foi possivel criar a empresa.')
+      setSavingCompany(false)
+      return
+    }
+
+    setEmpresas(prev => [...prev, { ...data, role: 'admin' }].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+    setSavingCompany(false)
+    closeCompanyModal()
   }
 
   useEffect(() => { fetchCategories() }, [])
@@ -1165,6 +1382,11 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                 <h2 className={styles.sectionTitle}>Listagem de empresas</h2>
                 {!loadingEmpresas && <span className={styles.sectionCount}>{empresas.length} empresa{empresas.length === 1 ? '' : 's'}</span>}
               </div>
+              {podeCriarEmpresa && (
+                <DesignButton variant="primary" onClick={openCreateCompanyModal}>
+                  <span className={styles.topNavButtonContent}><IconPlus /><span>Nova empresa</span></span>
+                </DesignButton>
+              )}
             </div>
 
             {loadingEmpresas ? (
@@ -1190,10 +1412,19 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                       </span>
                     </div>
                     <h3 className={styles.companyName}>{empresa.nome}</h3>
-                    <p className={styles.companyMeta}>{empresa.cnpj ? empresa.cnpj : 'CNPJ não informado'}</p>
+                    <p className={styles.companyMeta}>{empresa.cnpj ? formatarCnpj(empresa.cnpj) : 'CNPJ não informado'}</p>
                     <p className={styles.companyMeta}>
                       Vinculada em {new Date(empresa.created_at).toLocaleDateString('pt-BR')}
                     </p>
+                    {podeEditarEmpresa(empresa) && (
+                      <button
+                        type="button"
+                        className={styles.companyEditButton}
+                        onClick={() => openEditCompanyModal(empresa)}
+                      >
+                        Editar empresa
+                      </button>
+                    )}
                     {empresa.role === 'admin' && (
                       <div className={styles.companyMembersWrap}>
                         <button
@@ -1364,6 +1595,17 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       )}
       {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
       {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
+      {companyModalMode && (
+        <CompanyFormModal
+          mode={companyModalMode}
+          form={companyForm}
+          error={companyFormError}
+          saving={savingCompany}
+          onClose={closeCompanyModal}
+          onSubmit={handleSubmitCompany}
+          onChange={handleCompanyFormChange}
+        />
+      )}
     </div>
   )
 }
