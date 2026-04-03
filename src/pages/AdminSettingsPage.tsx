@@ -268,16 +268,19 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setExpiresDrafts(Object.fromEntries(usuarios.map(usuario => [usuario.id, toDateInputValue(usuario.expires_at)])))
   }, [usuarios])
 
+  const roleOrder: Record<string, number> = { admin: 0, editor: 1, user: 2 }
+
   const usuariosOrdenados = useMemo(
     () => [...usuarios].sort((a, b) => {
-      if (a.role === b.role) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-      return a.role === 'admin' ? -1 : 1
+      const diff = (roleOrder[a.role] ?? 99) - (roleOrder[b.role] ?? 99)
+      if (diff !== 0) return diff
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     }),
     [usuarios],
   )
 
   const alternarStatusUsuario = async (usuario: Profile) => {
-    if (usuario.role !== 'user') return
+    if (usuario.role === 'admin') return
 
     const proximoStatus = !(usuario.ativo ?? true)
     setSavingUserId(usuario.id)
@@ -298,7 +301,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
 
   const salvarExpiracaoUsuario = async (usuario: Profile) => {
-    if (usuario.role !== 'user') return
+    if (usuario.role === 'admin') return
 
     const expires_at = expiresDrafts[usuario.id]
       ? new Date(`${expiresDrafts[usuario.id]}T00:00:00.000Z`).toISOString()
@@ -320,9 +323,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setSavingExpiryId(null)
   }
 
-  const alternarFuncaoUsuario = async (usuario: Profile) => {
+  const alterarFuncaoUsuario = async (usuario: Profile, novaFuncao: string) => {
     if (usuario.id === currentUserId) return
-    const novaFuncao = usuario.role === 'admin' ? 'user' : 'admin'
+    if (novaFuncao === usuario.role) return
     setSavingRoleId(usuario.id)
 
     const { error } = await supabase
@@ -741,23 +744,24 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                         <td className={styles.td}>{u.email ?? '—'}</td>
                         <td className={styles.td}>
                           {u.id === currentUserId ? (
-                            <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : styles.roleUser}`}>
+                            <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : u.role === 'editor' ? styles.roleEditor : styles.roleUser}`}>
                               {u.role}
                             </span>
                           ) : (
-                            <button
-                              type="button"
-                              className={`${styles.roleBadge} ${styles.roleBadgeBtn} ${u.role === 'admin' ? styles.roleAdmin : styles.roleUser}`}
-                              onClick={() => alternarFuncaoUsuario(u)}
+                            <select
+                              className={styles.roleSelect}
+                              value={u.role}
+                              onChange={e => alterarFuncaoUsuario(u, e.target.value)}
                               disabled={savingRoleId === u.id}
-                              title={`Clique para tornar ${u.role === 'admin' ? 'usuário' : 'admin'}`}
                             >
-                              {savingRoleId === u.id ? '...' : u.role}
-                            </button>
+                              <option value="admin">admin</option>
+                              <option value="editor">editor</option>
+                              <option value="user">user</option>
+                            </select>
                           )}
                         </td>
                         <td className={styles.td}>
-                          {u.role === 'user' ? (
+                          {u.role !== 'admin' ? (
                             <button
                               type="button"
                               className={`${styles.switch} ${(u.ativo ?? true) ? styles.switchActive : ''}`}
@@ -777,7 +781,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           )}
                         </td>
                         <td className={styles.td}>
-                          {u.role === 'user' ? (
+                          {u.role !== 'admin' ? (
                             <div className={styles.expiryEditor}>
                               <input
                                 type="date"
@@ -801,7 +805,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                         </td>
                         <td className={styles.td}>{formatDate(u.created_at)}</td>
                         <td className={styles.td}>
-                          {u.role === 'user' && (
+                          {u.role !== 'admin' && (
                             <button
                               type="button"
                               className={styles.deleteBtn}

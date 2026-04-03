@@ -437,19 +437,37 @@
   border: 1px solid var(--border);
 }
 
-.roleBadgeBtn {
+.roleEditor {
+  background: rgba(99, 179, 237, 0.15);
+  color: #63b3ed;
+  border: 1px solid rgba(99, 179, 237, 0.3);
+}
+
+.roleSelect {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: rgba(255,255,255,0.07);
+  color: var(--text);
+  border: 1px solid var(--border);
   cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+  min-width: 72px;
+  text-align: center;
 }
 
-.roleBadgeBtn:hover:not(:disabled) {
-  opacity: 0.75;
-  transform: scale(1.05);
-}
-
-.roleBadgeBtn:disabled {
-  cursor: wait;
+.roleSelect:disabled {
   opacity: 0.5;
+  cursor: wait;
+}
+
+.roleSelect:focus {
+  border-color: var(--gold-light);
 }
 
 

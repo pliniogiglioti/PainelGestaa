@@ -34,7 +34,7 @@ export default function LoginPage({ onRegister }: LoginPageProps) {
       .eq('id', data.user.id)
       .single()
 
-    if (profile?.role === 'user' && profile.ativo === false) {
+    if (profile?.role !== 'admin' && profile?.ativo === false) {
       await supabase.auth.signOut()
       setError('Seu acesso está desativado. Entre em contato com o administrador.')
       setLoading(false)

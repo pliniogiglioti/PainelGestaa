@@ -33,7 +33,7 @@ async function validarUsuarioAtivo(session: Session) {
     .eq('id', session.user.id)
     .single()
 
-  if (profile?.role === 'user' && profile.ativo === false) {
+  if (profile?.role !== 'admin' && profile?.ativo === false) {
     await supabase.auth.signOut()
     return false
   }
