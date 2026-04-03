@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
-import type { Empresa } from '../lib/types'
+import type { Empresa, EmpresaPreco } from '../lib/types'
 
 interface PrecificacaoPageProps {
   empresa: Empresa
@@ -11,12 +11,6 @@ interface PrecificacaoPageProps {
 }
 
 type ViewMode = 'home' | 'lista'
-
-type PrecoItem = {
-  id: string
-  nome: string
-  preco: number
-}
 
 const IconBack = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,30 +56,36 @@ function parsePreco(value: string) {
 function PrecoModal({
   onClose,
   onSubmit,
+  saving,
+  error,
 }: {
   onClose: () => void
-  onSubmit: (item: { nome: string; preco: number }) => void
+  onSubmit: (item: { nome: string; preco: number }) => Promise<void>
+  saving: boolean
+  error: string
 }) {
   const [nome, setNome] = useState('')
   const [preco, setPreco] = useState('')
-  const [erro, setErro] = useState('')
-  const backdropDismiss = useBackdropDismiss(onClose)
+  const [erroLocal, setErroLocal] = useState('')
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
     if (!nome.trim()) {
-      setErro('Informe o nome do produto.')
+      setErroLocal('Informe o nome do produto.')
       return
     }
 
     const precoNumerico = parsePreco(preco)
     if (precoNumerico <= 0) {
-      setErro('Informe um preço válido.')
+      setErroLocal('Informe um preço válido.')
       return
     }
 
-    onSubmit({
+    setErroLocal('')
+
+    await onSubmit({
       nome: nome.trim(),
       preco: precoNumerico,
     })
@@ -110,8 +110,12 @@ function PrecoModal({
               className={styles.modalInput}
               placeholder="Ex: Consulta de avaliação"
               value={nome}
-              onChange={e => setNome(e.target.value)}
+              onChange={e => {
+                setNome(e.target.value)
+                setErroLocal('')
+              }}
               autoFocus
+              disabled={saving}
             />
           </label>
 
@@ -121,19 +125,23 @@ function PrecoModal({
               className={styles.modalInput}
               placeholder="Ex: 120,00"
               value={preco}
-              onChange={e => setPreco(e.target.value)}
+              onChange={e => {
+                setPreco(e.target.value)
+                setErroLocal('')
+              }}
               inputMode="decimal"
+              disabled={saving}
             />
           </label>
 
-          {erro && <p className={styles.formError}>{erro}</p>}
+          {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
 
           <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
               Cancelar
             </button>
-            <button type="submit" className={styles.modalSubmit}>
-              Adicionar
+            <button type="submit" className={styles.modalSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Adicionar'}
             </button>
           </div>
         </form>
@@ -147,7 +155,11 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [canManage, setCanManage] = useState(false)
   const [view, setView] = useState<ViewMode>('home')
   const [showPrecoModal, setShowPrecoModal] = useState(false)
-  const [precos, setPrecos] = useState<PrecoItem[]>([])
+  const [precos, setPrecos] = useState<EmpresaPreco[]>([])
+  const [savingPreco, setSavingPreco] = useState(false)
+  const [loadingPrecos, setLoadingPrecos] = useState(false)
+  const [error, setError] = useState('')
+  const [feedback, setFeedback] = useState('')
 
   useEffect(() => {
     let active = true
@@ -192,6 +204,26 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       }
 
       if (active) {
+        setLoadingPrecos(true)
+      }
+
+      const { data: precosData, error: precosError } = await supabase
+        .from('empresa_precos')
+        .select('*')
+        .eq('empresa_id', empresa.id)
+        .eq('ativo', true)
+        .order('nome_produto', { ascending: true })
+
+      if (!precosError && active) {
+        setPrecos(precosData ?? [])
+      }
+
+      if (precosError && active) {
+        setError(precosError.message ?? 'Não foi possível carregar a lista de preços.')
+      }
+
+      if (active) {
+        setLoadingPrecos(false)
         setLoading(false)
       }
     }
@@ -203,16 +235,33 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     }
   }, [empresa.id, onTrocarEmpresa])
 
-  const handleAddPreco = (item: { nome: string; preco: number }) => {
-    setPrecos(prev => [
-      ...prev,
-      {
-        id: `${Date.now()}-${prev.length}`,
-        nome: item.nome,
+  const handleAddPreco = async (item: { nome: string; preco: number }) => {
+    setSavingPreco(true)
+    setError('')
+    setFeedback('')
+
+    const { data, error: insertError } = await supabase
+      .from('empresa_precos')
+      .insert({
+        empresa_id: empresa.id,
+        nome_produto: item.nome,
         preco: item.preco,
-      },
-    ])
+      })
+      .select('*')
+      .single()
+
+    if (insertError) {
+      setError(insertError.message ?? 'Não foi possível salvar o preço.')
+      setSavingPreco(false)
+      return
+    }
+
+    setPrecos(prev =>
+      [...prev, data].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+    )
+    setFeedback('Preço salvo com sucesso.')
     setShowPrecoModal(false)
+    setSavingPreco(false)
     setView('lista')
   }
 
@@ -247,7 +296,15 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             Trocar empresa
           </button>
           {canManage && view === 'home' && (
-            <button type="button" className={styles.btnPrimary} onClick={() => setView('lista')}>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={() => {
+                setError('')
+                setFeedback('')
+                setView('lista')
+              }}
+            >
               <IconPlus /> Minha lista de preço
             </button>
           )}
@@ -262,7 +319,15 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             Comece criando seus preços manualmente ou, depois, importe uma lista pronta.
           </p>
           {canManage ? (
-            <button type="button" className={styles.btnPrimary} onClick={() => setView('lista')}>
+            <button
+              type="button"
+              className={styles.btnPrimary}
+              onClick={() => {
+                setError('')
+                setFeedback('')
+                setView('lista')
+              }}
+            >
               <IconPlus /> Abrir minha lista de preço
             </button>
           ) : (
@@ -279,18 +344,33 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
               <h2 className={styles.workspaceTitle}>Minha lista de preço</h2>
             </div>
             <div className={styles.workspaceActions}>
-              <button type="button" className={styles.btnSecondary}>
+              <button type="button" className={styles.btnSecondary} disabled>
                 <IconUpload /> Importar lista
               </button>
               {canManage && (
-                <button type="button" className={styles.btnPrimary} onClick={() => setShowPrecoModal(true)}>
+                <button
+                  type="button"
+                  className={styles.btnPrimary}
+                  onClick={() => {
+                    setError('')
+                    setFeedback('')
+                    setShowPrecoModal(true)
+                  }}
+                >
                   <IconPlus /> Criar preços
                 </button>
               )}
             </div>
           </div>
 
-          {precos.length === 0 ? (
+          {feedback && <p className={styles.feedbackSuccess}>{feedback}</p>}
+          {error && <p className={styles.feedbackError}>{error}</p>}
+
+          {loadingPrecos ? (
+            <div className={styles.blankCanvas}>
+              <p className={styles.blankTitle}>Carregando preços...</p>
+            </div>
+          ) : precos.length === 0 ? (
             <div className={styles.blankCanvas}>
               <p className={styles.blankTitle}>Nenhum preço cadastrado ainda.</p>
               <p className={styles.blankText}>
@@ -306,7 +386,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
               <div className={styles.priceTableBody}>
                 {precos.map(item => (
                   <div key={item.id} className={styles.priceRow}>
-                    <span className={styles.priceName}>{item.nome}</span>
+                    <span className={styles.priceName}>{item.nome_produto}</span>
                     <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                   </div>
                 ))}
@@ -320,6 +400,8 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         <PrecoModal
           onClose={() => setShowPrecoModal(false)}
           onSubmit={handleAddPreco}
+          saving={savingPreco}
+          error={error}
         />
       )}
     </div>

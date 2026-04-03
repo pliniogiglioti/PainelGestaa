@@ -178,6 +178,35 @@ export interface Database {
         }
         Relationships: []
       }
+      empresa_precos: {
+        Row: {
+          id:           string
+          empresa_id:   string
+          nome_produto: string
+          preco:        number
+          ativo:        boolean
+          created_at:   string
+          updated_at:   string
+        }
+        Insert: {
+          id?:           string
+          empresa_id:    string
+          nome_produto:  string
+          preco?:        number
+          ativo?:        boolean
+          created_at?:   string
+          updated_at?:   string
+        }
+        Update: {
+          id?:           string
+          empresa_id?:   string
+          nome_produto?: string
+          preco?:        number
+          ativo?:        boolean
+          updated_at?:   string
+        }
+        Relationships: []
+      }
       dre_lancamentos: {
         Row: {
           id:                string
@@ -631,6 +660,7 @@ export type AppCategory        = Database['public']['Tables']['app_categories'][
 export type App                = Database['public']['Tables']['apps']['Row']
 export type Empresa            = Database['public']['Tables']['empresas']['Row']
 export type EmpresaMembro      = Database['public']['Tables']['empresa_membros']['Row']
+export type EmpresaPreco       = Database['public']['Tables']['empresa_precos']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
 export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']['Row']
