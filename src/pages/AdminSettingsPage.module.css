@@ -466,23 +466,27 @@
   background: rgba(255,255,255,0.02);
 }
 
-.userMetaInlineRow {
+.userMetaCards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.userMetaCard {
   display: flex;
   align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
+  gap: 8px;
+  min-width: 0;
   padding: 12px 14px;
   border-radius: 14px;
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.02);
 }
 
-.userMetaInlineItem {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  min-width: 0;
+.userMetaCard > :last-child {
+  margin-left: auto;
 }
 
 .userCardLabel {
@@ -677,13 +681,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
   min-width: 0;
 }
 
 .expiryInput {
   min-width: 0;
-  flex: 1 1 170px;
+  flex: 1 1 150px;
 }
 
 .deleteBtn {
@@ -848,12 +853,13 @@
     max-width: none;
   }
 
-  .userMetaInlineRow {
-    align-items: flex-start;
+  .userMetaCards {
+    grid-template-columns: 1fr;
   }
 
-  .userMetaInlineItem {
+  .userMetaCard {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .deleteBtn {
