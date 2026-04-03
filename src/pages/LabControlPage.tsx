@@ -986,7 +986,9 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
   onClick: () => void; onEdit: (e: React.MouseEvent) => void
 }) {
   const overdue = envios.filter(isOverdue).length
-  const active  = envios.filter(e => !['Concluído', 'Entregue'].includes(e.status)).length
+  const enviosEmAndamento = envios.filter(e => !['Concluído', 'Entregue'].includes(e.status))
+  const active  = enviosEmAndamento.length
+  const valorEmAndamento = enviosEmAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
   const recent  = [...envios].slice(0, 5)
 
   return (
@@ -1023,6 +1025,13 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
             <span className={styles.labCardStatLabel}>atrasados</span>
           </div>
         )}
+      </div>
+
+      <div className={styles.labCardValueSummary}>
+        <span className={styles.labCardValueLabel}>Valores em andamento</span>
+        <strong className={styles.labCardValueAmount}>
+          {valorEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </strong>
       </div>
 
       {/* Mini kanban status bars */}
