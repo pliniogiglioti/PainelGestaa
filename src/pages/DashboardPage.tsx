@@ -6,7 +6,7 @@ import type { App, AppCategory, Empresa, ForumTopicWithMeta } from '../lib/types
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 
-type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade' | 'perfil'
+type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 
 
 interface DashboardPageProps {
@@ -68,11 +68,6 @@ const IconBuilding = () => (
     <path d="M7 6h.01M17 6h.01M7 10h.01M17 10h.01M7 14h.01M17 14h.01"/>
   </svg>
 )
-const IconProfile = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-  </svg>
-)
 const IconLogout = () => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
@@ -131,6 +126,11 @@ const IconMoon = () => (
     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
   </svg>
 )
+const IconChevronDown = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+)
 
 // ── Spinner ───────────────────────────────────────────────────────────────
 
@@ -139,6 +139,8 @@ function Spinner() {
 }
 
 function TopNavigation({
+  user,
+  tipoUsuario,
   navItems,
   activePage,
   onSelect,
@@ -148,6 +150,8 @@ function TopNavigation({
   theme,
   onToggleTheme,
 }: {
+  user: User
+  tipoUsuario: TipoUsuario
   navItems: { id: Page; label: string; icon: ReactNode }[]
   activePage: Page
   onSelect: (page: Page) => void
@@ -158,6 +162,35 @@ function TopNavigation({
   onToggleTheme: () => void
 }) {
   const isDark = theme === 'dark'
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+  const userInitial = user.name.trim().charAt(0).toUpperCase() || user.email.trim().charAt(0).toUpperCase() || 'U'
+  const roleLabel = isAdmin ? 'Admin' : 'Usuario'
+
+  useEffect(() => {
+    if (!menuOpen) return
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setMenuOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [menuOpen])
+
   return (
     <header className={styles.topNavWrap}>
       <div className={styles.topNavBrand}>
@@ -178,25 +211,103 @@ function TopNavigation({
       </nav>
 
       <div className={styles.topNavActions}>
-        <button
-          type="button"
-          className={`${styles.themeToggle} ${isDark ? styles.themeToggleDark : styles.themeToggleLight}`}
-          onClick={onToggleTheme}
-          title={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-          aria-label={isDark ? 'Mudar para tema claro' : 'Mudar para tema escuro'}
-        >
-          <span className={styles.themeToggleKnob}>
-            {isDark ? <IconMoon /> : <IconSun />}
-          </span>
-        </button>
-        {isAdmin && (
-          <DesignIconButton onClick={onSettings} title="Configurações">
-            <IconSettings />
-          </DesignIconButton>
-        )}
-        <DesignButton variant="primary" onClick={onLogout}>
-          <span className={styles.topNavButtonContent}><IconLogout /><span>Sair</span></span>
-        </DesignButton>
+        <div className={styles.userMenuWrap} ref={menuRef}>
+          <button
+            type="button"
+            className={`${styles.userMenuTrigger} ${menuOpen ? styles.userMenuTriggerOpen : ''}`}
+            onClick={() => setMenuOpen(open => !open)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+          >
+            <span className={styles.userMenuAvatar}>{userInitial}</span>
+            <span className={styles.userMenuTriggerText}>
+              <span className={styles.userMenuTriggerName}>{user.name}</span>
+              <span className={styles.userMenuTriggerRole}>{getTipoUsuarioLabel(tipoUsuario)}</span>
+            </span>
+            <span className={styles.userMenuChevron}><IconChevronDown /></span>
+          </button>
+
+          {menuOpen && (
+            <div className={styles.userMenuDropdown} role="menu">
+              <div className={styles.userMenuHeader}>
+                <div className={styles.userMenuAvatarLarge}>{userInitial}</div>
+                <div className={styles.userMenuIdentity}>
+                  <strong className={styles.userMenuName}>{user.name}</strong>
+                  <span className={styles.userMenuEmail}>{user.email}</span>
+                </div>
+              </div>
+
+              <div className={styles.userMenuInfoGrid}>
+                <div className={styles.userMenuInfoItem}>
+                  <span className={styles.userMenuInfoLabel}>Nome</span>
+                  <span className={styles.userMenuInfoValue}>{user.name}</span>
+                </div>
+                <div className={styles.userMenuInfoItem}>
+                  <span className={styles.userMenuInfoLabel}>E-mail</span>
+                  <span className={styles.userMenuInfoValue}>{user.email}</span>
+                </div>
+                <div className={styles.userMenuInfoItem}>
+                  <span className={styles.userMenuInfoLabel}>Funcao</span>
+                  <span className={styles.userMenuInfoValue}>{roleLabel}</span>
+                </div>
+                <div className={styles.userMenuInfoItem}>
+                  <span className={styles.userMenuInfoLabel}>Classificacao</span>
+                  <span className={styles.userMenuInfoValue}>{getTipoUsuarioLabel(tipoUsuario)}</span>
+                </div>
+              </div>
+
+              <div className={styles.userMenuSection}>
+                <span className={styles.userMenuSectionLabel}>Tema</span>
+                <div className={styles.userMenuThemeChoices}>
+                  <button
+                    type="button"
+                    className={`${styles.userMenuThemeButton} ${!isDark ? styles.userMenuThemeButtonActive : ''}`}
+                    onClick={() => {
+                      if (isDark) onToggleTheme()
+                    }}
+                  >
+                    <IconSun />
+                    <span>Claro</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.userMenuThemeButton} ${isDark ? styles.userMenuThemeButtonActive : ''}`}
+                    onClick={() => {
+                      if (!isDark) onToggleTheme()
+                    }}
+                  >
+                    <IconMoon />
+                    <span>Escuro</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className={styles.userMenuActions}>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className={styles.userMenuActionButton}
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onSettings()
+                    }}
+                  >
+                    <IconSettings />
+                    <span>Configuracoes</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={`${styles.userMenuActionButton} ${styles.userMenuLogoutButton}`}
+                  onClick={onLogout}
+                >
+                  <IconLogout />
+                  <span>Sair</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   )
@@ -909,7 +1020,6 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
     { id: 'minhas-empresas' as Page, label: 'Minhas empresas', icon: <IconBuilding /> },
     { id: 'comunidade'  as Page, label: 'Comunidade',  icon: <IconCommunity /> },
-    { id: 'perfil'      as Page, label: 'Perfil',      icon: <IconProfile /> },
   ]
 
   // Forum topic detail view overlays the community page
@@ -917,6 +1027,8 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     return (
       <div className={styles.layout}>
         <TopNavigation
+          user={user}
+          tipoUsuario={tipoUsuario}
           navItems={navItems}
           activePage={activePage}
           onSelect={page => { setActivePage(page); setOpenTopicId(null) }}
@@ -936,6 +1048,8 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   return (
     <div className={styles.layout}>
       <TopNavigation
+        user={user}
+        tipoUsuario={tipoUsuario}
         navItems={navItems}
         activePage={activePage}
         onSelect={setActivePage}
@@ -1238,36 +1352,6 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
           </div>
         )}
 
-        {/* PERFIL */}
-        {activePage === 'perfil' && (
-          <div className={styles.pageContent} key="profile">
-            <div className={styles.profilePage}>
-              <div className={styles.profileAvatar}>{user.name.charAt(0).toUpperCase()}</div>
-              <h2 className={styles.profileName}>{user.name}</h2>
-              <p className={styles.profileEmail}>{user.email}</p>
-              <div className={styles.profileCard}>
-                {[
-                  { label: 'Nome', value: user.name },
-                  { label: 'E-mail', value: user.email },
-                ].map(f => (
-                  <div key={f.label} className={styles.profileField}>
-                    <span className={styles.profileFieldLabel}>{f.label}</span>
-                    <span className={styles.profileFieldValue}>{f.value}</span>
-                  </div>
-                ))}
-                <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>Funcao</span>
-                  <span className={styles.profileFieldBadge}>{isAdmin ? 'Admin' : 'Usuario'}</span>
-                </div>
-                <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>Classificacao</span>
-                  <span className={styles.profileFieldBadge}>{getTipoUsuarioLabel(tipoUsuario)}</span>
-                </div>
-              </div>
-              <button className={styles.logoutButtonProfile} onClick={onLogout}>Sair da conta</button>
-            </div>
-          </div>
-        )}
       </main>
 
       {showCreateApp  && <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)}  onCreated={fetchApps} />}

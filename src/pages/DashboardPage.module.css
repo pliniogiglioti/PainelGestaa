@@ -134,12 +134,241 @@
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
+  position: relative;
 }
 
 .topNavButtonContent {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+
+.userMenuWrap {
+  position: relative;
+}
+
+.userMenuTrigger {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 10px 6px 6px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.userMenuTrigger:hover,
+.userMenuTriggerOpen {
+  border-color: rgba(213, 175, 69, 0.35);
+  background: rgba(255,255,255,0.05);
+}
+
+.userMenuAvatar,
+.userMenuAvatarLarge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(213, 175, 69, 0.28), rgba(213, 175, 69, 0.14));
+  color: var(--gold-light);
+  border: 1px solid rgba(213, 175, 69, 0.28);
+  font-weight: 700;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.userMenuAvatar {
+  width: 34px;
+  height: 34px;
+  font-size: 14px;
+}
+
+.userMenuAvatarLarge {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+}
+
+.userMenuTriggerText {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  min-width: 0;
+}
+
+.userMenuTriggerName {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.userMenuTriggerRole {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.userMenuChevron {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.userMenuTriggerOpen .userMenuChevron {
+  transform: rotate(180deg);
+}
+
+.userMenuDropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: min(360px, calc(100vw - 24px));
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(213, 175, 69, 0.08), transparent 28%),
+    var(--bg-nav);
+  box-shadow: var(--shadow-modal);
+  backdrop-filter: blur(14px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  z-index: 80;
+}
+
+.userMenuHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userMenuIdentity {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.userMenuName {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.userMenuEmail {
+  font-size: 12px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+
+.userMenuInfoGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.userMenuInfoItem,
+.userMenuSection {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.03);
+}
+
+.userMenuInfoItem {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.userMenuInfoLabel,
+.userMenuSectionLabel {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  font-weight: 700;
+}
+
+.userMenuInfoValue {
+  font-size: 13px;
+  color: var(--text);
+  word-break: break-word;
+}
+
+.userMenuSection {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.userMenuThemeChoices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.userMenuThemeButton,
+.userMenuActionButton {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.userMenuThemeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.userMenuThemeButton:hover,
+.userMenuActionButton:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(213, 175, 69, 0.32);
+}
+
+.userMenuThemeButtonActive {
+  background: rgba(213, 175, 69, 0.14);
+  border-color: rgba(213, 175, 69, 0.38);
+  color: var(--gold-light);
+}
+
+.userMenuActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.userMenuActionButton {
+  width: 100%;
+  min-height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.userMenuLogoutButton {
+  color: #ff9088;
+  border-color: rgba(255, 69, 58, 0.24);
 }
 
 /* ── Theme toggle switch ─────────────────────────────────────────────────── */
@@ -1871,5 +2100,33 @@
   .topNavMenu {
     order: 3;
     width: 100%;
+  }
+
+  .userMenuTriggerText {
+    display: none;
+  }
+
+  .userMenuTrigger {
+    padding-right: 8px;
+  }
+
+  .userMenuDropdown {
+    right: 0;
+    width: min(340px, calc(100vw - 24px));
+  }
+}
+
+@media (max-width: 560px) {
+  .userMenuDropdown {
+    position: fixed;
+    top: 74px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+  }
+
+  .userMenuInfoGrid,
+  .userMenuThemeChoices {
+    grid-template-columns: 1fr;
   }
 }
