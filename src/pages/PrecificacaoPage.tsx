@@ -9,6 +9,70 @@ interface PrecificacaoPageProps {
   onVoltar: () => void
 }
 
+type ViewMode = 'home' | 'lista' | 'criar'
+
+type QuestionarioState = {
+  cidade: string
+  perfil: string
+  convenio: string
+  ticket: string
+  observacoes: string
+}
+
+const DENTAL_STARTER_PRICES = [
+  {
+    categoria: 'Avaliacao e prevencao',
+    itens: [
+      { nome: 'Consulta de avaliacao', valor: 120 },
+      { nome: 'Profilaxia', valor: 180 },
+      { nome: 'Aplicacao de fluor', valor: 90 },
+    ],
+  },
+  {
+    categoria: 'Dentistica',
+    itens: [
+      { nome: 'Restauracao em resina 1 face', valor: 180 },
+      { nome: 'Restauracao em resina 2 faces', valor: 230 },
+      { nome: 'Restauracao em resina 3 faces', valor: 290 },
+    ],
+  },
+  {
+    categoria: 'Endodontia',
+    itens: [
+      { nome: 'Canal unirradicular', valor: 650 },
+      { nome: 'Canal birradicular', valor: 850 },
+      { nome: 'Canal multirradicular', valor: 1100 },
+    ],
+  },
+  {
+    categoria: 'Cirurgia',
+    itens: [
+      { nome: 'Extracao simples', valor: 220 },
+      { nome: 'Extracao de siso', valor: 750 },
+      { nome: 'Ulectomia / Ulotomia', valor: 260 },
+    ],
+  },
+  {
+    categoria: 'Estetica',
+    itens: [
+      { nome: 'Clareamento caseiro', valor: 900 },
+      { nome: 'Clareamento de consultorio', valor: 1200 },
+      { nome: 'Faceta em resina', valor: 850 },
+    ],
+  },
+  {
+    categoria: 'Protese',
+    itens: [
+      { nome: 'Coroa provisoria', valor: 280 },
+      { nome: 'Coroa em zirconia', valor: 1650 },
+      { nome: 'Protese total', valor: 2800 },
+    ],
+  },
+] as const
+
+const formatCurrency = (value: number) =>
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
 const IconBack = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6" />
@@ -50,7 +114,14 @@ function Spinner() {
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
-  const [view, setView] = useState<'home' | 'lista'>('home')
+  const [view, setView] = useState<ViewMode>('home')
+  const [questionario, setQuestionario] = useState<QuestionarioState>({
+    cidade: '',
+    perfil: 'intermediaria',
+    convenio: 'nao',
+    ticket: '',
+    observacoes: '',
+  })
 
   useEffect(() => {
     let active = true
@@ -113,7 +184,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           <button type="button" className={styles.backBtn} onClick={onVoltar}>
             <IconBack /> Voltar
           </button>
-          <h1 className={styles.pageTitle}>Precificação</h1>
+          <h1 className={styles.pageTitle}>Precificacao</h1>
         </div>
         <div className={styles.spinnerWrap}>
           <Spinner />
@@ -128,7 +199,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         <button type="button" className={styles.backBtn} onClick={onVoltar}>
           <IconBack /> Voltar
         </button>
-        <h1 className={styles.pageTitle}>Precificação</h1>
+        <h1 className={styles.pageTitle}>Precificacao</h1>
         <span className={styles.companyMeta}>
           Empresa: <strong>{empresa.nome}</strong>
         </span>
@@ -138,7 +209,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           </button>
           {canManage && view === 'home' && (
             <button type="button" className={styles.btnPrimary} onClick={() => setView('lista')}>
-              <IconPlus /> Minha lista de preço
+              <IconPlus /> Minha lista de preco
             </button>
           )}
         </div>
@@ -147,17 +218,17 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {view === 'home' ? (
         <div className={styles.emptyState}>
           <IconTag />
-          <p className={styles.emptyTitle}>Minha lista de preço</p>
+          <p className={styles.emptyTitle}>Minha lista de preco</p>
           <p className={styles.emptyText}>
-            Estrutura inicial pronta para importar a lista de preços ou cadastrar preços manualmente.
+            Estrutura inicial pronta para importar a lista de precos ou cadastrar precos manualmente.
           </p>
           {canManage ? (
             <button type="button" className={styles.btnPrimary} onClick={() => setView('lista')}>
-              <IconPlus /> Abrir minha lista de preço
+              <IconPlus /> Abrir minha lista de preco
             </button>
           ) : (
             <p className={styles.emptyHint}>
-              Você pode visualizar a empresa, mas a gestão da lista de preços ficará disponível para o titular.
+              Voce pode visualizar a empresa, mas a gestao da lista de precos ficara disponivel para o titular.
             </p>
           )}
         </div>
@@ -165,20 +236,127 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         <div className={styles.workspace}>
           <div className={styles.workspaceHeader}>
             <div>
-              <p className={styles.workspaceEyebrow}>Precificação</p>
-              <h2 className={styles.workspaceTitle}>Minha lista de preço</h2>
+              <p className={styles.workspaceEyebrow}>Precificacao</p>
+              <h2 className={styles.workspaceTitle}>Minha lista de preco</h2>
             </div>
             <div className={styles.workspaceActions}>
               <button type="button" className={styles.btnSecondary}>
                 <IconUpload /> Importar lista
               </button>
-              <button type="button" className={styles.btnPrimary}>
-                <IconSpark /> Criar preços
+              <button type="button" className={styles.btnPrimary} onClick={() => setView('criar')}>
+                <IconSpark /> Criar precos
               </button>
             </div>
           </div>
 
-          <div className={styles.blankCanvas} />
+          {view === 'lista' ? (
+            <div className={styles.blankCanvas} />
+          ) : (
+            <div className={styles.builderLayout}>
+              <section className={styles.pricingPanel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.panelEyebrow}>Base inicial</p>
+                    <h3 className={styles.panelTitle}>Precos odontologicos sugeridos</h3>
+                  </div>
+                  <button type="button" className={styles.btnSecondary} onClick={() => setView('lista')}>
+                    Voltar
+                  </button>
+                </div>
+
+                <p className={styles.panelText}>
+                  Montei uma base inicial para uma clinica odontologica com valores de partida. Depois ajustamos conforme perfil, regiao e posicionamento da sua clinica.
+                </p>
+
+                <div className={styles.priceGroups}>
+                  {DENTAL_STARTER_PRICES.map(grupo => (
+                    <article key={grupo.categoria} className={styles.priceGroupCard}>
+                      <h4 className={styles.priceGroupTitle}>{grupo.categoria}</h4>
+                      <div className={styles.priceList}>
+                        {grupo.itens.map(item => (
+                          <div key={item.nome} className={styles.priceItem}>
+                            <span className={styles.priceItemName}>{item.nome}</span>
+                            <strong className={styles.priceItemValue}>{formatCurrency(item.valor)}</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+
+              <aside className={styles.questionPanel}>
+                <div className={styles.panelHeader}>
+                  <div>
+                    <p className={styles.panelEyebrow}>Perguntas</p>
+                    <h3 className={styles.panelTitle}>Personalizar tabela</h3>
+                  </div>
+                </div>
+
+                <p className={styles.panelText}>
+                  Responda essas perguntas para refinarmos os valores-base nos proximos passos.
+                </p>
+
+                <div className={styles.questionList}>
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Cidade / regiao</span>
+                    <input
+                      className={styles.fieldInput}
+                      placeholder="Ex: Presidente Prudente - SP"
+                      value={questionario.cidade}
+                      onChange={e => setQuestionario(prev => ({ ...prev, cidade: e.target.value }))}
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Perfil da clinica</span>
+                    <select
+                      className={styles.fieldInput}
+                      value={questionario.perfil}
+                      onChange={e => setQuestionario(prev => ({ ...prev, perfil: e.target.value }))}
+                    >
+                      <option value="popular">Popular</option>
+                      <option value="intermediaria">Intermediaria</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </label>
+
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Atende convenio?</span>
+                    <select
+                      className={styles.fieldInput}
+                      value={questionario.convenio}
+                      onChange={e => setQuestionario(prev => ({ ...prev, convenio: e.target.value }))}
+                    >
+                      <option value="nao">Nao</option>
+                      <option value="sim">Sim</option>
+                      <option value="misto">Misto</option>
+                    </select>
+                  </label>
+
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Ticket medio desejado por paciente</span>
+                    <input
+                      className={styles.fieldInput}
+                      placeholder="Ex: 450"
+                      value={questionario.ticket}
+                      onChange={e => setQuestionario(prev => ({ ...prev, ticket: e.target.value }))}
+                    />
+                  </label>
+
+                  <label className={styles.field}>
+                    <span className={styles.fieldLabel}>Observacoes importantes</span>
+                    <textarea
+                      className={`${styles.fieldInput} ${styles.fieldTextarea}`}
+                      placeholder="Ex: foco em ortodontia, implante, odontologia estetica..."
+                      value={questionario.observacoes}
+                      onChange={e => setQuestionario(prev => ({ ...prev, observacoes: e.target.value }))}
+                    />
+                  </label>
+                </div>
+              </aside>
+            </div>
+          )}
         </div>
       )}
     </div>
