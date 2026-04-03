@@ -53,6 +53,30 @@ const IconTrash = () => (
   </svg>
 )
 
+const normalizarCnpj = (value: string) => value.replace(/\D/g, '')
+
+const validarCnpj = (value: string) => {
+  const cnpj = normalizarCnpj(value)
+
+  if (cnpj.length !== 14 || /^(\d)\1{13}$/.test(cnpj)) {
+    return false
+  }
+
+  const calcularDigito = (base: string, pesos: number[]) => {
+    const soma = base
+      .split('')
+      .reduce((total, numero, index) => total + Number(numero) * pesos[index], 0)
+
+    const resto = soma % 11
+    return resto < 2 ? 0 : 11 - resto
+  }
+
+  const digito1 = calcularDigito(cnpj.slice(0, 12), [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+  const digito2 = calcularDigito(cnpj.slice(0, 12) + String(digito1), [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2])
+
+  return cnpj === `${cnpj.slice(0, 12)}${digito1}${digito2}`
+}
+
 function EmpresaFormModal({
   modo,
   empresaId,
@@ -118,7 +142,7 @@ function EmpresaFormModal({
             />
           </label>
           <label className={styles.label}>
-            CNPJ <span className={styles.opcional}>(opcional)</span>
+            CNPJ *
             <input
               className={styles.input}
               value={cnpj}
@@ -414,8 +438,12 @@ export default function EmpresaGatePage({
   async function handleSalvarEmpresa(e: React.FormEvent) {
     e.preventDefault()
     if (!nome.trim()) { setErro('Informe o nome da empresa.'); return }
+    if (!cnpj.trim()) { setErro('Informe o CNPJ da empresa.'); return }
+    if (!validarCnpj(cnpj)) { setErro('Informe um CNPJ valido.'); return }
     setSalvando(true)
     setErro('')
+
+    const cnpjNormalizado = normalizarCnpj(cnpj)
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
@@ -427,7 +455,7 @@ export default function EmpresaGatePage({
     if (modalModo === 'editar' && empresaEmEdicao) {
       const payload = {
         nome: nome.trim(),
-        cnpj: cnpj.trim() || null,
+        cnpj: cnpjNormalizado,
       }
 
       const { error } = await supabase
@@ -460,7 +488,7 @@ export default function EmpresaGatePage({
       .from('empresas')
       .insert({
         nome: nome.trim(),
-        cnpj: cnpj.trim() || null,
+        cnpj: cnpjNormalizado,
         created_by: session.user.id,
       })
       .select()

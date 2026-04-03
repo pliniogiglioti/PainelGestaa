@@ -237,6 +237,19 @@
   flex-direction: column;
   gap: 14px;
   z-index: 80;
+  transform-origin: top right;
+  animation: userMenuIn 0.18s ease;
+}
+
+@keyframes userMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .userMenuHeader {
