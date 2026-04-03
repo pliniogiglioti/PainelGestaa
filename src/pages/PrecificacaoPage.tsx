@@ -1009,13 +1009,18 @@ function ApresentacaoVendaModal({
   const subtotal = calculateSubtotal(venda.itens)
   const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'boleto'>('cartao')
   const [parcelasSelecionadas, setParcelasSelecionadas] = useState(String(venda.max_parcelas))
-  const entradaAplicada = sanitizeEntrada(subtotal, venda.entrada_valor)
+  const [precoAvista, setPrecoAvista] = useState(
+    subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  )
+  const precoAvistaCalculado = parsePreco(precoAvista)
+  const baseApresentacao = precoAvistaCalculado > 0 ? precoAvistaCalculado : subtotal
+  const entradaAplicada = sanitizeEntrada(baseApresentacao, venda.entrada_valor)
 
   const usandoCartao = formaPagamento === 'cartao'
   const qtdParcelas = usandoCartao ? Math.max(1, Number(parcelasSelecionadas) || 1) : 1
   const taxaAplicada = usandoCartao ? taxaMaquinaPercent : taxaBoletoPercent
-  const resumo = buildFormaPagamento(subtotal, qtdParcelas, taxaAplicada, entradaAplicada)
-  const opcoesCartao = buildParcelas(subtotal, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
+  const resumo = buildFormaPagamento(baseApresentacao, qtdParcelas, taxaAplicada, entradaAplicada)
+  const opcoesCartao = buildParcelas(baseApresentacao, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
 
   return (
     <div
@@ -1035,6 +1040,20 @@ function ApresentacaoVendaModal({
         <div className={styles.presentationBody}>
           <div className={styles.presentationControls}>
             <div className={styles.presentationSelectorBlock}>
+              <span className={styles.modalLabel}>Preço à vista</span>
+              <div className={styles.presentationPriceCard}>
+                <input
+                  className={styles.presentationPriceInput}
+                  value={precoAvista}
+                  onChange={e => setPrecoAvista(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex: 3.500,00"
+                />
+                <small>Você pode ajustar o valor final à vista para apresentar ao cliente.</small>
+              </div>
+            </div>
+
+            <div className={styles.presentationSelectorBlock}>
               <span className={styles.modalLabel}>Forma de pagamento</span>
               <div className={styles.presentationSelectorGrid}>
                 <button
@@ -1043,7 +1062,7 @@ function ApresentacaoVendaModal({
                   onClick={() => setFormaPagamento('cartao')}
                 >
                   <span>Cartão</span>
-                  <strong>{formatCurrency(buildFormaPagamento(subtotal, qtdParcelas, taxaMaquinaPercent, entradaAplicada).valorParcela)}</strong>
+                  <strong>{formatCurrency(buildFormaPagamento(baseApresentacao, qtdParcelas, taxaMaquinaPercent, entradaAplicada).valorParcela)}</strong>
                   <small>{qtdParcelas}x disponível</small>
                 </button>
                 <button
@@ -1052,7 +1071,7 @@ function ApresentacaoVendaModal({
                   onClick={() => setFormaPagamento('boleto')}
                 >
                   <span>Boleto</span>
-                  <strong>{formatCurrency(buildFormaPagamento(subtotal, 1, taxaBoletoPercent, entradaAplicada).totalCobrado)}</strong>
+                  <strong>{formatCurrency(buildFormaPagamento(baseApresentacao, 1, taxaBoletoPercent, entradaAplicada).totalCobrado)}</strong>
                   <small>Pagamento à vista</small>
                 </button>
               </div>
@@ -1101,6 +1120,10 @@ function ApresentacaoVendaModal({
                 <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
               </div>
             )}
+            <div className={styles.presentationTotalCard}>
+              <span>Preço à vista</span>
+              <strong>{formatCurrency(baseApresentacao)}</strong>
+            </div>
             <div className={styles.presentationTotalCard}>
               <span>{usandoCartao ? 'Total no cartão' : 'Total no boleto'}</span>
               <strong>{formatCurrency(resumo.totalCobrado)}</strong>

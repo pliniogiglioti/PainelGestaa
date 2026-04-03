@@ -934,6 +934,32 @@
   gap: 12px;
 }
 
+.presentationPriceCard {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px;
+  padding: 16px;
+  background: rgba(255,255,255,0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presentationPriceInput {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--gold-light);
+  font-size: 26px;
+  font-weight: 700;
+  padding: 0;
+  font-family: inherit;
+}
+
+.presentationPriceCard small {
+  color: var(--text-muted);
+}
+
 .presentationSelectorGrid {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
