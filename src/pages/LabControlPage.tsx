@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
-import type { Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
+import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
 import styles from './LabControlPage.module.css'
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -1070,11 +1070,9 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
 
 // ── Main: LabControlPage ──────────────────────────────────────────────────
 
-export default function LabControlPage({ userId, onVoltar }: {
-  userId: string; onVoltar: () => void
+export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVoltar }: {
+  userId: string; empresa: Empresa; onTrocarEmpresa: () => void; onVoltar: () => void
 }) {
-  const [empresaId,    setEmpresaId]    = useState<string | null>(null)
-  const [empresas,     setEmpresas]     = useState<{ id: string; nome: string }[]>([])
   const [isAdmin,      setIsAdmin]      = useState(false)
   const [labs,         setLabs]         = useState<Lab[]>([])
   const [enviosMap,    setEnviosMap]    = useState<Record<string, LabEnvio[]>>({})
@@ -1084,44 +1082,50 @@ export default function LabControlPage({ userId, onVoltar }: {
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
 
-  // Fetch empresas do usuário
   useEffect(() => {
-    const init = async () => {
-      const { data: membros } = await supabase
-        .from('empresa_membros')
-        .select('empresa_id, role, empresas(id, nome)')
-        .eq('user_id', userId)
+    const validarAcesso = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single()
 
-      if (!membros || membros.length === 0) { setLoading(false); return }
+      const adminSistema = profile?.role === 'admin'
 
-      const mapped = membros.map(m => ({
-        id:   (m.empresas as unknown as { id: string; nome: string }).id,
-        nome: (m.empresas as unknown as { id: string; nome: string }).nome,
-        role: m.role as string,
-      }))
-      setEmpresas(mapped)
-      setEmpresaId(mapped[0].id)
+      if (!adminSistema) {
+        const { data: membro } = await supabase
+          .from('empresa_membros')
+          .select('role')
+          .eq('empresa_id', empresa.id)
+          .eq('user_id', userId)
+          .maybeSingle()
 
-      const { data: profile } = await supabase.from('profiles').select('role').eq('id', userId).single()
-      const empresaRole = mapped[0].role
-      setIsAdmin(profile?.role === 'admin' || empresaRole === 'admin')
+        if (!membro) {
+          onTrocarEmpresa()
+          return
+        }
+
+        setIsAdmin(membro.role === 'admin')
+        return
+      }
+
+      setIsAdmin(true)
     }
-    init()
-  }, [userId])
+
+    void validarAcesso()
+  }, [empresa.id, onTrocarEmpresa, userId])
 
   const fetchLabs = useCallback(async () => {
-    if (!empresaId) return
     const { data } = await supabase
       .from('labs').select('*')
-      .eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+      .eq('empresa_id', empresa.id).eq('ativo', true).order('nome')
     if (data) setLabs(data)
-  }, [empresaId])
+  }, [empresa.id])
 
   const fetchEnvios = useCallback(async () => {
-    if (!empresaId) return
     const { data } = await supabase
       .from('lab_envios').select('*')
-      .eq('empresa_id', empresaId).order('created_at', { ascending: false })
+      .eq('empresa_id', empresa.id).order('created_at', { ascending: false })
     if (data) {
       const map: Record<string, LabEnvio[]> = {}
       for (const e of data) {
@@ -1130,37 +1134,31 @@ export default function LabControlPage({ userId, onVoltar }: {
       }
       setEnviosMap(map)
     }
-  }, [empresaId])
+  }, [empresa.id])
 
   const fetchColunas = useCallback(async () => {
-    if (!empresaId) return
     const { data } = await supabase
       .from('lab_kanban_colunas').select('*')
-      .eq('empresa_id', empresaId).order('ordem')
+      .eq('empresa_id', empresa.id).order('ordem')
 
     if (data && data.length > 0) {
       setColunas(data)
     } else {
       // Cria colunas padrão para a empresa
-      const defaults = DEFAULT_COLUNAS.map(c => ({ ...c, empresa_id: empresaId }))
+      const defaults = DEFAULT_COLUNAS.map(c => ({ ...c, empresa_id: empresa.id }))
       const { data: inserted } = await supabase.from('lab_kanban_colunas').insert(defaults).select()
       if (inserted) setColunas(inserted)
     }
-  }, [empresaId])
+  }, [empresa.id])
 
   useEffect(() => {
-    if (!empresaId) return
+    setSelectedLab(null)
+    setLabs([])
+    setEnviosMap({})
+    setColunas([])
     setLoading(true)
     Promise.all([fetchLabs(), fetchEnvios(), fetchColunas()]).then(() => setLoading(false))
-  }, [empresaId, fetchLabs, fetchEnvios, fetchColunas])
-
-  // Atualiza empresa e verifica role quando muda
-  const handleEmpresaChange = async (id: string) => {
-    setEmpresaId(id)
-    const membro = (await supabase.from('empresa_membros').select('role').eq('empresa_id', id).eq('user_id', userId).single()).data
-    const profile = (await supabase.from('profiles').select('role').eq('id', userId).single()).data
-    setIsAdmin(profile?.role === 'admin' || membro?.role === 'admin')
-  }
+  }, [fetchLabs, fetchEnvios, fetchColunas])
 
   if (loading) {
     return (
@@ -1174,27 +1172,12 @@ export default function LabControlPage({ userId, onVoltar }: {
     )
   }
 
-  if (!empresaId) {
-    return (
-      <div className={styles.page}>
-        <div className={styles.pageHeader}>
-          <button type="button" className={styles.backBtn} onClick={onVoltar}><IconBack /> Voltar</button>
-          <h1 className={styles.pageTitle}>Controle de Laboratórios</h1>
-        </div>
-        <div className={styles.emptyState}>
-          <IconFlask />
-          <p>Você não pertence a nenhuma empresa.</p>
-        </div>
-      </div>
-    )
-  }
-
   // Detalhe do lab selecionado
   if (selectedLab) {
     return (
       <LabDetailView
         lab={selectedLab}
-        empresaId={empresaId}
+        empresaId={empresa.id}
         userId={userId}
         isAdmin={isAdmin}
         colunas={colunas}
@@ -1213,17 +1196,13 @@ export default function LabControlPage({ userId, onVoltar }: {
           <IconBack /> Voltar
         </button>
         <h1 className={styles.pageTitle}>Controle de Laboratórios</h1>
-        {empresas.length > 1 && (
-          <select
-            className={styles.select}
-            value={empresaId}
-            onChange={e => handleEmpresaChange(e.target.value)}
-            style={{ maxWidth: 220 }}
-          >
-            {empresas.map(e => <option key={e.id} value={e.id}>{e.nome}</option>)}
-          </select>
-        )}
-        <div style={{ marginLeft: 'auto' }}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+          Empresa: <strong style={{ color: 'var(--text)' }}>{empresa.nome}</strong>
+        </span>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
+            Trocar empresa
+          </button>
           {isAdmin && (
             <button
               type="button"
@@ -1269,7 +1248,7 @@ export default function LabControlPage({ userId, onVoltar }: {
       {showLabModal && (
         <LabModal
           lab={editingLab}
-          empresaId={empresaId}
+          empresaId={empresa.id}
           onClose={() => setShowLabModal(false)}
           onSaved={fetchLabs}
         />

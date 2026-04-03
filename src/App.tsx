@@ -43,6 +43,15 @@ async function validarUsuarioAtivo(session: Session) {
 }
 
 function App() {
+  const restaurarEmpresa = (key: string) => {
+    try {
+      const stored = localStorage.getItem(key)
+      return stored ? (JSON.parse(stored) as Empresa) : null
+    } catch {
+      return null
+    }
+  }
+
   const [user,             setUser]             = useState<User | null>(null)
   const [userId,           setUserId]           = useState<string | null>(null)
   const [loading,          setLoading]          = useState(true)
@@ -55,14 +64,8 @@ function App() {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
   })
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => {
-    try {
-      const stored = localStorage.getItem('empresa_selecionada')
-      return stored ? (JSON.parse(stored) as Empresa) : null
-    } catch {
-      return null
-    }
-  })
+  const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada'))
+  const [empresaSelecionadaLab, setEmpresaSelecionadaLab] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_lab_control'))
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -159,6 +162,7 @@ function App() {
 
   const handleLogout = async () => {
     localStorage.removeItem('empresa_selecionada')
+    localStorage.removeItem('empresa_selecionada_lab_control')
     await supabase.auth.signOut()
     setTermosAceitos(null)
     setUserId(null)
@@ -196,6 +200,16 @@ function App() {
   const trocarEmpresa = () => {
     localStorage.removeItem('empresa_selecionada')
     setEmpresaSelecionada(null)
+  }
+
+  const selecionarEmpresaLab = (emp: Empresa) => {
+    localStorage.setItem('empresa_selecionada_lab_control', JSON.stringify(emp))
+    setEmpresaSelecionadaLab(emp)
+  }
+
+  const trocarEmpresaLab = () => {
+    localStorage.removeItem('empresa_selecionada_lab_control')
+    setEmpresaSelecionadaLab(null)
   }
 
   if (user) {
@@ -282,9 +296,26 @@ function App() {
     }
 
     if (pathname === '/lab-control') {
+      if (!empresaSelecionadaLab) {
+        return (
+          <ErrorBoundary>
+            <EmpresaGatePage
+              onSelecionar={selecionarEmpresaLab}
+              onVoltar={() => navigate('/')}
+              contexto="labs"
+            />
+          </ErrorBoundary>
+        )
+      }
+
       return (
         <ErrorBoundary>
-          <LabControlPage userId={userId!} onVoltar={() => navigate('/')} />
+          <LabControlPage
+            userId={userId!}
+            empresa={empresaSelecionadaLab}
+            onTrocarEmpresa={trocarEmpresaLab}
+            onVoltar={() => navigate('/')}
+          />
         </ErrorBoundary>
       )
     }

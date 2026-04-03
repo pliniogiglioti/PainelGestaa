@@ -9,7 +9,8 @@ interface Props {
   /** Voltar para a home */
   onVoltar: () => void
   /** Navegar para os termos de uso deste app */
-  onVerTermos: () => void
+  onVerTermos?: () => void
+  contexto?: 'dre' | 'labs'
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
@@ -152,7 +153,12 @@ function ConfirmDeleteModal({
   )
 }
 
-export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }: Props) {
+export default function EmpresaGatePage({
+  onSelecionar,
+  onVoltar,
+  onVerTermos,
+  contexto = 'dre',
+}: Props) {
   const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
@@ -393,6 +399,22 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }:
     })
   }, [buscaNormalizada, empresas])
 
+  const textos = contexto === 'labs'
+    ? {
+        tituloComEmpresas: 'Selecionar empresa',
+        tituloSemEmpresas: 'Criar sua primeira empresa',
+        subtituloComEmpresas: 'Escolha a empresa para ver os laboratórios cadastrados ou crie uma nova.',
+        subtituloSemEmpresas: 'Para usar o Controle de Laboratórios, você precisa criar uma empresa.',
+        botaoSelecionar: 'Acessar laboratórios',
+      }
+    : {
+        tituloComEmpresas: 'Selecionar empresa',
+        tituloSemEmpresas: 'Criar sua primeira empresa',
+        subtituloComEmpresas: 'Escolha a empresa que deseja analisar ou crie uma nova.',
+        subtituloSemEmpresas: 'Para usar a Análise DRE, você precisa criar uma empresa.',
+        botaoSelecionar: 'Acessar DRE',
+      }
+
   if (loading) {
     return (
       <div className={styles.loadingWrap}>
@@ -408,12 +430,12 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }:
           ← Voltar
         </button>
         <h1 className={styles.titulo}>
-          {empresas.length === 0 ? 'Criar sua primeira empresa' : 'Selecionar empresa'}
+          {empresas.length === 0 ? textos.tituloSemEmpresas : textos.tituloComEmpresas}
         </h1>
         <p className={styles.subtitulo}>
           {empresas.length === 0
-            ? 'Para usar a Análise DRE, você precisa criar uma empresa.'
-            : 'Escolha a empresa que deseja analisar ou crie uma nova.'}
+            ? textos.subtituloSemEmpresas
+            : textos.subtituloComEmpresas}
         </p>
         {empresas.length > 0 && (
           <label className={styles.searchWrap}>
@@ -488,7 +510,7 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }:
                     className={styles.btnSelecionar}
                     onClick={() => onSelecionar(emp)}
                   >
-                    Acessar DRE
+                    {textos.botaoSelecionar}
                   </button>
                 </div>
               </div>
@@ -534,24 +556,26 @@ export default function EmpresaGatePage({ onSelecionar, onVoltar, onVerTermos }:
         />
       )}
 
-      <footer style={{ textAlign: 'center', padding: '24px 0 32px', marginTop: 8 }}>
-        <button
-          type="button"
-          onClick={onVerTermos}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            fontSize: 12,
-            color: '#555',
-            textDecoration: 'underline',
-            textUnderlineOffset: 3,
-            padding: 0,
-          }}
-        >
-          Termos de Uso e Política de Privacidade — DFC ClinicScale
-        </button>
-      </footer>
+      {onVerTermos && (
+        <footer style={{ textAlign: 'center', padding: '24px 0 32px', marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={onVerTermos}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 12,
+              color: '#555',
+              textDecoration: 'underline',
+              textUnderlineOffset: 3,
+              padding: 0,
+            }}
+          >
+            Termos de Uso e Política de Privacidade — DFC ClinicScale
+          </button>
+        </footer>
+      )}
     </div>
   )
 }
