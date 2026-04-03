@@ -10,6 +10,7 @@ import AdminSettingsPage from './pages/AdminSettingsPage'
 import AcceptInvitePage from './pages/AcceptInvitePage'
 import TermosPage from './pages/TermosPage'
 import LabControlPage from './pages/LabControlPage'
+import PrecificacaoPage from './pages/PrecificacaoPage'
 import { ErrorBoundary } from './ErrorBoundary'
 import type { Empresa } from './lib/types'
 
@@ -66,6 +67,7 @@ function App() {
   })
   const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada'))
   const [empresaSelecionadaLab, setEmpresaSelecionadaLab] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_lab_control'))
+  const [empresaSelecionadaPrecificacao, setEmpresaSelecionadaPrecificacao] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_precificacao'))
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -163,6 +165,7 @@ function App() {
   const handleLogout = async () => {
     localStorage.removeItem('empresa_selecionada')
     localStorage.removeItem('empresa_selecionada_lab_control')
+    localStorage.removeItem('empresa_selecionada_precificacao')
     await supabase.auth.signOut()
     setTermosAceitos(null)
     setUserId(null)
@@ -210,6 +213,16 @@ function App() {
   const trocarEmpresaLab = () => {
     localStorage.removeItem('empresa_selecionada_lab_control')
     setEmpresaSelecionadaLab(null)
+  }
+
+  const selecionarEmpresaPrecificacao = (emp: Empresa) => {
+    localStorage.setItem('empresa_selecionada_precificacao', JSON.stringify(emp))
+    setEmpresaSelecionadaPrecificacao(emp)
+  }
+
+  const trocarEmpresaPrecificacao = () => {
+    localStorage.removeItem('empresa_selecionada_precificacao')
+    setEmpresaSelecionadaPrecificacao(null)
   }
 
   if (user) {
@@ -314,6 +327,30 @@ function App() {
             userId={userId!}
             empresa={empresaSelecionadaLab}
             onTrocarEmpresa={trocarEmpresaLab}
+            onVoltar={() => navigate('/')}
+          />
+        </ErrorBoundary>
+      )
+    }
+
+    if (pathname === '/precificacao') {
+      if (!empresaSelecionadaPrecificacao) {
+        return (
+          <ErrorBoundary>
+            <EmpresaGatePage
+              onSelecionar={selecionarEmpresaPrecificacao}
+              onVoltar={() => navigate('/')}
+              contexto="precificacao"
+            />
+          </ErrorBoundary>
+        )
+      }
+
+      return (
+        <ErrorBoundary>
+          <PrecificacaoPage
+            empresa={empresaSelecionadaPrecificacao}
+            onTrocarEmpresa={trocarEmpresaPrecificacao}
             onVoltar={() => navigate('/')}
           />
         </ErrorBoundary>

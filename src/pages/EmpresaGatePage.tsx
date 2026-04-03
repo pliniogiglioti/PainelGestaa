@@ -11,7 +11,7 @@ interface Props {
   onVoltar: () => void
   /** Navegar para os termos de uso deste app */
   onVerTermos?: () => void
-  contexto?: 'dre' | 'labs'
+  contexto?: 'dre' | 'labs' | 'precificacao'
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
@@ -547,6 +547,18 @@ export default function EmpresaGatePage({
           : 'Seu acesso esta como colaborador. Um titular precisa vincular voce a uma empresa em Minhas empresas.',
         botaoSelecionar: 'Acessar laboratórios',
       }
+    : contexto === 'precificacao'
+      ? {
+          tituloComEmpresas: 'Selecionar empresa',
+          tituloSemEmpresas: podeCriarEmpresa ? 'Criar sua primeira empresa' : 'Aguardando vinculo com empresa',
+          subtituloComEmpresas: podeCriarEmpresa
+            ? 'Escolha a empresa para gerenciar a precificação ou crie uma nova.'
+            : 'Escolha a empresa vinculada ao seu acesso para gerenciar a precificação.',
+          subtituloSemEmpresas: podeCriarEmpresa
+            ? 'Para usar a Precificação, você precisa criar uma empresa.'
+            : 'Seu acesso esta como colaborador. Um titular precisa vincular voce a uma empresa em Minhas empresas.',
+          botaoSelecionar: 'Acessar precificação',
+        }
     : {
         tituloComEmpresas: 'Selecionar empresa',
         tituloSemEmpresas: podeCriarEmpresa ? 'Criar sua primeira empresa' : 'Aguardando vinculo com empresa',

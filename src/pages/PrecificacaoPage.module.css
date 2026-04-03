@@ -1,0 +1,242 @@
+.page {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--text);
+  padding: 34px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.backBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+
+.backBtn:hover {
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+}
+
+.companyMeta {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.companyMeta strong {
+  color: var(--text);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.btnPrimary,
+.btnSecondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.btnPrimary {
+  border: none;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-dark));
+  color: #090909;
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+  opacity: 0.92;
+}
+
+.btnSecondary {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.btnSecondary:hover {
+  transform: translateY(-1px);
+  color: var(--text);
+  border-color: var(--text-muted);
+  background: rgba(255,255,255,0.04);
+}
+
+.emptyState {
+  min-height: calc(100vh - 180px);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(201, 162, 42, 0.10), transparent 28%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  text-align: center;
+  padding: 32px;
+}
+
+.emptyState svg {
+  color: var(--gold-light);
+}
+
+.emptyTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.emptyText {
+  max-width: 560px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.emptyHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.workspaceHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top right, rgba(201, 162, 42, 0.08), transparent 26%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+}
+
+.workspaceEyebrow {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.workspaceTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.workspaceActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.blankCanvas {
+  min-height: 420px;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));
+}
+
+.spinnerWrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}
+
+.spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--gold);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 860px) {
+  .workspaceHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerActions {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding: 20px 16px 28px;
+  }
+
+  .pageHeader {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .headerActions,
+  .workspaceActions {
+    width: 100%;
+  }
+
+  .btnPrimary,
+  .btnSecondary {
+    width: 100%;
+  }
+}
