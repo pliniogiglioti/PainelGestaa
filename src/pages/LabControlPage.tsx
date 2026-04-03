@@ -28,6 +28,32 @@ function today() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function parseIsoDate(value: string) {
+  const [year, month, day] = value.split('-').map(Number)
+  if (!year || !month || !day) return null
+  return new Date(Date.UTC(year, month - 1, day))
+}
+
+function formatIsoDate(date: Date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function addBusinessDays(startDate: string, businessDays: number) {
+  if (!startDate || businessDays <= 0) return ''
+
+  const date = parseIsoDate(startDate)
+  if (!date) return ''
+
+  let remaining = businessDays
+  while (remaining > 0) {
+    date.setUTCDate(date.getUTCDate() + 1)
+    const dayOfWeek = date.getUTCDay()
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) remaining -= 1
+  }
+
+  return formatIsoDate(date)
+}
+
 function formatDate(d: string | null) {
   if (!d) return '—'
   const [y, m, day] = d.split('-')
@@ -460,6 +486,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   const [step,   setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
+  const [usarPrazoAutomatico, setUsarPrazoAutomatico] = useState(!envio)
   const [form,   setForm]   = useState<EnvioFormState>({
     tipo_trabalho:          envio?.tipo_trabalho ?? '',
     preco_servico:          envio?.preco_servico != null ? String(envio.preco_servico) : '',
@@ -468,12 +495,28 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
     cor:                    envio?.cor ?? '',
     observacoes:            envio?.observacoes ?? '',
     data_envio:             envio?.data_envio ?? today(),
-    data_entrega_prometida: envio?.data_entrega_prometida ?? '',
+    data_entrega_prometida: envio?.data_entrega_prometida ?? addBusinessDays(envio?.data_envio ?? today(), lab.prazo_medio_dias),
   })
 
   const set = (f: keyof EnvioFormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [f]: e.target.value }))
+
+  useEffect(() => {
+    if (!usarPrazoAutomatico) return
+
+    const prazoCalculado = addBusinessDays(form.data_envio, lab.prazo_medio_dias)
+    setForm(prev => (
+      prev.data_entrega_prometida === prazoCalculado
+        ? prev
+        : { ...prev, data_entrega_prometida: prazoCalculado }
+    ))
+  }, [form.data_envio, lab.prazo_medio_dias, usarPrazoAutomatico])
+
+  const handlePrazoPrometidoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUsarPrazoAutomatico(false)
+    setForm(prev => ({ ...prev, data_entrega_prometida: e.target.value }))
+  }
 
   const selectPreco = (p: LabPreco | null) => {
     if (!p) {
@@ -631,12 +674,12 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Prazo de entrega prometido</label>
-              <input className={styles.input} type="date" value={form.data_entrega_prometida} onChange={set('data_entrega_prometida')} />
+              <input className={styles.input} type="date" value={form.data_entrega_prometida} onChange={handlePrazoPrometidoChange} />
             </div>
           </div>
           {lab.prazo_medio_dias > 0 && (
             <p className={styles.stepHint} style={{ marginTop: 12 }}>
-              Prazo médio deste laboratório: <strong>{lab.prazo_medio_dias} dias</strong>
+              Prazo médio deste laboratório: <strong>{lab.prazo_medio_dias} dias úteis</strong>. {usarPrazoAutomatico ? 'A data prometida foi calculada automaticamente.' : 'A data prometida foi ajustada manualmente.'}
             </p>
           )}
         </div>
