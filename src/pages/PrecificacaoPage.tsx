@@ -1024,7 +1024,6 @@ function ApresentacaoVendaModal({
   const taxaAplicada = usandoCartao ? taxaMaquinaPercent : taxaBoletoPercent
   const resumo = buildFormaPagamento(baseApresentacao, qtdParcelas, taxaAplicada, entradaAplicada)
   const parcelasApresentacao = buildParcelas(baseApresentacao, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
-  const opcoesCartao = parcelasApresentacao
   const sugestoesUpsell = precos
     .filter(item => !itensApresentacao.some(vendaItem => vendaItem.empresa_preco_id === item.id))
     .sort((a, b) => b.preco - a.preco)
@@ -1165,11 +1164,7 @@ function ApresentacaoVendaModal({
               </div>
             )}
             <div className={styles.presentationTotalCard}>
-              <span>Preço à vista</span>
-              <strong>{formatCurrency(baseApresentacao)}</strong>
-            </div>
-            <div className={styles.presentationTotalCard}>
-              <span>{usandoCartao ? 'Total no cartão' : 'Total no boleto'}</span>
+              <span>Total final</span>
               <strong>{formatCurrency(resumo.totalCobrado)}</strong>
             </div>
             <div className={styles.presentationTotalCard}>
@@ -1178,33 +1173,6 @@ function ApresentacaoVendaModal({
             </div>
           </div>
 
-          <div className={styles.presentationBlock} style={{ display: 'none' }}>
-            <h3 className={styles.sectionTitle}>{usandoCartao ? 'Opções no cartão' : 'Resumo no boleto'}</h3>
-            {usandoCartao ? (
-              <div className={styles.presentationOptions}>
-                {opcoesCartao.map(opcao => (
-                  <button
-                    key={opcao.parcela}
-                    type="button"
-                    className={`${styles.presentationOption} ${opcao.parcela === resumo.parcelas ? styles.presentationOptionActive : ''}`}
-                    onClick={() => setParcelasSelecionadas(String(opcao.parcela))}
-                  >
-                    <span>{opcao.parcela}x de</span>
-                    <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                    <small>Total {formatCurrency(opcao.totalProposta)}</small>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.presentationOptions}>
-                <div className={`${styles.presentationOption} ${styles.presentationOptionActive}`}>
-                  <span>Boleto à vista</span>
-                  <strong>{formatCurrency(resumo.totalCobrado)}</strong>
-                  <small>Pagamento único</small>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
