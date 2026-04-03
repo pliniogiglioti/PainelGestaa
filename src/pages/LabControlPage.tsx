@@ -69,15 +69,14 @@ function formatWhatsAppNumber(value: string) {
   const normalized = normalizeWhatsAppNumber(value)
   if (!normalized) return value
 
-  const country = normalized.slice(0, 2)
   const area = normalized.slice(2, 4)
   const number = normalized.slice(4)
 
   if (number.length === 9) {
-    return `+${country} (${area}) ${number.slice(0, 5)}-${number.slice(5)}`
+    return `(${area}) ${number.slice(0, 5)}-${number.slice(5)}`
   }
 
-  return `+${country} (${area}) ${number.slice(0, 4)}-${number.slice(4)}`
+  return `(${area}) ${number.slice(0, 4)}-${number.slice(4)}`
 }
 
 function formatWhatsAppInput(value: string) {
@@ -258,7 +257,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
     if (!form.nome.trim()) { setError('Nome é obrigatório.'); return }
     const telefoneNormalizado = form.telefone.trim() ? normalizeWhatsAppNumber(form.telefone) : null
     if (form.telefone.trim() && !telefoneNormalizado) {
-      setError('Informe um WhatsApp válido. Ex.: (55) 11 99999-9999 ou (11) 99999-9999'); return
+      setError('Informe um WhatsApp válido. Ex.: (18) 99751-1381'); return
     }
     setSaving(true); setError('')
 
@@ -298,7 +297,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
           </div>
           <div className={styles.formField}>
             <label className={styles.label}>WhatsApp</label>
-            <input className={styles.input} value={form.telefone} onChange={handleTelefoneChange} placeholder="(55) 11 99999-9999" inputMode="tel" />
+            <input className={styles.input} value={form.telefone} onChange={handleTelefoneChange} placeholder="(18) 99751-1381" inputMode="tel" />
           </div>
           <div className={styles.formField}>
             <label className={styles.label}>E-mail</label>
