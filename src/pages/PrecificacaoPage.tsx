@@ -996,17 +996,20 @@ function VendaModal({
 
 function ApresentacaoVendaModal({
   venda,
+  precos,
   taxaMaquinaPercent,
   taxaBoletoPercent,
   onClose,
 }: {
   venda: VendaCard
+  precos: EmpresaPreco[]
   taxaMaquinaPercent: number
   taxaBoletoPercent: number
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
-  const subtotal = calculateSubtotal(venda.itens)
+  const [itensApresentacao, setItensApresentacao] = useState(venda.itens)
+  const subtotal = calculateSubtotal(itensApresentacao)
   const [formaPagamento, setFormaPagamento] = useState<'cartao' | 'boleto'>('cartao')
   const [parcelasSelecionadas, setParcelasSelecionadas] = useState(String(venda.max_parcelas))
   const [precoAvista, setPrecoAvista] = useState(
@@ -1020,7 +1023,32 @@ function ApresentacaoVendaModal({
   const qtdParcelas = usandoCartao ? Math.max(1, Number(parcelasSelecionadas) || 1) : 1
   const taxaAplicada = usandoCartao ? taxaMaquinaPercent : taxaBoletoPercent
   const resumo = buildFormaPagamento(baseApresentacao, qtdParcelas, taxaAplicada, entradaAplicada)
-  const opcoesCartao = buildParcelas(baseApresentacao, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
+  const parcelasApresentacao = buildParcelas(baseApresentacao, venda.max_parcelas, taxaMaquinaPercent, entradaAplicada)
+  const opcoesCartao = parcelasApresentacao
+  const sugestoesUpsell = precos
+    .filter(item => !itensApresentacao.some(vendaItem => vendaItem.empresa_preco_id === item.id))
+    .sort((a, b) => b.preco - a.preco)
+    .slice(0, 3)
+
+  const handleAddUpsell = (item: EmpresaPreco) => {
+    setItensApresentacao(prev => ([
+      ...prev,
+      {
+        id: `upsell-${item.id}`,
+        venda_id: venda.id,
+        empresa_preco_id: item.id,
+        descricao: item.nome_produto,
+        preco_unitario: item.preco,
+        quantidade: 1,
+        created_at: new Date().toISOString(),
+      },
+    ]))
+    setPrecoAvista(prev => {
+      const valorAtual = parsePreco(prev)
+      const proximoValor = valorAtual > 0 ? valorAtual + item.preco : subtotal + item.preco
+      return proximoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    })
+  }
 
   return (
     <div
@@ -1081,21 +1109,17 @@ function ApresentacaoVendaModal({
               <div className={styles.presentationSelectorBlock}>
                 <span className={styles.modalLabel}>Parcelas</span>
                 <div className={styles.presentationParcelasGrid}>
-                  {Array.from({ length: venda.max_parcelas }, (_, index) => index + 1).map(parcela => {
-                    const opcao = buildFormaPagamento(subtotal, parcela, taxaMaquinaPercent)
-
-                    return (
-                      <button
-                        key={parcela}
-                        type="button"
-                        className={`${styles.presentationParcelaCard} ${parcela === resumo.parcelas ? styles.presentationParcelaCardActive : ''}`}
-                        onClick={() => setParcelasSelecionadas(String(parcela))}
-                      >
-                        <span>{parcela}x</span>
-                        <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                      </button>
-                    )
-                  })}
+                  {parcelasApresentacao.map(opcao => (
+                    <button
+                      key={opcao.parcela}
+                      type="button"
+                      className={`${styles.presentationParcelaCard} ${opcao.parcela === resumo.parcelas ? styles.presentationParcelaCardActive : ''}`}
+                      onClick={() => setParcelasSelecionadas(String(opcao.parcela))}
+                    >
+                      <span>{opcao.parcela}x</span>
+                      <strong>{formatCurrency(opcao.valorParcela)}</strong>
+                    </button>
+                  ))}
                 </div>
               </div>
             )}
@@ -1104,7 +1128,7 @@ function ApresentacaoVendaModal({
           <div className={styles.presentationBlock}>
             <h3 className={styles.sectionTitle}>Itens da proposta</h3>
             <div className={styles.presentationItems}>
-              {venda.itens.map(item => (
+              {itensApresentacao.map(item => (
                 <div key={item.id} className={styles.presentationItem}>
                   <span>{item.descricao}</span>
                   <strong>{formatCurrency(item.preco_unitario * item.quantidade)}</strong>
@@ -1112,6 +1136,26 @@ function ApresentacaoVendaModal({
               ))}
             </div>
           </div>
+
+          {sugestoesUpsell.length > 0 && (
+            <div className={styles.presentationBlock}>
+              <h3 className={styles.sectionTitle}>Sugestões para aumentar a venda</h3>
+              <div className={styles.anchorGrid}>
+                {sugestoesUpsell.map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={styles.anchorCard}
+                    onClick={() => handleAddUpsell(item)}
+                  >
+                    <span>{item.nome_produto}</span>
+                    <strong>{formatCurrency(item.preco)}</strong>
+                    <small>Adicionar à apresentação</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className={styles.presentationTotals}>
             {resumo.entradaAplicada > 0 && (
@@ -1134,7 +1178,7 @@ function ApresentacaoVendaModal({
             </div>
           </div>
 
-          <div className={styles.presentationBlock}>
+          <div className={styles.presentationBlock} style={{ display: 'none' }}>
             <h3 className={styles.sectionTitle}>{usandoCartao ? 'Opções no cartão' : 'Resumo no boleto'}</h3>
             {usandoCartao ? (
               <div className={styles.presentationOptions}>
@@ -1846,6 +1890,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {vendaApresentacao && (
         <ApresentacaoVendaModal
           venda={vendaApresentacao}
+          precos={precos}
           taxaMaquinaPercent={taxaMaquinaPercent}
           taxaBoletoPercent={taxaBoletoPercent}
           onClose={() => setVendaApresentacao(null)}
