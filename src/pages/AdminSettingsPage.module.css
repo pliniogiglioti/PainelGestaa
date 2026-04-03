@@ -429,10 +429,19 @@
   min-width: 0;
 }
 
+.userCardNameRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
 .userCardName {
   font-size: 18px;
   font-weight: 700;
   color: var(--text);
+  min-width: 0;
 }
 
 .userCardEmail {
@@ -720,6 +729,32 @@
   border-color: rgba(255, 69, 58, 0.6);
 }
 
+.userPagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+  flex-wrap: wrap;
+}
+
+.userPaginationInfo {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.userPaginationActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.userPaginationPage {
+  font-size: 12px;
+  color: var(--text);
+}
+
 /* ── Modal de confirmação ───────────────────────────────────────────────── */
 
 .modalOverlay {
@@ -856,6 +891,11 @@
     flex-direction: column;
   }
 
+  .userCardNameRow {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
   .userCardBadges {
     justify-content: flex-start;
   }
@@ -871,6 +911,15 @@
   .userMetaCard {
     width: 100%;
     flex-wrap: wrap;
+  }
+
+  .userPagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .userPaginationActions {
+    justify-content: space-between;
   }
 
   .deleteBtn {

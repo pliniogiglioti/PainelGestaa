@@ -26,6 +26,8 @@ const EXEMPLOS_ESTATICOS = [
   { nome: 'CliniCorp',      arquivo: 'clinicorp.xlsx'  },
 ]
 
+const USERS_PER_PAGE = 5
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function lerCabecalhosArquivo(file: File): Promise<string[]> {
@@ -116,6 +118,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [savingRoleId,    setSavingRoleId]    = useState<string | null>(null)
   const [currentUserId,   setCurrentUserId]   = useState<string | null>(null)
   const [usuariosBusca,   setUsuariosBusca]   = useState('')
+  const [usuariosPagina,  setUsuariosPagina]  = useState(1)
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -377,6 +380,21 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       return textoBusca.includes(buscaUsuariosNormalizada)
     })
   }, [buscaUsuariosNormalizada, usuariosOrdenados])
+
+  const totalPaginasUsuarios = Math.max(1, Math.ceil(usuariosFiltrados.length / USERS_PER_PAGE))
+
+  const usuariosPaginados = useMemo(() => {
+    const inicio = (usuariosPagina - 1) * USERS_PER_PAGE
+    return usuariosFiltrados.slice(inicio, inicio + USERS_PER_PAGE)
+  }, [usuariosFiltrados, usuariosPagina])
+
+  useEffect(() => {
+    setUsuariosPagina(1)
+  }, [buscaUsuariosNormalizada])
+
+  useEffect(() => {
+    setUsuariosPagina(atual => Math.min(atual, totalPaginasUsuarios))
+  }, [totalPaginasUsuarios])
 
   const alternarStatusUsuario = async (usuario: Profile) => {
     if (usuario.role === 'admin') return
@@ -838,11 +856,16 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                   </div>
                 )}
 
-                {usuariosFiltrados.map(u => (
+                {usuariosPaginados.map(u => (
                   <article key={u.id} className={styles.userCard}>
                     <div className={styles.userCardTop}>
                       <div className={styles.userCardIdentity}>
-                        <h3 className={styles.userCardName}>{u.name ?? '—'}</h3>
+                        <div className={styles.userCardNameRow}>
+                          <h3 className={styles.userCardName}>{u.name ?? '—'}</h3>
+                          <span className={`${styles.userTypeBadge} ${u.tipo_usuario === 'colaborador' ? styles.userTypeColaborador : styles.userTypeTitular}`}>
+                            {u.tipo_usuario === 'colaborador' ? 'Colaborador' : 'Titular'}
+                          </span>
+                        </div>
                         <p className={styles.userCardEmail}>{u.email ?? '—'}</p>
                       </div>
 
@@ -869,10 +892,6 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                             </select>
                           </label>
                         )}
-
-                        <span className={`${styles.userTypeBadge} ${u.tipo_usuario === 'colaborador' ? styles.userTypeColaborador : styles.userTypeTitular}`}>
-                          {u.tipo_usuario === 'colaborador' ? 'Colaborador' : 'Titular'}
-                        </span>
                       </div>
                     </div>
 
@@ -960,6 +979,41 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                     </div>
                   </article>
                 ))}
+
+                {usuariosFiltrados.length > 0 && (
+                  <div className={styles.userPagination}>
+                    <span className={styles.userPaginationInfo}>
+                      Mostrando {((usuariosPagina - 1) * USERS_PER_PAGE) + 1}
+                      {' '}a{' '}
+                      {Math.min(usuariosPagina * USERS_PER_PAGE, usuariosFiltrados.length)}
+                      {' '}de {usuariosFiltrados.length} usuários
+                    </span>
+
+                    <div className={styles.userPaginationActions}>
+                      <button
+                        type="button"
+                        className={styles.btnSecondary}
+                        onClick={() => setUsuariosPagina(atual => Math.max(1, atual - 1))}
+                        disabled={usuariosPagina === 1}
+                      >
+                        Anterior
+                      </button>
+
+                      <span className={styles.userPaginationPage}>
+                        Página {usuariosPagina} de {totalPaginasUsuarios}
+                      </span>
+
+                      <button
+                        type="button"
+                        className={styles.btnSecondary}
+                        onClick={() => setUsuariosPagina(atual => Math.min(totalPaginasUsuarios, atual + 1))}
+                        disabled={usuariosPagina === totalPaginasUsuarios}
+                      >
+                        Próxima
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
