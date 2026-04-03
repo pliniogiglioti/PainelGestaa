@@ -151,13 +151,13 @@
   min-width: 0;
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  min-height: 42px;
+  gap: 8px;
+  min-height: 38px;
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.03);
   color: var(--text);
   border-radius: 999px;
-  padding: 4px 10px 4px 4px;
+  padding: 3px 9px 3px 3px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s, transform 0.15s;
 }
@@ -183,9 +183,9 @@
 }
 
 .userMenuAvatar {
-  width: 34px;
-  height: 34px;
-  font-size: 14px;
+  width: 30px;
+  height: 30px;
+  font-size: 13px;
 }
 
 .userMenuAvatarLarge {
@@ -201,11 +201,11 @@
 }
 
 .userMenuTriggerName {
-  max-width: 150px;
+  max-width: 138px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
 }
 
