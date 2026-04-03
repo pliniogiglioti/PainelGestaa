@@ -25,6 +25,27 @@ interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'create
   role: 'admin' | 'membro'
 }
 
+type TipoUsuario = 'titular' | 'colaborador'
+
+interface EmpresaMembroListItem {
+  user_id: string
+  name: string | null
+  email: string | null
+  tipo_usuario: TipoUsuario
+  empresa_role: 'admin' | 'membro'
+  created_at: string
+}
+
+const getTipoUsuarioLabel = (tipo: TipoUsuario) => tipo === 'titular' ? 'Titular' : 'Colaborador'
+const getEmpresaRoleLabel = (role: EmpresaListItem['role'] | EmpresaMembroListItem['empresa_role']) => (
+  role === 'admin' ? 'Titular' : 'Colaborador'
+)
+const getTipoUsuarioDescricao = (tipo: TipoUsuario) => (
+  tipo === 'titular'
+    ? 'Pode criar empresas e liberar acesso para colaboradores.'
+    : 'Recebe acesso as empresas concedidas por um titular.'
+)
+
 // ── Icons ─────────────────────────────────────────────────────────────────
 
 const IconApps = () => (
@@ -192,8 +213,6 @@ function CategoryChip({ label, active, onClick }: { label: string; active: boole
     </button>
   )
 }
-
-
 
 
 // ── Modals ────────────────────────────────────────────────────────────────
@@ -606,15 +625,22 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [forumFilter, setForumFilter] = useState('todos')
   const [openTopicId, setOpenTopicId] = useState<string | null>(null)
   const [isAdmin,     setIsAdmin]     = useState(false)
+  const [tipoUsuario, setTipoUsuario] = useState<TipoUsuario>('titular')
 
   // Supabase data
   const [apps,       setApps]       = useState<App[]>([])
   const [categories, setCategories] = useState<AppCategory[]>([])
   const [topics,     setTopics]     = useState<ForumTopicWithMeta[]>([])
   const [empresas,   setEmpresas]   = useState<EmpresaListItem[]>([])
+  const [empresaMembros, setEmpresaMembros] = useState<Record<string, EmpresaMembroListItem[]>>({})
   const [loadingApps,   setLoadingApps]   = useState(true)
   const [loadingEmpresas, setLoadingEmpresas] = useState(true)
   const [loadingTopics, setLoadingTopics] = useState(true)
+  const [loadingEmpresaMembros, setLoadingEmpresaMembros] = useState<Record<string, boolean>>({})
+  const [savingEmpresaMembros, setSavingEmpresaMembros] = useState<Record<string, boolean>>({})
+  const [inviteEmailByEmpresa, setInviteEmailByEmpresa] = useState<Record<string, string>>({})
+  const [empresaMemberErrors, setEmpresaMemberErrors] = useState<Record<string, string>>({})
+  const [empresaAberta, setEmpresaAberta] = useState<string | null>(null)
 
   // Modals
   const [showCreateApp,   setShowCreateApp]   = useState(false)
@@ -628,8 +654,11 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
-      supabase.from('profiles').select('role').eq('id', data.user.id).single()
-        .then(({ data: profile }) => setIsAdmin(profile?.role === 'admin'))
+      supabase.from('profiles').select('role, tipo_usuario').eq('id', data.user.id).single()
+        .then(({ data: profile }) => {
+          setIsAdmin(profile?.role === 'admin')
+          setTipoUsuario((profile?.tipo_usuario as TipoUsuario | undefined) ?? 'titular')
+        })
     })
   }, [])
 
@@ -704,6 +733,96 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
     setEmpresas(mapped)
     setLoadingEmpresas(false)
+  }
+
+  const fetchEmpresaMembros = async (empresaId: string) => {
+    setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: true }))
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: '' }))
+
+    const { data, error } = await supabase.rpc('listar_membros_empresa', {
+      p_empresa_id: empresaId,
+    })
+
+    if (error) {
+      setEmpresaMemberErrors(prev => ({
+        ...prev,
+        [empresaId]: error.message ?? 'Nao foi possivel carregar os colaboradores.',
+      }))
+      setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+      return
+    }
+
+    setEmpresaMembros(prev => ({
+      ...prev,
+      [empresaId]: ((data ?? []) as EmpresaMembroListItem[]).map(item => ({
+        ...item,
+        tipo_usuario: item.tipo_usuario === 'colaborador' ? 'colaborador' : 'titular',
+      })),
+    }))
+    setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+  }
+
+  const toggleEmpresaColaboradores = async (empresaId: string) => {
+    if (empresaAberta === empresaId) {
+      setEmpresaAberta(null)
+      return
+    }
+
+    setEmpresaAberta(empresaId)
+    if (!empresaMembros[empresaId]) {
+      await fetchEmpresaMembros(empresaId)
+    }
+  }
+
+  const handleAdicionarColaborador = async (empresaId: string) => {
+    const email = inviteEmailByEmpresa[empresaId]?.trim().toLowerCase() ?? ''
+    if (!email) {
+      setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: 'Informe o e-mail do colaborador.' }))
+      return
+    }
+
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: true }))
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: '' }))
+
+    const { error } = await supabase.rpc('vincular_colaborador_empresa', {
+      p_empresa_id: empresaId,
+      p_email: email,
+    })
+
+    if (error) {
+      setEmpresaMemberErrors(prev => ({
+        ...prev,
+        [empresaId]: error.message ?? 'Nao foi possivel adicionar o colaborador.',
+      }))
+      setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+      return
+    }
+
+    setInviteEmailByEmpresa(prev => ({ ...prev, [empresaId]: '' }))
+    await fetchEmpresaMembros(empresaId)
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+  }
+
+  const handleRemoverColaborador = async (empresaId: string, userId: string) => {
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: true }))
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: '' }))
+
+    const { error } = await supabase.rpc('remover_colaborador_empresa', {
+      p_empresa_id: empresaId,
+      p_user_id: userId,
+    })
+
+    if (error) {
+      setEmpresaMemberErrors(prev => ({
+        ...prev,
+        [empresaId]: error.message ?? 'Nao foi possivel remover o colaborador.',
+      }))
+      setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+      return
+    }
+
+    await fetchEmpresaMembros(empresaId)
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
   }
 
   useEffect(() => { fetchCategories() }, [])
@@ -896,6 +1015,17 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
               </div>
             </div>
 
+            <section className={styles.companyAccessCard}>
+              <div>
+                <p className={styles.companyAccessEyebrow}>Classificacao do usuario</p>
+                <h2 className={styles.companyAccessTitle}>{getTipoUsuarioLabel(tipoUsuario)}</h2>
+                <p className={styles.companyAccessText}>{getTipoUsuarioDescricao(tipoUsuario)}</p>
+              </div>
+              <span className={`${styles.companyRoleBadge} ${tipoUsuario === 'titular' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
+                {getTipoUsuarioLabel(tipoUsuario)}
+              </span>
+            </section>
+
             <div className={styles.sectionHeader}>
               <div className={styles.sectionLeft}>
                 <h2 className={styles.sectionTitle}>Listagem de empresas</h2>
@@ -922,7 +1052,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                         {empresa.nome.split(' ').slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('')}
                       </div>
                       <span className={`${styles.companyRoleBadge} ${empresa.role === 'admin' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
-                        {empresa.role === 'admin' ? 'Admin' : 'Membro'}
+                        {getEmpresaRoleLabel(empresa.role)}
                       </span>
                     </div>
                     <h3 className={styles.companyName}>{empresa.nome}</h3>
@@ -930,6 +1060,87 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                     <p className={styles.companyMeta}>
                       Vinculada em {new Date(empresa.created_at).toLocaleDateString('pt-BR')}
                     </p>
+                    {empresa.role === 'admin' && (
+                      <div className={styles.companyMembersWrap}>
+                        <button
+                          type="button"
+                          className={styles.companyManageButton}
+                          onClick={() => void toggleEmpresaColaboradores(empresa.id)}
+                        >
+                          {empresaAberta === empresa.id ? 'Ocultar colaboradores' : 'Gerenciar colaboradores'}
+                        </button>
+
+                        {empresaAberta === empresa.id && (
+                          <div className={styles.companyMembersPanel}>
+                            <div className={styles.companyMembersHeader}>
+                              <strong>Acessos da empresa</strong>
+                              <span className={styles.companyMembersCount}>
+                                {(empresaMembros[empresa.id] ?? []).length} acesso{(empresaMembros[empresa.id] ?? []).length === 1 ? '' : 's'}
+                              </span>
+                            </div>
+
+                            <div className={styles.companyMembersAddRow}>
+                              <input
+                                type="email"
+                                className={styles.companyMembersInput}
+                                placeholder="email@colaborador.com"
+                                value={inviteEmailByEmpresa[empresa.id] ?? ''}
+                                onChange={e => {
+                                  const value = e.target.value
+                                  setInviteEmailByEmpresa(prev => ({ ...prev, [empresa.id]: value }))
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className={styles.companyMembersAddButton}
+                                disabled={!!savingEmpresaMembros[empresa.id]}
+                                onClick={() => void handleAdicionarColaborador(empresa.id)}
+                              >
+                                {savingEmpresaMembros[empresa.id] ? 'Salvando...' : 'Adicionar'}
+                              </button>
+                            </div>
+
+                            {empresaMemberErrors[empresa.id] && (
+                              <p className={styles.companyMembersError}>{empresaMemberErrors[empresa.id]}</p>
+                            )}
+
+                            {loadingEmpresaMembros[empresa.id] ? (
+                              <p className={styles.companyMembersHint}>Carregando colaboradores...</p>
+                            ) : (
+                              <div className={styles.companyMembersList}>
+                                {(empresaMembros[empresa.id] ?? []).map(membro => (
+                                  <div key={membro.user_id} className={styles.companyMemberItem}>
+                                    <div>
+                                      <p className={styles.companyMemberName}>{membro.name?.trim() || membro.email || 'Usuario'}</p>
+                                      <p className={styles.companyMemberEmail}>{membro.email || 'E-mail nao informado'}</p>
+                                    </div>
+                                    <div className={styles.companyMemberMeta}>
+                                      <span className={`${styles.companyRoleBadge} ${membro.empresa_role === 'admin' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
+                                        {getEmpresaRoleLabel(membro.empresa_role)}
+                                      </span>
+                                      {membro.empresa_role !== 'admin' && (
+                                        <button
+                                          type="button"
+                                          className={styles.companyMemberRemove}
+                                          disabled={!!savingEmpresaMembros[empresa.id]}
+                                          onClick={() => void handleRemoverColaborador(empresa.id, membro.user_id)}
+                                        >
+                                          Remover
+                                        </button>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {(empresaMembros[empresa.id] ?? []).length === 0 && (
+                                  <p className={styles.companyMembersHint}>Nenhum colaborador vinculado ainda.</p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </article>
                 ))}
               </div>
@@ -1011,7 +1222,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
               <p className={styles.profileEmail}>{user.email}</p>
               <div className={styles.profileCard}>
                 {[
-                  { label: 'Nome',   value: user.name },
+                  { label: 'Nome', value: user.name },
                   { label: 'E-mail', value: user.email },
                 ].map(f => (
                   <div key={f.label} className={styles.profileField}>
@@ -1020,8 +1231,12 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                   </div>
                 ))}
                 <div className={styles.profileField}>
-                  <span className={styles.profileFieldLabel}>Função</span>
-                  <span className={styles.profileFieldBadge}>{isAdmin ? 'Admin' : 'Usuário'}</span>
+                  <span className={styles.profileFieldLabel}>Funcao</span>
+                  <span className={styles.profileFieldBadge}>{isAdmin ? 'Admin' : 'Usuario'}</span>
+                </div>
+                <div className={styles.profileField}>
+                  <span className={styles.profileFieldLabel}>Classificacao</span>
+                  <span className={styles.profileFieldBadge}>{getTipoUsuarioLabel(tipoUsuario)}</span>
                 </div>
               </div>
               <button className={styles.logoutButtonProfile} onClick={onLogout}>Sair da conta</button>
@@ -1044,3 +1259,5 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     </div>
   )
 }
+
+

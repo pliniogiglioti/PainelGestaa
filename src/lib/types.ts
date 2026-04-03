@@ -11,6 +11,7 @@ export interface Database {
           name:       string | null
           email:      string | null
           role:       string
+          tipo_usuario: 'titular' | 'colaborador'
           plan:       string
           avatar_url: string | null
           ativo:      boolean
@@ -23,6 +24,7 @@ export interface Database {
           name?:      string | null
           email?:     string | null
           role?:      string
+          tipo_usuario?: 'titular' | 'colaborador'
           plan?:      string
           avatar_url?: string | null
           ativo?:     boolean
@@ -35,6 +37,7 @@ export interface Database {
           name?:      string | null
           email?:     string | null
           role?:      string
+          tipo_usuario?: 'titular' | 'colaborador'
           plan?:      string
           avatar_url?: string | null
           ativo?:     boolean

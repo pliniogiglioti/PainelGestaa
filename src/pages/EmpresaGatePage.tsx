@@ -159,6 +159,7 @@ export default function EmpresaGatePage({
   onVerTermos,
   contexto = 'dre',
 }: Props) {
+  const [tipoUsuario, setTipoUsuario]     = useState<'titular' | 'colaborador'>('titular')
   const [empresas, setEmpresas]           = useState<EmpresaCard[]>([])
   const [loading, setLoading]             = useState(true)
   const [modalModo, setModalModo]         = useState<'criar' | 'editar' | null>(null)
@@ -187,12 +188,13 @@ export default function EmpresaGatePage({
 
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, tipo_usuario')
       .eq('id', user.id)
       .single()
 
     const adminSistema = profile?.role === 'admin'
     setIsSystemAdmin(adminSistema)
+    setTipoUsuario((profile?.tipo_usuario as 'titular' | 'colaborador' | undefined) ?? 'titular')
 
     let empresasData: Empresa[] = []
     let rolesMap: EmpresaRoleMap = {}
@@ -361,6 +363,12 @@ export default function EmpresaGatePage({
       return
     }
 
+    if (!isSystemAdmin && tipoUsuario !== 'titular') {
+      setErro('Somente usuarios titulares podem criar empresas.')
+      setSalvando(false)
+      return
+    }
+
     const { data, error } = await supabase
       .from('empresas')
       .insert({
@@ -383,6 +391,8 @@ export default function EmpresaGatePage({
   const inicialEmpresa = (empresaNome: string) =>
     empresaNome.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
 
+  const podeCriarEmpresa = isSystemAdmin || tipoUsuario === 'titular'
+
   const podeEditarEmpresa = useMemo(() => (
     (empresaId: string) => isSystemAdmin || empresaRoles[empresaId] === 'admin'
   ), [empresaRoles, isSystemAdmin])
@@ -402,16 +412,24 @@ export default function EmpresaGatePage({
   const textos = contexto === 'labs'
     ? {
         tituloComEmpresas: 'Selecionar empresa',
-        tituloSemEmpresas: 'Criar sua primeira empresa',
-        subtituloComEmpresas: 'Escolha a empresa para ver os laboratórios cadastrados ou crie uma nova.',
-        subtituloSemEmpresas: 'Para usar o Controle de Laboratórios, você precisa criar uma empresa.',
+        tituloSemEmpresas: podeCriarEmpresa ? 'Criar sua primeira empresa' : 'Aguardando vinculo com empresa',
+        subtituloComEmpresas: podeCriarEmpresa
+          ? 'Escolha a empresa para ver os laboratórios cadastrados ou crie uma nova.'
+          : 'Escolha a empresa vinculada ao seu acesso para ver os laboratórios cadastrados.',
+        subtituloSemEmpresas: podeCriarEmpresa
+          ? 'Para usar o Controle de Laboratórios, você precisa criar uma empresa.'
+          : 'Seu acesso esta como colaborador. Um titular precisa vincular voce a uma empresa em Minhas empresas.',
         botaoSelecionar: 'Acessar laboratórios',
       }
     : {
         tituloComEmpresas: 'Selecionar empresa',
-        tituloSemEmpresas: 'Criar sua primeira empresa',
-        subtituloComEmpresas: 'Escolha a empresa que deseja analisar ou crie uma nova.',
-        subtituloSemEmpresas: 'Para usar a Análise DRE, você precisa criar uma empresa.',
+        tituloSemEmpresas: podeCriarEmpresa ? 'Criar sua primeira empresa' : 'Aguardando vinculo com empresa',
+        subtituloComEmpresas: podeCriarEmpresa
+          ? 'Escolha a empresa que deseja analisar ou crie uma nova.'
+          : 'Escolha a empresa vinculada ao seu acesso para analisar os dados.',
+        subtituloSemEmpresas: podeCriarEmpresa
+          ? 'Para usar a Análise DRE, você precisa criar uma empresa.'
+          : 'Seu acesso esta como colaborador. Um titular precisa vincular voce a uma empresa em Minhas empresas.',
         botaoSelecionar: 'Acessar DRE',
       }
 
@@ -518,18 +536,20 @@ export default function EmpresaGatePage({
           )
         })}
 
-        <div
-          className={`${styles.card} ${styles.cardNova}`}
-          onMouseEnter={() => setHoveredId('__nova')}
-          onMouseLeave={() => setHoveredId(null)}
-          onClick={abrirModalCriacao}
-        >
-          <div className={`${styles.overlay} ${hoveredId === '__nova' ? styles.overlayHovered : ''}`} />
-          <div className={styles.cardContent}>
-            <div className={styles.iconPlus}>+</div>
-            <p className={styles.cardLabelNova}>Criar empresa</p>
+        {podeCriarEmpresa && (
+          <div
+            className={`${styles.card} ${styles.cardNova}`}
+            onMouseEnter={() => setHoveredId('__nova')}
+            onMouseLeave={() => setHoveredId(null)}
+            onClick={abrirModalCriacao}
+          >
+            <div className={`${styles.overlay} ${hoveredId === '__nova' ? styles.overlayHovered : ''}`} />
+            <div className={styles.cardContent}>
+              <div className={styles.iconPlus}>+</div>
+              <p className={styles.cardLabelNova}>Criar empresa</p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {modalModo && (

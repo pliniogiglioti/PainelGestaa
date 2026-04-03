@@ -673,6 +673,194 @@
   line-height: 1.45;
 }
 
+.companyAccessCard {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background:
+    radial-gradient(circle at top right, rgba(201, 162, 42, 0.12), transparent 38%),
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  animation: fadeUp 0.4s ease 0.05s both;
+}
+
+.companyAccessEyebrow {
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.companyAccessTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.companyAccessText {
+  margin-top: 6px;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.companyMembersWrap {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.companyManageButton {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border-gold);
+  background: var(--gold-glow);
+  color: var(--gold);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.companyManageButton:hover {
+  transform: translateY(-1px);
+  background: rgba(201, 162, 42, 0.16);
+}
+
+.companyMembersPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.companyMembersHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.companyMembersCount {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.companyMembersAddRow {
+  display: flex;
+  gap: 10px;
+}
+
+.companyMembersInput {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.companyMembersInput:focus {
+  border-color: var(--border-gold);
+  box-shadow: 0 0 0 3px rgba(201, 162, 42, 0.12);
+}
+
+.companyMembersAddButton {
+  flex-shrink: 0;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid var(--border-gold);
+  background: var(--gold);
+  color: var(--bg);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.companyMembersAddButton:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+.companyMembersError {
+  font-size: 12px;
+  color: #ff8585;
+}
+
+.companyMembersHint {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.companyMembersList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.companyMemberItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.companyMemberName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.companyMemberEmail {
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.companyMemberMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.companyMemberRemove {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 85, 85, 0.26);
+  background: rgba(224, 85, 85, 0.08);
+  color: #ff8b8b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.companyMemberRemove:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
 .adminCreateBtn {
   display: flex;
   align-items: center;
@@ -1470,6 +1658,21 @@
   .sectionHeader {
     flex-wrap: wrap;
     gap: 10px;
+  }
+
+  .companyAccessCard {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .companyMembersAddRow,
+  .companyMemberItem {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .companyMemberMeta {
+    justify-content: space-between;
   }
 }
 
