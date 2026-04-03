@@ -435,7 +435,6 @@ export interface Database {
         }
         Relationships: []
       }
-    }
       labs: {
         Row: {
           id:               string
