@@ -115,6 +115,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [deleteErro,      setDeleteErro]      = useState('')
   const [savingRoleId,    setSavingRoleId]    = useState<string | null>(null)
   const [currentUserId,   setCurrentUserId]   = useState<string | null>(null)
+  const [usuariosBusca,   setUsuariosBusca]   = useState('')
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -355,6 +356,27 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     }),
     [usuarios],
   )
+
+  const buscaUsuariosNormalizada = usuariosBusca.trim().toLocaleLowerCase('pt-BR')
+
+  const usuariosFiltrados = useMemo(() => {
+    if (!buscaUsuariosNormalizada) return usuariosOrdenados
+
+    return usuariosOrdenados.filter(usuario => {
+      const textoBusca = [
+        usuario.name ?? '',
+        usuario.email ?? '',
+        usuario.role,
+        usuario.tipo_usuario,
+        usuario.empresasAcesso.join(' '),
+        usuario.titularesResponsaveis.join(' '),
+      ]
+        .join(' ')
+        .toLocaleLowerCase('pt-BR')
+
+      return textoBusca.includes(buscaUsuariosNormalizada)
+    })
+  }, [buscaUsuariosNormalizada, usuariosOrdenados])
 
   const alternarStatusUsuario = async (usuario: Profile) => {
     if (usuario.role === 'admin') return
@@ -681,9 +703,18 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         {tab === 'usuarios' && (
           <div className={styles.section}>
             <div className={styles.usuariosHeader}>
-              <p className={styles.hint}>
-                Gerencie os usuários do sistema. Convites são enviados por e-mail.
-              </p>
+              <div className={styles.usuariosHeaderInfo}>
+                <p className={styles.hint}>
+                  Gerencie os usuários do sistema. Convites são enviados por e-mail.
+                </p>
+                <input
+                  className={`${styles.input} ${styles.userSearchInput}`}
+                  type="search"
+                  placeholder="Buscar por nome, e-mail, empresa ou titular"
+                  value={usuariosBusca}
+                  onChange={e => setUsuariosBusca(e.target.value)}
+                />
+              </div>
               <button
                 className={styles.btnPrimary}
                 onClick={() => { setShowAddUser(true); setAddUserErro(''); setAddUserOk('') }}
@@ -801,7 +832,13 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                   </div>
                 )}
 
-                {usuariosOrdenados.map(u => (
+                {usuarios.length > 0 && usuariosFiltrados.length === 0 && (
+                  <div className={styles.userCardEmpty}>
+                    Nenhum usuário encontrado para "{usuariosBusca.trim()}".
+                  </div>
+                )}
+
+                {usuariosFiltrados.map(u => (
                   <article key={u.id} className={styles.userCard}>
                     <div className={styles.userCardTop}>
                       <div className={styles.userCardIdentity}>
@@ -811,20 +848,26 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
                       <div className={styles.userCardBadges}>
                         {u.id === currentUserId ? (
-                          <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : u.role === 'editor' ? styles.roleEditor : styles.roleUser}`}>
-                            {u.role}
-                          </span>
+                          <div className={styles.roleEditorWrap}>
+                            <span className={styles.roleEditLabel}>Sua função</span>
+                            <span className={`${styles.roleBadge} ${u.role === 'admin' ? styles.roleAdmin : u.role === 'editor' ? styles.roleEditor : styles.roleUser}`}>
+                              {u.role}
+                            </span>
+                          </div>
                         ) : (
-                          <select
-                            className={styles.roleSelect}
-                            value={u.role}
-                            onChange={e => alterarFuncaoUsuario(u, e.target.value)}
-                            disabled={savingRoleId === u.id}
-                          >
-                            <option value="admin">admin</option>
-                            <option value="editor">editor</option>
-                            <option value="user">user</option>
-                          </select>
+                          <label className={styles.roleEditorWrap}>
+                            <span className={styles.roleEditLabel}>Alterar função</span>
+                            <select
+                              className={styles.roleSelect}
+                              value={u.role}
+                              onChange={e => alterarFuncaoUsuario(u, e.target.value)}
+                              disabled={savingRoleId === u.id}
+                            >
+                              <option value="admin">admin</option>
+                              <option value="editor">editor</option>
+                              <option value="user">user</option>
+                            </select>
+                          </label>
                         )}
 
                         <span className={`${styles.userTypeBadge} ${u.tipo_usuario === 'colaborador' ? styles.userTypeColaborador : styles.userTypeTitular}`}>
@@ -833,74 +876,74 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       </div>
                     </div>
 
-                    <div className={styles.userCardBody}>
-                      <section className={`${styles.userCardSection} ${styles.userCardSectionWide}`}>
-                        <p className={styles.userCardLabel}>Vínculos</p>
-                        <div className={styles.userLinksCell}>
-                          {u.tipo_usuario === 'colaborador' && (
-                            <p className={styles.userLinksLine}>
-                              <span className={styles.userLinksLabel}>Titular:</span>{' '}
-                              {u.titularesResponsaveis.length > 0 ? u.titularesResponsaveis.join(', ') : 'Não identificado'}
-                            </p>
-                          )}
-                          <p className={styles.userLinksLine}>
-                            <span className={styles.userLinksLabel}>Empresas:</span>{' '}
-                            {u.empresasAcesso.length > 0 ? u.empresasAcesso.join(', ') : 'Sem acesso'}
-                          </p>
-                        </div>
-                      </section>
-
-                      <section className={styles.userCardSection}>
-                        <p className={styles.userCardLabel}>Status</p>
-                        {u.role !== 'admin' ? (
-                          <button
-                            type="button"
-                            className={`${styles.switch} ${(u.ativo ?? true) ? styles.switchActive : ''}`}
-                            onClick={() => alternarStatusUsuario(u)}
-                            disabled={savingUserId === u.id}
-                            aria-pressed={u.ativo ?? true}
-                            aria-label={`${(u.ativo ?? true) ? 'Desativar' : 'Ativar'} usuário ${u.email ?? u.name ?? ''}`.trim()}
-                            title={(u.ativo ?? true) ? 'Clique para desativar o usuário' : 'Clique para ativar o usuário'}
-                          >
-                            <span className={styles.switchTrack}>
-                              <span className={styles.switchThumb} />
-                            </span>
-                            <span className={styles.switchLabel}>{(u.ativo ?? true) ? 'Ativo' : 'Inativo'}</span>
-                          </button>
-                        ) : (
-                          <span className={styles.statusMuted}>Sempre ativo</span>
+                    <div className={styles.userCardContent}>
+                      <div className={styles.userLinksCompact}>
+                        <span className={styles.userCardLabel}>Vínculos -</span>
+                        {u.tipo_usuario === 'colaborador' && (
+                          <span className={styles.userLinksLine}>
+                            <span className={styles.userLinksLabel}>Titular:</span>{' '}
+                            {u.titularesResponsaveis.length > 0 ? u.titularesResponsaveis.join(', ') : 'Não identificado'}
+                          </span>
                         )}
-                      </section>
+                        <span className={styles.userLinksLine}>
+                          <span className={styles.userLinksLabel}>Empresas:</span>{' '}
+                          {u.empresasAcesso.length > 0 ? u.empresasAcesso.join(', ') : 'Sem acesso'}
+                        </span>
+                      </div>
 
-                      <section className={styles.userCardSection}>
-                        <p className={styles.userCardLabel}>Expiração</p>
-                        {u.role !== 'admin' ? (
-                          <div className={styles.expiryEditor}>
-                            <input
-                              type="date"
-                              className={`${styles.input} ${styles.expiryInput}`}
-                              value={expiresDrafts[u.id] ?? ''}
-                              onChange={e => setExpiresDrafts(atual => ({ ...atual, [u.id]: e.target.value }))}
-                              disabled={savingExpiryId === u.id}
-                            />
+                      <div className={styles.userMetaRow}>
+                        <div className={styles.userMetaItem}>
+                          <span className={styles.userCardLabel}>Status</span>
+                          {u.role !== 'admin' ? (
                             <button
                               type="button"
-                              className={styles.btnSecondary}
-                              onClick={() => salvarExpiracaoUsuario(u)}
-                              disabled={savingExpiryId === u.id}
+                              className={`${styles.switch} ${(u.ativo ?? true) ? styles.switchActive : ''}`}
+                              onClick={() => alternarStatusUsuario(u)}
+                              disabled={savingUserId === u.id}
+                              aria-pressed={u.ativo ?? true}
+                              aria-label={`${(u.ativo ?? true) ? 'Desativar' : 'Ativar'} usuário ${u.email ?? u.name ?? ''}`.trim()}
+                              title={(u.ativo ?? true) ? 'Clique para desativar o usuário' : 'Clique para ativar o usuário'}
                             >
-                              {savingExpiryId === u.id ? 'Salvando...' : 'Salvar'}
+                              <span className={styles.switchTrack}>
+                                <span className={styles.switchThumb} />
+                              </span>
+                              <span className={styles.switchLabel}>{(u.ativo ?? true) ? 'Ativo' : 'Inativo'}</span>
                             </button>
-                          </div>
-                        ) : (
-                          <span className={styles.userCardValue}>{formatDate(u.expires_at)}</span>
-                        )}
-                      </section>
+                          ) : (
+                            <span className={styles.statusMuted}>Sempre ativo</span>
+                          )}
+                        </div>
 
-                      <section className={styles.userCardSection}>
-                        <p className={styles.userCardLabel}>Desde</p>
-                        <span className={styles.userCardValue}>{formatDate(u.created_at)}</span>
-                      </section>
+                        <div className={styles.userMetaItem}>
+                          <span className={styles.userCardLabel}>Expiração</span>
+                          {u.role !== 'admin' ? (
+                            <div className={styles.expiryEditor}>
+                              <input
+                                type="date"
+                                className={`${styles.input} ${styles.expiryInput}`}
+                                value={expiresDrafts[u.id] ?? ''}
+                                onChange={e => setExpiresDrafts(atual => ({ ...atual, [u.id]: e.target.value }))}
+                                disabled={savingExpiryId === u.id}
+                              />
+                              <button
+                                type="button"
+                                className={styles.btnSecondary}
+                                onClick={() => salvarExpiracaoUsuario(u)}
+                                disabled={savingExpiryId === u.id}
+                              >
+                                {savingExpiryId === u.id ? 'Salvando...' : 'Salvar'}
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={styles.userCardValue}>{formatDate(u.expires_at)}</span>
+                          )}
+                        </div>
+
+                        <div className={styles.userMetaItem}>
+                          <span className={styles.userCardLabel}>Desde</span>
+                          <span className={styles.userCardValue}>{formatDate(u.created_at)}</span>
+                        </div>
+                      </div>
                     </div>
 
                     <div className={styles.userCardActions}>
