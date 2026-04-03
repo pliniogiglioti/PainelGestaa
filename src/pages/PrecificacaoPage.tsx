@@ -1076,7 +1076,6 @@ function ApresentacaoVendaModal({
                   inputMode="decimal"
                   placeholder="Ex: 3.500,00"
                 />
-                <small>Você pode ajustar o valor final à vista para apresentar ao cliente.</small>
               </div>
             </div>
 
