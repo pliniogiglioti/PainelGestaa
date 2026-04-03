@@ -640,6 +640,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [savingEmpresaMembros, setSavingEmpresaMembros] = useState<Record<string, boolean>>({})
   const [inviteEmailByEmpresa, setInviteEmailByEmpresa] = useState<Record<string, string>>({})
   const [empresaMemberErrors, setEmpresaMemberErrors] = useState<Record<string, string>>({})
+  const [empresaMemberSuccess, setEmpresaMemberSuccess] = useState<Record<string, string>>({})
   const [empresaAberta, setEmpresaAberta] = useState<string | null>(null)
 
   // Modals
@@ -783,10 +784,17 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
     setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: true }))
     setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: '' }))
+    setEmpresaMemberSuccess(prev => ({ ...prev, [empresaId]: '' }))
 
-    const { error } = await supabase.rpc('vincular_colaborador_empresa', {
-      p_empresa_id: empresaId,
-      p_email: email,
+    const { data: sessionData } = await supabase.auth.getSession()
+    const { data, error } = await supabase.functions.invoke('invite-company-collaborator', {
+      body: {
+        empresa_id: empresaId,
+        email,
+      },
+      headers: {
+        Authorization: `Bearer ${sessionData.session?.access_token ?? ''}`,
+      },
     })
 
     if (error) {
@@ -799,7 +807,20 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }
 
     setInviteEmailByEmpresa(prev => ({ ...prev, [empresaId]: '' }))
-    await fetchEmpresaMembros(empresaId)
+
+    if (data?.mode === 'linked') {
+      setEmpresaMemberSuccess(prev => ({
+        ...prev,
+        [empresaId]: 'Colaborador vinculado com sucesso.',
+      }))
+      await fetchEmpresaMembros(empresaId)
+    } else {
+      setEmpresaMemberSuccess(prev => ({
+        ...prev,
+        [empresaId]: 'Convite enviado por e-mail para concluir o cadastro.',
+      }))
+    }
+
     setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
   }
 
@@ -1102,6 +1123,10 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
                             {empresaMemberErrors[empresa.id] && (
                               <p className={styles.companyMembersError}>{empresaMemberErrors[empresa.id]}</p>
+                            )}
+
+                            {empresaMemberSuccess[empresa.id] && (
+                              <p className={styles.companyMembersSuccess}>{empresaMemberSuccess[empresa.id]}</p>
                             )}
 
                             {loadingEmpresaMembros[empresa.id] ? (

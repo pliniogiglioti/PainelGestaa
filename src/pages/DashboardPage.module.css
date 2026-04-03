@@ -804,6 +804,11 @@
   color: #ff8585;
 }
 
+.companyMembersSuccess {
+  font-size: 12px;
+  color: #7fd9a8;
+}
+
 .companyMembersHint {
   font-size: 12px;
   color: var(--text-muted);
