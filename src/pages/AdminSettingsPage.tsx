@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreClassificacao, ExemploUpload, Profile } from '../lib/types'
+import type { DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
 
 // ── Constantes ────────────────────────────────────────────────────────────
 
@@ -270,17 +270,28 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
     const { data: membrosData } = await supabase
       .from('empresa_membros')
-      .select('user_id, role, empresas(id, nome, created_by)')
+      .select('user_id, role, empresa_id')
 
-    const membros = (membrosData ?? []) as Array<{
-      user_id: string
-      role: 'admin' | 'membro'
-      empresas: { id: string; nome: string; created_by: string } | null
-    }>
+    const membros = (membrosData ?? []) as Pick<EmpresaMembro, 'user_id' | 'role' | 'empresa_id'>[]
+
+    const empresaIds = [...new Set(membros.map(item => item.empresa_id))]
+
+    let empresasMap = new Map<string, Pick<Empresa, 'id' | 'nome' | 'created_by'>>()
+
+    if (empresaIds.length > 0) {
+      const { data: empresasData } = await supabase
+        .from('empresas')
+        .select('id, nome, created_by')
+        .in('id', empresaIds)
+
+      empresasMap = new Map(
+        ((empresasData ?? []) as Pick<Empresa, 'id' | 'nome' | 'created_by'>[]).map(empresa => [empresa.id, empresa]),
+      )
+    }
 
     const titularIds = [...new Set(
       membros
-        .map(item => item.empresas?.created_by)
+        .map(item => empresasMap.get(item.empresa_id)?.created_by)
         .filter((id): id is string => !!id),
     )]
 
@@ -304,8 +315,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
     membros.forEach(item => {
       const atual = vinculosPorUsuario.get(item.user_id) ?? { empresasAcesso: [], titularesResponsaveis: [] }
-      const nomeEmpresa = item.empresas?.nome?.trim()
-      const titularResponsavel = item.empresas?.created_by ? titularesMap[item.empresas.created_by] : null
+      const empresa = empresasMap.get(item.empresa_id)
+      const nomeEmpresa = empresa?.nome?.trim()
+      const titularResponsavel = empresa?.created_by ? titularesMap[empresa.created_by] : null
 
       if (nomeEmpresa && !atual.empresasAcesso.includes(nomeEmpresa)) {
         atual.empresasAcesso.push(nomeEmpresa)
