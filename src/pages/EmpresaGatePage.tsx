@@ -56,6 +56,15 @@ const IconTrash = () => (
 
 const normalizarCnpj = (value: string) => value.replace(/\D/g, '')
 
+const formatarCnpj = (value: string) => {
+  const digits = normalizarCnpj(value).slice(0, 14)
+  return digits
+    .replace(/^(\d{2})(\d)/, '$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
+    .replace(/\.(\d{3})(\d)/, '.$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+}
+
 const validarCnpj = (value: string) => {
   const cnpj = normalizarCnpj(value)
 
@@ -152,8 +161,12 @@ function EmpresaFormModal({
             <input
               className={styles.input}
               value={cnpj}
-              onChange={e => onCnpjChange(e.target.value)}
+              onChange={e => onCnpjChange(formatarCnpj(e.target.value))}
               placeholder="00.000.000/0000-00"
+              inputMode="numeric"
+              maxLength={18}
+              pattern="\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"
+              title="Informe um CNPJ válido no formato 00.000.000/0000-00"
               disabled={salvando}
             />
           </label>
@@ -442,7 +455,7 @@ export default function EmpresaGatePage({
     setModalModo('editar')
     setEmpresaEmEdicao(empresa)
     setNome(empresa.nome)
-    setCnpj(empresa.cnpj ?? '')
+    setCnpj(formatarCnpj(empresa.cnpj ?? ''))
     setErro('')
   }
 

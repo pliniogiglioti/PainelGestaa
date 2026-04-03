@@ -748,7 +748,7 @@ function CompanyFormModal({
         </div>
         <form className={styles.modalForm} onSubmit={onSubmit}>
           <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Nome da empresa</label>
+            <label className={styles.modalLabel}>Nome da empresa *</label>
             <input
               className={styles.modalInput}
               placeholder="Ex: Clinica Sorriso Ltda"
@@ -759,13 +759,16 @@ function CompanyFormModal({
             />
           </div>
           <div className={styles.modalField}>
-            <label className={styles.modalLabel}>CNPJ</label>
+            <label className={styles.modalLabel}>CNPJ *</label>
             <input
               className={styles.modalInput}
               placeholder="00.000.000/0000-00"
               value={form.cnpj}
               onChange={e => onChange('cnpj', formatarCnpj(e.target.value))}
               inputMode="numeric"
+              maxLength={18}
+              pattern="\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"
+              title="Informe um CNPJ válido no formato 00.000.000/0000-00"
               required
             />
           </div>
@@ -1108,7 +1111,13 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   }
 
   const handleCompanyFormChange = (field: keyof CompanyFormState, value: string) => {
-    setCompanyForm(prev => ({ ...prev, [field]: value }))
+    setCompanyForm(prev => ({
+      ...prev,
+      [field]: field === 'cnpj' ? formatarCnpj(value) : value,
+    }))
+    if (companyFormError) {
+      setCompanyFormError('')
+    }
   }
 
   const handleSubmitCompany = async (e: React.FormEvent) => {
