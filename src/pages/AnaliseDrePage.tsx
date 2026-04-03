@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
 import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
 import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
+import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -869,6 +870,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     setEditClassError('')
   }
 
+  const wizardBackdropDismiss = useBackdropDismiss(closeWizard)
+  const deletePeriodoBackdropDismiss = useBackdropDismiss(() => {
+    if (!deletingPeriodo) setShowDeletePeriodo(false)
+  }, deletingPeriodo)
+  const editClassBackdropDismiss = useBackdropDismiss(closeEditClassModal)
+
   const salvarClassificacao = async () => {
     if (!editClassItem) return
     if (!editClassForm.classificacaoNome || !editClassForm.grupo.trim() || !editClassForm.tipo) {
@@ -1654,7 +1661,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       {/* ── Wizard modal ── */}
       {showWizard && (
-        <div className={styles.modalOverlay} onClick={closeWizard}>
+        <div
+          className={styles.modalOverlay}
+          onPointerDown={wizardBackdropDismiss.handleBackdropPointerDown}
+          onClick={wizardBackdropDismiss.handleBackdropClick}
+        >
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
 
             <div className={styles.modalHeader}>
@@ -1882,7 +1893,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       {/* ── Modal: excluir período ── */}
       {showDeletePeriodo && (
-        <div className={styles.modalOverlay} onClick={() => !deletingPeriodo && setShowDeletePeriodo(false)}>
+        <div
+          className={styles.modalOverlay}
+          onPointerDown={deletePeriodoBackdropDismiss.handleBackdropPointerDown}
+          onClick={deletePeriodoBackdropDismiss.handleBackdropClick}
+        >
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
               <h2>Excluir período</h2>
@@ -1933,7 +1948,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       {/* ── Modal: Editar Classificação ── */}
       {showEditClassModal && editClassItem && (
-        <div className={styles.modalOverlay} onClick={closeEditClassModal}>
+        <div
+          className={styles.modalOverlay}
+          onPointerDown={editClassBackdropDismiss.handleBackdropPointerDown}
+          onClick={editClassBackdropDismiss.handleBackdropClick}
+        >
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
 
             <div className={styles.modalHeader}>

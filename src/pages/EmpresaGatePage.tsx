@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Empresa, EmpresaMembro, Profile } from '../lib/types'
 import styles from './EmpresaGatePage.module.css'
+import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 
 interface Props {
   /** Chamado quando o usuário seleciona (ou cria e seleciona) uma empresa */
@@ -92,6 +93,7 @@ function EmpresaFormModal({
   const [membros, setMembros] = useState<EmpresaMembroResumo[]>([])
   const [loadingMembros, setLoadingMembros] = useState(false)
   const [erroMembros, setErroMembros] = useState('')
+  const backdropDismiss = useBackdropDismiss(onClose, salvando)
 
   useEffect(() => {
     if (modo !== 'editar' || !empresaId) return
@@ -126,7 +128,11 @@ function EmpresaFormModal({
   }, [empresaId, modo])
 
   return (
-    <div className={styles.modalBackdrop} onClick={() => { if (!salvando) onClose() }}>
+    <div
+      className={styles.modalBackdrop}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={`${styles.modal} ${modo === 'editar' ? styles.modalWide : ''}`} onClick={e => e.stopPropagation()}>
         <h2 className={styles.modalTitulo}>{modo === 'criar' ? 'Nova empresa' : 'Editar empresa'}</h2>
         <form onSubmit={onSubmit} className={styles.form}>
@@ -231,8 +237,13 @@ function ConfirmDeleteModal({
   onClose: () => void
   onConfirm: () => void
 }) {
+  const backdropDismiss = useBackdropDismiss(onClose, deletando)
   return (
-    <div className={styles.modalBackdrop} onClick={() => { if (!deletando) onClose() }}>
+    <div
+      className={styles.modalBackdrop}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <h2 className={styles.modalTitulo}>Excluir empresa</h2>
         <p className={styles.deleteWarning}>

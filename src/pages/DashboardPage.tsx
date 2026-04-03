@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import type { App, AppCategory, Empresa, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
+import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 
 type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 
@@ -376,6 +377,7 @@ function CreateAppModal({ categories, onClose, onCreated }: {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
+  const backdropDismiss = useBackdropDismiss(onClose)
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -401,7 +403,11 @@ function CreateAppModal({ categories, onClose, onCreated }: {
   }
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Novo Aplicativo</h2>
@@ -501,6 +507,7 @@ function EditAppModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const backdropDismiss = useBackdropDismiss(onClose)
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -537,7 +544,11 @@ function EditAppModal({
   }
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Editar Aplicativo</h2>
@@ -616,6 +627,7 @@ function EditAppModal({
 function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
+  const backdropDismiss = useBackdropDismiss(onClose)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -626,7 +638,11 @@ function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCr
   }
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Nova Categoria</h2>
@@ -651,6 +667,7 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [title,   setTitle]   = useState('')
   const [content, setContent] = useState('')
   const [saving,  setSaving]  = useState(false)
+  const backdropDismiss = useBackdropDismiss(onClose)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -667,7 +684,11 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
   }
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>Novo Tópico</h2>
@@ -713,8 +734,13 @@ function CompanyFormModal({
   onSubmit: (e: React.FormEvent) => void
   onChange: (field: keyof CompanyFormState, value: string) => void
 }) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
   return (
-    <div className={styles.modalOverlay} onClick={onClose}>
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>{mode === 'create' ? 'Nova empresa' : 'Editar empresa'}</h2>
@@ -1168,7 +1194,12 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       return
     }
 
-    setEmpresas(prev => [...prev, { ...data, role: 'admin' }].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+    const novaEmpresa: EmpresaListItem = {
+      ...data,
+      role: 'admin',
+    }
+
+    setEmpresas(prev => [...prev, novaEmpresa].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
     setSavingCompany(false)
     closeCompanyModal()
   }

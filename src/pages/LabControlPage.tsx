@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
 import styles from './LabControlPage.module.css'
+import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -215,8 +216,13 @@ function Modal({ title, onClose, children, wide }: {
   children: React.ReactNode
   wide?: boolean
 }) {
+  const backdropDismiss = useBackdropDismiss(onClose)
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div
+      className={styles.overlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
       <div className={`${styles.modal} ${wide ? styles.modalWide : ''}`} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <h2 className={styles.modalTitle}>{title}</h2>
