@@ -1058,7 +1058,6 @@ function ApresentacaoVendaModal({
       <div className={`${styles.modal} ${styles.presentationModal}`} onClick={e => e.stopPropagation()}>
         <div className={styles.presentationHeader}>
           <div>
-            <p className={styles.presentationEyebrow}>Apresentação</p>
             <h2 className={styles.presentationTitle}>{venda.cliente_nome}</h2>
           </div>
           <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
