@@ -599,6 +599,80 @@
   border: 1px solid var(--border);
 }
 
+.companyGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  animation: fadeUp 0.4s ease 0.15s both;
+}
+
+.companyCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  animation: cardIn 0.35s ease both;
+}
+
+.companyCardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.companyAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gold-glow);
+  border: 1px solid var(--border-gold);
+  color: var(--gold);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.companyRoleBadge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.companyRoleAdmin {
+  color: var(--gold);
+  background: var(--gold-glow);
+  border-color: var(--border-gold);
+}
+
+.companyRoleMember {
+  color: var(--text-muted);
+  background: var(--bg-elevated);
+  border-color: var(--border);
+}
+
+.companyName {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.companyMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
 .adminCreateBtn {
   display: flex;
   align-items: center;

@@ -2,11 +2,11 @@ import { ReactNode, useEffect, useRef, useState } from 'react'
 import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
-import type { App, AppCategory, ForumTopicWithMeta } from '../lib/types'
+import type { App, AppCategory, Empresa, ForumTopicWithMeta } from '../lib/types'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 
-type Page = 'aplicativos' | 'comunidade' | 'perfil'
+type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade' | 'perfil'
 
 
 interface DashboardPageProps {
@@ -19,6 +19,10 @@ interface DashboardPageProps {
 
 interface AppCategoryRow extends AppCategory {
   apps: App[]
+}
+
+interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'created_at'> {
+  role: 'admin' | 'membro'
 }
 
 // ── Icons ─────────────────────────────────────────────────────────────────
@@ -34,6 +38,13 @@ const IconCommunity = () => (
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
     <circle cx="9" cy="7" r="4"/>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+)
+const IconBuilding = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="2" width="18" height="20" rx="2"/>
+    <path d="M9 22V8h6v14"/>
+    <path d="M7 6h.01M17 6h.01M7 10h.01M17 10h.01M7 14h.01M17 14h.01"/>
   </svg>
 )
 const IconProfile = () => (
@@ -600,7 +611,9 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [apps,       setApps]       = useState<App[]>([])
   const [categories, setCategories] = useState<AppCategory[]>([])
   const [topics,     setTopics]     = useState<ForumTopicWithMeta[]>([])
+  const [empresas,   setEmpresas]   = useState<EmpresaListItem[]>([])
   const [loadingApps,   setLoadingApps]   = useState(true)
+  const [loadingEmpresas, setLoadingEmpresas] = useState(true)
   const [loadingTopics, setLoadingTopics] = useState(true)
 
   // Modals
@@ -661,8 +674,41 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     setLoadingTopics(false)
   }
 
+  const fetchEmpresas = async () => {
+    setLoadingEmpresas(true)
+    const { data: auth } = await supabase.auth.getUser()
+    const currentUser = auth.user
+
+    if (!currentUser) {
+      setEmpresas([])
+      setLoadingEmpresas(false)
+      return
+    }
+
+    const { data: membros } = await supabase
+      .from('empresa_membros')
+      .select('role, empresas(id, nome, cnpj, created_at)')
+      .eq('user_id', currentUser.id)
+
+    const mapped = (membros ?? [])
+      .map(item => {
+        const empresa = item.empresas as unknown as Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'created_at'> | null
+        if (!empresa) return null
+        return {
+          ...empresa,
+          role: item.role as 'admin' | 'membro',
+        }
+      })
+      .filter((item): item is EmpresaListItem => !!item)
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+
+    setEmpresas(mapped)
+    setLoadingEmpresas(false)
+  }
+
   useEffect(() => { fetchCategories() }, [])
   useEffect(() => { fetchApps()       }, [])
+  useEffect(() => { fetchEmpresas()   }, [])
   useEffect(() => { fetchTopics()     }, [])
 
   // Realtime: new apps
@@ -721,6 +767,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
   const navItems = [
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
+    { id: 'minhas-empresas' as Page, label: 'Minhas empresas', icon: <IconBuilding /> },
     { id: 'comunidade'  as Page, label: 'Comunidade',  icon: <IconCommunity /> },
     { id: 'perfil'      as Page, label: 'Perfil',      icon: <IconProfile /> },
   ]
@@ -833,6 +880,57 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                       ))}
                     </div>
                   </section>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* MINHAS EMPRESAS */}
+        {activePage === 'minhas-empresas' && (
+          <div className={styles.pageContent} key="companies">
+            <div className={styles.welcomeRow}>
+              <div>
+                <p className={styles.welcomeGreeting}>Empresas vinculadas ao seu acesso</p>
+                <h1 className={styles.welcomeName}>Minhas empresas</h1>
+              </div>
+            </div>
+
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionLeft}>
+                <h2 className={styles.sectionTitle}>Listagem de empresas</h2>
+                {!loadingEmpresas && <span className={styles.sectionCount}>{empresas.length} empresa{empresas.length === 1 ? '' : 's'}</span>}
+              </div>
+            </div>
+
+            {loadingEmpresas ? (
+              <div className={styles.centeredSpinner}><Spinner /></div>
+            ) : empresas.length === 0 ? (
+              <div className={styles.emptyState}>
+                <p>Você ainda não está vinculado a nenhuma empresa.</p>
+              </div>
+            ) : (
+              <div className={styles.companyGrid}>
+                {empresas.map((empresa, index) => (
+                  <article
+                    key={empresa.id}
+                    className={styles.companyCard}
+                    style={{ animationDelay: `${index * 40}ms` }}
+                  >
+                    <div className={styles.companyCardTop}>
+                      <div className={styles.companyAvatar}>
+                        {empresa.nome.split(' ').slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('')}
+                      </div>
+                      <span className={`${styles.companyRoleBadge} ${empresa.role === 'admin' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
+                        {empresa.role === 'admin' ? 'Admin' : 'Membro'}
+                      </span>
+                    </div>
+                    <h3 className={styles.companyName}>{empresa.nome}</h3>
+                    <p className={styles.companyMeta}>{empresa.cnpj ? empresa.cnpj : 'CNPJ não informado'}</p>
+                    <p className={styles.companyMeta}>
+                      Vinculada em {new Date(empresa.created_at).toLocaleDateString('pt-BR')}
+                    </p>
+                  </article>
                 ))}
               </div>
             )}

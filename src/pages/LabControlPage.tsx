@@ -14,6 +14,8 @@ const DEFAULT_COLUNAS = [
   { nome: 'Concluído',    ordem: 4, cor: '#8b5cf6' },
 ]
 
+const KANBAN_PAGE_SIZE = 5
+
 const SHADE_OPTIONS = [
   'A1', 'A2', 'A3', 'A3.5', 'A4',
   'B1', 'B2', 'B3', 'B4',
@@ -960,7 +962,20 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDel
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<string | null>(null)
+  const [visibleByCol, setVisibleByCol] = useState<Record<string, number>>({})
+  const [loadingCols, setLoadingCols] = useState<Record<string, boolean>>({})
+  const loadTimersRef = useRef<Record<string, number>>({})
   const sorted = [...colunas].sort((a, b) => a.ordem - b.ordem)
+
+  useEffect(() => {
+    setVisibleByCol(prev => Object.fromEntries(
+      sorted.map(col => [col.nome, prev[col.nome] ?? KANBAN_PAGE_SIZE]),
+    ))
+  }, [colunas])
+
+  useEffect(() => () => {
+    Object.values(loadTimersRef.current).forEach(timer => window.clearTimeout(timer))
+  }, [])
 
   const handleDrop = (e: React.DragEvent, colNome: string) => {
     e.preventDefault()
@@ -968,10 +983,34 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDel
     setDraggingId(null); setDragOverCol(null)
   }
 
+  const loadMoreForColumn = (colNome: string, totalItems: number) => {
+    const visibleItems = visibleByCol[colNome] ?? KANBAN_PAGE_SIZE
+    if (loadingCols[colNome] || visibleItems >= totalItems) return
+
+    setLoadingCols(prev => ({ ...prev, [colNome]: true }))
+    loadTimersRef.current[colNome] = window.setTimeout(() => {
+      setVisibleByCol(prev => ({
+        ...prev,
+        [colNome]: Math.min((prev[colNome] ?? KANBAN_PAGE_SIZE) + KANBAN_PAGE_SIZE, totalItems),
+      }))
+      setLoadingCols(prev => ({ ...prev, [colNome]: false }))
+      delete loadTimersRef.current[colNome]
+    }, 350)
+  }
+
+  const handleColumnScroll = (e: React.UIEvent<HTMLDivElement>, colNome: string, totalItems: number) => {
+    const target = e.currentTarget
+    const nearBottom = target.scrollTop + target.clientHeight >= target.scrollHeight - 32
+    if (nearBottom) loadMoreForColumn(colNome, totalItems)
+  }
+
   return (
     <div className={styles.kanban}>
       {sorted.map(col => {
         const colEnvios = envios.filter(e => e.status === col.nome)
+        const visibleItems = visibleByCol[col.nome] ?? KANBAN_PAGE_SIZE
+        const visibleEnvios = colEnvios.slice(0, visibleItems)
+        const isLoadingMore = !!loadingCols[col.nome]
         return (
           <div
             key={col.id}
@@ -985,8 +1024,8 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDel
               <span className={styles.kanbanColName}>{col.nome}</span>
               <span className={styles.kanbanColCount}>{colEnvios.length}</span>
             </div>
-            <div className={styles.kanbanCards}>
-              {colEnvios.map(envio => (
+            <div className={styles.kanbanCards} onScroll={e => handleColumnScroll(e, col.nome, colEnvios.length)}>
+              {visibleEnvios.map(envio => (
                 <KanbanCard
                   key={envio.id}
                   envio={envio}
@@ -997,6 +1036,9 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDel
                   onDelete={() => onDeleteEnvio(envio.id)}
                 />
               ))}
+              {isLoadingMore && (
+                <div className={styles.kanbanLoadingMore}>Carregando...</div>
+              )}
               {colEnvios.length === 0 && (
                 <div className={styles.kanbanEmpty}>Sem trabalhos</div>
               )}
@@ -1232,18 +1274,7 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
       </div>
 
       <div className={styles.labCardContact}>
-        {lab.telefone && whatsappUrl && (
-          <a
-            className={`${styles.labCardContactItem} ${styles.labCardContactLink}`}
-            href={whatsappUrl}
-            target="_blank"
-            rel="noreferrer"
-            onClick={e => e.stopPropagation()}
-          >
-            <IconPhone /> {formatWhatsAppNumber(lab.telefone)}
-          </a>
-        )}
-        {lab.telefone && !whatsappUrl && <span className={styles.labCardContactItem}><IconPhone /> {lab.telefone}</span>}
+        {lab.telefone && <span className={styles.labCardContactItem}><IconPhone /> {formatWhatsAppNumber(lab.telefone)}</span>}
         {lab.email    && <span className={styles.labCardContactItem}><IconMail /> {lab.email}</span>}
         {lab.prazo_medio_dias > 0 && (
           <span className={styles.labCardContactItem}><IconClock /> {lab.prazo_medio_dias}d prazo médio</span>
