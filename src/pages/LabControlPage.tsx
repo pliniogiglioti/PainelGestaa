@@ -1164,12 +1164,10 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit }: {
           <span className={styles.labCardStatNum}>{active}</span>
           <span className={styles.labCardStatLabel}>em andamento</span>
         </div>
-        {overdue > 0 && (
-          <div className={`${styles.labCardStat} ${styles.labCardStatOverdue}`}>
-            <span className={styles.labCardStatNum}>{overdue}</span>
-            <span className={styles.labCardStatLabel}>atrasados</span>
-          </div>
-        )}
+        <div className={`${styles.labCardStat} ${styles.labCardStatOverdue}`}>
+          <span className={styles.labCardStatNum}>{overdue}</span>
+          <span className={styles.labCardStatLabel}>atrasados</span>
+        </div>
       </div>
 
       <div className={styles.labCardValueSummary}>
