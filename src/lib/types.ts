@@ -436,6 +436,149 @@ export interface Database {
         Relationships: []
       }
     }
+      labs: {
+        Row: {
+          id:               string
+          empresa_id:       string
+          nome:             string
+          cnpj:             string | null
+          telefone:         string | null
+          email:            string | null
+          endereco:         string | null
+          prazo_medio_dias: number
+          observacoes:      string | null
+          ativo:            boolean
+          created_at:       string
+          updated_at:       string
+        }
+        Insert: {
+          id?:               string
+          empresa_id:        string
+          nome:              string
+          cnpj?:             string | null
+          telefone?:         string | null
+          email?:            string | null
+          endereco?:         string | null
+          prazo_medio_dias?: number
+          observacoes?:      string | null
+          ativo?:            boolean
+          created_at?:       string
+          updated_at?:       string
+        }
+        Update: {
+          nome?:             string
+          cnpj?:             string | null
+          telefone?:         string | null
+          email?:            string | null
+          endereco?:         string | null
+          prazo_medio_dias?: number
+          observacoes?:      string | null
+          ativo?:            boolean
+          updated_at?:       string
+        }
+        Relationships: []
+      }
+      lab_precos: {
+        Row: {
+          id:           string
+          lab_id:       string
+          nome_servico: string
+          preco:        number
+          ativo:        boolean
+          created_at:   string
+        }
+        Insert: {
+          id?:          string
+          lab_id:       string
+          nome_servico: string
+          preco?:       number
+          ativo?:       boolean
+          created_at?:  string
+        }
+        Update: {
+          nome_servico?: string
+          preco?:        number
+          ativo?:        boolean
+        }
+        Relationships: []
+      }
+      lab_kanban_colunas: {
+        Row: {
+          id:         string
+          empresa_id: string
+          nome:       string
+          ordem:      number
+          cor:        string
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          empresa_id:  string
+          nome:        string
+          ordem?:      number
+          cor?:        string
+          created_at?: string
+        }
+        Update: {
+          nome?:  string
+          ordem?: number
+          cor?:   string
+        }
+        Relationships: []
+      }
+      lab_envios: {
+        Row: {
+          id:                     string
+          lab_id:                 string
+          empresa_id:             string
+          user_id:                string
+          paciente_nome:          string
+          tipo_trabalho:          string
+          preco_servico:          number | null
+          dentes:                 string | null
+          cor:                    string | null
+          observacoes:            string | null
+          status:                 string
+          data_envio:             string
+          data_entrega_prometida: string | null
+          data_entrega_real:      string | null
+          created_at:             string
+          updated_at:             string
+        }
+        Insert: {
+          id?:                     string
+          lab_id:                  string
+          empresa_id:              string
+          user_id:                 string
+          paciente_nome:           string
+          tipo_trabalho:           string
+          preco_servico?:          number | null
+          dentes?:                 string | null
+          cor?:                    string | null
+          observacoes?:            string | null
+          status?:                 string
+          data_envio?:             string
+          data_entrega_prometida?: string | null
+          data_entrega_real?:      string | null
+          created_at?:             string
+          updated_at?:             string
+        }
+        Update: {
+          paciente_nome?:          string
+          tipo_trabalho?:          string
+          preco_servico?:          number | null
+          dentes?:                 string | null
+          cor?:                    string | null
+          observacoes?:            string | null
+          status?:                 string
+          data_envio?:             string
+          data_entrega_prometida?: string | null
+          data_entrega_real?:      string | null
+          updated_at?:             string
+        }
+        Relationships: []
+      }
+    }
     Views: {
       [_ in never]: never
     }
@@ -486,54 +629,7 @@ export type ForumReplyWithAuthor = ForumReply & {
 
 // ── Lab Control ───────────────────────────────────────────────────────────
 
-export interface Lab {
-  id:               string
-  empresa_id:       string
-  nome:             string
-  cnpj:             string | null
-  telefone:         string | null
-  email:            string | null
-  endereco:         string | null
-  prazo_medio_dias: number
-  observacoes:      string | null
-  ativo:            boolean
-  created_at:       string
-  updated_at:       string
-}
-
-export interface LabPreco {
-  id:           string
-  lab_id:       string
-  nome_servico: string
-  preco:        number
-  ativo:        boolean
-  created_at:   string
-}
-
-export interface LabKanbanColuna {
-  id:         string
-  empresa_id: string
-  nome:       string
-  ordem:      number
-  cor:        string
-  created_at: string
-}
-
-export interface LabEnvio {
-  id:                     string
-  lab_id:                 string
-  empresa_id:             string
-  user_id:                string
-  paciente_nome:          string
-  tipo_trabalho:          string
-  preco_servico:          number | null
-  dentes:                 string | null
-  cor:                    string | null
-  observacoes:            string | null
-  status:                 string
-  data_envio:             string
-  data_entrega_prometida: string | null
-  data_entrega_real:      string | null
-  created_at:             string
-  updated_at:             string
-}
+export type Lab              = Database['public']['Tables']['labs']['Row']
+export type LabPreco         = Database['public']['Tables']['lab_precos']['Row']
+export type LabKanbanColuna  = Database['public']['Tables']['lab_kanban_colunas']['Row']
+export type LabEnvio         = Database['public']['Tables']['lab_envios']['Row']

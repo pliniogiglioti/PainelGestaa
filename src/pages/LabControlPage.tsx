@@ -471,8 +471,6 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
     data_entrega_prometida: envio?.data_entrega_prometida ?? '',
   })
 
-  const isCustomService = form.tipo_trabalho !== '' && !precos.find(p => p.nome_servico === form.tipo_trabalho)
-
   const set = (f: keyof EnvioFormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(p => ({ ...p, [f]: e.target.value }))
