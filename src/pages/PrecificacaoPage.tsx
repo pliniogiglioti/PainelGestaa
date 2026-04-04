@@ -23,7 +23,9 @@ type CalculadoraForm = {
   custoMaterialAplicado: string
   custoLaboratorio: string
   royaltiesPercent: string
+  custoProfissionaisModo: 'percentual' | 'valor'
   custoProfissionaisPercent: string
+  custoProfissionaisValor: string
   impostosPercent: string
   comissoesPercent: string
   taxaMaquinaPercent: string
@@ -119,12 +121,16 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const custoLaboratorio = parsePreco(form.custoLaboratorio)
   const royaltiesPercent = parsePreco(form.royaltiesPercent)
   const custoProfissionaisPercent = parsePreco(form.custoProfissionaisPercent)
+  const custoProfissionaisValor = parsePreco(form.custoProfissionaisValor)
   const impostosPercent = parsePreco(form.impostosPercent)
   const comissoesPercent = parsePreco(form.comissoesPercent)
   const taxaMaquinaPercent = parsePreco(form.taxaMaquinaPercent)
 
   const royalties = precoVenda * (royaltiesPercent / 100)
-  const custoProfissionais = precoVenda * (custoProfissionaisPercent / 100)
+  const custoProfissionais =
+    form.custoProfissionaisModo === 'valor'
+      ? custoProfissionaisValor
+      : precoVenda * (custoProfissionaisPercent / 100)
   const impostos = precoVenda * (impostosPercent / 100)
   const comissoes = precoVenda * (comissoesPercent / 100)
   const taxaMaquina = precoVenda * (taxaMaquinaPercent / 100)
@@ -146,7 +152,9 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoMaterialAplicado,
     custoLaboratorio,
     royaltiesPercent,
+    custoProfissionaisModo: form.custoProfissionaisModo,
     custoProfissionaisPercent,
+    custoProfissionaisValor,
     impostosPercent,
     comissoesPercent,
     taxaMaquinaPercent,
@@ -174,11 +182,19 @@ function configToForm(config: EmpresaPrecificacaoConfig | null): ConfiguracaoGer
 
 function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
   CalculadoraForm,
-  'royaltiesPercent' | 'custoProfissionaisPercent' | 'impostosPercent' | 'comissoesPercent' | 'taxaMaquinaPercent'
+  | 'royaltiesPercent'
+  | 'custoProfissionaisModo'
+  | 'custoProfissionaisPercent'
+  | 'custoProfissionaisValor'
+  | 'impostosPercent'
+  | 'comissoesPercent'
+  | 'taxaMaquinaPercent'
 > {
   return {
     royaltiesPercent: config.royaltiesPercent,
+    custoProfissionaisModo: 'percentual',
     custoProfissionaisPercent: config.custoProfissionaisPercent,
+    custoProfissionaisValor: '',
     impostosPercent: config.impostosPercent,
     comissoesPercent: config.comissoesPercent,
     taxaMaquinaPercent: config.taxaMaquinaPercent,
