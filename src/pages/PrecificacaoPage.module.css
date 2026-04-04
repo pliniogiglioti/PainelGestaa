@@ -350,6 +350,12 @@
   gap: 18px;
 }
 
+.modalHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .modalTitle {
   margin: 0;
   font-size: 18px;

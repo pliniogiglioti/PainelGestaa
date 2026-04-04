@@ -100,6 +100,9 @@ const formatCurrency = (value: number) =>
 const formatPercent = (value: number) =>
   `${value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 
+const formatCurrencyInput = (value: number) =>
+  value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
 function Spinner() {
   return <div className={styles.spinner} />
 }
@@ -366,8 +369,11 @@ function CalculadoraPrecificacaoModal({
     custoLaboratorio: '',
     ...configFormToCalculadoraForm(configPadrao),
   })
+  const [precoVenda, setPrecoVenda] = useState(() => formatCurrencyInput(item.preco))
+  const [showPrecoVendaEditor, setShowPrecoVendaEditor] = useState(false)
 
-  const calculo = calcularPrecificacao(item.preco, form)
+  const precoVendaCalculado = parsePreco(precoVenda)
+  const calculo = calcularPrecificacao(precoVendaCalculado, form)
 
   const handleChange = (field: keyof CalculadoraForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -385,11 +391,34 @@ function CalculadoraPrecificacaoModal({
             <h2 className={styles.modalTitle}>Verificar cálculo de precificação</h2>
             <p className={styles.calcItemName}>{item.nome_produto}</p>
           </div>
-          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+          <div className={styles.modalHeaderActions}>
+            <button
+              type="button"
+              className={styles.calcButton}
+              onClick={() => setShowPrecoVendaEditor(prev => !prev)}
+            >
+              {showPrecoVendaEditor ? 'Fechar edição do preço' : 'Alterar preço de venda'}
+            </button>
+            <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+          </div>
         </div>
 
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
+            {showPrecoVendaEditor && (
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Preço de venda (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={precoVenda}
+                  onChange={e => setPrecoVenda(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex: 1.250,00"
+                  autoFocus
+                />
+              </label>
+            )}
+
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Custo insumos (R$)</span>
               <input
@@ -540,7 +569,7 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcHighlight}>
                 <span>Preço de venda</span>
-                <strong>{formatCurrency(item.preco)}</strong>
+                <strong>{formatCurrency(precoVendaCalculado)}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
                 <span>Resultado da margem</span>
