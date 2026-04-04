@@ -372,10 +372,18 @@ function PrecoModal({
 function CalculadoraPrecificacaoModal({
   item,
   configPadrao,
+  canManage,
+  savingPreco,
+  error,
+  onUpdatePreco,
   onClose,
 }: {
   item: EmpresaPreco
   configPadrao: ConfiguracaoGeralForm
+  canManage: boolean
+  savingPreco: boolean
+  error: string
+  onUpdatePreco: (itemId: string, preco: number) => Promise<boolean>
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
@@ -385,14 +393,34 @@ function CalculadoraPrecificacaoModal({
     custoLaboratorio: '',
     ...configFormToCalculadoraForm(configPadrao),
   })
-  const [precoVenda, setPrecoVenda] = useState(() => formatCurrencyInput(item.preco))
   const [showPrecoVendaEditor, setShowPrecoVendaEditor] = useState(false)
+  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => formatCurrencyInput(item.preco))
+  const [erroPrecoLocal, setErroPrecoLocal] = useState('')
 
-  const precoVendaCalculado = parsePreco(precoVenda)
-  const calculo = calcularPrecificacao(precoVendaCalculado, form)
+  const calculo = calcularPrecificacao(item.preco, form)
 
   const handleChange = (field: keyof CalculadoraForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleToggleCustoProfissionais = (modo: CalculadoraForm['custoProfissionaisModo']) => {
+    setForm(prev => ({ ...prev, custoProfissionaisModo: modo }))
+  }
+
+  const handleSalvarPrecoVenda = async () => {
+    const precoNumerico = parsePreco(precoVendaEditado)
+
+    if (precoNumerico <= 0) {
+      setErroPrecoLocal('Informe um preço de venda válido.')
+      return
+    }
+
+    setErroPrecoLocal('')
+    const updated = await onUpdatePreco(item.id, precoNumerico)
+
+    if (updated) {
+      setShowPrecoVendaEditor(false)
+    }
   }
 
   return (
@@ -408,13 +436,19 @@ function CalculadoraPrecificacaoModal({
             <p className={styles.calcItemName}>{item.nome_produto}</p>
           </div>
           <div className={styles.modalHeaderActions}>
-            <button
-              type="button"
-              className={styles.calcButton}
-              onClick={() => setShowPrecoVendaEditor(prev => !prev)}
-            >
-              {showPrecoVendaEditor ? 'Fechar edição do preço' : 'Alterar preço de venda'}
-            </button>
+            {canManage && (
+              <button
+                type="button"
+                className={styles.calcButton}
+                onClick={() => {
+                  setPrecoVendaEditado(formatCurrencyInput(item.preco))
+                  setErroPrecoLocal('')
+                  setShowPrecoVendaEditor(prev => !prev)
+                }}
+              >
+                {showPrecoVendaEditor ? 'Fechar edição do preço' : 'Alterar preço de venda'}
+              </button>
+            )}
             <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
           </div>
         </div>
@@ -422,17 +456,46 @@ function CalculadoraPrecificacaoModal({
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
             {showPrecoVendaEditor && (
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Preço de venda (R$)</span>
-                <input
-                  className={styles.modalInput}
-                  value={precoVenda}
-                  onChange={e => setPrecoVenda(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="Ex: 1.250,00"
-                  autoFocus
-                />
-              </label>
+              <div className={styles.calcInlineCard}>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Preço de venda atual (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={precoVendaEditado}
+                    onChange={e => {
+                      setPrecoVendaEditado(e.target.value)
+                      setErroPrecoLocal('')
+                    }}
+                    inputMode="decimal"
+                    placeholder="Ex: 1.250,00"
+                    autoFocus
+                    disabled={savingPreco}
+                  />
+                </label>
+                {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.modalCancel}
+                    onClick={() => {
+                      setPrecoVendaEditado(formatCurrencyInput(item.preco))
+                      setErroPrecoLocal('')
+                      setShowPrecoVendaEditor(false)
+                    }}
+                    disabled={savingPreco}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalSubmit}
+                    onClick={() => void handleSalvarPrecoVenda()}
+                    disabled={savingPreco}
+                  >
+                    {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                  </button>
+                </div>
+              </div>
             )}
 
             <label className={styles.modalField}>
@@ -480,13 +543,36 @@ function CalculadoraPrecificacaoModal({
             </label>
 
             <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo profissionais (%)</span>
+              <span className={styles.modalLabel}>Custo profissionais</span>
+              <div className={styles.switchRow}>
+                <button
+                  type="button"
+                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
+                  onClick={() => handleToggleCustoProfissionais('percentual')}
+                >
+                  Porcentagem
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
+                  onClick={() => handleToggleCustoProfissionais('valor')}
+                >
+                  Valor
+                </button>
+              </div>
               <input
                 className={styles.modalInput}
-                value={form.custoProfissionaisPercent}
-                onChange={e => handleChange('custoProfissionaisPercent', e.target.value)}
+                value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
+                onChange={e =>
+                  handleChange(
+                    form.custoProfissionaisModo === 'percentual'
+                      ? 'custoProfissionaisPercent'
+                      : 'custoProfissionaisValor',
+                    e.target.value,
+                  )
+                }
                 inputMode="decimal"
-                placeholder="Ex: 30"
+                placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
               />
             </label>
 
@@ -554,7 +640,11 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcRow}>
                 <span>Custo profissionais</span>
-                <span>{calculo.custoProfissionaisPercent > 0 ? formatPercent(calculo.custoProfissionaisPercent) : '-'}</span>
+                <span>
+                  {calculo.custoProfissionaisModo === 'valor'
+                    ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
+                    : (calculo.custoProfissionaisPercent > 0 ? formatPercent(calculo.custoProfissionaisPercent) : '-')}
+                </span>
                 <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
@@ -585,7 +675,7 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcHighlight}>
                 <span>Preço de venda</span>
-                <strong>{formatCurrency(precoVendaCalculado)}</strong>
+                <strong>{formatCurrency(item.preco)}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
                 <span>Resultado da margem</span>
@@ -1457,6 +1547,35 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setView('lista')
   }
 
+  const handleUpdatePreco = async (itemId: string, preco: number) => {
+    setSavingPreco(true)
+    setError('')
+    setFeedback('')
+
+    const { data, error: updateError } = await supabase
+      .from('empresa_precos')
+      .update({ preco })
+      .eq('id', itemId)
+      .eq('empresa_id', empresa.id)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      setError(updateError.message ?? 'Não foi possível atualizar o preço.')
+      setSavingPreco(false)
+      return false
+    }
+
+    setPrecos(prev =>
+      prev.map(item => (item.id === itemId ? data : item))
+        .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+    )
+    setItemCalculadora(data)
+    setFeedback('Preço atualizado com sucesso.')
+    setSavingPreco(false)
+    return true
+  }
+
   const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
     setConfigForm(prev => ({ ...prev, [field]: value }))
   }
@@ -1872,6 +1991,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         <CalculadoraPrecificacaoModal
           item={itemCalculadora}
           configPadrao={configToForm(configGeral)}
+          canManage={canManage}
+          savingPreco={savingPreco}
+          error={error}
+          onUpdatePreco={handleUpdatePreco}
           onClose={() => setItemCalculadora(null)}
         />
       )}

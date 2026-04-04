@@ -397,6 +397,49 @@
   gap: 6px;
 }
 
+.calcInlineCard {
+  border: 1px solid rgba(201, 162, 42, 0.22);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(201, 162, 42, 0.08);
+}
+
+.inlineActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.switchRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.switchOption {
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.switchOption:hover {
+  color: var(--text);
+  border-color: rgba(201, 162, 42, 0.3);
+}
+
+.switchOptionActive {
+  background: rgba(201, 162, 42, 0.14);
+  border-color: rgba(201, 162, 42, 0.4);
+  color: var(--gold-light);
+}
+
 .modalLabel {
   font-size: 12px;
   font-weight: 600;
