@@ -115,6 +115,10 @@ function parsePreco(value: string) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function sanitizeDecimalInput(value: string) {
+  return value.replace(/[^\d,.\s]/g, '')
+}
+
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const custoInsumos = parsePreco(form.custoInsumos)
   const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
@@ -627,7 +631,7 @@ function CalculadoraPrecificacaoModal({
                       className={`${styles.modalInput} ${styles.calcHighlightInput}`}
                       value={precoVendaEditado}
                       onChange={e => {
-                        setPrecoVendaEditado(e.target.value)
+                        setPrecoVendaEditado(sanitizeDecimalInput(e.target.value))
                         setErroPrecoLocal('')
                       }}
                       inputMode="decimal"
@@ -635,29 +639,6 @@ function CalculadoraPrecificacaoModal({
                       disabled={savingPreco}
                     />
                     {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
-                    {(precoVendaMudou || erroPrecoLocal) && (
-                      <div className={styles.inlineActions}>
-                        <button
-                          type="button"
-                          className={styles.modalCancel}
-                          onClick={() => {
-                            setPrecoVendaEditado(formatCurrencyInput(item.preco))
-                            setErroPrecoLocal('')
-                          }}
-                          disabled={savingPreco}
-                        >
-                          Cancelar
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.modalSubmit}
-                          onClick={() => void handleSalvarPrecoVenda()}
-                          disabled={savingPreco}
-                        >
-                          {savingPreco ? 'Salvando...' : 'Salvar preço'}
-                        </button>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
@@ -668,6 +649,29 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.resultadoMargem}</strong>
               </div>
             </div>
+            {canManage && (precoVendaMudou || erroPrecoLocal) && (
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className={styles.modalCancel}
+                  onClick={() => {
+                    setPrecoVendaEditado(formatCurrencyInput(item.preco))
+                    setErroPrecoLocal('')
+                  }}
+                  disabled={savingPreco}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalSubmit}
+                  onClick={() => void handleSalvarPrecoVenda()}
+                  disabled={savingPreco}
+                >
+                  {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
