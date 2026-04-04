@@ -1192,15 +1192,30 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function EnvioResumoModal({ envio, isAdmin, onClose, onEdit, onTogglePago }: {
+function EnvioResumoModal({ envio, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
   envio: LabEnvio
   isAdmin: boolean
   onClose: () => void
   onEdit: () => void
   onTogglePago: (envio: LabEnvio) => Promise<void>
+  onUpdateEtapa: (
+    envio: LabEnvio,
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => Promise<void>
 }) {
   const etapas = getEnvioEtapas(envio)
   const overdueEtapas = getOverdueEtapas(envio)
+  const [savingEtapaId, setSavingEtapaId] = useState<string | null>(null)
+
+  const handleEtapaUpdate = async (
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => {
+    setSavingEtapaId(etapaId)
+    await onUpdateEtapa(envio, etapaId, changes)
+    setSavingEtapaId(prev => prev === etapaId ? null : prev)
+  }
 
   return (
     <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
@@ -1226,15 +1241,46 @@ function EnvioResumoModal({ envio, isAdmin, onClose, onEdit, onTogglePago }: {
 
       <div className={styles.summarySteps}>
         {etapas.map(etapa => {
-          const etapaAtrasada = !etapa.concluido && Boolean(etapa.prazo_entrega) && etapa.prazo_entrega! < today()
+          const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
+          const savingEtapa = savingEtapaId === etapa.id
           return (
             <div key={etapa.id} className={`${styles.summaryStepCard} ${etapaAtrasada ? styles.summaryStepCardOverdue : ''}`}>
               <div className={styles.summaryStepHeader}>
                 <strong>{etapa.nome}</strong>
                 <span>{etapa.preco != null ? etapa.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valor'}</span>
               </div>
+              <div className={styles.kanbanCardEtapaGrid}>
+                <label className={styles.kanbanCardField}>
+                  <span>Prazo</span>
+                  <input
+                    className={styles.input}
+                    type="date"
+                    value={etapa.prazo_entrega ?? ''}
+                    disabled={savingEtapa}
+                    onChange={e => void handleEtapaUpdate(etapa.id, { prazo_entrega: e.target.value || null })}
+                  />
+                </label>
+                <label className={styles.kanbanCardField}>
+                  <span>Concluído em</span>
+                  <input
+                    className={styles.input}
+                    type="date"
+                    value={etapa.data_conclusao ?? ''}
+                    disabled={savingEtapa}
+                    onChange={e => void handleEtapaUpdate(etapa.id, { data_conclusao: e.target.value || null })}
+                  />
+                </label>
+              </div>
+              <label className={styles.checkRow}>
+                <input
+                  type="checkbox"
+                  checked={etapa.concluido}
+                  disabled={savingEtapa}
+                  onChange={e => void handleEtapaUpdate(etapa.id, { concluido: e.target.checked })}
+                />
+                <span>{etapa.concluido ? 'Etapa pronta' : 'Marcar etapa como pronta'}</span>
+              </label>
               <div className={styles.summaryStepMeta}>
-                <span>Prazo: {formatDate(etapa.prazo_entrega)}</span>
                 <span>{etapa.concluido ? `Pronto em ${formatDate(etapa.data_conclusao)}` : 'Em andamento'}</span>
               </div>
               {etapaAtrasada && <span className={styles.etapaAlert}>Etapa atrasada</span>}
@@ -1321,40 +1367,24 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onUpdateEtapa, onEdit, onDelete }: {
+function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
-  onUpdateEtapa: (
-    envio: LabEnvio,
-    etapaId: string,
-    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
-  ) => Promise<void>
   onEdit: () => void; onDelete: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const [savingEtapaId, setSavingEtapaId] = useState<string | null>(null)
   const overdue = isOverdue(envio)
   const overdueEtapas = getOverdueEtapas(envio)
   const resumoTrabalho = getEnvioResumo(envio)
   const etapas = getEnvioEtapas(envio)
   const etapasConcluidas = etapas.filter(etapa => etapa.concluido).length
 
-  const handleEtapaUpdate = async (
-    etapaId: string,
-    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
-  ) => {
-    setSavingEtapaId(etapaId)
-    await onUpdateEtapa(envio, etapaId, changes)
-    setSavingEtapaId(prev => prev === etapaId ? null : prev)
-  }
-
   return (
     <div
-      className={`${styles.kanbanCard} ${expanded ? styles.kanbanCardOpen : ''} ${dragging ? styles.kanbanCardDragging : ''} ${overdue ? styles.kanbanCardOverdue : ''}`}
-      draggable={!expanded}
+      className={`${styles.kanbanCard} ${dragging ? styles.kanbanCardDragging : ''} ${overdue ? styles.kanbanCardOverdue : ''}`}
+      draggable
       onDragStart={e => onDragStart(e, envio.id)}
-      onClick={() => setExpanded(prev => !prev)}
+      onClick={onOpenResumo}
     >
       {overdue && (
         <div className={styles.kanbanCardAlert}>
@@ -1381,59 +1411,9 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onUpd
       )}
       <div className={styles.kanbanCardStageSummary}>
         <span>{etapasConcluidas}/{etapas.length} etapa(s) prontas</span>
-        <span>{expanded ? 'Ocultar etapas' : 'Ver etapas'}</span>
+        <span>Ver resumo</span>
       </div>
-      {expanded && (
-        <div className={styles.kanbanCardExpanded} onClick={e => e.stopPropagation()}>
-          {etapas.map(etapa => {
-            const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
-            const savingEtapa = savingEtapaId === etapa.id
-
-            return (
-              <div key={etapa.id} className={`${styles.kanbanCardEtapa} ${etapaAtrasada ? styles.kanbanCardEtapaOverdue : ''}`}>
-                <div className={styles.kanbanCardEtapaHeader}>
-                  <strong>{etapa.nome}</strong>
-                  <span>{etapa.preco != null ? etapa.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valor'}</span>
-                </div>
-                <div className={styles.kanbanCardEtapaGrid}>
-                  <label className={styles.kanbanCardField}>
-                    <span>Prazo</span>
-                    <input
-                      className={styles.input}
-                      type="date"
-                      value={etapa.prazo_entrega ?? ''}
-                      disabled={savingEtapa}
-                      onChange={e => void handleEtapaUpdate(etapa.id, { prazo_entrega: e.target.value || null })}
-                    />
-                  </label>
-                  <label className={styles.kanbanCardField}>
-                    <span>Concluído em</span>
-                    <input
-                      className={styles.input}
-                      type="date"
-                      value={etapa.data_conclusao ?? ''}
-                      disabled={savingEtapa}
-                      onChange={e => void handleEtapaUpdate(etapa.id, { data_conclusao: e.target.value || null })}
-                    />
-                  </label>
-                </div>
-                <label className={styles.checkRow}>
-                  <input
-                    type="checkbox"
-                    checked={etapa.concluido}
-                    disabled={savingEtapa}
-                    onChange={e => void handleEtapaUpdate(etapa.id, { concluido: e.target.checked })}
-                  />
-                  <span>{etapa.concluido ? 'Etapa pronta' : 'Marcar etapa como pronta'}</span>
-                </label>
-                {etapaAtrasada && <span className={styles.etapaAlert}>Etapa atrasada</span>}
-              </div>
-            )
-          })}
-        </div>
-      )}
       <div className={styles.kanbanCardActions}>
-        <button type="button" className={styles.btnIcon} onClick={e => { e.stopPropagation(); onOpenResumo() }} title="Resumo">i</button>
         <button type="button" className={styles.btnIcon} onClick={e => { e.stopPropagation(); onEdit() }} title="Editar"><IconEdit /></button>
         {isAdmin && (
           <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={e => { e.stopPropagation(); onDelete() }} title="Excluir"><IconTrash /></button>
@@ -1445,15 +1425,10 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onUpd
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onUpdateEtapa, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
-  onUpdateEtapa: (
-    envio: LabEnvio,
-    etapaId: string,
-    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
-  ) => Promise<void>
   onEditEnvio: (envio: LabEnvio) => void
   onDeleteEnvio: (id: string) => void
 }) {
@@ -1530,7 +1505,6 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onUp
                   isAdmin={isAdmin}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
-                  onUpdateEtapa={onUpdateEtapa}
                   onEdit={() => onEditEnvio(envio)}
                   onDelete={() => onDeleteEnvio(envio.id)}
                 />
@@ -1711,7 +1685,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               isAdmin={isAdmin}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
-              onUpdateEtapa={updateEnvioEtapa}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
               onDeleteEnvio={deleteEnvio}
             />
@@ -1871,6 +1844,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
             setShowEnvioSteps(true)
           }}
           onTogglePago={togglePagoEnvio}
+          onUpdateEtapa={updateEnvioEtapa}
         />
       )}
     </div>
