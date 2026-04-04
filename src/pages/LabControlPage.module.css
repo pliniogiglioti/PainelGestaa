@@ -936,6 +936,14 @@
   flex-wrap: wrap;
 }
 
+.financialDateFilters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  align-items: end;
+}
+
 .filterChip {
   border: 1px solid var(--border);
   background: transparent;
@@ -1261,6 +1269,10 @@
 @keyframes spin { to { transform: rotate(360deg); } }
 
 @media (max-width: 500px) {
+  .financialDateFilters {
+    grid-template-columns: 1fr;
+  }
+
   .kanbanCardEtapaGrid {
     grid-template-columns: 1fr;
   }

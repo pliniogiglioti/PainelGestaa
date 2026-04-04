@@ -178,6 +178,10 @@ function getEnvioDataEntregaRealFromEtapas(etapas: LabEtapa[]) {
   return datasConcluidas[datasConcluidas.length - 1] ?? null
 }
 
+function getFinanceiroReferenceDate(envio: LabEnvio) {
+  return envio.pago ? (envio.data_pagamento ?? envio.data_envio) : envio.data_envio
+}
+
 function normalizeWhatsAppNumber(value: string) {
   const digits = value.replace(/\D/g, '')
   if (!digits) return null
@@ -1311,15 +1315,25 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
   onTogglePago: (envio: LabEnvio) => Promise<void>
 }) {
   const [filtro, setFiltro] = useState<FinanceiroFiltro>('todos')
+  const [dataInicial, setDataInicial] = useState('')
+  const [dataFinal, setDataFinal] = useState('')
 
-  const filtered = envios.filter(envio => {
+  const enviosComData = envios.filter(envio => {
+    const dataReferencia = getFinanceiroReferenceDate(envio)
+    if (!dataReferencia) return !dataInicial && !dataFinal
+    if (dataInicial && dataReferencia < dataInicial) return false
+    if (dataFinal && dataReferencia > dataFinal) return false
+    return true
+  })
+
+  const filtered = enviosComData.filter(envio => {
     if (filtro === 'pagos') return envio.pago
     if (filtro === 'em_andamento') return !envio.pago
     return true
   })
 
-  const totalEmAndamento = envios.filter(envio => !envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-  const totalPagos = envios.filter(envio => envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const totalEmAndamento = enviosComData.filter(envio => !envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const totalPagos = enviosComData.filter(envio => envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
 
   return (
     <Modal title={`Financeiro — ${lab.nome}`} onClose={onClose} wide>
@@ -1340,6 +1354,20 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
         <button type="button" className={`${styles.filterChip} ${filtro === 'pagos' ? styles.filterChipActive : ''}`} onClick={() => setFiltro('pagos')}>Pagos</button>
       </div>
 
+      <div className={styles.financialDateFilters}>
+        <label className={styles.kanbanCardField}>
+          <span>Data inicial</span>
+          <input className={styles.input} type="date" value={dataInicial} onChange={e => setDataInicial(e.target.value)} />
+        </label>
+        <label className={styles.kanbanCardField}>
+          <span>Data final</span>
+          <input className={styles.input} type="date" value={dataFinal} onChange={e => setDataFinal(e.target.value)} />
+        </label>
+        <button type="button" className={styles.btnSecondary} onClick={() => { setDataInicial(''); setDataFinal('') }}>
+          Limpar datas
+        </button>
+      </div>
+
       <div className={styles.financialList}>
         {filtered.length === 0 && <p className={styles.emptyMsg}>Nenhum trabalho nesse filtro.</p>}
         {filtered.map(envio => (
@@ -1347,7 +1375,7 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
             <div className={styles.financialMeta}>
               <strong>{envio.paciente_nome}</strong>
               <span>{getEnvioResumo(envio) || envio.tipo_trabalho}</span>
-              <small>{envio.status} · {formatDate(envio.data_entrega_prometida)}</small>
+              <small>{envio.status} · Referência: {formatDate(getFinanceiroReferenceDate(envio))}</small>
             </div>
             <div className={styles.financialActions}>
               <strong>{(envio.preco_servico ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
