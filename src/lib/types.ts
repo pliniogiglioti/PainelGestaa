@@ -2,6 +2,8 @@
 // Regenerate automatically with:
 //   npx supabase gen types typescript --project-id <your-project-id>
 
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
 export interface Database {
   public: {
     Tables: {
@@ -576,6 +578,8 @@ export interface Database {
           email:            string | null
           endereco:         string | null
           prazo_medio_dias: number
+          dia_fechamento:   number | null
+          feriados:         Json
           observacoes:      string | null
           ativo:            boolean
           created_at:       string
@@ -590,6 +594,8 @@ export interface Database {
           email?:            string | null
           endereco?:         string | null
           prazo_medio_dias?: number
+          dia_fechamento?:   number | null
+          feriados?:         Json
           observacoes?:      string | null
           ativo?:            boolean
           created_at?:       string
@@ -602,6 +608,8 @@ export interface Database {
           email?:            string | null
           endereco?:         string | null
           prazo_medio_dias?: number
+          dia_fechamento?:   number | null
+          feriados?:         Json
           observacoes?:      string | null
           ativo?:            boolean
           updated_at?:       string
@@ -671,6 +679,10 @@ export interface Database {
           status:                 string
           data_envio:             string
           data_entrega_prometida: string | null
+          data_consulta:          string | null
+          etapas:                 Json
+          pago:                   boolean
+          data_pagamento:         string | null
           data_entrega_real:      string | null
           created_at:             string
           updated_at:             string
@@ -689,6 +701,10 @@ export interface Database {
           status?:                 string
           data_envio?:             string
           data_entrega_prometida?: string | null
+          data_consulta?:          string | null
+          etapas?:                 Json
+          pago?:                   boolean
+          data_pagamento?:         string | null
           data_entrega_real?:      string | null
           created_at?:             string
           updated_at?:             string
@@ -703,6 +719,10 @@ export interface Database {
           status?:                 string
           data_envio?:             string
           data_entrega_prometida?: string | null
+          data_consulta?:          string | null
+          etapas?:                 Json
+          pago?:                   boolean
+          data_pagamento?:         string | null
           data_entrega_real?:      string | null
           updated_at?:             string
         }

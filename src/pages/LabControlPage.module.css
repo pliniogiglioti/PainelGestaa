@@ -233,6 +233,10 @@
   white-space: nowrap;
 }
 
+.searchRow {
+  margin-bottom: 12px;
+}
+
 /* Status bar (mini kanban visualization) */
 .labCardStatusBar {
   display: flex;
@@ -734,6 +738,227 @@
 .selectedServicePrice {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.etapasBox {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+}
+
+.etapasList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etapaCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.etapaCardOverdue {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.etapaHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.checkRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.etapaAlert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.summaryGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.summaryAlert {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  color: #f87171;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.summarySteps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.summaryStepCard {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.summaryStepCardOverdue {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.summaryStepHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.summaryStepMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.financialSummary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.financialCard {
+  border: 1px solid rgba(201, 162, 42, 0.2);
+  background: rgba(201, 162, 42, 0.08);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.financialCard span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.financialCard strong {
+  font-size: 18px;
+  color: var(--gold-light);
+}
+
+.filterRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.filterChip {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.filterChipActive {
+  border-color: var(--border-gold);
+  background: var(--gold-glow);
+  color: var(--gold-light);
+}
+
+.financialList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.financialRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: var(--bg-elevated);
+}
+
+.financialMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.financialMeta strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.financialMeta span,
+.financialMeta small {
+  color: var(--text-muted);
+}
+
+.financialActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.paidBadge,
+.pendingBadge {
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.paidBadge {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+}
+
+.pendingBadge {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
 }
 
 /* Review (step 4) */
