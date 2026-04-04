@@ -558,6 +558,16 @@
   color: var(--text);
 }
 
+.calcHighlightEditable {
+  gap: 10px;
+}
+
+.calcHighlightInput {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 10px 12px;
+}
+
 .calcHighlightGood {
   border-color: rgba(49, 160, 93, 0.34);
   background: rgba(49, 160, 93, 0.12);

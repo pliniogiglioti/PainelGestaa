@@ -393,11 +393,17 @@ function CalculadoraPrecificacaoModal({
     custoLaboratorio: '',
     ...configFormToCalculadoraForm(configPadrao),
   })
-  const [showPrecoVendaEditor, setShowPrecoVendaEditor] = useState(false)
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() => formatCurrencyInput(item.preco))
   const [erroPrecoLocal, setErroPrecoLocal] = useState('')
+  const precoVendaMudou = Math.abs(parsePreco(precoVendaEditado) - item.preco) > 0.001
+  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item.preco
 
-  const calculo = calcularPrecificacao(item.preco, form)
+  const calculo = calcularPrecificacao(precoVendaAtual, form)
+
+  useEffect(() => {
+    setPrecoVendaEditado(formatCurrencyInput(item.preco))
+    setErroPrecoLocal('')
+  }, [item.preco])
 
   const handleChange = (field: keyof CalculadoraForm, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -416,11 +422,7 @@ function CalculadoraPrecificacaoModal({
     }
 
     setErroPrecoLocal('')
-    const updated = await onUpdatePreco(item.id, precoNumerico)
-
-    if (updated) {
-      setShowPrecoVendaEditor(false)
-    }
+    await onUpdatePreco(item.id, precoNumerico)
   }
 
   return (
@@ -436,68 +438,12 @@ function CalculadoraPrecificacaoModal({
             <p className={styles.calcItemName}>{item.nome_produto}</p>
           </div>
           <div className={styles.modalHeaderActions}>
-            {canManage && (
-              <button
-                type="button"
-                className={styles.calcButton}
-                onClick={() => {
-                  setPrecoVendaEditado(formatCurrencyInput(item.preco))
-                  setErroPrecoLocal('')
-                  setShowPrecoVendaEditor(prev => !prev)
-                }}
-              >
-                {showPrecoVendaEditor ? 'Fechar edição do preço' : 'Alterar preço de venda'}
-              </button>
-            )}
             <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
           </div>
         </div>
 
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
-            {showPrecoVendaEditor && (
-              <div className={styles.calcInlineCard}>
-                <label className={styles.modalField}>
-                  <span className={styles.modalLabel}>Preço de venda atual (R$)</span>
-                  <input
-                    className={styles.modalInput}
-                    value={precoVendaEditado}
-                    onChange={e => {
-                      setPrecoVendaEditado(e.target.value)
-                      setErroPrecoLocal('')
-                    }}
-                    inputMode="decimal"
-                    placeholder="Ex: 1.250,00"
-                    autoFocus
-                    disabled={savingPreco}
-                  />
-                </label>
-                {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
-                <div className={styles.inlineActions}>
-                  <button
-                    type="button"
-                    className={styles.modalCancel}
-                    onClick={() => {
-                      setPrecoVendaEditado(formatCurrencyInput(item.preco))
-                      setErroPrecoLocal('')
-                      setShowPrecoVendaEditor(false)
-                    }}
-                    disabled={savingPreco}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.modalSubmit}
-                    onClick={() => void handleSalvarPrecoVenda()}
-                    disabled={savingPreco}
-                  >
-                    {savingPreco ? 'Salvando...' : 'Salvar preço'}
-                  </button>
-                </div>
-              </div>
-            )}
-
             <label className={styles.modalField}>
               <span className={styles.modalLabel}>Custo insumos (R$)</span>
               <input
@@ -673,9 +619,49 @@ function CalculadoraPrecificacaoModal({
                 <span>Margem</span>
                 <strong>{formatPercent(calculo.margem)}</strong>
               </div>
-              <div className={styles.calcHighlight}>
+              <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
                 <span>Preço de venda</span>
-                <strong>{formatCurrency(item.preco)}</strong>
+                {canManage ? (
+                  <>
+                    <input
+                      className={`${styles.modalInput} ${styles.calcHighlightInput}`}
+                      value={precoVendaEditado}
+                      onChange={e => {
+                        setPrecoVendaEditado(e.target.value)
+                        setErroPrecoLocal('')
+                      }}
+                      inputMode="decimal"
+                      placeholder="Ex: 1.250,00"
+                      disabled={savingPreco}
+                    />
+                    {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
+                    {(precoVendaMudou || erroPrecoLocal) && (
+                      <div className={styles.inlineActions}>
+                        <button
+                          type="button"
+                          className={styles.modalCancel}
+                          onClick={() => {
+                            setPrecoVendaEditado(formatCurrencyInput(item.preco))
+                            setErroPrecoLocal('')
+                          }}
+                          disabled={savingPreco}
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.modalSubmit}
+                          onClick={() => void handleSalvarPrecoVenda()}
+                          disabled={savingPreco}
+                        >
+                          {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                        </button>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <strong>{formatCurrency(precoVendaAtual)}</strong>
+                )}
               </div>
               <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
                 <span>Resultado da margem</span>
