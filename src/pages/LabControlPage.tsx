@@ -1386,7 +1386,7 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onUpd
       {expanded && (
         <div className={styles.kanbanCardExpanded} onClick={e => e.stopPropagation()}>
           {etapas.map(etapa => {
-            const etapaAtrasada = !etapa.concluido && Boolean(etapa.prazo_entrega) && etapa.prazo_entrega < today()
+            const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
             const savingEtapa = savingEtapaId === etapa.id
 
             return (
