@@ -197,9 +197,6 @@ function EmpresaFormModal({
                         <span className={`${styles.memberBadge} ${membro.empresa_role === 'admin' ? styles.memberBadgeAdmin : styles.memberBadgeMember}`}>
                           {membro.empresa_role === 'admin' ? 'Titular' : 'Colaborador'}
                         </span>
-                        <span className={`${styles.memberBadge} ${membro.tipo_usuario === 'titular' ? styles.memberBadgeAdmin : styles.memberBadgeNeutral}`}>
-                          {membro.tipo_usuario === 'titular' ? 'Titular' : 'Colaborador'}
-                        </span>
                       </div>
                     </div>
                   ))}
