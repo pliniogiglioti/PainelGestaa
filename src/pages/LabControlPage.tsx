@@ -138,6 +138,46 @@ function getEnvioResumo(envio: LabEnvio) {
     .join(' + ')
 }
 
+function applyEtapaChanges(etapa: LabEtapa, changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>) {
+  const next: LabEtapa = { ...etapa, ...changes }
+
+  if (changes.concluido === true && !next.data_conclusao) {
+    next.data_conclusao = today()
+  }
+
+  if (changes.concluido === false) {
+    next.data_conclusao = null
+  }
+
+  if (Object.prototype.hasOwnProperty.call(changes, 'data_conclusao')) {
+    next.concluido = Boolean(next.data_conclusao)
+  }
+
+  return next
+}
+
+function serializeLabEtapas(etapas: LabEtapa[]) {
+  return etapas.map(etapa => ({
+    id: etapa.id,
+    nome: etapa.nome,
+    preco: etapa.preco,
+    origem: etapa.origem,
+    prazo_entrega: etapa.prazo_entrega,
+    concluido: etapa.concluido,
+    data_conclusao: etapa.data_conclusao,
+  }))
+}
+
+function getEnvioDataEntregaRealFromEtapas(etapas: LabEtapa[]) {
+  if (etapas.length === 0 || etapas.some(etapa => !etapa.concluido)) return null
+
+  const datasConcluidas = etapas
+    .map(etapa => etapa.data_conclusao || today())
+    .sort()
+
+  return datasConcluidas[datasConcluidas.length - 1] ?? null
+}
+
 function normalizeWhatsAppNumber(value: string) {
   const digits = value.replace(/\D/g, '')
   if (!digits) return null
@@ -1281,21 +1321,40 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdit, onDelete }: {
+function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onUpdateEtapa, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
+  onUpdateEtapa: (
+    envio: LabEnvio,
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => Promise<void>
   onEdit: () => void; onDelete: () => void
 }) {
+  const [expanded, setExpanded] = useState(false)
+  const [savingEtapaId, setSavingEtapaId] = useState<string | null>(null)
   const overdue = isOverdue(envio)
   const overdueEtapas = getOverdueEtapas(envio)
   const resumoTrabalho = getEnvioResumo(envio)
+  const etapas = getEnvioEtapas(envio)
+  const etapasConcluidas = etapas.filter(etapa => etapa.concluido).length
+
+  const handleEtapaUpdate = async (
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => {
+    setSavingEtapaId(etapaId)
+    await onUpdateEtapa(envio, etapaId, changes)
+    setSavingEtapaId(prev => prev === etapaId ? null : prev)
+  }
+
   return (
     <div
-      className={`${styles.kanbanCard} ${dragging ? styles.kanbanCardDragging : ''} ${overdue ? styles.kanbanCardOverdue : ''}`}
-      draggable
+      className={`${styles.kanbanCard} ${expanded ? styles.kanbanCardOpen : ''} ${dragging ? styles.kanbanCardDragging : ''} ${overdue ? styles.kanbanCardOverdue : ''}`}
+      draggable={!expanded}
       onDragStart={e => onDragStart(e, envio.id)}
-      onClick={onOpenResumo}
+      onClick={() => setExpanded(prev => !prev)}
     >
       {overdue && (
         <div className={styles.kanbanCardAlert}>
@@ -1320,7 +1379,61 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdi
           {envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </div>
       )}
+      <div className={styles.kanbanCardStageSummary}>
+        <span>{etapasConcluidas}/{etapas.length} etapa(s) prontas</span>
+        <span>{expanded ? 'Ocultar etapas' : 'Ver etapas'}</span>
+      </div>
+      {expanded && (
+        <div className={styles.kanbanCardExpanded} onClick={e => e.stopPropagation()}>
+          {etapas.map(etapa => {
+            const etapaAtrasada = !etapa.concluido && Boolean(etapa.prazo_entrega) && etapa.prazo_entrega < today()
+            const savingEtapa = savingEtapaId === etapa.id
+
+            return (
+              <div key={etapa.id} className={`${styles.kanbanCardEtapa} ${etapaAtrasada ? styles.kanbanCardEtapaOverdue : ''}`}>
+                <div className={styles.kanbanCardEtapaHeader}>
+                  <strong>{etapa.nome}</strong>
+                  <span>{etapa.preco != null ? etapa.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valor'}</span>
+                </div>
+                <div className={styles.kanbanCardEtapaGrid}>
+                  <label className={styles.kanbanCardField}>
+                    <span>Prazo</span>
+                    <input
+                      className={styles.input}
+                      type="date"
+                      value={etapa.prazo_entrega ?? ''}
+                      disabled={savingEtapa}
+                      onChange={e => void handleEtapaUpdate(etapa.id, { prazo_entrega: e.target.value || null })}
+                    />
+                  </label>
+                  <label className={styles.kanbanCardField}>
+                    <span>Concluído em</span>
+                    <input
+                      className={styles.input}
+                      type="date"
+                      value={etapa.data_conclusao ?? ''}
+                      disabled={savingEtapa}
+                      onChange={e => void handleEtapaUpdate(etapa.id, { data_conclusao: e.target.value || null })}
+                    />
+                  </label>
+                </div>
+                <label className={styles.checkRow}>
+                  <input
+                    type="checkbox"
+                    checked={etapa.concluido}
+                    disabled={savingEtapa}
+                    onChange={e => void handleEtapaUpdate(etapa.id, { concluido: e.target.checked })}
+                  />
+                  <span>{etapa.concluido ? 'Etapa pronta' : 'Marcar etapa como pronta'}</span>
+                </label>
+                {etapaAtrasada && <span className={styles.etapaAlert}>Etapa atrasada</span>}
+              </div>
+            )
+          })}
+        </div>
+      )}
       <div className={styles.kanbanCardActions}>
+        <button type="button" className={styles.btnIcon} onClick={e => { e.stopPropagation(); onOpenResumo() }} title="Resumo">i</button>
         <button type="button" className={styles.btnIcon} onClick={e => { e.stopPropagation(); onEdit() }} title="Editar"><IconEdit /></button>
         {isAdmin && (
           <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={e => { e.stopPropagation(); onDelete() }} title="Excluir"><IconTrash /></button>
@@ -1332,10 +1445,15 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdi
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onUpdateEtapa, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
+  onUpdateEtapa: (
+    envio: LabEnvio,
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => Promise<void>
   onEditEnvio: (envio: LabEnvio) => void
   onDeleteEnvio: (id: string) => void
 }) {
@@ -1412,6 +1530,7 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onEd
                   isAdmin={isAdmin}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
+                  onUpdateEtapa={onUpdateEtapa}
                   onEdit={() => onEditEnvio(envio)}
                   onDelete={() => onDeleteEnvio(envio.id)}
                 />
@@ -1488,6 +1607,28 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     }
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
     if (error) return
+    setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
+    setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
+  }
+
+  const updateEnvioEtapa = async (
+    envio: LabEnvio,
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => {
+    const etapas = getEnvioEtapas(envio).map(etapa =>
+      etapa.id === etapaId ? applyEtapaChanges(etapa, changes) : etapa,
+    )
+
+    const payload = {
+      etapas: serializeLabEtapas(etapas),
+      data_entrega_real: getEnvioDataEntregaRealFromEtapas(etapas),
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
+    if (error) return
+
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
   }
@@ -1570,6 +1711,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               isAdmin={isAdmin}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
+              onUpdateEtapa={updateEnvioEtapa}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
               onDeleteEnvio={deleteEnvio}
             />

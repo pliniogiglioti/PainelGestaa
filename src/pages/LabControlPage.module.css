@@ -362,6 +362,10 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 }
 .kanbanCard:active { cursor: grabbing; }
+.kanbanCardOpen {
+  cursor: default;
+  user-select: auto;
+}
 .kanbanCardDragging { opacity: 0.4; }
 .kanbanCardOverdue  { border-color: rgba(239, 68, 68, 0.4) !important; }
 
@@ -411,6 +415,55 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--gold);
+}
+.kanbanCardStageSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding-top: 2px;
+}
+.kanbanCardExpanded {
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.kanbanCardEtapa {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: var(--bg-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kanbanCardEtapaOverdue {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+.kanbanCardEtapaHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text);
+}
+.kanbanCardEtapaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.kanbanCardField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
 }
 .kanbanCardActions {
   display: flex;
@@ -1206,3 +1259,9 @@
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+@media (max-width: 500px) {
+  .kanbanCardEtapaGrid {
+    grid-template-columns: 1fr;
+  }
+}
