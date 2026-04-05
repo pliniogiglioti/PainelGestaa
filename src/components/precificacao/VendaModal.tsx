@@ -158,7 +158,7 @@ export default function VendaModal({
 }: VendaModalProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(initialVenda ? 4 : 1)
   const [clienteNome, setClienteNome] = useState<string>(initialVenda?.cliente_nome ?? '')
-  const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Proposta em planejamento')
+  const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes ?? '')
   const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
   const [busca, setBusca] = useState<string>('')
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
@@ -329,7 +329,7 @@ export default function VendaModal({
                   value={planoNome}
                   onChange={e => setPlanoNome(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleNextStep2() }}
-                  placeholder="Proposta em planejamento"
+                  placeholder=""
                   disabled={saving}
                 />
                 <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
@@ -342,7 +342,7 @@ export default function VendaModal({
             <div className={styles.vendaColLeft}>
               <div className={styles.vendaResultadoHeader}>
                 <span className={styles.vendaResultadoLabel}>Proposta em planejamento</span>
-                <strong className={styles.vendaResultadoTitulo}>{planoNome.trim() || 'Proposta em planejamento'}</strong>
+                <strong className={styles.vendaResultadoTitulo}>{planoNome.trim() || 'Nova proposta'}</strong>
                 <span className={styles.vendaResultadoSub}>
                   Selecione os produtos para montar a proposta de {clienteNomeExibicao}.
                 </span>
@@ -413,7 +413,7 @@ export default function VendaModal({
                   onClick={handleVerificarMeios}
                   disabled={saving}
                 >
-                  Buscar propostas para IA
+                  Buscar proposta
                 </button>
               )}
             </div>
