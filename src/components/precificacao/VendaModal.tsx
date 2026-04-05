@@ -130,7 +130,7 @@ export default function VendaModal({
   onClose,
   onSubmit,
 }: VendaModalProps) {
-  const [step, setStep] = useState<1 | 2 | 3>(initialVenda ? 3 : 1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(initialVenda ? 4 : 1)
   const [clienteNome, setClienteNome] = useState<string>(initialVenda?.cliente_nome ?? '')
   const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Planejamento A')
   const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
@@ -148,7 +148,7 @@ export default function VendaModal({
   const precosPorCategoria = buildPrecosPorCategoria(precos)
   const categorias = precosPorCategoria.map(([cat]) => cat)
   const produtosSelecionadosIds = new Set<string>(
-    itens.map((i: VendaItemDraft) => i.empresaPrecoId).filter((id): id is string => id !== null),
+    itens.map((i: VendaItemDraft) => i.empresaPrecoId).filter((id): id is string => id !== null && typeof id === 'string'),
   )
 
   const produtosFiltrados = precos
@@ -158,8 +158,6 @@ export default function VendaModal({
       return matchBusca && matchCat
     })
     .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
-
-  const meiosPagamentoLiberados = verificacaoIniciada && (meiosLiberadosEm ?? 0) <= 0
 
   useEffect(() => {
     if (step === 1) input1Ref.current?.focus()
@@ -186,6 +184,7 @@ export default function VendaModal({
     setVerificacaoIniciada(true)
     setMeiosLiberadosEm(configVendas?.vendas_tempo_apresentacao_segundos ?? 0)
     setOfertaExpiraEm((configVendas?.vendas_oferta_valida_minutos ?? 15) * 60)
+    setStep(4)
   }
 
   const toggleProduto = (preco: EmpresaPreco) => {
@@ -281,132 +280,128 @@ export default function VendaModal({
             </div>
           )}
 
-          {/* Etapa 3 — produtos + pagamento */}
+          {/* Etapa 3 — produtos */}
           {step === 3 && (
-            <div className={styles.vendaLayout3}>
+            <div className={styles.vendaColLeft}>
+              <div className={styles.vendaSearch}>
+                <span className={styles.vendaSearchIcon}>⌕</span>
+                <input
+                  className={styles.vendaSearchInput}
+                  value={busca}
+                  onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
+                  placeholder="Buscar produto ou servico..."
+                  disabled={saving}
+                />
+              </div>
 
-              {/* Coluna esquerda — produtos */}
-              <div className={styles.vendaColLeft}>
-                <div className={styles.vendaSearch}>
-                  <span className={styles.vendaSearchIcon}>⌕</span>
-                  <input
-                    className={styles.vendaSearchInput}
-                    value={busca}
-                    onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
-                    placeholder="Buscar produto ou servico..."
-                    disabled={saving}
-                  />
-                </div>
-
-                <div className={styles.vendaChips}>
+              <div className={styles.vendaChips}>
+                <button
+                  type="button"
+                  className={`${styles.vendaChip} ${!categoriaFiltro ? styles.vendaChipAtivo : ''}`}
+                  onClick={() => { setCategoriaFiltro(null); setBusca('') }}
+                >
+                  Todos
+                </button>
+                {categorias.map(cat => (
                   <button
+                    key={cat}
                     type="button"
-                    className={`${styles.vendaChip} ${!categoriaFiltro ? styles.vendaChipAtivo : ''}`}
-                    onClick={() => { setCategoriaFiltro(null); setBusca('') }}
+                    className={`${styles.vendaChip} ${categoriaFiltro === cat ? styles.vendaChipAtivo : ''}`}
+                    onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
                   >
-                    Todos
+                    {cat}
                   </button>
-                  {categorias.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      className={`${styles.vendaChip} ${categoriaFiltro === cat ? styles.vendaChipAtivo : ''}`}
-                      onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
+                ))}
+              </div>
 
-                <div className={styles.vendaProdutoLista}>
-                  {produtosFiltrados.length === 0 ? (
-                    <p style={{ color: '#9ca3af', fontSize: 14 }}>Nenhum produto encontrado.</p>
-                  ) : (
-                    produtosFiltrados.map(item => {
-                      const selecionado = produtosSelecionadosIds.has(item.id)
+              <div className={styles.vendaProdutoLista}>
+                {produtosFiltrados.length === 0 ? (
+                  <p style={{ color: '#9ca3af', fontSize: 14 }}>Nenhum produto encontrado.</p>
+                ) : (
+                  produtosFiltrados.map(item => {
+                    const selecionado = produtosSelecionadosIds.has(item.id)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`${styles.vendaProdutoItem} ${selecionado ? styles.vendaProdutoItemAtivo : ''}`}
+                        onClick={() => toggleProduto(item)}
+                        disabled={saving}
+                      >
+                        <span className={`${styles.vendaCirculo} ${selecionado ? styles.vendaCirculoAtivo : ''}`}>
+                          {selecionado && <span className={styles.vendaCirculoPonto} />}
+                        </span>
+                        <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+
+              {itens.length > 0 && (
+                <button
+                  type="button"
+                  className={styles.vendaVerificarBtn}
+                  onClick={handleVerificarMeios}
+                  disabled={saving}
+                >
+                  Verificar meios de pagamento
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Etapa 4 — buscando / meios de pagamento */}
+          {step === 4 && (
+            <div className={styles.vendaStepWrapper}>
+              {(meiosLiberadosEm ?? 0) > 0 ? (
+                <div className={styles.vendaProcurando}>
+                  <span className={styles.vendaProcurandoTexto}>
+                    Buscando meios de pagamento para o cliente {clienteNome.trim()}
+                  </span>
+                  <span className={styles.vendaProcurandoTimer}>{formatCountdown(meiosLiberadosEm ?? 0)}</span>
+                </div>
+              ) : (
+                <div className={styles.vendaStepCenter}>
+                  <div className={styles.vendaMeiosLista}>
+                    {FORMAS_PAGAMENTO.map(forma => {
+                      const ativo = formaPagamento === forma.id
                       return (
                         <button
-                          key={item.id}
+                          key={forma.id}
                           type="button"
-                          className={`${styles.vendaProdutoItem} ${selecionado ? styles.vendaProdutoItemAtivo : ''}`}
-                          onClick={() => toggleProduto(item)}
+                          className={`${styles.vendaMeioCard} ${ativo ? styles.vendaMeioCardAtivo : ''}`}
+                          onClick={() => setFormaPagamento(prev => prev === forma.id ? null : forma.id)}
                           disabled={saving}
                         >
-                          <span className={`${styles.vendaCirculo} ${selecionado ? styles.vendaCirculoAtivo : ''}`}>
-                            {selecionado && <span className={styles.vendaCirculoPonto} />}
+                          <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
+                            {ativo && <span className={styles.vendaCirculoPonto} />}
                           </span>
-                          <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                          <span className={styles.vendaMeioNome}>{forma.label}</span>
                         </button>
                       )
-                    })
+                    })}
+                  </div>
+
+                  {ofertaExpiraEm != null && (
+                    <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
+                      <span className={styles.vendaOfertaLabel}>
+                        {ofertaExpiraEm > 0 ? 'Oferta valida por' : 'Oferta expirada'}
+                      </span>
+                      {ofertaExpiraEm > 0 && (
+                        <span className={styles.vendaOfertaTimer}>{formatCountdown(ofertaExpiraEm)}</span>
+                      )}
+                    </div>
                   )}
                 </div>
-
-                {!verificacaoIniciada && (
-                  <button
-                    type="button"
-                    className={styles.vendaVerificarBtn}
-                    onClick={handleVerificarMeios}
-                    disabled={saving}
-                  >
-                    Verificar meios de pagamento
-                  </button>
-                )}
-              </div>
-
-              {/* Coluna direita — pagamento */}
-              <div className={styles.vendaColRight}>
-
-                {!verificacaoIniciada ? null : !meiosPagamentoLiberados ? (
-                  <div className={styles.vendaProcurando}>
-                    <span className={styles.vendaProcurandoTexto}>Procurando meios de pagamentos disponíveis...</span>
-                    <span className={styles.vendaProcurandoTimer}>{formatCountdown(meiosLiberadosEm ?? 0)}</span>
-                    <span className={styles.vendaProcurandoSub}>Aguarde enquanto verificamos as opções</span>
-                  </div>
-                ) : (
-                  <>
-                    <span className={styles.vendaSecaoTitulo}>Meios de pagamento</span>
-                    <div className={styles.vendaMeiosLista}>
-                      {FORMAS_PAGAMENTO.map(forma => {
-                        const ativo = formaPagamento === forma.id
-                        return (
-                          <button
-                            key={forma.id}
-                            type="button"
-                            className={`${styles.vendaMeioCard} ${ativo ? styles.vendaMeioCardAtivo : ''}`}
-                            onClick={() => setFormaPagamento(prev => prev === forma.id ? null : forma.id)}
-                            disabled={saving}
-                          >
-                            <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
-                              {ativo && <span className={styles.vendaCirculoPonto} />}
-                            </span>
-                            <span className={styles.vendaMeioNome}>{forma.label}</span>
-                          </button>
-                        )
-                      })}
-                    </div>
-
-                    {ofertaExpiraEm != null && (
-                      <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
-                        <span className={styles.vendaOfertaLabel}>
-                          {ofertaExpiraEm > 0 ? 'Oferta valida por' : 'Oferta expirada'}
-                        </span>
-                        {ofertaExpiraEm > 0 && (
-                          <span className={styles.vendaOfertaTimer}>{formatCountdown(ofertaExpiraEm)}</span>
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
-
-              </div>
+              )}
             </div>
           )}
 
         </div>
 
-        {/* Rodapé — só na etapa 3, editando */}
-        {step === 3 && initialVenda && (
+        {/* Rodapé — salvar ao editar */}
+        {initialVenda && (step === 3 || step === 4) && (
           <div className={styles.vendaFooter}>
             {(erroLocal || error) && (
               <span className={styles.vendaErro} style={{ marginRight: 'auto' }}>{erroLocal || error}</span>
