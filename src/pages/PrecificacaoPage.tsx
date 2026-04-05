@@ -135,7 +135,9 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 ] as const
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
-const CATEGORIA_ORDEM = new Map(PRECIFICACAO_CATEGORIAS_ODONTO.map((categoria, index) => [categoria, index]))
+const CATEGORIA_ORDEM = new Map<string, number>(
+  PRECIFICACAO_CATEGORIAS_ODONTO.map((categoria, index) => [categoria, index]),
+)
 
 function Spinner() {
   return <div className={styles.spinner} />
