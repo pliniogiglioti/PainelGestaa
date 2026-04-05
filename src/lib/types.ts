@@ -185,6 +185,7 @@ export interface Database {
           id:           string
           empresa_id:   string
           nome_produto: string
+          categoria:    string | null
           preco:        number
           ativo:        boolean
           created_at:   string
@@ -194,6 +195,7 @@ export interface Database {
           id?:           string
           empresa_id:    string
           nome_produto:  string
+          categoria?:    string | null
           preco?:        number
           ativo?:        boolean
           created_at?:   string
@@ -203,6 +205,7 @@ export interface Database {
           id?:           string
           empresa_id?:   string
           nome_produto?: string
+          categoria?:    string | null
           preco?:        number
           ativo?:        boolean
           updated_at?:   string

@@ -52,6 +52,12 @@ type VendaCard = EmpresaVenda & {
   itens: EmpresaVendaItem[]
 }
 
+type PrecoFormPayload = {
+  nome: string
+  categoria: string
+  preco: number
+}
+
 const IconBack = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6" />
@@ -105,6 +111,32 @@ const formatPercent = (value: number) =>
 const formatCurrencyInput = (value: number) =>
   value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+const PRECIFICACAO_CATEGORIAS_ODONTO = [
+  'Consultas e avaliacao',
+  'Diagnostico por imagem',
+  'Prevencao e profilaxia',
+  'Dentistica restauradora',
+  'Endodontia',
+  'Periodontia',
+  'Ortodontia',
+  'Implantodontia',
+  'Protese dentaria',
+  'Cirurgia oral',
+  'Odontopediatria',
+  'Estetica dental e clareamento',
+  'Harmonizacao orofacial',
+  'DTM e dor orofacial',
+  'Urgencia odontologica',
+  'Materiais e insumos',
+  'Biosseguranca e esterilizacao',
+  'Equipamentos e instrumentais',
+  'Laboratorio protetico',
+  'Outros produtos e servicos odontologicos',
+] as const
+
+const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
+const CATEGORIA_ORDEM = new Map(PRECIFICACAO_CATEGORIAS_ODONTO.map((categoria, index) => [categoria, index]))
+
 function Spinner() {
   return <div className={styles.spinner} />
 }
@@ -117,6 +149,50 @@ function parsePreco(value: string) {
 
 function sanitizeDecimalInput(value: string) {
   return value.replace(/[^\d,.\s]/g, '')
+}
+
+function normalizeCategoria(value?: string | null) {
+  const categoria = value?.trim()
+  return categoria ? categoria : null
+}
+
+function getCategoriaLabel(value?: string | null) {
+  return normalizeCategoria(value) ?? CATEGORIA_SEM_CADASTRO
+}
+
+function compareCategorias(a: string, b: string) {
+  const aIsEmpty = a === CATEGORIA_SEM_CADASTRO
+  const bIsEmpty = b === CATEGORIA_SEM_CADASTRO
+
+  if (aIsEmpty && !bIsEmpty) return 1
+  if (!aIsEmpty && bIsEmpty) return -1
+
+  const aOrder = CATEGORIA_ORDEM.get(a)
+  const bOrder = CATEGORIA_ORDEM.get(b)
+
+  if (aOrder != null && bOrder != null) return aOrder - bOrder
+  if (aOrder != null) return -1
+  if (bOrder != null) return 1
+
+  return a.localeCompare(b, 'pt-BR')
+}
+
+function buildPrecosPorCategoria(precos: EmpresaPreco[]) {
+  const grouped = new Map<string, EmpresaPreco[]>()
+
+  for (const item of precos) {
+    const categoria = getCategoriaLabel(item.categoria)
+    const current = grouped.get(categoria) ?? []
+    current.push(item)
+    grouped.set(categoria, current)
+  }
+
+  return [...grouped.entries()]
+    .sort(([a], [b]) => compareCategorias(a, b))
+    .map(([categoria, itens]) => [
+      categoria,
+      [...itens].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR')),
+    ] as const)
 }
 
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
@@ -283,11 +359,12 @@ function PrecoModal({
   error,
 }: {
   onClose: () => void
-  onSubmit: (item: { nome: string; preco: number }) => Promise<void>
+  onSubmit: (item: PrecoFormPayload) => Promise<void>
   saving: boolean
   error: string
 }) {
   const [nome, setNome] = useState('')
+  const [categoria, setCategoria] = useState('')
   const [preco, setPreco] = useState('')
   const [erroLocal, setErroLocal] = useState('')
   const backdropDismiss = useBackdropDismiss(onClose, saving)
@@ -296,7 +373,12 @@ function PrecoModal({
     e.preventDefault()
 
     if (!nome.trim()) {
-      setErroLocal('Informe o nome do produto.')
+      setErroLocal('Informe o nome do produto ou servico.')
+      return
+    }
+
+    if (!categoria) {
+      setErroLocal('Selecione uma categoria odontologica.')
       return
     }
 
@@ -310,6 +392,7 @@ function PrecoModal({
 
     await onSubmit({
       nome: nome.trim(),
+      categoria,
       preco: precoNumerico,
     })
   }
@@ -328,7 +411,7 @@ function PrecoModal({
 
         <form className={styles.modalForm} onSubmit={handleSubmit}>
           <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Nome do produto</span>
+            <span className={styles.modalLabel}>Nome do produto ou servico</span>
             <input
               className={styles.modalInput}
               placeholder="Ex: Consulta de avaliação"
@@ -340,6 +423,27 @@ function PrecoModal({
               autoFocus
               disabled={saving}
             />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Categoria odontologica</span>
+            <select
+              className={styles.modalInput}
+              value={categoria}
+              onChange={e => {
+                setCategoria(e.target.value)
+                setErroLocal('')
+              }}
+              disabled={saving}
+            >
+              <option value="">Selecione uma categoria</option>
+              {PRECIFICACAO_CATEGORIAS_ODONTO.map(item => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+            <span className={styles.modalFieldHint}>Use a categoria para organizar os produtos e servicos da clinica.</span>
           </label>
 
           <label className={styles.modalField}>
@@ -439,7 +543,7 @@ function CalculadoraPrecificacaoModal({
         <div className={styles.modalHeader}>
           <div>
             <h2 className={styles.modalTitle}>Verificar cálculo de precificação</h2>
-            <p className={styles.calcItemName}>{item.nome_produto}</p>
+            <p className={styles.calcItemName}>{item.nome_produto} - {getCategoriaLabel(item.categoria)}</p>
           </div>
           <div className={styles.modalHeaderActions}>
             <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
@@ -846,6 +950,7 @@ function VendaModal({
     .filter(item => !produtosSelecionadosIds.has(item.id))
     .sort((a, b) => b.preco - a.preco)
     .slice(0, 4)
+  const precosPorCategoria = buildPrecosPorCategoria(precos)
 
   const addProduto = (precoSelecionado: EmpresaPreco, quantidade = 1) => {
     setItens(prev => [
@@ -863,7 +968,7 @@ function VendaModal({
   const handleAddItem = () => {
     const precoSelecionado = precos.find(item => item.id === selectedPrecoId)
     if (!precoSelecionado) {
-      setErroLocal('Selecione um produto da lista.')
+      setErroLocal('Selecione um produto ou servico da lista.')
       return
     }
 
@@ -973,11 +1078,15 @@ function VendaModal({
                   onChange={e => setSelectedPrecoId(e.target.value)}
                   disabled={saving}
                 >
-                  <option value="">Selecione um produto</option>
-                  {precos.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome_produto} - {formatCurrency(item.preco)}
-                    </option>
+                  <option value="">Selecione um produto ou servico</option>
+                  {precosPorCategoria.map(([categoria, itens]) => (
+                    <optgroup key={categoria} label={categoria}>
+                      {itens.map(item => (
+                        <option key={item.id} value={item.id}>
+                          {item.nome_produto} - {formatCurrency(item.preco)}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
 
@@ -1017,7 +1126,7 @@ function VendaModal({
                       >
                         <span>{item.nome_produto}</span>
                         <strong>{formatCurrency(item.preco)}</strong>
-                        <small>Adicionar na proposta</small>
+                        <small>{getCategoriaLabel(item.categoria)}</small>
                       </button>
                     ))}
                   </div>
@@ -1507,7 +1616,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     )
   }
 
-  const handleAddPreco = async (item: { nome: string; preco: number }) => {
+  const handleAddPreco = async (item: PrecoFormPayload) => {
     setSavingPreco(true)
     setError('')
     setFeedback('')
@@ -1517,6 +1626,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       .insert({
         empresa_id: empresa.id,
         nome_produto: item.nome,
+        categoria: item.categoria,
         preco: item.preco,
       })
       .select('*')
@@ -1842,14 +1952,17 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           ) : (
             <div className={styles.priceTable}>
               <div className={styles.priceTableHead}>
-                <span>Produto</span>
+                <span>Produto / servico</span>
                 <span>Ação</span>
                 <span>Preço</span>
               </div>
               <div className={styles.priceTableBody}>
                 {precos.map(item => (
                   <div key={item.id} className={styles.priceRow}>
-                    <span className={styles.priceName}>{item.nome_produto}</span>
+                    <div className={styles.priceNameWrap}>
+                      <span className={styles.priceName}>{item.nome_produto}</span>
+                      <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
+                    </div>
                     <button
                       type="button"
                       className={styles.calcButton}
