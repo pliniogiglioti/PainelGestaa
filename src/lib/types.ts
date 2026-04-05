@@ -221,6 +221,13 @@ export interface Database {
           comissoes_percent:           number
           taxa_maquina_percent:        number
           taxa_boleto_percent:         number
+          vendas_max_cartao:           number
+          vendas_max_boleto:           number
+          vendas_max_pix:              number
+          vendas_max_carne:            number
+          vendas_tempo_apresentacao_segundos: number
+          vendas_oferta_valida_minutos: number
+          vendas_exibir_campanha_promocional: boolean
           created_at:                  string
           updated_at:                  string
         }
@@ -232,6 +239,13 @@ export interface Database {
           comissoes_percent?:          number
           taxa_maquina_percent?:       number
           taxa_boleto_percent?:        number
+          vendas_max_cartao?:          number
+          vendas_max_boleto?:          number
+          vendas_max_pix?:             number
+          vendas_max_carne?:           number
+          vendas_tempo_apresentacao_segundos?: number
+          vendas_oferta_valida_minutos?: number
+          vendas_exibir_campanha_promocional?: boolean
           created_at?:                 string
           updated_at?:                 string
         }
@@ -243,6 +257,13 @@ export interface Database {
           comissoes_percent?:           number
           taxa_maquina_percent?:        number
           taxa_boleto_percent?:         number
+          vendas_max_cartao?:           number
+          vendas_max_boleto?:           number
+          vendas_max_pix?:              number
+          vendas_max_carne?:            number
+          vendas_tempo_apresentacao_segundos?: number
+          vendas_oferta_valida_minutos?: number
+          vendas_exibir_campanha_promocional?: boolean
           updated_at?:                  string
         }
         Relationships: []

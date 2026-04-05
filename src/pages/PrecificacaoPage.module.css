@@ -497,6 +497,55 @@
   color: var(--text-muted);
 }
 
+.switchField {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255,255,255,0.02);
+}
+
+.switchText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.switchButton {
+  position: relative;
+  width: 54px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.switchButtonActive {
+  background: rgba(201, 162, 42, 0.22);
+  border-color: rgba(201, 162, 42, 0.42);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #fff;
+  transition: transform 0.15s ease;
+}
+
+.switchButtonActive .switchThumb {
+  transform: translateX(24px);
+}
+
 .modalInput {
   width: 100%;
   padding: 11px 13px;
@@ -1026,10 +1075,69 @@
   gap: 18px;
 }
 
+.presentationCountdownRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.presentationCountdownCard {
+  border: 1px solid rgba(201, 162, 42, 0.22);
+  border-radius: 18px;
+  padding: 16px;
+  background: rgba(201, 162, 42, 0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.presentationCountdownCard span,
+.presentationCountdownCard small {
+  color: var(--text-muted);
+}
+
+.presentationCountdownCard strong {
+  font-size: 20px;
+  color: var(--text);
+}
+
 .presentationControls {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.presentationDelayBlock,
+.presentationCampaign {
+  border-radius: 18px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.presentationDelayBlock {
+  border: 1px dashed rgba(201, 162, 42, 0.28);
+  background: rgba(255,255,255,0.03);
+  color: var(--text);
+}
+
+.presentationDelayBlock span {
+  color: var(--text-muted);
+}
+
+.presentationCampaign {
+  border: 1px solid rgba(49, 160, 93, 0.24);
+  background: rgba(49, 160, 93, 0.10);
+}
+
+.presentationCampaign span,
+.presentationCampaign small {
+  color: #bfeccc;
+}
+
+.presentationCampaign strong {
+  color: #ecfff1;
 }
 
 .presentationSelectorBlock {
@@ -1286,6 +1394,7 @@
   }
 
   .saleMetrics,
+  .presentationCountdownRow,
   .presentationTotals {
     grid-template-columns: 1fr;
   }
@@ -1350,7 +1459,8 @@
   .addItemHeader,
   .saleCardHeader,
   .saleItemRow,
-  .presentationHeader {
+  .presentationHeader,
+  .switchField {
     flex-direction: column;
     align-items: flex-start;
   }
