@@ -355,21 +355,31 @@ function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
 }
 
 function PrecoModal({
+  initialItem,
   onClose,
   onSubmit,
   saving,
   error,
 }: {
+  initialItem?: EmpresaPreco | null
   onClose: () => void
   onSubmit: (item: PrecoFormPayload) => Promise<void>
   saving: boolean
   error: string
 }) {
-  const [nome, setNome] = useState('')
-  const [categoria, setCategoria] = useState('')
-  const [preco, setPreco] = useState('')
+  const [nome, setNome] = useState(initialItem?.nome_produto ?? '')
+  const [categoria, setCategoria] = useState(initialItem?.categoria ?? '')
+  const [preco, setPreco] = useState(initialItem ? formatCurrencyInput(initialItem.preco) : '')
   const [erroLocal, setErroLocal] = useState('')
   const backdropDismiss = useBackdropDismiss(onClose, saving)
+  const isEditing = Boolean(initialItem)
+
+  useEffect(() => {
+    setNome(initialItem?.nome_produto ?? '')
+    setCategoria(initialItem?.categoria ?? '')
+    setPreco(initialItem ? formatCurrencyInput(initialItem.preco) : '')
+    setErroLocal('')
+  }, [initialItem])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -407,7 +417,7 @@ function PrecoModal({
     >
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Novo preço</h2>
+          <h2 className={styles.modalTitle}>{isEditing ? 'Editar preço' : 'Novo preço'}</h2>
           <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
         </div>
 
@@ -470,7 +480,7 @@ function PrecoModal({
               Cancelar
             </button>
             <button type="submit" className={styles.modalSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Adicionar'}
+              {saving ? 'Salvando...' : isEditing ? 'Salvar alterações' : 'Adicionar'}
             </button>
           </div>
         </form>
@@ -1432,6 +1442,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [precoEditando, setPrecoEditando] = useState<EmpresaPreco | null>(null)
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
   const [vendaEditando, setVendaEditando] = useState<VendaCard | null>(null)
   const [vendaApresentacao, setVendaApresentacao] = useState<VendaCard | null>(null)
@@ -1644,9 +1655,44 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       [...prev, data].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
     )
     setFeedback('Preço salvo com sucesso.')
+    setPrecoEditando(null)
     setShowPrecoModal(false)
     setSavingPreco(false)
     setView('lista')
+  }
+
+  const handleEditPreco = async (itemId: string, item: PrecoFormPayload) => {
+    setSavingPreco(true)
+    setError('')
+    setFeedback('')
+
+    const { data, error: updateError } = await supabase
+      .from('empresa_precos')
+      .update({
+        nome_produto: item.nome,
+        categoria: item.categoria,
+        preco: item.preco,
+      })
+      .eq('id', itemId)
+      .eq('empresa_id', empresa.id)
+      .select('*')
+      .single()
+
+    if (updateError) {
+      setError(updateError.message ?? 'Não foi possível atualizar o produto ou serviço.')
+      setSavingPreco(false)
+      return
+    }
+
+    setPrecos(prev =>
+      prev.map(current => (current.id === itemId ? data : current))
+        .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+    )
+    setItemCalculadora(prev => (prev?.id === itemId ? data : prev))
+    setPrecoEditando(null)
+    setShowPrecoModal(false)
+    setFeedback('Produto ou serviço atualizado com sucesso.')
+    setSavingPreco(false)
   }
 
   const handleUpdatePreco = async (itemId: string, preco: number) => {
@@ -1913,6 +1959,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 onClick={() => {
                   setError('')
                   setFeedback('')
+                  setPrecoEditando(null)
                   setShowPrecoModal(true)
                 }}
               >
@@ -1948,7 +1995,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             <div className={styles.blankCanvas}>
               <p className={styles.blankTitle}>Nenhum preço cadastrado ainda.</p>
               <p className={styles.blankText}>
-                Clique em <strong>Criar preços</strong> para adicionar nome do produto e preço na sua lista.
+                Clique em <strong>Criar preços</strong> para adicionar nome, categoria e preço na sua lista.
               </p>
             </div>
           ) : (
@@ -1965,13 +2012,29 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                       <span className={styles.priceName}>{item.nome_produto}</span>
                       <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
                     </div>
-                    <button
-                      type="button"
-                      className={styles.calcButton}
-                      onClick={() => setItemCalculadora(item)}
-                    >
-                      Verificar cálculo de precificação
-                    </button>
+                    <div className={styles.priceActions}>
+                      {canManage && (
+                        <button
+                          type="button"
+                          className={styles.priceEditButton}
+                          onClick={() => {
+                            setError('')
+                            setFeedback('')
+                            setPrecoEditando(item)
+                            setShowPrecoModal(true)
+                          }}
+                        >
+                          Editar
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.calcButton}
+                        onClick={() => setItemCalculadora(item)}
+                      >
+                        Verificar cálculo de precificação
+                      </button>
+                    </div>
                     <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                   </div>
                 ))}
@@ -2085,8 +2148,14 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
 
       {showPrecoModal && (
         <PrecoModal
-          onClose={() => setShowPrecoModal(false)}
-          onSubmit={handleAddPreco}
+          initialItem={precoEditando}
+          onClose={() => {
+            setShowPrecoModal(false)
+            setPrecoEditando(null)
+          }}
+          onSubmit={precoEditando
+            ? (item => handleEditPreco(precoEditando.id, item))
+            : handleAddPreco}
           saving={savingPreco}
           error={error}
         />
