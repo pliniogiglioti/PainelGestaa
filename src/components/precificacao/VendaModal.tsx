@@ -357,11 +357,7 @@ export default function VendaModal({
               {/* Coluna direita — pagamento */}
               <div className={styles.vendaColRight}>
 
-                {!verificacaoIniciada ? (
-                  <p style={{ color: '#9ca3af', fontSize: 14, marginTop: 8 }}>
-                    Selecione os produtos e clique em "Verificar meios de pagamento".
-                  </p>
-                ) : !meiosPagamentoLiberados ? (
+                {!verificacaoIniciada ? null : !meiosPagamentoLiberados ? (
                   <div className={styles.vendaProcurando}>
                     <span className={styles.vendaProcurandoTexto}>Procurando meios de pagamentos disponíveis...</span>
                     <span className={styles.vendaProcurandoTimer}>{formatCountdown(meiosLiberadosEm ?? 0)}</span>
@@ -409,8 +405,8 @@ export default function VendaModal({
 
         </div>
 
-        {/* Rodapé — só na etapa 3 */}
-        {step === 3 && (
+        {/* Rodapé — só na etapa 3, editando */}
+        {step === 3 && initialVenda && (
           <div className={styles.vendaFooter}>
             {(erroLocal || error) && (
               <span className={styles.vendaErro} style={{ marginRight: 'auto' }}>{erroLocal || error}</span>
@@ -421,7 +417,7 @@ export default function VendaModal({
               disabled={saving}
               onClick={() => { void handleSave() }}
             >
-              {saving ? 'Salvando...' : initialVenda ? 'Salvar' : 'Criar venda'}
+              {saving ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         )}
