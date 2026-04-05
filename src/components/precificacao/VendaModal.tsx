@@ -67,10 +67,10 @@ const CATEGORIA_ORDEM = new Map<string, number>(
 )
 
 const FORMAS_PAGAMENTO = [
-  { id: 'cartao', label: 'Divisao no cartao' },
-  { id: 'boleto', label: 'Divisao no boleto' },
-  { id: 'pix', label: 'Divisao no PIX' },
-  { id: 'carne', label: 'Divisao no carne' },
+  { id: 'cartao', label: 'Divisao no cartao', hint: 'Entrada suave para fechar ainda hoje' },
+  { id: 'boleto', label: 'Divisao no boleto', hint: 'Parcelas organizadas para facilitar a decisao' },
+  { id: 'pix', label: 'Divisao no PIX', hint: 'Condicao agil para quem quer resolver agora' },
+  { id: 'carne', label: 'Divisao no carne', hint: 'Opcao acessivel para ampliar a chance de aceite' },
 ] as const
 
 function getCategoriaLabel(value?: string | null): string {
@@ -158,6 +158,8 @@ export default function VendaModal({
       return matchBusca && matchCat
     })
     .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+
+  const clienteNomeExibicao = clienteNome.trim() || 'seu paciente'
 
   useEffect(() => {
     if (step === 1) input1Ref.current?.focus()
@@ -345,7 +347,7 @@ export default function VendaModal({
                   onClick={handleVerificarMeios}
                   disabled={saving}
                 >
-                  Verificar meios de pagamento
+                  Buscar propostas para IA
                 </button>
               )}
             </div>
@@ -356,13 +358,28 @@ export default function VendaModal({
             <div className={styles.vendaStepWrapper}>
               {(meiosLiberadosEm ?? 0) > 0 ? (
                 <div className={styles.vendaProcurando}>
+                  <div className={styles.vendaPulseOrb} aria-hidden="true">
+                    <span className={styles.vendaPulseCore} />
+                    <span className={styles.vendaPulseRing} />
+                    <span className={styles.vendaPulseRingDelayed} />
+                  </div>
                   <span className={styles.vendaProcurandoTexto}>
-                    Buscando meios de pagamento para o cliente {clienteNome.trim()}
+                    Procurando propostas de pagamento para {clienteNomeExibicao}
                   </span>
-                  <span className={styles.vendaProcurandoTimer}>{formatCountdown(meiosLiberadosEm ?? 0)}</span>
+                  <span className={styles.vendaProcurandoSub}>
+                    A IA esta montando as melhores condicoes para aumentar a chance de fechamento.
+                  </span>
                 </div>
               ) : (
                 <div className={styles.vendaStepCenter}>
+                  <div className={styles.vendaResultadoHeader}>
+                    <span className={styles.vendaResultadoLabel}>Propostas prontas</span>
+                    <strong className={styles.vendaResultadoTitulo}>{clienteNomeExibicao}</strong>
+                    <span className={styles.vendaResultadoSub}>
+                      Escolha a condicao ideal para apresentar agora.
+                    </span>
+                  </div>
+
                   <div className={styles.vendaMeiosLista}>
                     {FORMAS_PAGAMENTO.map(forma => {
                       const ativo = formaPagamento === forma.id
@@ -377,7 +394,10 @@ export default function VendaModal({
                           <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
                             {ativo && <span className={styles.vendaCirculoPonto} />}
                           </span>
-                          <span className={styles.vendaMeioNome}>{forma.label}</span>
+                          <span className={styles.vendaMeioConteudo}>
+                            <span className={styles.vendaMeioNome}>{forma.label}</span>
+                            <span className={styles.vendaMeioHint}>{forma.hint}</span>
+                          </span>
                         </button>
                       )
                     })}
