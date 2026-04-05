@@ -1336,7 +1336,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [showVendasConfigModal, setShowVendasConfigModal] = useState(false)
   const [showVendaModal, setShowVendaModal] = useState(false)
   const [precos, setPrecos] = useState<EmpresaPreco[]>([])
-  const [vendas, setVendas] = useState<VendaCard[]>([])
   const [savingPreco, setSavingPreco] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [savingVenda, setSavingVenda] = useState(false)
@@ -1427,35 +1426,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         .eq('empresa_id', empresa.id)
         .maybeSingle()
 
-      const { data: vendasData, error: vendasError } = await supabase
-        .from('empresa_vendas')
-        .select('*')
-        .eq('empresa_id', empresa.id)
-        .eq('ativo', true)
-        .order('created_at', { ascending: false })
-
-      let itensAgrupados = new Map<string, EmpresaVendaItem[]>()
-
-      if (!vendasError && vendasData && vendasData.length > 0) {
-        const vendaIds = vendasData.map(item => item.id)
-        const { data: itensData, error: itensError } = await supabase
-          .from('empresa_venda_itens')
-          .select('*')
-          .in('venda_id', vendaIds)
-          .order('created_at', { ascending: true })
-
-        if (itensError && active) {
-          setError(itensError.message ?? 'Não foi possível carregar os itens das vendas.')
-        } else {
-          itensAgrupados = (itensData ?? []).reduce((map, item) => {
-            const atual = map.get(item.venda_id) ?? []
-            atual.push(item)
-            map.set(item.venda_id, atual)
-            return map
-          }, new Map<string, EmpresaVendaItem[]>())
-        }
-      }
-
       if (active) {
         if (precosError) {
           setError(precosError.message ?? 'Não foi possível carregar a lista de preços.')
@@ -1471,17 +1441,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           setConfigVendasForm(configToVendasForm(configData))
         }
 
-        if (vendasError) {
-          setError(vendasError.message ?? 'Não foi possível carregar as vendas.')
-        } else {
-          setVendas(
-            (vendasData ?? []).map(venda => ({
-              ...venda,
-              itens: itensAgrupados.get(venda.id) ?? [],
-            })),
-          )
-        }
-
         setLoadingWorkspace(false)
         setLoading(false)
       }
@@ -1494,50 +1453,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     }
   }, [empresa.id, onTrocarEmpresa])
 
-  const refreshVendas = async () => {
-    const { data: vendasData, error: vendasError } = await supabase
-      .from('empresa_vendas')
-      .select('*')
-      .eq('empresa_id', empresa.id)
-      .eq('ativo', true)
-      .order('created_at', { ascending: false })
-
-    if (vendasError) {
-      setError(vendasError.message ?? 'Não foi possível recarregar as vendas.')
-      return
-    }
-
-    if (!vendasData || vendasData.length === 0) {
-      setVendas([])
-      return
-    }
-
-    const vendaIds = vendasData.map(item => item.id)
-    const { data: itensData, error: itensError } = await supabase
-      .from('empresa_venda_itens')
-      .select('*')
-      .in('venda_id', vendaIds)
-      .order('created_at', { ascending: true })
-
-    if (itensError) {
-      setError(itensError.message ?? 'Não foi possível recarregar os itens das vendas.')
-      return
-    }
-
-    const itensAgrupados = (itensData ?? []).reduce((map, item) => {
-      const atual = map.get(item.venda_id) ?? []
-      atual.push(item)
-      map.set(item.venda_id, atual)
-      return map
-    }, new Map<string, EmpresaVendaItem[]>())
-
-    setVendas(
-      vendasData.map(venda => ({
-        ...venda,
-        itens: itensAgrupados.get(venda.id) ?? [],
-      })),
-    )
-  }
 
   const handleAddPreco = async (item: PrecoFormPayload) => {
     setSavingPreco(true)
@@ -1812,33 +1727,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       return
     }
 
-    await refreshVendas()
-    setFeedback(payload.id ? 'Apresentação atualizada com sucesso.' : 'Apresentação criada com sucesso.')
+    setFeedback(payload.id ? 'Venda atualizada com sucesso.' : 'Venda criada com sucesso.')
     setShowVendaModal(false)
     setVendaEditando(null)
     setSavingVenda(false)
   }
 
-  const handleDeleteVenda = async (vendaId: string) => {
-    setError('')
-    setFeedback('')
-
-    const { error: deleteError } = await supabase
-      .from('empresa_vendas')
-      .update({
-        ativo: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', vendaId)
-
-    if (deleteError) {
-      setError(deleteError.message ?? 'Não foi possível remover a venda.')
-      return
-    }
-
-    await refreshVendas()
-    setFeedback('Apresentação removida com sucesso.')
-  }
 
   if (loading) {
     return (
