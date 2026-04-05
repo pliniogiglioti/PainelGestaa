@@ -104,10 +104,6 @@ function buildPrecosPorCategoria(precos: EmpresaPreco[]) {
     ] as const)
 }
 
-function formatCurrency(value: number): string {
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
-
 function formatCountdown(totalSeconds: number): string {
   const safe = Math.max(0, totalSeconds)
   const m = Math.floor(safe / 60)
@@ -147,10 +143,9 @@ export default function VendaModal({
 
   const precosPorCategoria = buildPrecosPorCategoria(precos)
   const categorias = precosPorCategoria.map(([cat]) => cat)
-  const produtosSelecionadosIds = new Set<string | null>(
+  const produtosSelecionadosIds = new Set<string>(
     itens.map((i: VendaItemDraft) => i.empresaPrecoId).filter((id): id is string => id !== null),
   )
-  const subtotal = itens.reduce((acc: number, item: VendaItemDraft) => acc + item.precoUnitario * item.quantidade, 0)
 
   const produtosFiltrados = precos
     .filter(p => {
@@ -239,30 +234,32 @@ export default function VendaModal({
 
   return (
     <div className={styles.vendaOverlay}>
-      <header className={styles.vendaHeader}>
+
+      {/* Cabeçalho */}
+      <div className={styles.vendaHeader}>
         <div className={styles.vendaHeaderInfo}>
-          <h2 className={styles.vendaHeaderTitle}>
+          <h2 className={styles.modalTitle}>
             {initialVenda ? 'Editar venda' : 'Nova venda'}
           </h2>
-          {headerSub && <p className={styles.vendaHeaderSub}>{headerSub}</p>}
+          {headerSub && (
+            <p className={styles.calcItemName}>{headerSub}</p>
+          )}
         </div>
-        <button type="button" className={styles.vendaClose} onClick={onClose} disabled={saving}>
+        <button type="button" className={styles.modalClose} onClick={onClose} disabled={saving}>
           ×
         </button>
-      </header>
+      </div>
 
+      {/* Conteúdo */}
       <div className={styles.vendaContent}>
 
         {/* ── Etapa 1: Nome do cliente ── */}
         {step === 1 && (
           <div className={styles.vendaStepWrap}>
-            <div>
-              <label className={styles.vendaFieldLabel} htmlFor="venda-nome">
-                Nome do cliente
-              </label>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Nome do cliente</span>
               <input
-                id="venda-nome"
-                className={styles.vendaInput}
+                className={styles.modalInput}
                 value={clienteNome}
                 onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
                 onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
@@ -270,21 +267,18 @@ export default function VendaModal({
                 autoFocus
                 disabled={saving}
               />
-            </div>
-            {erroLocal && <p className={styles.vendaFormError}>{erroLocal}</p>}
+            </label>
+            {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
           </div>
         )}
 
         {/* ── Etapa 2: Nome do planejamento ── */}
         {step === 2 && (
           <div className={styles.vendaStepWrap}>
-            <div>
-              <label className={styles.vendaFieldLabel} htmlFor="venda-plano">
-                Nome do planejamento
-              </label>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Nome do planejamento</span>
               <input
-                id="venda-plano"
-                className={styles.vendaInput}
+                className={styles.modalInput}
                 value={planoNome}
                 onChange={e => setPlanoNome(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') goToStep3() }}
@@ -292,8 +286,8 @@ export default function VendaModal({
                 autoFocus
                 disabled={saving}
               />
-            </div>
-            {erroLocal && <p className={styles.vendaFormError}>{erroLocal}</p>}
+            </label>
+            {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
           </div>
         )}
 
@@ -303,18 +297,22 @@ export default function VendaModal({
 
             {/* Coluna esquerda — produtos */}
             <div className={styles.vendaStep3Left}>
+
+              {/* Busca */}
               <input
-                className={styles.vendaBuscaInput}
+                className={styles.modalInput}
                 value={busca}
                 onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
                 placeholder="Buscar produto ou servico..."
                 disabled={saving}
               />
 
+              {/* Chips de categoria */}
               <div className={styles.vendaCategoriaChips}>
                 <button
                   type="button"
-                  className={`${styles.vendaCategoriaChip} ${!categoriaFiltro ? styles.vendaCategoriaChipAtivo : ''}`}
+                  className={`${styles.btnSecondary} ${!categoriaFiltro ? styles.btnPrimary : ''}`}
+                  style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999 }}
                   onClick={() => { setCategoriaFiltro(null); setBusca('') }}
                 >
                   Todos
@@ -323,7 +321,8 @@ export default function VendaModal({
                   <button
                     key={cat}
                     type="button"
-                    className={`${styles.vendaCategoriaChip} ${categoriaFiltro === cat ? styles.vendaCategoriaChipAtivo : ''}`}
+                    className={`${styles.btnSecondary} ${categoriaFiltro === cat ? styles.btnPrimary : ''}`}
+                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999, whiteSpace: 'nowrap' }}
                     onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
                   >
                     {cat}
@@ -331,9 +330,10 @@ export default function VendaModal({
                 ))}
               </div>
 
+              {/* Lista de produtos — SEM precos */}
               <div className={styles.vendaProdutosLista}>
                 {produtosFiltrados.length === 0 ? (
-                  <p style={{ color: '#888', fontSize: 14 }}>Nenhum produto encontrado.</p>
+                  <p className={styles.sectionHint}>Nenhum produto encontrado.</p>
                 ) : (
                   produtosFiltrados.map(item => {
                     const selecionado = produtosSelecionadosIds.has(item.id)
@@ -341,11 +341,26 @@ export default function VendaModal({
                       <button
                         key={item.id}
                         type="button"
-                        className={`${styles.vendaProdutoCard} ${selecionado ? styles.vendaProdutoCardSelecionado : ''}`}
+                        className={styles.vendaProdutoCard}
+                        style={selecionado ? { borderColor: 'var(--text)', background: 'var(--bg-hover)' } : {}}
                         onClick={() => toggleProduto(item)}
                         disabled={saving}
                       >
-                        <span className={styles.vendaProdutoCheckbox}>
+                        {/* Checkbox */}
+                        <span style={{
+                          width: 18,
+                          height: 18,
+                          border: `2px solid ${selecionado ? 'var(--text)' : 'var(--text-muted)'}`,
+                          borderRadius: 4,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: selecionado ? 'var(--text)' : 'transparent',
+                          flexShrink: 0,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: 'var(--bg-surface)',
+                        }}>
                           {selecionado ? '✓' : ''}
                         </span>
                         <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
@@ -358,20 +373,46 @@ export default function VendaModal({
 
             {/* Coluna direita — resumo e pagamento */}
             <div className={styles.vendaStep3Right}>
-              <div className={styles.vendaResumoCard}>
-                <p className={styles.vendaResumoLabel}>Total selecionado</p>
-                <p className={styles.vendaResumoValor}>{formatCurrency(subtotal)}</p>
+
+              {/* Resumo — sem precos */}
+              <div className={styles.saleSummaryCard}>
+                <h3 className={styles.sectionTitle}>Itens selecionados</h3>
+                <div className={styles.summaryLine}>
+                  <span>Cliente</span>
+                  <strong>{clienteNome.trim() || '—'}</strong>
+                </div>
+                <div className={styles.summaryLine}>
+                  <span>Planejamento</span>
+                  <strong>{planoNome.trim() || '—'}</strong>
+                </div>
+                <div className={styles.summaryLine}>
+                  <span>Itens</span>
+                  <strong>{itens.length}</strong>
+                </div>
+
                 {itens.length > 0 && (
-                  <p className={styles.vendaResumoItens}>
-                    {itens.length} {itens.length === 1 ? 'item selecionado' : 'itens selecionados'}
-                  </p>
+                  <div className={styles.saleItemList} style={{ marginTop: 8 }}>
+                    {itens.map(item => (
+                      <div key={item.id} className={styles.saleItemRow}>
+                        <strong className={styles.saleItemName}>{item.descricao}</strong>
+                        <button
+                          type="button"
+                          className={styles.removeButton}
+                          onClick={() => setItens(prev => prev.filter(i => i.id !== item.id))}
+                        >
+                          Remover
+                        </button>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
 
+              {/* Verificar / Timer / Cards de pagamento */}
               {!verificacaoIniciada ? (
                 <button
                   type="button"
-                  className={styles.vendaBtnPrimary}
+                  className={styles.modalSubmit}
                   onClick={handleVerificarMeios}
                   disabled={saving}
                   style={{ width: '100%' }}
@@ -379,22 +420,26 @@ export default function VendaModal({
                   Verificar meios de pagamento
                 </button>
               ) : !meiosPagamentoLiberados ? (
-                <div className={styles.vendaTimerWrap}>
-                  <span className={styles.vendaTimerDisplay}>
+                <div className={styles.saleSummaryCard} style={{ textAlign: 'center' }}>
+                  <span className={styles.sectionHint}>Liberando meios de pagamento...</span>
+                  <div className={styles.vendaTimerDisplay}>
                     {formatCountdown(meiosLiberadosEm ?? 0)}
-                  </span>
-                  <span className={styles.vendaTimerLabel}>Liberando meios de pagamento...</span>
+                  </div>
                 </div>
               ) : (
-                <div className={styles.vendaPagamentoGrid}>
-                  {FORMAS_PAGAMENTO.map(forma => (
-                    <div key={forma.id} className={styles.vendaPagamentoCard}>
-                      {forma.label}
-                    </div>
-                  ))}
+                <div className={styles.saleSummaryCard}>
+                  <h3 className={styles.sectionTitle}>Meios de pagamento</h3>
+                  <div className={styles.vendaPagamentoGrid}>
+                    {FORMAS_PAGAMENTO.map(forma => (
+                      <div key={forma.id} className={styles.vendaPagamentoCard}>
+                        {forma.label}
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
+              {/* Oferta valida */}
               {ofertaExpiraEm != null && (
                 <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
                   <span className={styles.vendaOfertaLabel}>
@@ -409,47 +454,45 @@ export default function VendaModal({
               )}
 
               {(erroLocal || error) && (
-                <p className={styles.vendaFormError}>{erroLocal || error}</p>
+                <p className={styles.formError}>{erroLocal || error}</p>
               )}
             </div>
           </div>
         )}
       </div>
 
-      {/* Footer fixo */}
+      {/* Rodapé */}
       <div className={styles.vendaFormActions}>
-        <button type="button" className={styles.vendaBtnSecondary} onClick={onClose} disabled={saving}>
+        <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
           Cancelar
         </button>
 
         <div style={{ display: 'flex', gap: 12 }}>
           {step === 1 && (
-            <button type="button" className={styles.vendaBtnPrimary} disabled={saving} onClick={handleNextStep1}>
+            <button type="button" className={styles.modalSubmit} disabled={saving} onClick={handleNextStep1}>
               Proximo passo
             </button>
           )}
-
           {step === 2 && (
             <>
-              <button type="button" className={styles.vendaBtnSecondary} disabled={saving} onClick={goToStep1}>
+              <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep1}>
                 Voltar
               </button>
-              <button type="button" className={styles.vendaBtnPrimary} disabled={saving} onClick={goToStep3}>
+              <button type="button" className={styles.modalSubmit} disabled={saving} onClick={goToStep3}>
                 Proximo
               </button>
             </>
           )}
-
           {step === 3 && (
             <>
               {!initialVenda && (
-                <button type="button" className={styles.vendaBtnSecondary} disabled={saving} onClick={goToStep2}>
+                <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep2}>
                   Voltar
                 </button>
               )}
               <button
                 type="button"
-                className={styles.vendaBtnPrimary}
+                className={styles.modalSubmit}
                 disabled={saving}
                 onClick={() => { void handleSave() }}
               >
