@@ -96,12 +96,6 @@ const IconTag = () => (
   </svg>
 )
 
-const IconEye = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12Z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-)
 
 const IconReceipt = () => (
   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -318,14 +312,6 @@ function buildFormaPagamento(subtotal: number, parcelas: number, taxaPercent: nu
   }
 }
 
-function getParcelasCompactas(parcelas: ReturnType<typeof buildParcelas>) {
-  if (parcelas.length <= 4) return parcelas
-
-  const indices = Array.from(new Set([0, 1, Math.floor(parcelas.length / 2), parcelas.length - 1]))
-  return indices
-    .map(index => parcelas[index])
-    .filter((item): item is (typeof parcelas)[number] => Boolean(item))
-}
 
 function parsePositiveInteger(value: string, fallback: number, min = 0) {
   const parsed = Math.floor(Number(value))
@@ -1972,7 +1958,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                   setShowVendaModal(true)
                 }}
               >
-                <IconPlus /> Nova apresentação
+                <IconPlus /> Nova venda
               </button>
             )}
           </div>
@@ -2036,106 +2022,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
               </div>
             </div>
           )
-        ) : vendas.length === 0 ? (
-          <div className={styles.blankCanvas}>
-            <p className={styles.blankTitle}>Nenhuma apresentação montada ainda.</p>
-            <p className={styles.blankText}>
-              Crie apresentações com o nome do cliente, adicione produtos da lista e libere os meios de pagamento no tempo configurado.
-            </p>
-          </div>
         ) : (
-          <div className={styles.salesGrid}>
-            {vendas.map(venda => {
-              const subtotal = calculateSubtotal(venda.itens)
-              const parcelas = getParcelasCompactas(
-                buildParcelas(subtotal, maxParcelasCartaoPadrao, taxaMaquinaPercent, 0),
-              )
-
-              return (
-                <article key={venda.id} className={styles.saleCard}>
-                  <div className={styles.saleCardHeader}>
-                    <div>
-                      <p className={styles.saleCardEyebrow}>Cliente</p>
-                      <h3 className={styles.saleClient}>{venda.cliente_nome}</h3>
-                    </div>
-                    <span className={styles.saleBadge}>Modo apresentação</span>
-                  </div>
-
-                  <div className={styles.saleMetrics}>
-                    <div className={styles.saleMetric}>
-                      <span>Itens</span>
-                      <strong>{venda.itens.length}</strong>
-                    </div>
-                    <div className={styles.saleMetric}>
-                      <span>Subtotal</span>
-                      <strong>{formatCurrency(subtotal)}</strong>
-                    </div>
-                    <div className={styles.saleMetric}>
-                      <span>Cartão</span>
-                      <strong>Até {maxParcelasCartaoPadrao}x</strong>
-                    </div>
-                    <div className={styles.saleMetric}>
-                      <span>Pagamento</span>
-                      <strong>Definido na apresentação</strong>
-                    </div>
-                  </div>
-
-                  <div className={styles.saleItemsPreview}>
-                    {venda.itens.slice(0, 4).map(item => (
-                      <div key={item.id} className={styles.saleItemPreviewRow}>
-                        <span>{item.descricao}</span>
-                        <strong>{formatCurrency(item.preco_unitario * item.quantidade)}</strong>
-                      </div>
-                    ))}
-                    {venda.itens.length > 4 && (
-                      <p className={styles.sectionHint}>+ {venda.itens.length - 4} itens na proposta</p>
-                    )}
-                  </div>
-
-                  <div className={styles.saleParcelasPreview}>
-                    {parcelas.slice(0, 3).map(opcao => (
-                      <div key={opcao.parcela} className={styles.saleParcelaBadge}>
-                        <span>{opcao.parcela}x</span>
-                        <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className={styles.saleCardActions}>
-                    <button
-                      type="button"
-                      className={styles.calcButton}
-                      onClick={() => setVendaApresentacao(venda)}
-                    >
-                      <IconEye /> Modo apresentação
-                    </button>
-                    {canManage && (
-                      <button
-                        type="button"
-                        className={styles.btnSecondary}
-                        onClick={() => {
-                          setError('')
-                          setFeedback('')
-                          setVendaEditando(venda)
-                          setShowVendaModal(true)
-                        }}
-                      >
-                        Editar
-                      </button>
-                    )}
-                    {canManage && (
-                      <button
-                        type="button"
-                        className={styles.dangerButton}
-                        onClick={() => void handleDeleteVenda(venda.id)}
-                      >
-                        Remover
-                      </button>
-                    )}
-                  </div>
-                </article>
-              )
-            })}
+          <div className={styles.blankCanvas}>
+            <p className={styles.blankTitle}>Pronto para iniciar uma venda.</p>
+            <p className={styles.blankText}>
+              Clique em <strong>Nova venda</strong> para comecar.
+            </p>
           </div>
         )}
       </div>

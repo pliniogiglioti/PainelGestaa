@@ -1,5 +1,4 @@
-import { useState, type FormEvent } from 'react'
-import { useBackdropDismiss } from '../../hooks/useBackdropDismiss'
+import { useEffect, useState } from 'react'
 import styles from '../../pages/PrecificacaoPage.module.css'
 import type {
   EmpresaPreco,
@@ -64,54 +63,56 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
 const CATEGORIA_ORDEM = new Map<string, number>(
-  PRECIFICACAO_CATEGORIAS_ODONTO.map((categoria, index) => [categoria, index]),
+  PRECIFICACAO_CATEGORIAS_ODONTO.map((cat, i): [string, number] => [cat, i]),
 )
 
-const formatCurrency = (value: number) =>
-  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+const FORMAS_PAGAMENTO = [
+  { id: 'cartao', label: 'Divisao no cartao' },
+  { id: 'boleto', label: 'Divisao no boleto' },
+  { id: 'pix', label: 'Divisao no PIX' },
+  { id: 'carne', label: 'Divisao no carne' },
+] as const
 
-function normalizeCategoria(value?: string | null) {
-  const categoria = value?.trim()
-  return categoria ? categoria : null
-}
-
-function getCategoriaLabel(value?: string | null) {
-  return normalizeCategoria(value) ?? CATEGORIA_SEM_CADASTRO
-}
-
-function compareCategorias(a: string, b: string) {
-  const aIsEmpty = a === CATEGORIA_SEM_CADASTRO
-  const bIsEmpty = b === CATEGORIA_SEM_CADASTRO
-
-  if (aIsEmpty && !bIsEmpty) return 1
-  if (!aIsEmpty && bIsEmpty) return -1
-
-  const aOrder = CATEGORIA_ORDEM.get(a)
-  const bOrder = CATEGORIA_ORDEM.get(b)
-
-  if (aOrder != null && bOrder != null) return aOrder - bOrder
-  if (aOrder != null) return -1
-  if (bOrder != null) return 1
-
-  return a.localeCompare(b, 'pt-BR')
+function getCategoriaLabel(value?: string | null): string {
+  return value?.trim() || CATEGORIA_SEM_CADASTRO
 }
 
 function buildPrecosPorCategoria(precos: EmpresaPreco[]) {
   const grouped = new Map<string, EmpresaPreco[]>()
-
   for (const item of precos) {
-    const categoria = getCategoriaLabel(item.categoria)
-    const current = grouped.get(categoria) ?? []
+    const cat = getCategoriaLabel(item.categoria)
+    const current = grouped.get(cat) ?? []
     current.push(item)
-    grouped.set(categoria, current)
+    grouped.set(cat, current)
   }
-
   return [...grouped.entries()]
-    .sort(([a], [b]) => compareCategorias(a, b))
-    .map(([categoria, itens]) => [
-      categoria,
+    .sort(([a], [b]) => {
+      const aE = a === CATEGORIA_SEM_CADASTRO
+      const bE = b === CATEGORIA_SEM_CADASTRO
+      if (aE && !bE) return 1
+      if (!aE && bE) return -1
+      const ao = CATEGORIA_ORDEM.get(a)
+      const bo = CATEGORIA_ORDEM.get(b)
+      if (ao != null && bo != null) return ao - bo
+      if (ao != null) return -1
+      if (bo != null) return 1
+      return a.localeCompare(b, 'pt-BR')
+    })
+    .map(([cat, itens]) => [
+      cat,
       [...itens].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR')),
     ] as const)
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+function formatCountdown(totalSeconds: number): string {
+  const safe = Math.max(0, totalSeconds)
+  const m = Math.floor(safe / 60)
+  const s = safe % 60
+  return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
 }
 
 function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
@@ -126,52 +127,76 @@ function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
 
 export default function VendaModal({
   precos,
+  configVendas,
   initialVenda,
   saving,
   error,
   onClose,
   onSubmit,
 }: VendaModalProps) {
-  const backdropDismiss = useBackdropDismiss(onClose, saving)
   const [step, setStep] = useState<1 | 2 | 3>(initialVenda ? 3 : 1)
-  const [clienteNome, setClienteNome] = useState(initialVenda?.cliente_nome ?? '')
-  const [planoNome, setPlanoNome] = useState(initialVenda?.observacoes || 'Planejamento A')
+  const [clienteNome, setClienteNome] = useState<string>(initialVenda?.cliente_nome ?? '')
+  const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Planejamento A')
   const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
-  const [busca, setBusca] = useState('')
+  const [busca, setBusca] = useState<string>('')
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
-  const [erroLocal, setErroLocal] = useState('')
+  const [erroLocal, setErroLocal] = useState<string>('')
+  const [verificacaoIniciada, setVerificacaoIniciada] = useState<boolean>(Boolean(initialVenda))
+  const [meiosLiberadosEm, setMeiosLiberadosEm] = useState<number | null>(initialVenda ? 0 : null)
+  const [ofertaExpiraEm, setOfertaExpiraEm] = useState<number | null>(null)
 
   const precosPorCategoria = buildPrecosPorCategoria(precos)
   const categorias = precosPorCategoria.map(([cat]) => cat)
-  const produtosSelecionadosIds = new Set(itens.map(i => i.empresaPrecoId).filter(Boolean))
+  const produtosSelecionadosIds = new Set<string | null>(
+    itens.map((i: VendaItemDraft) => i.empresaPrecoId).filter((id): id is string => id !== null),
+  )
+  const subtotal = itens.reduce((acc: number, item: VendaItemDraft) => acc + item.precoUnitario * item.quantidade, 0)
 
-  const produtosFiltrados = precos.filter(p => {
-    const matchBusca = !busca || p.nome_produto.toLowerCase().includes(busca.toLowerCase())
-    const matchCategoria = !categoriaFiltro || getCategoriaLabel(p.categoria) === categoriaFiltro
-    return matchBusca && matchCategoria
-  }).sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+  const produtosFiltrados = precos
+    .filter(p => {
+      const matchBusca = !busca || p.nome_produto.toLowerCase().includes(busca.toLowerCase())
+      const matchCat = !categoriaFiltro || getCategoriaLabel(p.categoria) === categoriaFiltro
+      return matchBusca && matchCat
+    })
+    .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
 
-  const subtotal = itens.reduce((total, item) => total + item.precoUnitario * item.quantidade, 0)
+  const meiosPagamentoLiberados = verificacaoIniciada && (meiosLiberadosEm ?? 0) <= 0
 
-  const handleNextStep1 = () => {
-    if (!clienteNome.trim()) {
-      setErroLocal('Informe o nome do cliente.')
-      return
+  useEffect(() => {
+    const onEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !saving) onClose()
     }
-    setErroLocal('')
-    setStep(2)
-  }
+    document.addEventListener('keydown', onEscape)
+    return () => document.removeEventListener('keydown', onEscape)
+  }, [saving, onClose])
 
-  const handleNextStep2 = () => {
-    setErroLocal('')
-    setStep(3)
+  useEffect(() => {
+    if (!verificacaoIniciada || meiosLiberadosEm == null || meiosLiberadosEm <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setMeiosLiberadosEm((prev: number | null) => (prev == null || prev <= 1 ? 0 : prev - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [verificacaoIniciada, meiosLiberadosEm])
+
+  useEffect(() => {
+    if (!verificacaoIniciada || ofertaExpiraEm == null || ofertaExpiraEm <= 0) return undefined
+    const timer = window.setInterval(() => {
+      setOfertaExpiraEm((prev: number | null) => (prev == null || prev <= 1 ? 0 : prev - 1))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [verificacaoIniciada, ofertaExpiraEm])
+
+  const handleVerificarMeios = () => {
+    setVerificacaoIniciada(true)
+    setMeiosLiberadosEm(configVendas?.vendas_tempo_apresentacao_segundos ?? 0)
+    setOfertaExpiraEm((configVendas?.vendas_oferta_valida_minutos ?? 15) * 60)
   }
 
   const toggleProduto = (preco: EmpresaPreco) => {
     if (produtosSelecionadosIds.has(preco.id)) {
-      setItens(prev => prev.filter(i => i.empresaPrecoId !== preco.id))
+      setItens((prev: VendaItemDraft[]) => prev.filter((i: VendaItemDraft) => i.empresaPrecoId !== preco.id))
     } else {
-      setItens(prev => [
+      setItens((prev: VendaItemDraft[]) => [
         ...prev,
         {
           id: `draft-${Date.now()}-${prev.length}`,
@@ -184,25 +209,12 @@ export default function VendaModal({
     }
   }
 
-  const handleRemoveItem = (id: string) => {
-    setItens(prev => prev.filter(item => item.id !== id))
-  }
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-
-    if (!clienteNome.trim()) {
-      setErroLocal('Informe o nome do cliente.')
-      return
-    }
-
+  const handleSave = async () => {
     if (itens.length === 0) {
-      setErroLocal('Adicione ao menos um produto ou servico.')
+      setErroLocal('Selecione ao menos um produto ou servico.')
       return
     }
-
     setErroLocal('')
-
     await onSubmit({
       id: initialVenda?.id,
       clienteNome: clienteNome.trim(),
@@ -211,231 +223,241 @@ export default function VendaModal({
     })
   }
 
-  const isExpanded = step >= 2
+  const goToStep1 = () => { setErroLocal(''); setStep(1) }
+  const goToStep2 = () => { setErroLocal(''); setStep(2) }
+  const goToStep3 = () => { setErroLocal(''); setStep(3) }
+
+  const handleNextStep1 = () => {
+    if (!clienteNome.trim()) { setErroLocal('Informe o nome do cliente.'); return }
+    goToStep2()
+  }
+
+  const headerSub =
+    step >= 3 ? `${clienteNome.trim()} — ${planoNome.trim()}` :
+    step === 2 ? clienteNome.trim() :
+    undefined
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div
-        className={`${styles.modal} ${step === 3 ? styles.saleModal : ''}`}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className={styles.modalHeader}>
-          <div>
-            <h2 className={styles.modalTitle}>
-              {initialVenda ? 'Editar apresentacao' : 'Nova apresentacao'}
-            </h2>
-            {step < 3 && (
-              <p className={styles.calcItemName}>
-                {step === 1 ? 'Informe o nome do cliente para comecar.' : 'Defina o nome do planejamento.'}
-              </p>
-            )}
-          </div>
-          <button type="button" className={styles.modalClose} onClick={onClose}>×</button>
+    <div className={styles.vendaOverlay}>
+      <header className={styles.vendaHeader}>
+        <div className={styles.vendaHeaderInfo}>
+          <h2 className={styles.vendaHeaderTitle}>
+            {initialVenda ? 'Editar venda' : 'Nova venda'}
+          </h2>
+          {headerSub && <p className={styles.vendaHeaderSub}>{headerSub}</p>}
         </div>
+        <button type="button" className={styles.vendaClose} onClick={onClose} disabled={saving}>
+          ×
+        </button>
+      </header>
 
-        <form
-          className={step === 3 ? styles.saleForm : `${styles.saleForm} ${styles.saleFormSingleColumn}`}
-          onSubmit={handleSubmit}
-        >
-          <div className={styles.saleFormMain}>
+      <div className={styles.vendaContent}>
 
-            {/* Etapa 1 — Nome do cliente */}
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Nome do cliente</span>
+        {/* ── Etapa 1: Nome do cliente ── */}
+        {step === 1 && (
+          <div className={styles.vendaStepWrap}>
+            <div>
+              <label className={styles.vendaFieldLabel} htmlFor="venda-nome">
+                Nome do cliente
+              </label>
               <input
-                className={styles.modalInput}
+                id="venda-nome"
+                className={styles.vendaInput}
                 value={clienteNome}
-                onChange={e => {
-                  setClienteNome(e.target.value)
-                  setErroLocal('')
-                }}
+                onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
+                onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
                 placeholder="Ex: Maria Silva"
                 autoFocus
                 disabled={saving}
               />
-            </label>
-
-            {step === 1 && (
-              <>
-                {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
-                <div className={styles.modalActions} style={{ marginTop: '1rem' }}>
-                  <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-                    Cancelar
-                  </button>
-                  <button type="button" className={styles.modalSubmit} onClick={handleNextStep1} disabled={saving}>
-                    Proximo passo
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Etapa 2 — Nome do planejamento */}
-            {isExpanded && (
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Nome do planejamento</span>
-                <input
-                  className={styles.modalInput}
-                  value={planoNome}
-                  onChange={e => setPlanoNome(e.target.value)}
-                  placeholder="Ex: Planejamento A"
-                  disabled={saving}
-                />
-              </label>
-            )}
-
-            {step === 2 && (
-              <>
-                {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
-                <div className={styles.modalActions} style={{ marginTop: '1rem' }}>
-                  <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-                    Cancelar
-                  </button>
-                  <button type="button" className={styles.modalSubmit} onClick={handleNextStep2} disabled={saving}>
-                    Proximo
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Etapa 3 — Selecao de produtos */}
-            {step === 3 && (
-              <div className={styles.addItemPanel}>
-                <div className={styles.addItemHeader}>
-                  <h3 className={styles.sectionTitle}>Produtos e servicos</h3>
-                  <span className={styles.sectionHint}>Selecione os produtos cadastrados</span>
-                </div>
-
-                <input
-                  className={styles.modalInput}
-                  value={busca}
-                  onChange={e => setBusca(e.target.value)}
-                  placeholder="Buscar produto..."
-                  disabled={saving}
-                />
-
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className={`${styles.btnSecondary} ${!categoriaFiltro ? styles.presentationSelectCardActive : ''}`}
-                    onClick={() => setCategoriaFiltro(null)}
-                  >
-                    Todas
-                  </button>
-                  {categorias.map(cat => (
-                    <button
-                      key={cat}
-                      type="button"
-                      className={`${styles.btnSecondary} ${categoriaFiltro === cat ? styles.presentationSelectCardActive : ''}`}
-                      onClick={() => setCategoriaFiltro(prev => prev === cat ? null : cat)}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-
-                <div className={styles.saleItemList} style={{ marginTop: '0.75rem' }}>
-                  {produtosFiltrados.length === 0 ? (
-                    <p className={styles.sectionHint}>Nenhum produto encontrado.</p>
-                  ) : (
-                    produtosFiltrados.map(item => {
-                      const selecionado = produtosSelecionadosIds.has(item.id)
-                      return (
-                        <div
-                          key={item.id}
-                          className={`${styles.saleItemRow} ${selecionado ? styles.presentationSelectCardActive : ''}`}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => toggleProduto(item)}
-                        >
-                          <div>
-                            <strong className={styles.saleItemName}>{item.nome_produto}</strong>
-                            <span className={styles.saleItemMeta}>{getCategoriaLabel(item.categoria)}</span>
-                          </div>
-                          <div className={styles.saleItemActions}>
-                            <strong className={styles.saleItemTotal}>{formatCurrency(item.preco)}</strong>
-                            <span style={{ fontSize: '0.75rem', color: selecionado ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-                              {selecionado ? 'Selecionado' : 'Adicionar'}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    })
-                  )}
-                </div>
-              </div>
-            )}
+            </div>
+            {erroLocal && <p className={styles.vendaFormError}>{erroLocal}</p>}
           </div>
+        )}
 
-          {/* Coluna lateral — itens selecionados */}
-          {step === 3 && (
-            <div className={styles.saleFormSidebar}>
-              <div className={styles.saleSummaryCard}>
-                <h3 className={styles.sectionTitle}>Itens selecionados</h3>
-                <div className={styles.summaryLine}>
-                  <span>Cliente</span>
-                  <strong>{clienteNome.trim() || '-'}</strong>
-                </div>
-                <div className={styles.summaryLine}>
-                  <span>Planejamento</span>
-                  <strong>{planoNome.trim() || '-'}</strong>
-                </div>
-                <div className={styles.summaryLine}>
-                  <span>Subtotal</span>
-                  <strong>{formatCurrency(subtotal)}</strong>
-                </div>
+        {/* ── Etapa 2: Nome do planejamento ── */}
+        {step === 2 && (
+          <div className={styles.vendaStepWrap}>
+            <div>
+              <label className={styles.vendaFieldLabel} htmlFor="venda-plano">
+                Nome do planejamento
+              </label>
+              <input
+                id="venda-plano"
+                className={styles.vendaInput}
+                value={planoNome}
+                onChange={e => setPlanoNome(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') goToStep3() }}
+                placeholder="Ex: Planejamento A"
+                autoFocus
+                disabled={saving}
+              />
+            </div>
+            {erroLocal && <p className={styles.vendaFormError}>{erroLocal}</p>}
+          </div>
+        )}
 
-                {itens.length === 0 ? (
-                  <p className={styles.sectionHint} style={{ marginTop: '0.75rem' }}>
-                    Nenhum item selecionado ainda.
-                  </p>
+        {/* ── Etapa 3: Produtos + pagamento ── */}
+        {step === 3 && (
+          <div className={styles.vendaStep3Layout}>
+
+            {/* Coluna esquerda — produtos */}
+            <div className={styles.vendaStep3Left}>
+              <input
+                className={styles.vendaBuscaInput}
+                value={busca}
+                onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
+                placeholder="Buscar produto ou servico..."
+                disabled={saving}
+              />
+
+              <div className={styles.vendaCategoriaChips}>
+                <button
+                  type="button"
+                  className={`${styles.vendaCategoriaChip} ${!categoriaFiltro ? styles.vendaCategoriaChipAtivo : ''}`}
+                  onClick={() => { setCategoriaFiltro(null); setBusca('') }}
+                >
+                  Todos
+                </button>
+                {categorias.map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    className={`${styles.vendaCategoriaChip} ${categoriaFiltro === cat ? styles.vendaCategoriaChipAtivo : ''}`}
+                    onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.vendaProdutosLista}>
+                {produtosFiltrados.length === 0 ? (
+                  <p style={{ color: '#888', fontSize: 14 }}>Nenhum produto encontrado.</p>
                 ) : (
-                  <div className={styles.saleItemList} style={{ marginTop: '0.75rem' }}>
-                    {itens.map(item => (
-                      <div key={item.id} className={styles.saleItemRow}>
-                        <div>
-                          <strong className={styles.saleItemName}>{item.descricao}</strong>
-                          <span className={styles.saleItemMeta}>
-                            {item.quantidade}x {formatCurrency(item.precoUnitario)}
-                          </span>
-                        </div>
-                        <div className={styles.saleItemActions}>
-                          <strong className={styles.saleItemTotal}>
-                            {formatCurrency(item.precoUnitario * item.quantidade)}
-                          </strong>
-                          <button
-                            type="button"
-                            className={styles.removeButton}
-                            onClick={() => handleRemoveItem(item.id)}
-                          >
-                            Remover
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                  produtosFiltrados.map(item => {
+                    const selecionado = produtosSelecionadosIds.has(item.id)
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className={`${styles.vendaProdutoCard} ${selecionado ? styles.vendaProdutoCardSelecionado : ''}`}
+                        onClick={() => toggleProduto(item)}
+                        disabled={saving}
+                      >
+                        <span className={styles.vendaProdutoCheckbox}>
+                          {selecionado ? '✓' : ''}
+                        </span>
+                        <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                      </button>
+                    )
+                  })
                 )}
               </div>
             </div>
+
+            {/* Coluna direita — resumo e pagamento */}
+            <div className={styles.vendaStep3Right}>
+              <div className={styles.vendaResumoCard}>
+                <p className={styles.vendaResumoLabel}>Total selecionado</p>
+                <p className={styles.vendaResumoValor}>{formatCurrency(subtotal)}</p>
+                {itens.length > 0 && (
+                  <p className={styles.vendaResumoItens}>
+                    {itens.length} {itens.length === 1 ? 'item selecionado' : 'itens selecionados'}
+                  </p>
+                )}
+              </div>
+
+              {!verificacaoIniciada ? (
+                <button
+                  type="button"
+                  className={styles.vendaBtnPrimary}
+                  onClick={handleVerificarMeios}
+                  disabled={saving}
+                  style={{ width: '100%' }}
+                >
+                  Verificar meios de pagamento
+                </button>
+              ) : !meiosPagamentoLiberados ? (
+                <div className={styles.vendaTimerWrap}>
+                  <span className={styles.vendaTimerDisplay}>
+                    {formatCountdown(meiosLiberadosEm ?? 0)}
+                  </span>
+                  <span className={styles.vendaTimerLabel}>Liberando meios de pagamento...</span>
+                </div>
+              ) : (
+                <div className={styles.vendaPagamentoGrid}>
+                  {FORMAS_PAGAMENTO.map(forma => (
+                    <div key={forma.id} className={styles.vendaPagamentoCard}>
+                      {forma.label}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ofertaExpiraEm != null && (
+                <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
+                  <span className={styles.vendaOfertaLabel}>
+                    {ofertaExpiraEm > 0 ? 'Oferta valida por' : 'Oferta expirada'}
+                  </span>
+                  {ofertaExpiraEm > 0 && (
+                    <span className={styles.vendaOfertaTimer}>
+                      {formatCountdown(ofertaExpiraEm)}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {(erroLocal || error) && (
+                <p className={styles.vendaFormError}>{erroLocal || error}</p>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Footer fixo */}
+      <div className={styles.vendaFormActions}>
+        <button type="button" className={styles.vendaBtnSecondary} onClick={onClose} disabled={saving}>
+          Cancelar
+        </button>
+
+        <div style={{ display: 'flex', gap: 12 }}>
+          {step === 1 && (
+            <button type="button" className={styles.vendaBtnPrimary} disabled={saving} onClick={handleNextStep1}>
+              Proximo passo
+            </button>
           )}
 
-          {step === 3 && (erroLocal || error) && (
-            <p className={styles.formError}>{erroLocal || error}</p>
+          {step === 2 && (
+            <>
+              <button type="button" className={styles.vendaBtnSecondary} disabled={saving} onClick={goToStep1}>
+                Voltar
+              </button>
+              <button type="button" className={styles.vendaBtnPrimary} disabled={saving} onClick={goToStep3}>
+                Proximo
+              </button>
+            </>
           )}
 
           {step === 3 && (
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-                Cancelar
+            <>
+              {!initialVenda && (
+                <button type="button" className={styles.vendaBtnSecondary} disabled={saving} onClick={goToStep2}>
+                  Voltar
+                </button>
+              )}
+              <button
+                type="button"
+                className={styles.vendaBtnPrimary}
+                disabled={saving}
+                onClick={() => { void handleSave() }}
+              >
+                {saving ? 'Salvando...' : initialVenda ? 'Salvar' : 'Criar venda'}
               </button>
-              <button type="submit" className={styles.modalSubmit} disabled={saving}>
-                {saving ? 'Salvando...' : initialVenda ? 'Salvar apresentacao' : 'Criar apresentacao'}
-              </button>
-            </div>
+            </>
           )}
-        </form>
+        </div>
       </div>
     </div>
   )

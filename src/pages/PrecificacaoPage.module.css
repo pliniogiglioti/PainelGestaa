@@ -1516,3 +1516,424 @@
     width: 100%;
   }
 }
+
+/* ============================================================
+   VENDA FULL-SCREEN MODAL
+   ============================================================ */
+
+.vendaOverlay {
+  position: fixed;
+  inset: 0;
+  background: #ffffff;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.vendaHeader {
+  position: sticky;
+  top: 0;
+  background: #ffffff;
+  border-bottom: 2px solid #000;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.vendaHeaderInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vendaHeaderTitle {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #000;
+  line-height: 1.2;
+}
+
+.vendaHeaderSub {
+  font-size: 13px;
+  color: #555;
+  margin: 0;
+}
+
+.vendaClose {
+  background: none;
+  border: 2px solid #000;
+  border-radius: 6px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  color: #000;
+  padding: 2px 10px;
+}
+
+.vendaClose:hover {
+  background: #000;
+  color: #fff;
+}
+
+.vendaContent {
+  flex: 1;
+  padding: 40px 32px;
+}
+
+.vendaStepWrap {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.vendaFieldLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.vendaInput {
+  width: 100%;
+  border: 2px solid #000;
+  border-radius: 8px;
+  padding: 13px 16px;
+  font-size: 17px;
+  color: #000;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+  font-weight: 500;
+}
+
+.vendaInput:focus {
+  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.08);
+}
+
+.vendaBtnPrimary {
+  background: #000;
+  color: #fff;
+  border: 2px solid #000;
+  border-radius: 8px;
+  padding: 13px 32px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vendaBtnPrimary:hover:not(:disabled) {
+  background: #222;
+}
+
+.vendaBtnPrimary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vendaBtnSecondary {
+  background: #fff;
+  color: #000;
+  border: 2px solid #000;
+  border-radius: 8px;
+  padding: 11px 28px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.vendaBtnSecondary:hover:not(:disabled) {
+  background: #f5f5f5;
+}
+
+.vendaBtnSecondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.vendaFormActions {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  border-top: 2px solid #000;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.vendaFormError {
+  color: #dc2626;
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* === Step 3 — layout 2 colunas === */
+
+.vendaStep3Layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 32px;
+  max-width: 1200px;
+}
+
+.vendaStep3Left {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.vendaStep3Right {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Busca de produto */
+
+.vendaBuscaInput {
+  width: 100%;
+  border: 2px solid #000;
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 15px;
+  color: #000;
+  background: #fff;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.vendaBuscaInput:focus {
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Chips de categoria */
+
+.vendaCategoriaChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vendaCategoriaChip {
+  padding: 5px 13px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #000;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.12s;
+  white-space: nowrap;
+}
+
+.vendaCategoriaChip:hover {
+  border-color: #000;
+}
+
+.vendaCategoriaChipAtivo {
+  border-color: #000;
+  background: #000;
+  color: #fff;
+}
+
+/* Cards de produto com checkbox */
+
+.vendaProdutosLista {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.vendaProdutoCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 10px;
+  cursor: pointer;
+  background: #fff;
+  transition: all 0.12s;
+  user-select: none;
+  color: #000;
+}
+
+.vendaProdutoCard:hover {
+  border-color: #9ca3af;
+}
+
+.vendaProdutoCardSelecionado {
+  border-color: #000;
+  background: #000;
+  color: #fff;
+}
+
+.vendaProdutoCheckbox {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #9ca3af;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vendaProdutoCardSelecionado .vendaProdutoCheckbox {
+  border-color: #fff;
+  background: #fff;
+  color: #000;
+}
+
+.vendaProdutoNome {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  text-align: left;
+}
+
+/* Painel direito — resumo */
+
+.vendaResumoCard {
+  border: 2px solid #000;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vendaResumoLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #555;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.vendaResumoValor {
+  font-size: 32px;
+  font-weight: 700;
+  color: #16a34a;
+  line-height: 1;
+  margin: 0;
+}
+
+.vendaResumoItens {
+  font-size: 13px;
+  color: #555;
+  margin: 0;
+}
+
+/* Timer de liberacao */
+
+.vendaTimerWrap {
+  text-align: center;
+  padding: 16px 0;
+}
+
+.vendaTimerDisplay {
+  font-size: 48px;
+  font-weight: 700;
+  color: #16a34a;
+  font-variant-numeric: tabular-nums;
+  display: block;
+}
+
+.vendaTimerLabel {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+  display: block;
+}
+
+/* Cards de meios de pagamento */
+
+.vendaPagamentoGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.vendaPagamentoCard {
+  border: 2px solid #000;
+  border-radius: 10px;
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #000;
+  background: #fff;
+}
+
+/* Oferta valida */
+
+.vendaOfertaValida {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border: 1.5px solid #16a34a;
+  border-radius: 8px;
+}
+
+.vendaOfertaLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.vendaOfertaTimer {
+  font-size: 20px;
+  font-weight: 700;
+  color: #16a34a;
+  font-variant-numeric: tabular-nums;
+}
+
+.vendaOfertaExpirada {
+  color: #dc2626;
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.vendaOfertaExpirada .vendaOfertaLabel,
+.vendaOfertaExpirada .vendaOfertaTimer {
+  color: #dc2626;
+}
+
+@media (max-width: 768px) {
+  .vendaHeader {
+    padding: 12px 16px;
+  }
+
+  .vendaContent {
+    padding: 24px 16px;
+  }
+
+  .vendaFormActions {
+    padding: 12px 16px;
+  }
+
+  .vendaStep3Layout {
+    grid-template-columns: 1fr;
+  }
+}
