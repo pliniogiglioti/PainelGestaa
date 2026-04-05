@@ -67,10 +67,10 @@ const CATEGORIA_ORDEM = new Map<string, number>(
 )
 
 const FORMAS_PAGAMENTO = [
-  { id: 'cartao', label: 'Divisao no cartao', hint: 'Entrada suave para fechar ainda hoje' },
-  { id: 'boleto', label: 'Divisao no boleto', hint: 'Parcelas organizadas para facilitar a decisao' },
-  { id: 'pix', label: 'Divisao no PIX', hint: 'Condicao agil para quem quer resolver agora' },
-  { id: 'carne', label: 'Divisao no carne', hint: 'Opcao acessivel para ampliar a chance de aceite' },
+  { id: 'cartao', label: 'Cartao', hint: 'Entrada suave para fechar ainda hoje' },
+  { id: 'boleto', label: 'Boleto', hint: 'Parcelas organizadas para facilitar a decisao' },
+  { id: 'pix', label: 'PIX', hint: 'Condicao agil para quem quer resolver agora' },
+  { id: 'carne', label: 'Carne', hint: 'Opcao acessivel para ampliar a chance de aceite' },
 ] as const
 
 function getCategoriaLabel(value?: string | null): string {
@@ -104,11 +104,35 @@ function buildPrecosPorCategoria(precos: EmpresaPreco[]) {
     ] as const)
 }
 
+function calculateSubtotal(itens: VendaItemDraft[]) {
+  return itens.reduce((total, item) => total + item.precoUnitario * item.quantidade, 0)
+}
+
+function buildFormaPagamento(subtotal: number, parcelas: number, taxaPercent: number) {
+  const qtdParcelas = Math.max(1, Math.floor(parcelas || 1))
+  const taxa = taxaPercent > 0 && taxaPercent < 100 ? taxaPercent / 100 : 0
+  const totalCobrado = taxa > 0 ? subtotal / (1 - taxa) : subtotal
+
+  return {
+    totalCobrado,
+    valorParcela: totalCobrado / qtdParcelas,
+    parcelas: qtdParcelas,
+  }
+}
+
 function formatCountdown(totalSeconds: number): string {
   const safe = Math.max(0, totalSeconds)
   const m = Math.floor(safe / 60)
   const s = safe % 60
   return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+}
+
+function formatCurrency(value: number): string {
+  return value.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+  })
 }
 
 function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
@@ -123,7 +147,9 @@ function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
 
 export default function VendaModal({
   precos,
+  taxaMaquinaPercent,
   configVendas,
+  maxParcelasCartaoPadrao,
   initialVenda,
   saving,
   error,
@@ -132,7 +158,7 @@ export default function VendaModal({
 }: VendaModalProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(initialVenda ? 4 : 1)
   const [clienteNome, setClienteNome] = useState<string>(initialVenda?.cliente_nome ?? '')
-  const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Planejamento A')
+  const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Proposta em planejamento')
   const [itens, setItens] = useState<VendaItemDraft[]>(() => mapVendaItensToDrafts(initialVenda?.itens ?? []))
   const [busca, setBusca] = useState<string>('')
   const [categoriaFiltro, setCategoriaFiltro] = useState<string | null>(null)
@@ -160,6 +186,35 @@ export default function VendaModal({
     .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
 
   const clienteNomeExibicao = clienteNome.trim() || 'seu paciente'
+  const subtotalSelecionado = calculateSubtotal(itens)
+  const formasPagamentoDisponiveis = FORMAS_PAGAMENTO
+    .map(forma => {
+      const maxParcelas = forma.id === 'cartao'
+        ? Math.max(0, configVendas?.vendas_max_cartao ?? maxParcelasCartaoPadrao)
+        : forma.id === 'boleto'
+          ? Math.max(0, configVendas?.vendas_max_boleto ?? 1)
+          : forma.id === 'pix'
+            ? Math.max(0, configVendas?.vendas_max_pix ?? 1)
+            : Math.max(0, configVendas?.vendas_max_carne ?? 1)
+
+      if (maxParcelas <= 0) return null
+
+      const taxaPercent = forma.id === 'cartao'
+        ? taxaMaquinaPercent
+        : forma.id === 'boleto'
+          ? (configVendas?.taxa_boleto_percent ?? 0)
+          : 0
+
+      const resumo = buildFormaPagamento(subtotalSelecionado, maxParcelas, taxaPercent)
+
+      return {
+        ...forma,
+        maxParcelas,
+        total: resumo.totalCobrado,
+        parcela: resumo.valorParcela,
+      }
+    })
+    .filter((forma): forma is NonNullable<typeof forma> => forma !== null)
 
   useEffect(() => {
     if (step === 1) input1Ref.current?.focus()
@@ -267,14 +322,14 @@ export default function VendaModal({
           {step === 2 && (
             <div className={styles.vendaStepWrapper}>
               <div className={styles.vendaStepCenter}>
-                <span className={styles.vendaStepLabel}>Nome do planejamento</span>
+                <span className={styles.vendaStepLabel}>Nome da proposta</span>
                 <input
                   ref={input2Ref}
                   className={styles.vendaStepInput}
                   value={planoNome}
                   onChange={e => setPlanoNome(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Enter') handleNextStep2() }}
-                  placeholder="Planejamento A"
+                  placeholder="Proposta em planejamento"
                   disabled={saving}
                 />
                 <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
@@ -285,6 +340,14 @@ export default function VendaModal({
           {/* Etapa 3 — produtos */}
           {step === 3 && (
             <div className={styles.vendaColLeft}>
+              <div className={styles.vendaResultadoHeader}>
+                <span className={styles.vendaResultadoLabel}>Proposta em planejamento</span>
+                <strong className={styles.vendaResultadoTitulo}>{planoNome.trim() || 'Proposta em planejamento'}</strong>
+                <span className={styles.vendaResultadoSub}>
+                  Selecione os produtos para montar a proposta de {clienteNomeExibicao}.
+                </span>
+              </div>
+
               <div className={styles.vendaSearch}>
                 <span className={styles.vendaSearchIcon}>⌕</span>
                 <input
@@ -333,7 +396,11 @@ export default function VendaModal({
                         <span className={`${styles.vendaCirculo} ${selecionado ? styles.vendaCirculoAtivo : ''}`}>
                           {selecionado && <span className={styles.vendaCirculoPonto} />}
                         </span>
-                        <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                        <span className={styles.vendaProdutoConteudo}>
+                          <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                          <span className={styles.vendaProdutoMeta}>{getCategoriaLabel(item.categoria)}</span>
+                          <strong className={styles.vendaProdutoValor}>{formatCurrency(item.preco)}</strong>
+                        </span>
                       </button>
                     )
                   })
@@ -381,7 +448,7 @@ export default function VendaModal({
                   </div>
 
                   <div className={styles.vendaMeiosLista}>
-                    {FORMAS_PAGAMENTO.map(forma => {
+                    {formasPagamentoDisponiveis.map(forma => {
                       const ativo = formaPagamento === forma.id
                       return (
                         <button
@@ -391,28 +458,28 @@ export default function VendaModal({
                           onClick={() => setFormaPagamento(prev => prev === forma.id ? null : forma.id)}
                           disabled={saving}
                         >
-                          <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
-                            {ativo && <span className={styles.vendaCirculoPonto} />}
-                          </span>
-                          <span className={styles.vendaMeioConteudo}>
+                          <div className={styles.vendaMeioTopo}>
                             <span className={styles.vendaMeioNome}>{forma.label}</span>
-                            <span className={styles.vendaMeioHint}>{forma.hint}</span>
+                            <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
+                              {ativo && <span className={styles.vendaCirculoPonto} />}
+                            </span>
+                          </div>
+                          <strong className={styles.vendaMeioValor}>{formatCurrency(forma.total)}</strong>
+                          <span className={styles.vendaMeioHint}>{forma.hint}</span>
+                          <span className={styles.vendaMeioParcelamento}>
+                            {forma.maxParcelas > 1
+                              ? `Ate ${forma.maxParcelas}x de ${formatCurrency(forma.parcela)}`
+                              : 'Pagamento a vista'}
                           </span>
+                          {forma.id === 'pix' && ofertaExpiraEm != null && (
+                            <span className={`${styles.vendaOfertaInline} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaInlineExpirada : ''}`}>
+                              {ofertaExpiraEm > 0 ? `Oferta valida por ${formatCountdown(ofertaExpiraEm)}` : 'Oferta expirada'}
+                            </span>
+                          )}
                         </button>
                       )
                     })}
                   </div>
-
-                  {ofertaExpiraEm != null && (
-                    <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
-                      <span className={styles.vendaOfertaLabel}>
-                        {ofertaExpiraEm > 0 ? 'Oferta valida por' : 'Oferta expirada'}
-                      </span>
-                      {ofertaExpiraEm > 0 && (
-                        <span className={styles.vendaOfertaTimer}>{formatCountdown(ofertaExpiraEm)}</span>
-                      )}
-                    </div>
-                  )}
                 </div>
               )}
             </div>
