@@ -1518,7 +1518,28 @@
 }
 
 /* ============================================================
-   VENDA FULL-SCREEN MODAL
+   VENDA MODAL — TEMA BRANCO
+   ============================================================ */
+
+/* Aplica light theme no modal de venda, mantendo o design padrao */
+.vendaModalWhite {
+  --bg-surface:  #ffffff;
+  --bg-elevated: #fafafa;
+  --bg-hover:    #f0f0f2;
+  --border:      #e2e2e5;
+  --text:        #18181b;
+  --text-muted:  #71717a;
+  --text-dim:    #a1a1aa;
+  --gold:        #16a34a;
+  --gold-light:  #22c55e;
+  --shadow-modal: 0 8px 40px rgba(0,0,0,0.15);
+  background: #ffffff;
+  color: #18181b;
+  border-color: #e2e2e5;
+}
+
+/* ============================================================
+   VENDA FULL-SCREEN MODAL (legacy — mantido para compatibilidade)
    ============================================================ */
 
 .vendaOverlay {

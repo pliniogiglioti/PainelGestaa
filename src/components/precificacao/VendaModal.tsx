@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useBackdropDismiss } from '../../hooks/useBackdropDismiss'
 import styles from '../../pages/PrecificacaoPage.module.css'
 import type {
   EmpresaPreco,
@@ -130,6 +131,8 @@ export default function VendaModal({
   onClose,
   onSubmit,
 }: VendaModalProps) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
+
   const [step, setStep] = useState<1 | 2 | 3>(initialVenda ? 3 : 1)
   const [clienteNome, setClienteNome] = useState<string>(initialVenda?.cliente_nome ?? '')
   const [planoNome, setPlanoNome] = useState<string>(initialVenda?.observacoes || 'Planejamento A')
@@ -156,14 +159,6 @@ export default function VendaModal({
     .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
 
   const meiosPagamentoLiberados = verificacaoIniciada && (meiosLiberadosEm ?? 0) <= 0
-
-  useEffect(() => {
-    const onEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !saving) onClose()
-    }
-    document.addEventListener('keydown', onEscape)
-    return () => document.removeEventListener('keydown', onEscape)
-  }, [saving, onClose])
 
   useEffect(() => {
     if (!verificacaoIniciada || meiosLiberadosEm == null || meiosLiberadosEm <= 0) return undefined
@@ -227,201 +222,172 @@ export default function VendaModal({
     goToStep2()
   }
 
-  const headerSub =
-    step >= 3 ? `${clienteNome.trim()} — ${planoNome.trim()}` :
-    step === 2 ? clienteNome.trim() :
-    undefined
-
   return (
-    <div className={styles.vendaOverlay}>
-
-      {/* Cabeçalho */}
-      <div className={styles.vendaHeader}>
-        <div className={styles.vendaHeaderInfo}>
-          <h2 className={styles.modalTitle}>
-            {initialVenda ? 'Editar venda' : 'Nova venda'}
-          </h2>
-          {headerSub && (
-            <p className={styles.calcItemName}>{headerSub}</p>
-          )}
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div
+        className={`${styles.modal} ${step === 3 ? styles.saleModal : ''} ${styles.vendaModalWhite}`}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.modalHeader}>
+          <div>
+            <h2 className={styles.modalTitle}>
+              {initialVenda ? 'Editar venda' : 'Nova venda'}
+            </h2>
+            {step >= 2 && (
+              <p className={styles.calcItemName}>
+                {step >= 3 ? `${clienteNome.trim()} — ${planoNome.trim()}` : clienteNome.trim()}
+              </p>
+            )}
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose} disabled={saving}>
+            ×
+          </button>
         </div>
-        <button type="button" className={styles.modalClose} onClick={onClose} disabled={saving}>
-          ×
-        </button>
-      </div>
 
-      {/* Conteúdo */}
-      <div className={styles.vendaContent}>
+        <div className={step === 3 ? styles.saleForm : `${styles.saleForm} ${styles.saleFormSingleColumn}`}>
 
-        {/* ── Etapa 1: Nome do cliente ── */}
-        {step === 1 && (
-          <div className={styles.vendaStepWrap}>
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Nome do cliente</span>
-              <input
-                className={styles.modalInput}
-                value={clienteNome}
-                onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
-                onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
-                placeholder="Ex: Maria Silva"
-                autoFocus
-                disabled={saving}
-              />
-            </label>
-            {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
-          </div>
-        )}
+          {/* Coluna principal */}
+          <div className={styles.saleFormMain}>
 
-        {/* ── Etapa 2: Nome do planejamento ── */}
-        {step === 2 && (
-          <div className={styles.vendaStepWrap}>
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Nome do planejamento</span>
-              <input
-                className={styles.modalInput}
-                value={planoNome}
-                onChange={e => setPlanoNome(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') goToStep3() }}
-                placeholder="Ex: Planejamento A"
-                autoFocus
-                disabled={saving}
-              />
-            </label>
-            {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
-          </div>
-        )}
-
-        {/* ── Etapa 3: Produtos + pagamento ── */}
-        {step === 3 && (
-          <div className={styles.vendaStep3Layout}>
-
-            {/* Coluna esquerda — produtos */}
-            <div className={styles.vendaStep3Left}>
-
-              {/* Busca */}
-              <input
-                className={styles.modalInput}
-                value={busca}
-                onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
-                placeholder="Buscar produto ou servico..."
-                disabled={saving}
-              />
-
-              {/* Chips de categoria */}
-              <div className={styles.vendaCategoriaChips}>
-                <button
-                  type="button"
-                  className={`${styles.btnSecondary} ${!categoriaFiltro ? styles.btnPrimary : ''}`}
-                  style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999 }}
-                  onClick={() => { setCategoriaFiltro(null); setBusca('') }}
-                >
-                  Todos
-                </button>
-                {categorias.map(cat => (
-                  <button
-                    key={cat}
-                    type="button"
-                    className={`${styles.btnSecondary} ${categoriaFiltro === cat ? styles.btnPrimary : ''}`}
-                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999, whiteSpace: 'nowrap' }}
-                    onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
-                  >
-                    {cat}
-                  </button>
-                ))}
-              </div>
-
-              {/* Lista de produtos — SEM precos */}
-              <div className={styles.vendaProdutosLista}>
-                {produtosFiltrados.length === 0 ? (
-                  <p className={styles.sectionHint}>Nenhum produto encontrado.</p>
-                ) : (
-                  produtosFiltrados.map(item => {
-                    const selecionado = produtosSelecionadosIds.has(item.id)
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={styles.vendaProdutoCard}
-                        style={selecionado ? { borderColor: 'var(--text)', background: 'var(--bg-hover)' } : {}}
-                        onClick={() => toggleProduto(item)}
-                        disabled={saving}
-                      >
-                        {/* Checkbox */}
-                        <span style={{
-                          width: 18,
-                          height: 18,
-                          border: `2px solid ${selecionado ? 'var(--text)' : 'var(--text-muted)'}`,
-                          borderRadius: 4,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: selecionado ? 'var(--text)' : 'transparent',
-                          flexShrink: 0,
-                          fontSize: 11,
-                          fontWeight: 700,
-                          color: 'var(--bg-surface)',
-                        }}>
-                          {selecionado ? '✓' : ''}
-                        </span>
-                        <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
-                      </button>
-                    )
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Coluna direita — resumo e pagamento */}
-            <div className={styles.vendaStep3Right}>
-
-              {/* Resumo — sem precos */}
-              <div className={styles.saleSummaryCard}>
-                <h3 className={styles.sectionTitle}>Itens selecionados</h3>
-                <div className={styles.summaryLine}>
-                  <span>Cliente</span>
-                  <strong>{clienteNome.trim() || '—'}</strong>
-                </div>
-                <div className={styles.summaryLine}>
-                  <span>Planejamento</span>
-                  <strong>{planoNome.trim() || '—'}</strong>
-                </div>
-                <div className={styles.summaryLine}>
-                  <span>Itens</span>
-                  <strong>{itens.length}</strong>
-                </div>
-
-                {itens.length > 0 && (
-                  <div className={styles.saleItemList} style={{ marginTop: 8 }}>
-                    {itens.map(item => (
-                      <div key={item.id} className={styles.saleItemRow}>
-                        <strong className={styles.saleItemName}>{item.descricao}</strong>
-                        <button
-                          type="button"
-                          className={styles.removeButton}
-                          onClick={() => setItens(prev => prev.filter(i => i.id !== item.id))}
-                        >
-                          Remover
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Verificar / Timer / Cards de pagamento */}
-              {!verificacaoIniciada ? (
-                <button
-                  type="button"
-                  className={styles.modalSubmit}
-                  onClick={handleVerificarMeios}
+            {/* Etapa 1 — nome */}
+            {(step === 1 || step === 2) && (
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Nome do cliente</span>
+                <input
+                  className={styles.modalInput}
+                  value={clienteNome}
+                  onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
+                  onKeyDown={e => { if (e.key === 'Enter' && step === 1) handleNextStep1() }}
+                  placeholder="Ex: Maria Silva"
+                  autoFocus={step === 1}
                   disabled={saving}
-                  style={{ width: '100%' }}
-                >
-                  Verificar meios de pagamento
-                </button>
+                />
+              </label>
+            )}
+
+            {/* Etapa 2 — planejamento */}
+            {step === 2 && (
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Nome do planejamento</span>
+                <input
+                  className={styles.modalInput}
+                  value={planoNome}
+                  onChange={e => setPlanoNome(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') goToStep3() }}
+                  placeholder="Ex: Planejamento A"
+                  autoFocus
+                  disabled={saving}
+                />
+              </label>
+            )}
+
+            {/* Etapa 3 — produtos */}
+            {step === 3 && (
+              <div className={styles.addItemPanel}>
+                <div className={styles.addItemHeader}>
+                  <h3 className={styles.sectionTitle}>Produtos e servicos</h3>
+                  <span className={styles.sectionHint}>Selecione os itens do planejamento</span>
+                </div>
+
+                <input
+                  className={styles.modalInput}
+                  value={busca}
+                  onChange={e => { setBusca(e.target.value); setCategoriaFiltro(null) }}
+                  placeholder="Buscar produto..."
+                  disabled={saving}
+                />
+
+                <div className={styles.vendaCategoriaChips}>
+                  <button
+                    type="button"
+                    className={!categoriaFiltro ? styles.modalSubmit : styles.btnSecondary}
+                    style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999 }}
+                    onClick={() => { setCategoriaFiltro(null); setBusca('') }}
+                  >
+                    Todos
+                  </button>
+                  {categorias.map(cat => (
+                    <button
+                      key={cat}
+                      type="button"
+                      className={categoriaFiltro === cat ? styles.modalSubmit : styles.btnSecondary}
+                      style={{ fontSize: 12, padding: '4px 12px', borderRadius: 999, whiteSpace: 'nowrap' }}
+                      onClick={() => { setCategoriaFiltro(prev => prev === cat ? null : cat); setBusca('') }}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Lista — sem preços */}
+                <div className={styles.vendaProdutosLista}>
+                  {produtosFiltrados.length === 0 ? (
+                    <p className={styles.sectionHint}>Nenhum produto encontrado.</p>
+                  ) : (
+                    produtosFiltrados.map(item => {
+                      const selecionado = produtosSelecionadosIds.has(item.id)
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className={styles.vendaProdutoCard}
+                          style={selecionado ? { borderColor: 'var(--text)', background: 'var(--bg-hover)' } : {}}
+                          onClick={() => toggleProduto(item)}
+                          disabled={saving}
+                        >
+                          <span style={{
+                            width: 16,
+                            height: 16,
+                            border: `2px solid ${selecionado ? 'var(--text)' : 'var(--text-dim)'}`,
+                            borderRadius: 3,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            background: selecionado ? 'var(--text)' : 'transparent',
+                            flexShrink: 0,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            color: 'var(--bg-surface)',
+                          }}>
+                            {selecionado ? '✓' : ''}
+                          </span>
+                          <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
+                        </button>
+                      )
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Coluna lateral — pagamento (só na etapa 3) */}
+          {step === 3 && (
+            <div className={styles.saleFormSidebar}>
+
+              {!verificacaoIniciada ? (
+                <div className={styles.saleSummaryCard}>
+                  <h3 className={styles.sectionTitle}>Meios de pagamento</h3>
+                  <p className={styles.sectionHint}>
+                    Clique no botao abaixo para iniciar o timer e liberar as opcoes de pagamento.
+                  </p>
+                  <button
+                    type="button"
+                    className={styles.modalSubmit}
+                    onClick={handleVerificarMeios}
+                    disabled={saving}
+                    style={{ width: '100%', marginTop: 8 }}
+                  >
+                    Verificar meios de pagamento
+                  </button>
+                </div>
               ) : !meiosPagamentoLiberados ? (
                 <div className={styles.saleSummaryCard} style={{ textAlign: 'center' }}>
-                  <span className={styles.sectionHint}>Liberando meios de pagamento...</span>
+                  <p className={styles.sectionHint}>Liberando meios de pagamento...</p>
                   <div className={styles.vendaTimerDisplay}>
                     {formatCountdown(meiosLiberadosEm ?? 0)}
                   </div>
@@ -439,7 +405,6 @@ export default function VendaModal({
                 </div>
               )}
 
-              {/* Oferta valida */}
               {ofertaExpiraEm != null && (
                 <div className={`${styles.vendaOfertaValida} ${ofertaExpiraEm <= 0 ? styles.vendaOfertaExpirada : ''}`}>
                   <span className={styles.vendaOfertaLabel}>
@@ -452,54 +417,50 @@ export default function VendaModal({
                   )}
                 </div>
               )}
-
-              {(erroLocal || error) && (
-                <p className={styles.formError}>{erroLocal || error}</p>
-              )}
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Rodapé */}
-      <div className={styles.vendaFormActions}>
-        <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-          Cancelar
-        </button>
-
-        <div style={{ display: 'flex', gap: 12 }}>
-          {step === 1 && (
-            <button type="button" className={styles.modalSubmit} disabled={saving} onClick={handleNextStep1}>
-              Proximo passo
-            </button>
           )}
-          {step === 2 && (
-            <>
-              <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep1}>
-                Voltar
+        </div>
+
+        {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {step === 1 && (
+              <button type="button" className={styles.modalSubmit} disabled={saving} onClick={handleNextStep1}>
+                Proximo passo
               </button>
-              <button type="button" className={styles.modalSubmit} disabled={saving} onClick={goToStep3}>
-                Proximo
-              </button>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              {!initialVenda && (
-                <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep2}>
+            )}
+            {step === 2 && (
+              <>
+                <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep1}>
                   Voltar
                 </button>
-              )}
-              <button
-                type="button"
-                className={styles.modalSubmit}
-                disabled={saving}
-                onClick={() => { void handleSave() }}
-              >
-                {saving ? 'Salvando...' : initialVenda ? 'Salvar' : 'Criar venda'}
-              </button>
-            </>
-          )}
+                <button type="button" className={styles.modalSubmit} disabled={saving} onClick={goToStep3}>
+                  Proximo
+                </button>
+              </>
+            )}
+            {step === 3 && (
+              <>
+                {!initialVenda && (
+                  <button type="button" className={styles.modalCancel} disabled={saving} onClick={goToStep2}>
+                    Voltar
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={styles.modalSubmit}
+                  disabled={saving}
+                  onClick={() => { void handleSave() }}
+                >
+                  {saving ? 'Salvando...' : initialVenda ? 'Salvar' : 'Criar venda'}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>
