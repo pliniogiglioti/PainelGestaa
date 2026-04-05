@@ -1626,18 +1626,12 @@
 .vendaStepInput {
   width: 100%;
   border: none;
-  border-bottom: 2px solid #e5e7eb;
   padding: 10px 0;
   font-size: 28px;
   font-weight: 600;
   color: #18181b;
   background: transparent;
   outline: none;
-  transition: border-color 0.2s;
-}
-
-.vendaStepInput:focus {
-  border-bottom-color: #18181b;
 }
 
 .vendaStepHint {
