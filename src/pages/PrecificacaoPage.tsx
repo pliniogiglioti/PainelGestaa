@@ -145,9 +145,6 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 ] as const
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
-const CATEGORIA_ORDEM = new Map<string, number>(
-  PRECIFICACAO_CATEGORIAS_ODONTO.map((categoria, index) => [categoria, index]),
-)
 
 function Spinner() {
   return <div className={styles.spinner} />
@@ -170,41 +167,6 @@ function normalizeCategoria(value?: string | null) {
 
 function getCategoriaLabel(value?: string | null) {
   return normalizeCategoria(value) ?? CATEGORIA_SEM_CADASTRO
-}
-
-function compareCategorias(a: string, b: string) {
-  const aIsEmpty = a === CATEGORIA_SEM_CADASTRO
-  const bIsEmpty = b === CATEGORIA_SEM_CADASTRO
-
-  if (aIsEmpty && !bIsEmpty) return 1
-  if (!aIsEmpty && bIsEmpty) return -1
-
-  const aOrder = CATEGORIA_ORDEM.get(a)
-  const bOrder = CATEGORIA_ORDEM.get(b)
-
-  if (aOrder != null && bOrder != null) return aOrder - bOrder
-  if (aOrder != null) return -1
-  if (bOrder != null) return 1
-
-  return a.localeCompare(b, 'pt-BR')
-}
-
-function buildPrecosPorCategoria(precos: EmpresaPreco[]) {
-  const grouped = new Map<string, EmpresaPreco[]>()
-
-  for (const item of precos) {
-    const categoria = getCategoriaLabel(item.categoria)
-    const current = grouped.get(categoria) ?? []
-    current.push(item)
-    grouped.set(categoria, current)
-  }
-
-  return [...grouped.entries()]
-    .sort(([a], [b]) => compareCategorias(a, b))
-    .map(([categoria, itens]) => [
-      categoria,
-      [...itens].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR')),
-    ] as const)
 }
 
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
@@ -382,16 +344,6 @@ function formatCountdown(totalSeconds: number) {
   }
 
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-}
-
-function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
-  return itens.map(item => ({
-    id: item.id,
-    empresaPrecoId: item.empresa_preco_id,
-    descricao: item.descricao,
-    precoUnitario: item.preco_unitario,
-    quantidade: item.quantidade,
-  }))
 }
 
 function PrecoModal({
