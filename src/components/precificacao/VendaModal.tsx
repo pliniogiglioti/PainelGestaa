@@ -286,6 +286,29 @@ export default function VendaModal({
     setStep(3)
   }
 
+  const handleBack = () => {
+    if (step === 2) {
+      setErroLocal('')
+      setStep(1)
+      return
+    }
+
+    if (step === 3) {
+      setErroLocal('')
+      setStep(2)
+      return
+    }
+
+    if (step === 4) {
+      setErroLocal('')
+      setFormaPagamento(null)
+      setVerificacaoIniciada(false)
+      setMeiosLiberadosEm(null)
+      setOfertaExpiraEm(null)
+      setStep(3)
+    }
+  }
+
   return (
     <div className={styles.vendaOverlay} onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }}>
       <div className={styles.vendaContainer}>
@@ -499,6 +522,19 @@ export default function VendaModal({
               onClick={() => { void handleSave() }}
             >
               {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+        )}
+
+        {!initialVenda && step > 1 && (
+          <div className={styles.vendaFooter}>
+            <button
+              type="button"
+              className={styles.vendaBackLink}
+              onClick={handleBack}
+              disabled={saving}
+            >
+              Voltar
             </button>
           </div>
         )}

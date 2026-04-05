@@ -1604,8 +1604,9 @@
 .vendaStepWrapper {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 12px;
 }
 
 /* ── Etapas 1 e 2: centralizadas ── */
@@ -2060,6 +2061,28 @@
   align-items: center;
   justify-content: flex-end;
   background: rgba(255, 255, 255, 0.92);
+}
+
+.vendaBackLink {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: #475569;
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.vendaBackLink:hover:not(:disabled) {
+  color: #0f172a;
+}
+
+.vendaBackLink:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .vendaSalvarBtn {
