@@ -6,7 +6,11 @@
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\plini\\\\Documents\\\\repositoriogit\\\\PainelGestaa && npx tsc --noEmit && echo BUILD_OK || echo BUILD_FAILED\")",
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\plini\\\\Documents\\\\repositoriogit\\\\PainelGestaa && node_modules\\\\.bin\\\\tsc --noEmit 2>&1 && echo TS_OK\")",
       "Bash(cmd /c \"cd /d C:\\\\Users\\\\plini\\\\Documents\\\\repositoriogit\\\\PainelGestaa && node_modules\\\\.bin\\\\tsc --noEmit > tsc_output.txt 2>&1 & echo done\")",
-      "Bash(cmd /c \"timeout /t 30 && type C:\\\\Users\\\\plini\\\\Documents\\\\repositoriogit\\\\PainelGestaa\\\\tsc_output.txt\")"
+      "Bash(cmd /c \"timeout /t 30 && type C:\\\\Users\\\\plini\\\\Documents\\\\repositoriogit\\\\PainelGestaa\\\\tsc_output.txt\")",
+      "Bash(npx vite:*)",
+      "Bash(npm run:*)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }
