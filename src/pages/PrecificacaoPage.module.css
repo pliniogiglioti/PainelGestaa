@@ -1604,9 +1604,9 @@
 .vendaStepWrapper {
   flex: 1;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding-top: 12px;
+  padding-top: 0;
 }
 
 /* ── Etapas 1 e 2: centralizadas ── */
@@ -2061,6 +2061,12 @@
   align-items: center;
   justify-content: flex-end;
   background: rgba(255, 255, 255, 0.92);
+}
+
+.vendaFooterCentered {
+  justify-content: center;
+  border-top: none;
+  padding-top: 8px;
 }
 
 .vendaBackLink {

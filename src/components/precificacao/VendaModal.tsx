@@ -527,7 +527,7 @@ export default function VendaModal({
         )}
 
         {!initialVenda && step > 1 && (
-          <div className={styles.vendaFooter}>
+          <div className={`${styles.vendaFooter} ${styles.vendaFooterCentered}`}>
             <button
               type="button"
               className={styles.vendaBackLink}
