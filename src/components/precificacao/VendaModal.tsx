@@ -456,7 +456,7 @@ export default function VendaModal({
                     Procurando propostas de pagamento para {clienteNomeExibicao}
                   </span>
                   <span className={styles.vendaProcurandoSub}>
-                    A IA esta montando as melhores condicoes para aumentar a chance de fechamento.
+                    O sistema esta montando as melhores condicoes para aumentar a chance de fechamento.
                   </span>
                 </div>
               ) : (
@@ -534,7 +534,8 @@ export default function VendaModal({
               onClick={handleBack}
               disabled={saving}
             >
-              Voltar
+              <span aria-hidden="true">←</span>
+              <span>Voltar</span>
             </button>
           </div>
         )}
