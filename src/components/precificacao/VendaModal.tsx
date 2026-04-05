@@ -244,36 +244,40 @@ export default function VendaModal({
 
           {/* Etapa 1 — nome do cliente */}
           {step === 1 && (
-            <div className={styles.vendaStepCenter}>
-              <span className={styles.vendaStepLabel}>Como se chama o seu paciente?</span>
-              <input
-                ref={input1Ref}
-                className={styles.vendaStepInput}
-                value={clienteNome}
-                onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
-                onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
-                placeholder="Nome completo"
-                disabled={saving}
-              />
-              {erroLocal && <span className={styles.vendaErro}>{erroLocal}</span>}
-              <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
+            <div className={styles.vendaStepWrapper}>
+              <div className={styles.vendaStepCenter}>
+                <span className={styles.vendaStepLabel}>Como se chama o seu paciente?</span>
+                <input
+                  ref={input1Ref}
+                  className={styles.vendaStepInput}
+                  value={clienteNome}
+                  onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
+                  onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
+                  placeholder="Nome completo"
+                  disabled={saving}
+                />
+                {erroLocal && <span className={styles.vendaErro}>{erroLocal}</span>}
+                <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
+              </div>
             </div>
           )}
 
           {/* Etapa 2 — nome do planejamento */}
           {step === 2 && (
-            <div className={styles.vendaStepCenter}>
-              <span className={styles.vendaStepLabel}>Nome do planejamento</span>
-              <input
-                ref={input2Ref}
-                className={styles.vendaStepInput}
-                value={planoNome}
-                onChange={e => setPlanoNome(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleNextStep2() }}
-                placeholder="Planejamento A"
-                disabled={saving}
-              />
-              <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
+            <div className={styles.vendaStepWrapper}>
+              <div className={styles.vendaStepCenter}>
+                <span className={styles.vendaStepLabel}>Nome do planejamento</span>
+                <input
+                  ref={input2Ref}
+                  className={styles.vendaStepInput}
+                  value={planoNome}
+                  onChange={e => setPlanoNome(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleNextStep2() }}
+                  placeholder="Planejamento A"
+                  disabled={saving}
+                />
+                <span className={styles.vendaStepHint}>Pressione Enter para continuar</span>
+              </div>
             </div>
           )}
 

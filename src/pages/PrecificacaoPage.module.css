@@ -1593,11 +1593,22 @@
   flex: 1;
   overflow-y: auto;
   padding: 60px 56px 40px;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Wrapper de centralização vertical (etapas 1 e 2) ── */
+.vendaStepWrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Etapas 1 e 2: centralizadas ── */
 .vendaStepCenter {
   max-width: 520px;
+  width: 100%;
   display: flex;
   flex-direction: column;
   gap: 6px;
