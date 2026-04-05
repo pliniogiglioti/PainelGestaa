@@ -701,6 +701,10 @@
   gap: 18px;
 }
 
+.saleFormSingleColumn {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .modalTextarea {
   resize: vertical;
   min-height: 88px;
