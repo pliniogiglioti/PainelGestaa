@@ -1518,10 +1518,9 @@
 }
 
 /* ============================================================
-   VENDA MODAL — TEMA BRANCO
+   VENDA MODAL PREMIUM
    ============================================================ */
 
-/* Aplica light theme no modal de venda, mantendo o design padrao */
 .vendaModalWhite {
   --bg-surface:  #ffffff;
   --bg-elevated: #fafafa;
@@ -1538,397 +1537,382 @@
   border-color: #e2e2e5;
 }
 
-/* ============================================================
-   VENDA FULL-SCREEN MODAL (legacy — mantido para compatibilidade)
-   ============================================================ */
-
+/* ── Overlay: tela cheia com margem ── */
 .vendaOverlay {
-  /* força light theme dentro do modal */
-  --bg:          #f4f4f5;
-  --bg-surface:  #ffffff;
-  --bg-elevated: #fafafa;
-  --bg-hover:    #e8e8ea;
-  --border:      #e2e2e5;
-  --text:        #18181b;
-  --text-muted:  #71717a;
-  --text-dim:    #a1a1aa;
-  --shadow-modal: 0 8px 40px rgba(0,0,0,0.15);
-  --gold:        #16a34a;
-  --gold-light:  #22c55e;
-
   position: fixed;
   inset: 0;
-  background: #ffffff;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   z-index: 1000;
   display: flex;
-  flex-direction: column;
-  overflow-y: auto;
-  color: #18181b;
+  align-items: stretch;
+  justify-content: stretch;
+  padding: 20px;
 }
 
-.vendaHeader {
-  position: sticky;
-  top: 0;
+/* ── Container principal: preenche o overlay com margem ── */
+.vendaContainer {
+  flex: 1;
   background: #ffffff;
-  border-bottom: 2px solid #000;
-  padding: 16px 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  z-index: 10;
-  flex-shrink: 0;
-}
-
-.vendaHeaderInfo {
+  border-radius: 20px;
+  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.28);
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  overflow: hidden;
+  position: relative;
 }
 
-.vendaHeaderTitle {
-  margin: 0;
-  font-size: 20px;
-  font-weight: 700;
-  color: #000;
-  line-height: 1.2;
-}
-
-.vendaHeaderSub {
-  font-size: 13px;
-  color: #555;
-  margin: 0;
-}
-
-.vendaClose {
-  background: none;
-  border: 2px solid #000;
-  border-radius: 6px;
-  font-size: 20px;
+/* ── Botão X flutuante ── */
+.vendaCloseBtn {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 20;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: #18181b;
+  font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  color: #000;
-  padding: 2px 10px;
-}
-
-.vendaClose:hover {
-  background: #000;
-  color: #fff;
-}
-
-.vendaContent {
-  flex: 1;
-  padding: 40px 32px;
-}
-
-.vendaStepWrap {
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-.vendaFieldLabel {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: #000;
-  margin-bottom: 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.vendaInput {
-  width: 100%;
-  border: 2px solid #000;
-  border-radius: 8px;
-  padding: 13px 16px;
-  font-size: 17px;
-  color: #000;
-  background: #fff;
-  outline: none;
-  box-sizing: border-box;
-  font-weight: 500;
-}
-
-.vendaInput:focus {
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.08);
-}
-
-.vendaBtnPrimary {
-  background: #000;
-  color: #fff;
-  border: 2px solid #000;
-  border-radius: 8px;
-  padding: 13px 32px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.vendaBtnPrimary:hover:not(:disabled) {
-  background: #222;
-}
-
-.vendaBtnPrimary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.vendaBtnSecondary {
-  background: #fff;
-  color: #000;
-  border: 2px solid #000;
-  border-radius: 8px;
-  padding: 11px 28px;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-}
-
-.vendaBtnSecondary:hover:not(:disabled) {
-  background: #f5f5f5;
-}
-
-.vendaBtnSecondary:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.vendaFormActions {
-  position: sticky;
-  bottom: 0;
-  background: #fff;
-  border-top: 2px solid #000;
-  padding: 16px 32px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
+  justify-content: center;
+  transition: background 0.15s;
 }
 
-.vendaFormError {
-  color: #dc2626;
-  font-size: 14px;
-  font-weight: 500;
-  margin: 0;
+.vendaCloseBtn:hover {
+  background: rgba(0, 0, 0, 0.12);
 }
 
-/* === Step 3 — layout 2 colunas === */
-
-.vendaStep3Layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 32px;
-  max-width: 1200px;
+/* ── Área de conteúdo rolável ── */
+.vendaBody {
+  flex: 1;
+  overflow-y: auto;
+  padding: 60px 56px 40px;
 }
 
-.vendaStep3Left {
+/* ── Etapas 1 e 2: centralizadas ── */
+.vendaStepCenter {
+  max-width: 520px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 6px;
 }
 
-.vendaStep3Right {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
+.vendaStepLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 4px;
 }
 
-/* Busca de produto */
-
-.vendaBuscaInput {
+.vendaStepInput {
   width: 100%;
-  border: 2px solid #000;
-  border-radius: 8px;
-  padding: 11px 14px;
-  font-size: 15px;
-  color: #000;
-  background: #fff;
+  border: none;
+  border-bottom: 2px solid #e5e7eb;
+  padding: 10px 0;
+  font-size: 28px;
+  font-weight: 600;
+  color: #18181b;
+  background: transparent;
   outline: none;
+  transition: border-color 0.2s;
+}
+
+.vendaStepInput:focus {
+  border-bottom-color: #18181b;
+}
+
+.vendaStepHint {
+  font-size: 13px;
+  color: #9ca3af;
+  margin-top: 8px;
+}
+
+/* ── Layout etapa 3 ── */
+.vendaLayout3 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 40px;
+  height: 100%;
+}
+
+.vendaColLeft {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vendaColRight {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-left: 1px solid #f0f0f0;
+  padding-left: 40px;
+}
+
+/* ── Busca ── */
+.vendaSearch {
+  position: relative;
+}
+
+.vendaSearchInput {
+  width: 100%;
+  background: #f8f8f8;
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 12px 16px 12px 42px;
+  font-size: 14px;
+  color: #18181b;
+  outline: none;
+  transition: all 0.15s;
   box-sizing: border-box;
 }
 
-.vendaBuscaInput:focus {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.08);
+.vendaSearchInput:focus {
+  background: #fff;
+  border-color: #e5e7eb;
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.04);
 }
 
-/* Chips de categoria */
+.vendaSearchIcon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+  font-size: 15px;
+}
 
-.vendaCategoriaChips {
+/* ── Chips de categoria ── */
+.vendaChips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-.vendaCategoriaChip {
-  padding: 5px 13px;
-  border: 1.5px solid #d1d5db;
+.vendaChip {
+  padding: 5px 14px;
+  border: 1.5px solid #e5e7eb;
   border-radius: 999px;
   font-size: 12px;
   font-weight: 500;
-  color: #000;
+  color: #71717a;
   background: #fff;
   cursor: pointer;
-  transition: all 0.12s;
+  transition: all 0.15s;
   white-space: nowrap;
 }
 
-.vendaCategoriaChip:hover {
-  border-color: #000;
+.vendaChip:hover {
+  border-color: #18181b;
+  color: #18181b;
 }
 
-.vendaCategoriaChipAtivo {
-  border-color: #000;
-  background: #000;
+.vendaChipAtivo {
+  background: #18181b;
+  border-color: #18181b;
   color: #fff;
 }
 
-/* Cards de produto com checkbox */
-
-.vendaProdutosLista {
+/* ── Lista de produtos ── */
+.vendaProdutoLista {
   display: flex;
   flex-direction: column;
-  gap: 7px;
+  gap: 6px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(100vh - 380px);
+  padding-right: 4px;
 }
 
-.vendaProdutoCard {
+.vendaProdutoItem {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 13px 16px;
-  border: 2px solid #e5e7eb;
-  border-radius: 10px;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1.5px solid #f0f0f0;
+  border-radius: 14px;
   cursor: pointer;
   background: #fff;
-  transition: all 0.12s;
-  user-select: none;
-  color: #000;
+  transition: all 0.18s ease;
+  text-align: left;
+  color: #18181b;
+  width: 100%;
 }
 
-.vendaProdutoCard:hover {
-  border-color: #9ca3af;
+.vendaProdutoItem:hover {
+  border-color: #e5e7eb;
+  background: #fafafa;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
-.vendaProdutoCardSelecionado {
-  border-color: #000;
-  background: #000;
-  color: #fff;
+.vendaProdutoItemAtivo {
+  border-color: #16a34a;
+  background: #f0fdf4;
 }
 
-.vendaProdutoCheckbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #9ca3af;
-  border-radius: 4px;
+.vendaProdutoItemAtivo:hover {
+  border-color: #16a34a;
+  background: #dcfce7;
+}
+
+/* ── Círculo de seleção ── */
+.vendaCirculo {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-size: 12px;
-  font-weight: 700;
+  transition: all 0.18s ease;
+  background: #fff;
 }
 
-.vendaProdutoCardSelecionado .vendaProdutoCheckbox {
-  border-color: #fff;
+.vendaCirculoAtivo {
+  border-color: #16a34a;
+  background: #16a34a;
+}
+
+.vendaCirculoPonto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
   background: #fff;
-  color: #000;
 }
 
 .vendaProdutoNome {
   font-size: 14px;
   font-weight: 500;
+  color: inherit;
   flex: 1;
-  text-align: left;
 }
 
-/* Painel direito — resumo */
+/* ── Botão verificar meios ── */
+.vendaVerificarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px 24px;
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  margin-top: 8px;
+  letter-spacing: 0.01em;
+}
 
-.vendaResumoCard {
-  border: 2px solid #000;
-  border-radius: 12px;
-  padding: 20px;
+.vendaVerificarBtn:hover:not(:disabled) {
+  background: #27272a;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.vendaVerificarBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Estado "procurando" ── */
+.vendaProcurando {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.vendaProcurandoTexto {
+  font-size: 15px;
+  font-weight: 500;
+  color: #18181b;
+}
+
+.vendaProcurandoTimer {
+  font-size: 52px;
+  font-weight: 700;
+  color: #16a34a;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.vendaProcurandoSub {
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* ── Cards de meios de pagamento ── */
+.vendaMeiosLista {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
 
-.vendaResumoLabel {
-  font-size: 11px;
-  font-weight: 700;
-  color: #555;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  margin: 0;
-}
-
-.vendaResumoValor {
-  font-size: 32px;
-  font-weight: 700;
-  color: #16a34a;
-  line-height: 1;
-  margin: 0;
-}
-
-.vendaResumoItens {
-  font-size: 13px;
-  color: #555;
-  margin: 0;
-}
-
-/* Timer de liberacao */
-
-.vendaTimerWrap {
-  text-align: center;
-  padding: 16px 0;
-}
-
-.vendaTimerDisplay {
-  font-size: 48px;
-  font-weight: 700;
-  color: #16a34a;
-  font-variant-numeric: tabular-nums;
-  display: block;
-}
-
-.vendaTimerLabel {
-  font-size: 12px;
-  color: #666;
-  margin-top: 4px;
-  display: block;
-}
-
-/* Cards de meios de pagamento */
-
-.vendaPagamentoGrid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.vendaPagamentoCard {
-  border: 2px solid #000;
-  border-radius: 10px;
-  padding: 18px 12px;
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #000;
+.vendaMeioCard {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1.5px solid #f0f0f0;
+  border-radius: 14px;
+  cursor: pointer;
   background: #fff;
+  transition: all 0.18s ease;
+  text-align: left;
+  width: 100%;
+  color: #18181b;
 }
 
-/* Oferta valida */
+.vendaMeioCard:hover {
+  border-color: #e5e7eb;
+  background: #fafafa;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
 
+.vendaMeioCardAtivo {
+  border-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.vendaMeioCardAtivo:hover {
+  background: #dcfce7;
+}
+
+.vendaMeioNome {
+  font-size: 14px;
+  font-weight: 600;
+  color: inherit;
+}
+
+/* ── Oferta válida ── */
 .vendaOfertaValida {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 14px 18px;
   background: #f0fdf4;
   border: 1.5px solid #16a34a;
-  border-radius: 8px;
+  border-radius: 12px;
+  margin-top: 4px;
 }
 
 .vendaOfertaLabel {
@@ -1945,30 +1929,81 @@
 }
 
 .vendaOfertaExpirada {
-  color: #dc2626;
-  border-color: #dc2626;
   background: #fef2f2;
+  border-color: #ef4444;
 }
 
 .vendaOfertaExpirada .vendaOfertaLabel,
 .vendaOfertaExpirada .vendaOfertaTimer {
-  color: #dc2626;
+  color: #ef4444;
 }
 
-@media (max-width: 768px) {
-  .vendaHeader {
-    padding: 12px 16px;
-  }
+/* ── Rodapé ── */
+.vendaFooter {
+  border-top: 1px solid #f0f0f0;
+  padding: 16px 56px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
 
-  .vendaContent {
-    padding: 24px 16px;
-  }
+.vendaSalvarBtn {
+  padding: 13px 36px;
+  background: #18181b;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  letter-spacing: 0.01em;
+}
 
-  .vendaFormActions {
-    padding: 12px 16px;
-  }
+.vendaSalvarBtn:hover:not(:disabled) {
+  background: #27272a;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
 
-  .vendaStep3Layout {
+.vendaSalvarBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.vendaErro {
+  color: #ef4444;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Títulos de seção no painel direito ── */
+.vendaSecaoTitulo {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .vendaLayout3 {
     grid-template-columns: 1fr;
+  }
+
+  .vendaColRight {
+    border-left: none;
+    border-top: 1px solid #f0f0f0;
+    padding-left: 0;
+    padding-top: 24px;
+  }
+
+  .vendaBody {
+    padding: 48px 24px 32px;
+  }
+
+  .vendaFooter {
+    padding: 14px 24px;
   }
 }
