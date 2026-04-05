@@ -399,7 +399,6 @@ export default function VendaModal({
                         <span className={styles.vendaProdutoConteudo}>
                           <span className={styles.vendaProdutoNome}>{item.nome_produto}</span>
                           <span className={styles.vendaProdutoMeta}>{getCategoriaLabel(item.categoria)}</span>
-                          <strong className={styles.vendaProdutoValor}>{formatCurrency(item.preco)}</strong>
                         </span>
                       </button>
                     )
@@ -458,12 +457,12 @@ export default function VendaModal({
                           onClick={() => setFormaPagamento(prev => prev === forma.id ? null : forma.id)}
                           disabled={saving}
                         >
-                          <div className={styles.vendaMeioTopo}>
-                            <span className={styles.vendaMeioNome}>{forma.label}</span>
+                          <div className={styles.vendaMeioStatus}>
                             <span className={`${styles.vendaCirculo} ${ativo ? styles.vendaCirculoAtivo : ''}`}>
                               {ativo && <span className={styles.vendaCirculoPonto} />}
                             </span>
                           </div>
+                          <span className={styles.vendaMeioNome}>{forma.label}</span>
                           <strong className={styles.vendaMeioValor}>{formatCurrency(forma.total)}</strong>
                           <span className={styles.vendaMeioHint}>{forma.hint}</span>
                           <span className={styles.vendaMeioParcelamento}>
