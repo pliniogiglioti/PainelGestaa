@@ -1614,6 +1614,14 @@
   gap: 6px;
 }
 
+.vendaPagamentoStage {
+  width: 100%;
+  max-width: 1180px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .vendaStepLabel {
   font-size: 11px;
   font-weight: 700;
@@ -1946,8 +1954,9 @@
 /* ── Cards de meios de pagamento ── */
 .vendaMeiosLista {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 14px;
+  align-items: stretch;
 }
 
 .vendaMeioCard {
@@ -1964,6 +1973,7 @@
   text-align: left;
   width: 100%;
   min-height: 100%;
+  min-width: 0;
   color: #18181b;
 }
 
@@ -1996,9 +2006,10 @@
 }
 
 .vendaMeioValor {
-  font-size: 28px;
-  line-height: 1;
+  font-size: clamp(28px, 2.1vw, 36px);
+  line-height: 1.05;
   color: #166534;
+  white-space: nowrap;
 }
 
 .vendaMeioHint {
@@ -2118,6 +2129,10 @@
 
   .vendaFooter {
     padding: 14px 24px;
+  }
+
+  .vendaPagamentoStage {
+    max-width: 100%;
   }
 }
 

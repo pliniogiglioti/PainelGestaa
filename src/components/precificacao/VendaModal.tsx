@@ -437,7 +437,7 @@ export default function VendaModal({
                   </span>
                 </div>
               ) : (
-                <div className={styles.vendaStepCenter}>
+                <div className={styles.vendaPagamentoStage}>
                   <div className={styles.vendaResultadoHeader}>
                     <span className={styles.vendaResultadoLabel}>Propostas prontas</span>
                     <strong className={styles.vendaResultadoTitulo}>{clienteNomeExibicao}</strong>
