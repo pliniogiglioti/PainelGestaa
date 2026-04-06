@@ -36,6 +36,10 @@ type LabEtapa = {
 }
 
 type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
+type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
+
+const LAB_FILTER_ALL = '__all__'
+const FINAL_ENVIO_STATUSES = ['Concluído', 'Entregue']
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -180,6 +184,31 @@ function getEnvioDataEntregaRealFromEtapas(etapas: LabEtapa[]) {
 
 function getFinanceiroReferenceDate(envio: LabEnvio) {
   return envio.pago ? (envio.data_pagamento ?? envio.data_envio) : envio.data_envio
+}
+
+function sortEnviosByCreatedAt(envios: LabEnvio[]) {
+  return [...envios].sort((a, b) => b.created_at.localeCompare(a.created_at))
+}
+
+function getEnvioMetrics(envios: LabEnvio[]) {
+  const emAndamento = envios.filter(envio => !FINAL_ENVIO_STATUSES.includes(envio.status))
+  const concluidos = envios.filter(envio => FINAL_ENVIO_STATUSES.includes(envio.status))
+  const pagos = envios.filter(envio => envio.pago)
+  const overdue = envios.filter(isOverdue)
+  const totalValor = envios.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const valorEmAndamento = emAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const valorPago = pagos.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+
+  return {
+    total: envios.length,
+    emAndamento: emAndamento.length,
+    concluidos: concluidos.length,
+    pagos: pagos.length,
+    overdue: overdue.length,
+    valorEmAndamento,
+    valorPago,
+    ticketMedio: envios.length > 0 ? totalValor / envios.length : 0,
+  }
 }
 
 function normalizeWhatsAppNumber(value: string) {
@@ -1196,8 +1225,9 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function EnvioResumoModal({ envio, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
+function EnvioResumoModal({ envio, labNome, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
   envio: LabEnvio
+  labNome?: string
   isAdmin: boolean
   onClose: () => void
   onEdit: () => void
@@ -1224,6 +1254,7 @@ function EnvioResumoModal({ envio, isAdmin, onClose, onEdit, onTogglePago, onUpd
   return (
     <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
       <div className={styles.summaryGrid}>
+        {labNome && <ReviewRow label="Laboratório" value={labNome} />}
         <ReviewRow label="Paciente" value={envio.paciente_nome} />
         <ReviewRow label="Resumo" value={getEnvioResumo(envio) || envio.tipo_trabalho} />
         <ReviewRow label="Status" value={envio.status} />
@@ -1395,8 +1426,8 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdit, onDelete }: {
-  envio: LabEnvio; dragging: boolean; isAdmin: boolean
+function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResumo, onEdit, onDelete }: {
+  envio: LabEnvio; dragging: boolean; isAdmin: boolean; labNome?: string | null
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
   onEdit: () => void; onDelete: () => void
@@ -1419,6 +1450,7 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdi
           <IconAlert /> {overdueEtapas[0] ? `Etapa atrasada: ${overdueEtapas[0].nome}` : 'Prazo vencido'}
         </div>
       )}
+      {labNome && <div className={styles.kanbanCardLab}>{labNome}</div>}
       <div className={styles.kanbanCardPatient}>{envio.paciente_nome}</div>
       <div className={styles.kanbanCardService}>{resumoTrabalho || envio.tipo_trabalho}</div>
       {(envio.dentes || envio.cor) && (
@@ -1453,8 +1485,10 @@ function KanbanCard({ envio, dragging, isAdmin, onDragStart, onOpenResumo, onEdi
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
+  showLabName?: boolean
+  getLabName?: (labId: string) => string
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
   onEditEnvio: (envio: LabEnvio) => void
@@ -1531,6 +1565,7 @@ function KanbanBoard({ envios, colunas, isAdmin, onMoveEnvio, onOpenResumo, onEd
                   envio={envio}
                   dragging={draggingId === envio.id}
                   isAdmin={isAdmin}
+                  labNome={showLabName ? getLabName?.(envio.lab_id) ?? 'Laboratório' : null}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
                   onEdit={() => onEditEnvio(envio)}
@@ -1879,6 +1914,261 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   )
 }
 
+function LabsAggregateDetailView({
+  labs,
+  empresaId,
+  userId,
+  isAdmin,
+  colunas,
+  onBack,
+  onColunasUpdated,
+}: {
+  labs: Lab[]
+  empresaId: string
+  userId: string
+  isAdmin: boolean
+  colunas: LabKanbanColuna[]
+  onBack: () => void
+  onColunasUpdated: () => void
+}) {
+  const [envios,         setEnvios]         = useState<LabEnvio[]>([])
+  const [precosByLab,    setPrecosByLab]    = useState<Record<string, LabPreco[]>>({})
+  const [loading,        setLoading]        = useState(true)
+  const [showEnvioSteps, setShowEnvioSteps] = useState(false)
+  const [editingEnvio,   setEditingEnvio]   = useState<LabEnvio | null>(null)
+  const [resumoEnvio,    setResumoEnvio]    = useState<LabEnvio | null>(null)
+  const [showKanbanCfg,  setShowKanbanCfg]  = useState(false)
+  const [patientSearch,  setPatientSearch]  = useState('')
+  const [labFilterId,    setLabFilterId]    = useState(LAB_FILTER_ALL)
+
+  const labsById = Object.fromEntries(labs.map(item => [item.id, item]))
+
+  const fetchEnvios = useCallback(async () => {
+    const { data } = await supabase
+      .from('lab_envios')
+      .select('*')
+      .eq('empresa_id', empresaId)
+      .order('created_at', { ascending: false })
+
+    setEnvios(data ? sortEnviosByCreatedAt(data) : [])
+  }, [empresaId])
+
+  const fetchPrecos = useCallback(async () => {
+    if (labs.length === 0) {
+      setPrecosByLab({})
+      return
+    }
+
+    const { data } = await supabase
+      .from('lab_precos')
+      .select('*')
+      .in('lab_id', labs.map(item => item.id))
+      .eq('ativo', true)
+      .order('nome_servico')
+
+    const nextMap: Record<string, LabPreco[]> = {}
+    for (const preco of data ?? []) {
+      if (!nextMap[preco.lab_id]) nextMap[preco.lab_id] = []
+      nextMap[preco.lab_id].push(preco)
+    }
+    setPrecosByLab(nextMap)
+  }, [labs])
+
+  useEffect(() => {
+    setLoading(true)
+    void Promise.all([fetchEnvios(), fetchPrecos()]).then(() => setLoading(false))
+  }, [fetchEnvios, fetchPrecos])
+
+  const moveEnvio = async (envioId: string, status: string) => {
+    await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
+    setEnvios(prev => prev.map(item => item.id === envioId ? { ...item, status } : item))
+  }
+
+  const deleteEnvio = async (envioId: string) => {
+    if (!confirm('Excluir este envio?')) return
+    await supabase.from('lab_envios').delete().eq('id', envioId)
+    setEnvios(prev => prev.filter(item => item.id !== envioId))
+  }
+
+  const togglePagoEnvio = async (envio: LabEnvio) => {
+    const nextPago = !envio.pago
+    const payload = {
+      pago: nextPago,
+      data_pagamento: nextPago ? today() : null,
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
+    if (error) return
+    setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
+    setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
+  }
+
+  const updateEnvioEtapa = async (
+    envio: LabEnvio,
+    etapaId: string,
+    changes: Partial<Pick<LabEtapa, 'prazo_entrega' | 'concluido' | 'data_conclusao'>>,
+  ) => {
+    const etapas = getEnvioEtapas(envio).map(etapa =>
+      etapa.id === etapaId ? applyEtapaChanges(etapa, changes) : etapa,
+    )
+
+    const payload = {
+      etapas: serializeLabEtapas(etapas),
+      data_entrega_real: getEnvioDataEntregaRealFromEtapas(etapas),
+      updated_at: new Date().toISOString(),
+    }
+
+    const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
+    if (error) return
+
+    setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
+    setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
+  }
+
+  const visibleEnvios = envios.filter(envio => {
+    if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
+    if (labFilterId !== LAB_FILTER_ALL && envio.lab_id !== labFilterId) return false
+    return true
+  })
+
+  const overdueCount = envios.filter(isOverdue).length
+  const canCreateEnvio = labFilterId !== LAB_FILTER_ALL
+  const currentModalLab = editingEnvio
+    ? (labsById[editingEnvio.lab_id] ?? null)
+    : (labFilterId !== LAB_FILTER_ALL ? (labsById[labFilterId] ?? null) : null)
+  const currentPrecos = currentModalLab ? (precosByLab[currentModalLab.id] ?? []) : []
+  const aggregateLabCount = new Set(visibleEnvios.map(envio => envio.lab_id)).size
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.pageHeader}>
+        <button type="button" className={styles.backBtn} onClick={onBack}>
+          <IconBack /> Voltar
+        </button>
+        <div className={styles.labDetailTitle}>
+          <h1 className={styles.pageTitle}>Todos os laboratórios</h1>
+          {overdueCount > 0 && (
+            <span className={styles.overdueBadge}>
+              <IconAlert /> {overdueCount} atrasado{overdueCount > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <span className={styles.headerMetaBadge}>{labs.length} laboratórios ativos</span>
+        <div className={styles.headerActions}>
+          {isAdmin && (
+            <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
+              <IconSettings2 /> Kanban
+            </button>
+          )}
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            disabled={!canCreateEnvio}
+            onClick={() => {
+              if (!canCreateEnvio) return
+              setEditingEnvio(null)
+              setShowEnvioSteps(true)
+            }}
+          >
+            <IconPlus /> Novo envio
+          </button>
+        </div>
+      </div>
+
+      <div className={styles.tabs}>
+        <button className={`${styles.tab} ${styles.tabActive}`}>
+          Kanban ({visibleEnvios.length})
+        </button>
+      </div>
+
+      {loading ? <Spinner /> : (
+        <>
+          <div className={styles.searchRow}>
+            <input
+              className={`${styles.input} ${styles.searchGrow}`}
+              value={patientSearch}
+              onChange={e => setPatientSearch(e.target.value)}
+              placeholder="Buscar paciente no kanban"
+            />
+            <select
+              className={styles.select}
+              value={labFilterId}
+              onChange={e => setLabFilterId(e.target.value)}
+            >
+              <option value={LAB_FILTER_ALL}>Todos os laboratórios</option>
+              {labs.map(item => (
+                <option key={item.id} value={item.id}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.aggregateFilterHint}>
+            {labFilterId === LAB_FILTER_ALL
+              ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
+              : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
+            {!canCreateEnvio && ' Selecione um laboratório para criar um novo envio por aqui.'}
+          </div>
+
+          <KanbanBoard
+            envios={visibleEnvios}
+            colunas={colunas}
+            isAdmin={isAdmin}
+            showLabName
+            getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
+            onMoveEnvio={moveEnvio}
+            onOpenResumo={setResumoEnvio}
+            onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
+            onDeleteEnvio={deleteEnvio}
+          />
+        </>
+      )}
+
+      {showEnvioSteps && currentModalLab && (
+        <EnvioSteps
+          lab={currentModalLab}
+          precos={currentPrecos}
+          empresaId={empresaId}
+          userId={userId}
+          envio={editingEnvio}
+          colunas={colunas}
+          onClose={() => {
+            setShowEnvioSteps(false)
+            setEditingEnvio(null)
+          }}
+          onSaved={async () => {
+            await Promise.all([fetchEnvios(), fetchPrecos()])
+          }}
+        />
+      )}
+      {showKanbanCfg && (
+        <KanbanConfigModal
+          empresaId={empresaId}
+          colunas={colunas}
+          onClose={() => setShowKanbanCfg(false)}
+          onSaved={onColunasUpdated}
+        />
+      )}
+      {resumoEnvio && (
+        <EnvioResumoModal
+          envio={resumoEnvio}
+          labNome={labsById[resumoEnvio.lab_id]?.nome}
+          isAdmin={isAdmin}
+          onClose={() => setResumoEnvio(null)}
+          onEdit={() => {
+            setEditingEnvio(resumoEnvio)
+            setResumoEnvio(null)
+            setShowEnvioSteps(true)
+          }}
+          onTogglePago={togglePagoEnvio}
+          onUpdateEtapa={updateEnvioEtapa}
+        />
+      )}
+    </div>
+  )
+}
+
 function InfoRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className={styles.infoRow}>
@@ -1966,7 +2256,7 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onOpenFinance
       {/* Mini kanban status bars */}
       {envios.length > 0 && (
         <div className={styles.labCardStatusBar}>
-          {colunas.sort((a, b) => a.ordem - b.ordem).map(col => {
+          {[...colunas].sort((a, b) => a.ordem - b.ordem).map(col => {
             const count = envios.filter(e => e.status === col.nome).length
             if (count === 0) return null
             return (
@@ -2008,6 +2298,100 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onOpenFinance
 
 // ── Main: LabControlPage ──────────────────────────────────────────────────
 
+function TodosLabsCard({ labs, envios, colunas, getLabName, onClick }: {
+  labs: Lab[]
+  envios: LabEnvio[]
+  colunas: LabKanbanColuna[]
+  getLabName: (labId: string) => string
+  onClick: () => void
+}) {
+  const metrics = getEnvioMetrics(envios)
+  const recent = envios.slice(0, 5)
+
+  return (
+    <div className={`${styles.labCard} ${styles.labCardAggregate}`} onClick={onClick}>
+      <div className={styles.labCardHeader}>
+        <div>
+          <div className={styles.aggregateBadge}>Visão geral</div>
+          <div className={styles.labCardName}>Todos</div>
+        </div>
+      </div>
+
+      <div className={styles.aggregateCardHint}>
+        Acompanhe todos os trabalhos no mesmo kanban e filtre por laboratório quando precisar.
+      </div>
+
+      <div className={styles.aggregateKpiGrid}>
+        <div className={styles.aggregateKpiCard}>
+          <strong>{labs.length}</strong>
+          <span>laboratórios</span>
+        </div>
+        <div className={styles.aggregateKpiCard}>
+          <strong>{metrics.total}</strong>
+          <span>trabalhos</span>
+        </div>
+        <div className={styles.aggregateKpiCard}>
+          <strong>{metrics.emAndamento}</strong>
+          <span>em andamento</span>
+        </div>
+        <div className={`${styles.aggregateKpiCard} ${styles.aggregateKpiCardAlert}`}>
+          <strong>{metrics.overdue}</strong>
+          <span>atrasados</span>
+        </div>
+        <div className={styles.aggregateKpiCard}>
+          <strong>{metrics.pagos}</strong>
+          <span>pagos</span>
+        </div>
+        <div className={styles.aggregateKpiCard}>
+          <strong>{metrics.ticketMedio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+          <span>ticket médio</span>
+        </div>
+      </div>
+
+      <div className={styles.labCardValueSummary}>
+        <span className={styles.labCardValueLabel}>Valores em andamento</span>
+        <strong className={styles.labCardValueAmount}>
+          {metrics.valorEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+        </strong>
+      </div>
+
+      {envios.length > 0 && (
+        <div className={styles.labCardStatusBar}>
+          {[...colunas].sort((a, b) => a.ordem - b.ordem).map(col => {
+            const count = envios.filter(envio => envio.status === col.nome).length
+            if (count === 0) return null
+            return (
+              <div
+                key={col.id}
+                className={styles.labCardStatusSegment}
+                style={{ background: col.cor, flex: count }}
+                title={`${col.nome}: ${count}`}
+              />
+            )
+          })}
+        </div>
+      )}
+
+      {recent.length > 0 && (
+        <div className={styles.labCardEnvios}>
+          {recent.map(envio => (
+            <div key={envio.id} className={`${styles.labCardEnvioItem} ${isOverdue(envio) ? styles.labCardEnvioOverdue : ''}`}>
+              <span className={styles.labCardEnvioPatient}>{envio.paciente_nome}</span>
+              <span className={styles.labCardEnvioType}>{getLabName(envio.lab_id)}</span>
+              {envio.data_entrega_prometida && (
+                <span className={styles.labCardEnvioDate}>{formatDate(envio.data_entrega_prometida)}</span>
+              )}
+            </div>
+          ))}
+          {envios.length > 5 && (
+            <div className={styles.labCardMore}>+{envios.length - 5} trabalhos</div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVoltar }: {
   userId: string; empresa: Empresa; onTrocarEmpresa: () => void; onVoltar: () => void
 }) {
@@ -2015,7 +2399,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [labs,         setLabs]         = useState<Lab[]>([])
   const [enviosMap,    setEnviosMap]    = useState<Record<string, LabEnvio[]>>({})
   const [colunas,      setColunas]      = useState<LabKanbanColuna[]>([])
-  const [selectedLab,  setSelectedLab]  = useState<Lab | null>(null)
+  const [selectedView, setSelectedView] = useState<LabViewSelection | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
@@ -2060,7 +2444,12 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
       .eq('empresa_id', empresa.id).eq('ativo', true).order('nome')
     if (data) {
       setLabs(data)
-      setSelectedLab(prev => prev ? data.find(item => item.id === prev.id) ?? prev : prev)
+      setSelectedView(prev => {
+        if (!prev) return prev
+        if (prev.kind === 'all') return prev
+        const updatedLab = data.find(item => item.id === prev.lab.id)
+        return updatedLab ? { kind: 'lab', lab: updatedLab } : null
+      })
       setFinanceiroLab(prev => prev ? data.find(item => item.id === prev.id) ?? prev : prev)
     }
   }, [empresa.id])
@@ -2110,7 +2499,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   }, [empresa.id])
 
   useEffect(() => {
-    setSelectedLab(null)
+    setSelectedView(null)
     setLabs([])
     setEnviosMap({})
     setColunas([])
@@ -2131,15 +2520,29 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   }
 
   // Detalhe do lab selecionado
-  if (selectedLab) {
+  if (selectedView) {
+    if (selectedView.kind === 'all') {
+      return (
+        <LabsAggregateDetailView
+          labs={labs}
+          empresaId={empresa.id}
+          userId={userId}
+          isAdmin={isAdmin}
+          colunas={colunas}
+          onBack={() => { setSelectedView(null); fetchEnvios() }}
+          onColunasUpdated={fetchColunas}
+        />
+      )
+    }
+
     return (
       <LabDetailView
-        lab={selectedLab}
+        lab={selectedView.lab}
         empresaId={empresa.id}
         userId={userId}
         isAdmin={isAdmin}
         colunas={colunas}
-        onBack={() => { setSelectedLab(null); fetchEnvios() }}
+        onBack={() => { setSelectedView(null); fetchEnvios() }}
         onLabUpdated={() => { fetchLabs() }}
         onColunasUpdated={fetchColunas}
       />
@@ -2189,6 +2592,13 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         </div>
       ) : (
         <div className={styles.labsGrid}>
+          <TodosLabsCard
+            labs={labs}
+            envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+            colunas={colunas}
+            getLabName={labId => labs.find(item => item.id === labId)?.nome ?? 'Laboratório removido'}
+            onClick={() => setSelectedView({ kind: 'all' })}
+          />
           {labs.map(lab => (
             <LabCard
               key={lab.id}
@@ -2196,7 +2606,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               envios={enviosMap[lab.id] ?? []}
               isAdmin={isAdmin}
               colunas={colunas}
-              onClick={() => setSelectedLab(lab)}
+              onClick={() => setSelectedView({ kind: 'lab', lab })}
               onEdit={e => { e.stopPropagation(); setEditingLab(lab); setShowLabModal(true) }}
               onOpenFinanceiro={e => { e.stopPropagation(); setFinanceiroLab(lab) }}
             />
