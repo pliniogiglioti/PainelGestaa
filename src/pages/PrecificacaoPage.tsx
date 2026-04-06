@@ -890,7 +890,7 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.resultadoMargem}</strong>
               </div>
             </div>
-            {canManage && (hasChanges || erroPrecoLocal) && (
+            {canManage && (
               <div className={styles.inlineActions}>
                 <button
                   type="button"
@@ -920,7 +920,7 @@ function CalculadoraPrecificacaoModal({
                   type="button"
                   className={styles.modalSubmit}
                   onClick={() => void handleSalvarCalculo()}
-                  disabled={savingPreco}
+                  disabled={savingPreco || (!hasChanges && !erroPrecoLocal)}
                 >
                   {savingPreco ? 'Salvando...' : 'Salvar preço'}
                 </button>
