@@ -487,11 +487,31 @@ export default function VendaModal({
               ) : (
                 <div className={styles.vendaPagamentoStage}>
                   <div className={styles.vendaResultadoHeader}>
-                    <span className={styles.vendaResultadoLabel}>Propostas prontas</span>
+                    <span className={styles.vendaResultadoLabel}>Propostas encontradas para</span>
                     <strong className={styles.vendaResultadoTitulo}>{clienteNomeExibicao}</strong>
                     <span className={styles.vendaResultadoSub}>
-                      Escolha a condicao ideal para apresentar agora.
+                      Foram encontradas condicoes exclusivas.
                     </span>
+                  </div>
+
+                  <div className={styles.vendaProdutosResumo}>
+                    <div className={styles.vendaProdutosResumoHeader}>
+                      <strong>Produtos selecionados</strong>
+                      <span>{formatCurrency(subtotalSelecionado)}</span>
+                    </div>
+                    <div className={styles.vendaProdutosResumoList}>
+                      {itens.map(item => (
+                        <div key={item.id} className={styles.vendaProdutosResumoRow}>
+                          <div className={styles.vendaProdutosResumoMeta}>
+                            <strong>{item.descricao}</strong>
+                            <span>
+                              {item.quantidade}x {formatCurrency(item.precoUnitario)}
+                            </span>
+                          </div>
+                          <strong>{formatCurrency(item.precoUnitario * item.quantidade)}</strong>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className={styles.vendaMeiosLista}>

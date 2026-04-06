@@ -1479,6 +1479,10 @@
     padding: 22px 18px;
   }
 
+  .vendaStepInput {
+    font-size: 40px;
+  }
+
   .calcLayout,
   .calcHighlights {
     grid-template-columns: 1fr;
@@ -1667,7 +1671,8 @@
   width: 100%;
   border: none;
   padding: 8px 0;
-  font-size: 26px;
+  font-size: 56px;
+  line-height: 1.05;
   font-weight: 600;
   color: #18181b;
   background: transparent;
