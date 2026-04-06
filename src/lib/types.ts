@@ -135,6 +135,7 @@ export interface Database {
           nome:       string
           cnpj:       string | null
           logo_url:   string | null
+          card_background_url: string | null
           created_by: string
           ativo:      boolean
           created_at: string
@@ -145,6 +146,7 @@ export interface Database {
           nome:       string
           cnpj?:      string | null
           logo_url?:  string | null
+          card_background_url?: string | null
           created_by: string
           ativo?:     boolean
           created_at?: string
@@ -155,6 +157,7 @@ export interface Database {
           nome?:      string
           cnpj?:      string | null
           logo_url?:  string | null
+          card_background_url?: string | null
           ativo?:     boolean
           updated_at?: string
         }

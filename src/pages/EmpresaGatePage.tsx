@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import type { Empresa, EmpresaMembro, Profile } from '../lib/types'
+import {
+  COMPANY_CARD_BACKGROUND_ACCEPT,
+  deleteCompanyCardBackground,
+  uploadCompanyCardBackground,
+  validateCompanyCardBackground,
+} from '../lib/companyCardBackground'
 import styles from './EmpresaGatePage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 
@@ -30,12 +36,14 @@ type EmpresaFormModalProps = {
   empresaId?: string | null
   nome: string
   cnpj: string
+  cardBackgroundPreview: string
   erro: string
   salvando: boolean
   onClose: () => void
   onSubmit: (e: React.FormEvent) => void
   onNomeChange: (value: string) => void
   onCnpjChange: (value: string) => void
+  onBackgroundChange: (file: File | null) => void
 }
 
 const IconSettings = () => (
@@ -92,12 +100,14 @@ function EmpresaFormModal({
   empresaId,
   nome,
   cnpj,
+  cardBackgroundPreview,
   erro,
   salvando,
   onClose,
   onSubmit,
   onNomeChange,
   onCnpjChange,
+  onBackgroundChange,
 }: EmpresaFormModalProps) {
   const [membros, setMembros] = useState<EmpresaMembroResumo[]>([])
   const [loadingMembros, setLoadingMembros] = useState(false)
@@ -170,6 +180,23 @@ function EmpresaFormModal({
               disabled={salvando}
             />
           </label>
+          <label className={styles.label}>
+            Imagem de fundo do card
+            <input
+              className={styles.input}
+              type="file"
+              accept={COMPANY_CARD_BACKGROUND_ACCEPT}
+              onChange={e => onBackgroundChange(e.target.files?.[0] ?? null)}
+              disabled={salvando}
+            />
+            <span className={styles.inputHint}>Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.</span>
+          </label>
+          {cardBackgroundPreview && (
+            <div
+              className={styles.cardBackgroundPreview}
+              style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
+            />
+          )}
           {erro && <p className={styles.erro}>{erro}</p>}
 
           {modo === 'editar' && (
@@ -307,6 +334,15 @@ export default function EmpresaGatePage({
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
   const [isSystemAdmin, setIsSystemAdmin] = useState(false)
   const [empresaRoles, setEmpresaRoles]   = useState<EmpresaRoleMap>({})
+  const [backgroundFile, setBackgroundFile] = useState<File | null>(null)
+  const [backgroundPreview, setBackgroundPreview] = useState('')
+
+  const resetBackgroundPreview = (nextValue = '') => {
+    setBackgroundPreview(current => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current)
+      return nextValue
+    })
+  }
 
   useEffect(() => {
     carregarEmpresas()
@@ -389,6 +425,8 @@ export default function EmpresaGatePage({
     setEmpresaEmEdicao(null)
     setNome('')
     setCnpj('')
+    setBackgroundFile(null)
+    resetBackgroundPreview('')
     setErro('')
     setSalvando(false)
   }
@@ -408,6 +446,7 @@ export default function EmpresaGatePage({
     if (!empresaParaDeletar) return
     setDeletando(true)
     setErroDelete('')
+    const cardBackgroundUrl = empresaParaDeletar.card_background_url
 
     // 1. Delete lançamentos da empresa
     const { error: errLancamentos } = await supabase
@@ -435,6 +474,16 @@ export default function EmpresaGatePage({
       return
     }
 
+    if (cardBackgroundUrl) {
+      try {
+        await deleteCompanyCardBackground(cardBackgroundUrl)
+      } catch (err) {
+        setErroDelete(err instanceof Error ? err.message : 'Erro ao excluir a imagem do card da empresa.')
+        setDeletando(false)
+        return
+      }
+    }
+
     setEmpresas(prev => prev.filter(e => e.id !== empresaParaDeletar.id))
     setEmpresaParaDeletar(null)
     setDeletando(false)
@@ -445,6 +494,8 @@ export default function EmpresaGatePage({
     setEmpresaEmEdicao(null)
     setNome('')
     setCnpj('')
+    setBackgroundFile(null)
+    resetBackgroundPreview('')
     setErro('')
   }
 
@@ -453,7 +504,27 @@ export default function EmpresaGatePage({
     setEmpresaEmEdicao(empresa)
     setNome(empresa.nome)
     setCnpj(formatarCnpj(empresa.cnpj ?? ''))
+    setBackgroundFile(null)
+    resetBackgroundPreview(empresa.card_background_url ?? '')
     setErro('')
+  }
+
+  function handleBackgroundChange(file: File | null) {
+    if (!file) {
+      setBackgroundFile(null)
+      resetBackgroundPreview(empresaEmEdicao?.card_background_url ?? '')
+      return
+    }
+
+    try {
+      validateCompanyCardBackground(file)
+      setBackgroundFile(file)
+      resetBackgroundPreview(URL.createObjectURL(file))
+      setErro('')
+    } catch (err) {
+      setBackgroundFile(null)
+      setErro(err instanceof Error ? err.message : 'Nao foi possivel validar a imagem.')
+    }
   }
 
   async function handleSalvarEmpresa(e: React.FormEvent) {
@@ -465,6 +536,18 @@ export default function EmpresaGatePage({
     setErro('')
 
     const cnpjNormalizado = normalizarCnpj(cnpj)
+    let cardBackgroundUrl = modalModo === 'editar' ? (empresaEmEdicao?.card_background_url ?? null) : null
+    const previousCardBackgroundUrl = empresaEmEdicao?.card_background_url ?? null
+
+    if (backgroundFile) {
+      try {
+        cardBackgroundUrl = await uploadCompanyCardBackground(backgroundFile)
+      } catch (err) {
+        setErro(err instanceof Error ? err.message : 'Nao foi possivel enviar a imagem de fundo.')
+        setSalvando(false)
+        return
+      }
+    }
 
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
@@ -477,6 +560,7 @@ export default function EmpresaGatePage({
       const payload = {
         nome: nome.trim(),
         cnpj: cnpjNormalizado,
+        card_background_url: cardBackgroundUrl,
       }
 
       const { error } = await supabase
@@ -485,9 +569,24 @@ export default function EmpresaGatePage({
         .eq('id', empresaEmEdicao.id)
 
       if (error) {
+        if (backgroundFile && cardBackgroundUrl && cardBackgroundUrl !== previousCardBackgroundUrl) {
+          try {
+            await deleteCompanyCardBackground(cardBackgroundUrl)
+          } catch {}
+        }
         setErro(error.message ?? 'Erro ao editar empresa.')
         setSalvando(false)
         return
+      }
+
+      if (backgroundFile && previousCardBackgroundUrl && previousCardBackgroundUrl !== cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(previousCardBackgroundUrl)
+        } catch (err) {
+          setErro(err instanceof Error ? err.message : 'A empresa foi salva, mas nao foi possivel excluir a imagem antiga.')
+          setSalvando(false)
+          return
+        }
       }
 
       setEmpresas(prev => prev.map(emp => (
@@ -510,12 +609,18 @@ export default function EmpresaGatePage({
       .insert({
         nome: nome.trim(),
         cnpj: cnpjNormalizado,
+        card_background_url: cardBackgroundUrl,
         created_by: session.user.id,
       })
       .select()
       .single()
 
     if (error || !data) {
+      if (backgroundFile && cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(cardBackgroundUrl)
+        } catch {}
+      }
       setErro(error?.message ?? 'Erro ao criar empresa.')
       setSalvando(false)
       return
@@ -576,9 +681,9 @@ export default function EmpresaGatePage({
           ? 'Escolha a empresa que deseja analisar ou crie uma nova.'
           : 'Escolha a empresa vinculada ao seu acesso para analisar os dados.',
         subtituloSemEmpresas: podeCriarEmpresa
-          ? 'Para usar a Análise DRE, você precisa criar uma empresa.'
+          ? 'Para usar a Análise DFC, você precisa criar uma empresa.'
           : 'Seu acesso esta como colaborador. Um titular precisa vincular voce a uma empresa em Minhas empresas.',
-        botaoSelecionar: 'Acessar DRE',
+        botaoSelecionar: 'Acessar DFC',
       }
 
   if (loading) {
@@ -631,6 +736,11 @@ export default function EmpresaGatePage({
             <div
               key={emp.id}
               className={styles.card}
+              style={{
+                backgroundImage: emp.card_background_url ? `url(${emp.card_background_url})` : undefined,
+                backgroundSize: emp.card_background_url ? 'cover' : undefined,
+                backgroundPosition: emp.card_background_url ? 'center' : undefined,
+              }}
               onMouseEnter={() => setHoveredId(emp.id)}
               onMouseLeave={() => setHoveredId(null)}
             >
@@ -706,12 +816,14 @@ export default function EmpresaGatePage({
           empresaId={empresaEmEdicao?.id ?? null}
           nome={nome}
           cnpj={cnpj}
+          cardBackgroundPreview={backgroundPreview}
           erro={erro}
           salvando={salvando}
           onClose={resetModalState}
           onSubmit={handleSalvarEmpresa}
           onNomeChange={setNome}
           onCnpjChange={setCnpj}
+          onBackgroundChange={handleBackgroundChange}
         />
       )}
 

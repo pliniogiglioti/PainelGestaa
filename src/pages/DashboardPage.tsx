@@ -3,6 +3,12 @@ import styles from './DashboardPage.module.css'
 import { User } from '../App'
 import { supabase } from '../lib/supabase'
 import type { App, AppCategory, Empresa, ForumTopicWithMeta } from '../lib/types'
+import {
+  COMPANY_CARD_BACKGROUND_ACCEPT,
+  deleteCompanyCardBackground,
+  uploadCompanyCardBackground,
+  validateCompanyCardBackground,
+} from '../lib/companyCardBackground'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -22,7 +28,7 @@ interface AppCategoryRow extends AppCategory {
   apps: App[]
 }
 
-interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'created_at'> {
+interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'card_background_url' | 'created_at'> {
   role: 'admin' | 'membro'
 }
 
@@ -40,6 +46,7 @@ interface EmpresaMembroListItem {
 interface CompanyFormState {
   nome: string
   cnpj: string
+  cardBackgroundUrl: string
 }
 
 const getTipoUsuarioLabel = (tipo: TipoUsuario) => tipo === 'titular' ? 'Titular' : 'Colaborador'
@@ -722,17 +729,21 @@ function CompanyFormModal({
   form,
   error,
   saving,
+  cardBackgroundPreview,
   onClose,
   onSubmit,
   onChange,
+  onBackgroundChange,
 }: {
   mode: 'create' | 'edit'
   form: CompanyFormState
   error: string
   saving: boolean
+  cardBackgroundPreview: string
   onClose: () => void
   onSubmit: (e: React.FormEvent) => void
   onChange: (field: keyof CompanyFormState, value: string) => void
+  onBackgroundChange: (file: File | null) => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose, saving)
   return (
@@ -771,6 +782,23 @@ function CompanyFormModal({
               title="Informe um CNPJ válido no formato 00.000.000/0000-00"
               required
             />
+          </div>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Imagem de fundo do card</label>
+            <input
+              className={styles.modalInput}
+              type="file"
+              accept={COMPANY_CARD_BACKGROUND_ACCEPT}
+              onChange={e => onBackgroundChange(e.target.files?.[0] ?? null)}
+              disabled={saving}
+            />
+            <p className={styles.modalHint}>Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.</p>
+            {cardBackgroundPreview && (
+              <div
+                className={styles.companyBackgroundPreview}
+                style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
+              />
+            )}
           </div>
           {error && <p className={styles.formError}>{error}</p>}
           <div className={styles.modalActions}>
@@ -875,9 +903,11 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [empresaAberta, setEmpresaAberta] = useState<string | null>(null)
   const [companyModalMode, setCompanyModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingCompany, setEditingCompany] = useState<EmpresaListItem | null>(null)
-  const [companyForm, setCompanyForm] = useState<CompanyFormState>({ nome: '', cnpj: '' })
+  const [companyForm, setCompanyForm] = useState<CompanyFormState>({ nome: '', cnpj: '', cardBackgroundUrl: '' })
   const [companyFormError, setCompanyFormError] = useState('')
   const [savingCompany, setSavingCompany] = useState(false)
+  const [companyBackgroundFile, setCompanyBackgroundFile] = useState<File | null>(null)
+  const [companyBackgroundPreview, setCompanyBackgroundPreview] = useState('')
 
   // Modals
   const [showCreateApp,   setShowCreateApp]   = useState(false)
@@ -886,6 +916,13 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [editingApp,      setEditingApp]      = useState<App | null>(null)
   const appsListRef = useRef<HTMLDivElement | null>(null)
   const categorySectionRefs = useRef<Record<string, HTMLElement | null>>({})
+
+  const resetCompanyBackgroundPreview = (nextValue = '') => {
+    setCompanyBackgroundPreview(current => {
+      if (current.startsWith('blob:')) URL.revokeObjectURL(current)
+      return nextValue
+    })
+  }
 
   // Check if current user is admin
   useEffect(() => {
@@ -953,12 +990,12 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
 
     const { data: membros } = await supabase
       .from('empresa_membros')
-      .select('role, empresas(id, nome, cnpj, created_at)')
+      .select('role, empresas(id, nome, cnpj, card_background_url, created_at)')
       .eq('user_id', currentUser.id)
 
     const mapped = (membros ?? [])
       .map(item => {
-        const empresa = item.empresas as unknown as Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'created_at'> | null
+        const empresa = item.empresas as unknown as Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'card_background_url' | 'created_at'> | null
         if (!empresa) return null
         return {
           ...empresa,
@@ -1088,7 +1125,9 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const openCreateCompanyModal = () => {
     setCompanyModalMode('create')
     setEditingCompany(null)
-    setCompanyForm({ nome: '', cnpj: '' })
+    setCompanyForm({ nome: '', cnpj: '', cardBackgroundUrl: '' })
+    setCompanyBackgroundFile(null)
+    resetCompanyBackgroundPreview('')
     setCompanyFormError('')
   }
 
@@ -1098,7 +1137,10 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     setCompanyForm({
       nome: empresa.nome,
       cnpj: formatarCnpj(empresa.cnpj ?? ''),
+      cardBackgroundUrl: empresa.card_background_url ?? '',
     })
+    setCompanyBackgroundFile(null)
+    resetCompanyBackgroundPreview(empresa.card_background_url ?? '')
     setCompanyFormError('')
   }
 
@@ -1106,7 +1148,9 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     if (savingCompany) return
     setCompanyModalMode(null)
     setEditingCompany(null)
-    setCompanyForm({ nome: '', cnpj: '' })
+    setCompanyForm({ nome: '', cnpj: '', cardBackgroundUrl: '' })
+    setCompanyBackgroundFile(null)
+    resetCompanyBackgroundPreview('')
     setCompanyFormError('')
   }
 
@@ -1117,6 +1161,25 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }))
     if (companyFormError) {
       setCompanyFormError('')
+    }
+  }
+
+  const handleCompanyBackgroundChange = (file: File | null) => {
+    if (!file) {
+      setCompanyBackgroundFile(null)
+      resetCompanyBackgroundPreview(companyForm.cardBackgroundUrl)
+      return
+    }
+
+    try {
+      validateCompanyCardBackground(file)
+      setCompanyBackgroundFile(file)
+      const previewUrl = URL.createObjectURL(file)
+      resetCompanyBackgroundPreview(previewUrl)
+      setCompanyFormError('')
+    } catch (err) {
+      setCompanyBackgroundFile(null)
+      setCompanyFormError(err instanceof Error ? err.message : 'Nao foi possivel validar a imagem.')
     }
   }
 
@@ -1146,6 +1209,18 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     const cnpj = normalizarCnpj(companyForm.cnpj)
     setSavingCompany(true)
     setCompanyFormError('')
+    let cardBackgroundUrl = companyForm.cardBackgroundUrl.trim() || null
+    const previousCardBackgroundUrl = editingCompany?.card_background_url ?? null
+
+    if (companyBackgroundFile) {
+      try {
+        cardBackgroundUrl = await uploadCompanyCardBackground(companyBackgroundFile)
+      } catch (err) {
+        setCompanyFormError(err instanceof Error ? err.message : 'Nao foi possivel enviar a imagem de fundo.')
+        setSavingCompany(false)
+        return
+      }
+    }
 
     if (companyModalMode === 'edit' && editingCompany) {
       if (!podeEditarEmpresa(editingCompany)) {
@@ -1159,20 +1234,37 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
         .update({
           nome: companyForm.nome.trim(),
           cnpj,
+          card_background_url: cardBackgroundUrl,
         })
         .eq('id', editingCompany.id)
 
       if (error) {
+        if (companyBackgroundFile && cardBackgroundUrl && cardBackgroundUrl !== previousCardBackgroundUrl) {
+          try {
+            await deleteCompanyCardBackground(cardBackgroundUrl)
+          } catch {}
+        }
         setCompanyFormError(error.message ?? 'Nao foi possivel editar a empresa.')
         setSavingCompany(false)
         return
       }
 
+      if (companyBackgroundFile && previousCardBackgroundUrl && previousCardBackgroundUrl !== cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(previousCardBackgroundUrl)
+        } catch (err) {
+          setCompanyFormError(err instanceof Error ? err.message : 'A empresa foi salva, mas nao foi possivel excluir a imagem antiga.')
+          setSavingCompany(false)
+          return
+        }
+      }
+
       setEmpresas(prev => prev.map(empresa => (
         empresa.id === editingCompany.id
-          ? { ...empresa, nome: companyForm.nome.trim(), cnpj }
+          ? { ...empresa, nome: companyForm.nome.trim(), cnpj, card_background_url: cardBackgroundUrl }
           : empresa
       )))
+      resetCompanyBackgroundPreview(cardBackgroundUrl ?? '')
       setSavingCompany(false)
       closeCompanyModal()
       return
@@ -1192,12 +1284,18 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       .insert({
         nome: companyForm.nome.trim(),
         cnpj,
+        card_background_url: cardBackgroundUrl,
         created_by: sessionUser.id,
       })
-      .select('id, nome, cnpj, created_at')
+      .select('id, nome, cnpj, card_background_url, created_at')
       .single()
 
     if (error || !data) {
+      if (companyBackgroundFile && cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(cardBackgroundUrl)
+        } catch {}
+      }
       setCompanyFormError(error?.message ?? 'Nao foi possivel criar a empresa.')
       setSavingCompany(false)
       return
@@ -1209,6 +1307,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }
 
     setEmpresas(prev => [...prev, novaEmpresa].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')))
+    resetCompanyBackgroundPreview(cardBackgroundUrl ?? '')
     setSavingCompany(false)
     closeCompanyModal()
   }
@@ -1441,7 +1540,12 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                   <article
                     key={empresa.id}
                     className={styles.companyCard}
-                    style={{ animationDelay: `${index * 40}ms` }}
+                    style={{
+                      animationDelay: `${index * 40}ms`,
+                      backgroundImage: empresa.card_background_url
+                        ? `linear-gradient(180deg, rgba(9,12,19,0.18), rgba(9,12,19,0.72)), url(${empresa.card_background_url})`
+                        : undefined,
+                    }}
                   >
                     <div className={styles.companyCardTop}>
                       <div className={styles.companyAvatar}>
@@ -1641,13 +1745,13 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
           form={companyForm}
           error={companyFormError}
           saving={savingCompany}
+          cardBackgroundPreview={companyBackgroundPreview}
           onClose={closeCompanyModal}
           onSubmit={handleSubmitCompany}
           onChange={handleCompanyFormChange}
+          onBackgroundChange={handleCompanyBackgroundChange}
         />
       )}
     </div>
   )
 }
-
-
