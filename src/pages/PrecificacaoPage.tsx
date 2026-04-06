@@ -764,7 +764,12 @@ function CalculadoraPrecificacaoModal({
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
             {isCreating && (
-              <>
+              <div className={styles.calcFormCard}>
+                <div className={styles.calcFormHeader}>
+                  <h3 className={styles.calcFormTitle}>Dados do item</h3>
+                  <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
+                </div>
+
                 <label className={styles.modalField}>
                   <span className={styles.modalLabel}>Nome do produto ou servico</span>
                   <input
@@ -799,146 +804,162 @@ function CalculadoraPrecificacaoModal({
                     ))}
                   </select>
                 </label>
-              </>
+              </div>
             )}
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo insumos (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoInsumos}
-                onChange={e => {
-                  handleChange('custoInsumos', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 40,00"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoMaterialAplicado}
-                onChange={e => {
-                  handleChange('custoMaterialAplicado', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 700,00"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo laboratório (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoLaboratorio}
-                onChange={e => {
-                  handleChange('custoLaboratorio', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 120,00"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Royalties e FNP (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.royaltiesPercent}
-                onChange={e => {
-                  handleChange('royaltiesPercent', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 9"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo profissionais</span>
-              <div className={styles.switchRow}>
-                <button
-                  type="button"
-                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
-                  onClick={() => handleToggleCustoProfissionais('percentual')}
-                >
-                  Porcentagem
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
-                  onClick={() => handleToggleCustoProfissionais('valor')}
-                >
-                  Valor
-                </button>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Custos diretos</h3>
+                <p className={styles.calcFormHint}>Valores que entram diretamente na execução do procedimento.</p>
               </div>
-              <input
-                className={styles.modalInput}
-                value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
-                onChange={e => {
-                  handleChange(
-                    form.custoProfissionaisModo === 'percentual'
-                      ? 'custoProfissionaisPercent'
-                      : 'custoProfissionaisValor',
-                    e.target.value,
-                  )
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
-              />
-              {form.custoProfissionaisModo === 'percentual' && (
-                <span className={styles.modalFieldHint}>
-                  A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
-                </span>
-              )}
-            </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Impostos (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.impostosPercent}
-                onChange={e => {
-                  handleChange('impostosPercent', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 8"
-              />
-            </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo insumos (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoInsumos}
+                  onChange={e => {
+                    handleChange('custoInsumos', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 40,00"
+                />
+              </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Comissões vendas (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.comissoesPercent}
-                onChange={e => {
-                  handleChange('comissoesPercent', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 3"
-              />
-            </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoMaterialAplicado}
+                  onChange={e => {
+                    handleChange('custoMaterialAplicado', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 700,00"
+                />
+              </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Taxa máquina (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.taxaMaquinaPercent}
-                onChange={e => {
-                  handleChange('taxaMaquinaPercent', e.target.value)
-                  setErroLocal('')
-                }}
-                inputMode="decimal"
-                placeholder="Ex: 2"
-              />
-            </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoLaboratorio}
+                  onChange={e => {
+                    handleChange('custoLaboratorio', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 120,00"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.calcForm}>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Encargos e repasses</h3>
+                <p className={styles.calcFormHint}>Percentuais e remunerações que impactam a margem final.</p>
+              </div>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.royaltiesPercent}
+                  onChange={e => {
+                    handleChange('royaltiesPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 9"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo profissionais</span>
+                <div className={styles.switchRow}>
+                  <button
+                    type="button"
+                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
+                    onClick={() => handleToggleCustoProfissionais('percentual')}
+                  >
+                    Porcentagem
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
+                    onClick={() => handleToggleCustoProfissionais('valor')}
+                  >
+                    Valor
+                  </button>
+                </div>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
+                  onChange={e => {
+                    handleChange(
+                      form.custoProfissionaisModo === 'percentual'
+                        ? 'custoProfissionaisPercent'
+                        : 'custoProfissionaisValor',
+                      e.target.value,
+                    )
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
+                />
+                {form.custoProfissionaisModo === 'percentual' && (
+                  <span className={styles.modalFieldHint}>
+                    A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                  </span>
+                )}
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Impostos (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.impostosPercent}
+                  onChange={e => {
+                    handleChange('impostosPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 8"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Comissões vendas (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.comissoesPercent}
+                  onChange={e => {
+                    handleChange('comissoesPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 3"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Taxa máquina (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.taxaMaquinaPercent}
+                  onChange={e => {
+                    handleChange('taxaMaquinaPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 2"
+                />
+              </label>
+            </div>
           </div>
 
           <div className={styles.calcSummary}>
@@ -2241,7 +2262,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                     <div className={styles.priceNameWrap}>
                       <span className={styles.priceName}>{item.nome_produto}</span>
                       {hasGestaaCalculatedPrice(item) && (
-                        <span className={styles.priceCalculatedBadge}>Preco ajustado pela calculadora da Gestaa</span>
+                        <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
                       )}
                       <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
                     </div>
