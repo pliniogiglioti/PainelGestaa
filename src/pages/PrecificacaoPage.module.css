@@ -2061,12 +2061,10 @@
   background: rgba(255, 255, 255, 0.92);
 }
 
-.vendaFooterCentered {
+.vendaInlineBackRow {
+  display: flex;
   justify-content: center;
-  border-top: none;
-  padding-top: 0;
-  padding-bottom: 0;
-  margin-top: -110px;
+  padding-top: 20px;
 }
 
 .vendaBackLink {

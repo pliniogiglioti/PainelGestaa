@@ -532,6 +532,20 @@ export default function VendaModal({
             </div>
           )}
 
+          {!initialVenda && step > 1 && (
+            <div className={styles.vendaInlineBackRow}>
+              <button
+                type="button"
+                className={styles.vendaBackLink}
+                onClick={handleBack}
+                disabled={saving}
+              >
+                <span aria-hidden="true">←</span>
+                <span>Voltar</span>
+              </button>
+            </div>
+          )}
+
         </div>
 
         {/* Rodapé — salvar ao editar */}
@@ -547,20 +561,6 @@ export default function VendaModal({
               onClick={() => { void handleSave() }}
             >
               {saving ? 'Salvando...' : 'Salvar'}
-            </button>
-          </div>
-        )}
-
-        {!initialVenda && step > 1 && (
-          <div className={`${styles.vendaFooter} ${styles.vendaFooterCentered}`}>
-            <button
-              type="button"
-              className={styles.vendaBackLink}
-              onClick={handleBack}
-              disabled={saving}
-            >
-              <span aria-hidden="true">←</span>
-              <span>Voltar</span>
             </button>
           </div>
         )}
