@@ -341,29 +341,6 @@ function configToVendasForm(config: EmpresaPrecificacaoConfig | null): Configura
   }
 }
 
-function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
-  CalculadoraForm,
-  | 'royaltiesPercent'
-  | 'custoProfissionaisModo'
-  | 'custoProfissionaisBases'
-  | 'custoProfissionaisPercent'
-  | 'custoProfissionaisValor'
-  | 'impostosPercent'
-  | 'comissoesPercent'
-  | 'taxaMaquinaPercent'
-> {
-  return {
-    royaltiesPercent: config.royaltiesPercent,
-    custoProfissionaisModo: 'percentual',
-    custoProfissionaisBases: [],
-    custoProfissionaisPercent: config.custoProfissionaisPercent,
-    custoProfissionaisValor: '',
-    impostosPercent: config.impostosPercent,
-    comissoesPercent: config.comissoesPercent,
-    taxaMaquinaPercent: config.taxaMaquinaPercent,
-  }
-}
-
 function calculateSubtotal(itens: Array<{ preco_unitario: number; quantidade: number }>) {
   return itens.reduce((total, item) => total + item.preco_unitario * item.quantidade, 0)
 }
@@ -628,10 +605,7 @@ function CalculadoraPrecificacaoModal({
     })
     setPrecoVendaEditado(persisted.precoVenda)
     setErroPrecoLocal('')
-    lastSavedPayloadRef.current = JSON.stringify({
-      precoVenda: persisted.precoVenda,
-      ...persisted,
-    })
+    lastSavedPayloadRef.current = JSON.stringify(persisted)
   }, [configPadrao, item])
 
   const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
