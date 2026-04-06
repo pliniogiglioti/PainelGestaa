@@ -1990,6 +1990,90 @@
 }
 
 /* ── Cards de meios de pagamento ── */
+.vendaProdutosResumo {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 18px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 32%),
+    linear-gradient(180deg, #ffffff, #f8fff9);
+  box-shadow: 0 16px 34px rgba(15, 23, 42, 0.06);
+}
+
+.vendaProdutosResumoHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vendaProdutosResumoHeader strong {
+  font-size: 14px;
+  font-weight: 800;
+  color: #14532d;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.vendaProdutosResumoHeader span {
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(22, 163, 74, 0.10);
+  border: 1px solid rgba(22, 163, 74, 0.18);
+  font-size: 14px;
+  font-weight: 800;
+  color: #166534;
+  white-space: nowrap;
+}
+
+.vendaProdutosResumoList {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.vendaProdutosResumoCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 132px;
+  padding: 16px;
+  border-radius: 18px;
+  border: 1px solid rgba(22, 163, 74, 0.14);
+  background:
+    linear-gradient(180deg, rgba(34, 197, 94, 0.10), rgba(34, 197, 94, 0.03)),
+    #ffffff;
+}
+
+.vendaProdutosResumoMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vendaProdutosResumoMeta strong {
+  font-size: 16px;
+  line-height: 1.35;
+  color: #14532d;
+}
+
+.vendaProdutosResumoMeta span {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.vendaProdutosResumoValor {
+  font-size: 24px;
+  line-height: 1.05;
+  color: #166534;
+}
+
 .vendaMeiosLista {
   display: grid;
   grid-template-columns: repeat(4, minmax(180px, 1fr));
