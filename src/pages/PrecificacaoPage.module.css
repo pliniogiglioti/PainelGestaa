@@ -1834,7 +1834,8 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  width: 100%;
+  width: auto;
+  align-self: center;
   padding: 15px 22px;
   background: linear-gradient(135deg, #22c55e, #15803d);
   color: #fff;
@@ -1846,6 +1847,7 @@
   transition: all 0.18s ease;
   margin-top: 6px;
   letter-spacing: 0.01em;
+  min-width: 240px;
 }
 
 .vendaVerificarBtn:hover:not(:disabled) {
