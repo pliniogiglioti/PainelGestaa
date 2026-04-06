@@ -73,6 +73,8 @@ const FORMAS_PAGAMENTO = [
   { id: 'carne', label: 'Carne', hint: 'Opcao acessivel para ampliar a chance de aceite' },
 ] as const
 
+const VENDA_MODAL_DRAFT_KEY = 'precificacao_venda_modal_draft_v1'
+
 function getCategoriaLabel(value?: string | null): string {
   return value?.trim() || CATEGORIA_SEM_CADASTRO
 }
@@ -145,6 +147,20 @@ function mapVendaItensToDrafts(itens: EmpresaVendaItem[]): VendaItemDraft[] {
   }))
 }
 
+type VendaModalDraft = {
+  step: 1 | 2 | 3 | 4
+  clienteNome: string
+  planoNome: string
+  itens: VendaItemDraft[]
+  busca: string
+  categoriaFiltro: string | null
+  erroLocal: string
+  verificacaoIniciada: boolean
+  meiosLiberadosEm: number | null
+  ofertaExpiraEm: number | null
+  formaPagamento: string | null
+}
+
 export default function VendaModal({
   precos,
   taxaMaquinaPercent,
@@ -172,6 +188,7 @@ export default function VendaModal({
   const input2Ref = useRef<HTMLInputElement>(null)
   const fullscreenHostRef = useRef<HTMLDivElement>(null)
   const entrouFullscreenRef = useRef(false)
+  const draftRestoredRef = useRef(false)
 
   const precosPorCategoria = buildPrecosPorCategoria(precos)
   const categorias = precosPorCategoria.map(([cat]) => cat)
@@ -222,6 +239,68 @@ export default function VendaModal({
     if (step === 1) input1Ref.current?.focus()
     if (step === 2) input2Ref.current?.focus()
   }, [step])
+
+  useEffect(() => {
+    if (initialVenda || draftRestoredRef.current || typeof window === 'undefined') return
+
+    const rawDraft = window.sessionStorage.getItem(VENDA_MODAL_DRAFT_KEY)
+    if (!rawDraft) {
+      draftRestoredRef.current = true
+      return
+    }
+
+    try {
+      const draft = JSON.parse(rawDraft) as VendaModalDraft
+      setStep(draft.step ?? 1)
+      setClienteNome(draft.clienteNome ?? '')
+      setPlanoNome(draft.planoNome ?? '')
+      setItens(Array.isArray(draft.itens) ? draft.itens : [])
+      setBusca(draft.busca ?? '')
+      setCategoriaFiltro(draft.categoriaFiltro ?? null)
+      setErroLocal(draft.erroLocal ?? '')
+      setVerificacaoIniciada(Boolean(draft.verificacaoIniciada))
+      setMeiosLiberadosEm(draft.meiosLiberadosEm ?? null)
+      setOfertaExpiraEm(draft.ofertaExpiraEm ?? null)
+      setFormaPagamento(draft.formaPagamento ?? null)
+    } catch {
+      window.sessionStorage.removeItem(VENDA_MODAL_DRAFT_KEY)
+    } finally {
+      draftRestoredRef.current = true
+    }
+  }, [initialVenda])
+
+  useEffect(() => {
+    if (initialVenda || !draftRestoredRef.current || typeof window === 'undefined') return
+
+    const draft: VendaModalDraft = {
+      step,
+      clienteNome,
+      planoNome,
+      itens,
+      busca,
+      categoriaFiltro,
+      erroLocal,
+      verificacaoIniciada,
+      meiosLiberadosEm,
+      ofertaExpiraEm,
+      formaPagamento,
+    }
+
+    window.sessionStorage.setItem(VENDA_MODAL_DRAFT_KEY, JSON.stringify(draft))
+  }, [
+    initialVenda,
+    step,
+    clienteNome,
+    planoNome,
+    itens,
+    busca,
+    categoriaFiltro,
+    erroLocal,
+    verificacaoIniciada,
+    meiosLiberadosEm,
+    ofertaExpiraEm,
+    formaPagamento,
+  ])
 
   useEffect(() => {
     const host = fullscreenHostRef.current
@@ -294,6 +373,10 @@ export default function VendaModal({
       observacoes: planoNome.trim(),
       itens,
     })
+
+    if (!initialVenda && typeof window !== 'undefined') {
+      window.sessionStorage.removeItem(VENDA_MODAL_DRAFT_KEY)
+    }
   }
 
   const handleNextStep1 = () => {
