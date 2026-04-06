@@ -19,12 +19,23 @@ interface PrecificacaoPageProps {
 
 type ViewMode = 'vendas' | 'lista'
 
+type CustoProfissionaisBase =
+  | 'precoVenda'
+  | 'custoInsumos'
+  | 'custoMaterialAplicado'
+  | 'custoLaboratorio'
+  | 'royalties'
+  | 'impostos'
+  | 'comissoes'
+  | 'taxaMaquina'
+
 type CalculadoraForm = {
   custoInsumos: string
   custoMaterialAplicado: string
   custoLaboratorio: string
   royaltiesPercent: string
   custoProfissionaisModo: 'percentual' | 'valor'
+  custoProfissionaisBase: CustoProfissionaisBase
   custoProfissionaisPercent: string
   custoProfissionaisValor: string
   impostosPercent: string
@@ -140,6 +151,21 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
 
+const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = {
+  precoVenda: 'Preço de venda',
+  custoInsumos: 'Custo insumos',
+  custoMaterialAplicado: 'Custo material aplicado',
+  custoLaboratorio: 'Custo laboratório',
+  royalties: 'Royalties e FNP',
+  impostos: 'Impostos',
+  comissoes: 'Comissões vendas',
+  taxaMaquina: 'Taxa máquina',
+}
+
+const CUSTO_PROFISSIONAIS_BASE_OPTIONS = (
+  Object.entries(CUSTO_PROFISSIONAIS_BASE_LABELS) as Array<[CustoProfissionaisBase, string]>
+).map(([value, label]) => ({ value, label }))
+
 function Spinner() {
   return <div className={styles.spinner} />
 }
@@ -163,6 +189,10 @@ function getCategoriaLabel(value?: string | null) {
   return normalizeCategoria(value) ?? CATEGORIA_SEM_CADASTRO
 }
 
+function getCustoProfissionaisBaseLabel(base: CustoProfissionaisBase) {
+  return CUSTO_PROFISSIONAIS_BASE_LABELS[base]
+}
+
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const custoInsumos = parsePreco(form.custoInsumos)
   const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
@@ -175,13 +205,23 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const taxaMaquinaPercent = parsePreco(form.taxaMaquinaPercent)
 
   const royalties = precoVenda * (royaltiesPercent / 100)
-  const custoProfissionais =
-    form.custoProfissionaisModo === 'valor'
-      ? custoProfissionaisValor
-      : precoVenda * (custoProfissionaisPercent / 100)
   const impostos = precoVenda * (impostosPercent / 100)
   const comissoes = precoVenda * (comissoesPercent / 100)
   const taxaMaquina = precoVenda * (taxaMaquinaPercent / 100)
+  const custoProfissionaisBaseValor = {
+    precoVenda,
+    custoInsumos,
+    custoMaterialAplicado,
+    custoLaboratorio,
+    royalties,
+    impostos,
+    comissoes,
+    taxaMaquina,
+  }[form.custoProfissionaisBase]
+  const custoProfissionais =
+    form.custoProfissionaisModo === 'valor'
+      ? custoProfissionaisValor
+      : custoProfissionaisBaseValor * (custoProfissionaisPercent / 100)
 
   const custoTotal =
     custoInsumos +
@@ -201,6 +241,8 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoLaboratorio,
     royaltiesPercent,
     custoProfissionaisModo: form.custoProfissionaisModo,
+    custoProfissionaisBase: form.custoProfissionaisBase,
+    custoProfissionaisBaseValor,
     custoProfissionaisPercent,
     custoProfissionaisValor,
     impostosPercent,
@@ -243,6 +285,7 @@ function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
   CalculadoraForm,
   | 'royaltiesPercent'
   | 'custoProfissionaisModo'
+  | 'custoProfissionaisBase'
   | 'custoProfissionaisPercent'
   | 'custoProfissionaisValor'
   | 'impostosPercent'
@@ -252,6 +295,7 @@ function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
   return {
     royaltiesPercent: config.royaltiesPercent,
     custoProfissionaisModo: 'percentual',
+    custoProfissionaisBase: 'precoVenda',
     custoProfissionaisPercent: config.custoProfissionaisPercent,
     custoProfissionaisValor: '',
     impostosPercent: config.impostosPercent,
@@ -618,6 +662,24 @@ function CalculadoraPrecificacaoModal({
                 inputMode="decimal"
                 placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
               />
+              {form.custoProfissionaisModo === 'percentual' && (
+                <>
+                  <select
+                    className={styles.modalInput}
+                    value={form.custoProfissionaisBase}
+                    onChange={e => handleChange('custoProfissionaisBase', e.target.value)}
+                  >
+                    {CUSTO_PROFISSIONAIS_BASE_OPTIONS.map(option => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                  <span className={styles.modalFieldHint}>
+                    Escolha qual referência deve receber o desconto percentual dos profissionais.
+                  </span>
+                </>
+              )}
             </label>
 
             <label className={styles.modalField}>
@@ -687,7 +749,11 @@ function CalculadoraPrecificacaoModal({
                 <span>
                   {calculo.custoProfissionaisModo === 'valor'
                     ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
-                    : (calculo.custoProfissionaisPercent > 0 ? formatPercent(calculo.custoProfissionaisPercent) : '-')}
+                    : (
+                      calculo.custoProfissionaisPercent > 0
+                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre ${getCustoProfissionaisBaseLabel(calculo.custoProfissionaisBase)}`
+                        : '-'
+                    )}
                 </span>
                 <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
               </div>
@@ -2005,4 +2071,3 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     </div>
   )
 }
-
