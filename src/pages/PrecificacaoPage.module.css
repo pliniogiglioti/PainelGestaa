@@ -596,47 +596,25 @@
   padding: 16px;
 }
 
-.calcSelectionCard {
-  border: 1px solid rgba(201, 162, 42, 0.18);
-  border-radius: 14px;
-  background: rgba(201, 162, 42, 0.06);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.calcSelectionHeader {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.calcSelectionHeader strong {
-  font-size: 13px;
-  color: var(--text);
-}
-
-.calcSelectionHeader span {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.calcSelectionList {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 12px;
-}
-
-.calcSelectionOption {
+.calcReferenceCell {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: var(--text);
+  justify-content: flex-end;
 }
 
-.calcSelectionOption input {
+.calcReferenceCell span {
+  text-align: right;
+}
+
+.calcRowCheckbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calcRowCheckbox input {
   width: 16px;
   height: 16px;
   accent-color: var(--gold);
@@ -673,7 +651,7 @@
   color: var(--text);
 }
 
-.calcRow span:nth-child(2),
+.calcRow > :nth-child(2),
 .calcRow strong {
   text-align: right;
 }
@@ -1506,8 +1484,8 @@
     grid-template-columns: 1fr;
   }
 
-  .calcSelectionList {
-    grid-template-columns: 1fr;
+  .calcReferenceCell {
+    justify-content: flex-start;
   }
 
   .addItemHeader,
@@ -1552,7 +1530,7 @@
     grid-template-columns: 1fr;
   }
 
-  .calcRow span:nth-child(2),
+  .calcRow > :nth-child(2),
   .calcRow strong {
     text-align: left;
   }

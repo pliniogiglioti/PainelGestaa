@@ -20,7 +20,6 @@ interface PrecificacaoPageProps {
 type ViewMode = 'vendas' | 'lista'
 
 type CustoProfissionaisBase =
-  | 'precoVenda'
   | 'custoInsumos'
   | 'custoMaterialAplicado'
   | 'custoLaboratorio'
@@ -152,7 +151,6 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
 
 const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = {
-  precoVenda: 'Preço de venda',
   custoInsumos: 'Custo insumos',
   custoMaterialAplicado: 'Custo material aplicado',
   custoLaboratorio: 'Custo laboratório',
@@ -161,10 +159,6 @@ const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = 
   comissoes: 'Comissões vendas',
   taxaMaquina: 'Taxa máquina',
 }
-
-const CUSTO_PROFISSIONAIS_BASE_OPTIONS = (
-  Object.entries(CUSTO_PROFISSIONAIS_BASE_LABELS) as Array<[CustoProfissionaisBase, string]>
-).map(([value, label]) => ({ value, label }))
 
 function Spinner() {
   return <div className={styles.spinner} />
@@ -216,7 +210,6 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const comissoes = precoVenda * (comissoesPercent / 100)
   const taxaMaquina = precoVenda * (taxaMaquinaPercent / 100)
   const custoProfissionaisBaseValores: Record<CustoProfissionaisBase, number> = {
-    precoVenda,
     custoInsumos,
     custoMaterialAplicado,
     custoLaboratorio,
@@ -306,7 +299,7 @@ function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
   return {
     royaltiesPercent: config.royaltiesPercent,
     custoProfissionaisModo: 'percentual',
-    custoProfissionaisBases: ['precoVenda'],
+    custoProfissionaisBases: [],
     custoProfissionaisPercent: config.custoProfissionaisPercent,
     custoProfissionaisValor: '',
     impostosPercent: config.impostosPercent,
@@ -575,6 +568,21 @@ function CalculadoraPrecificacaoModal({
     }))
   }
 
+  const renderReferenciaComSelecao = (base: CustoProfissionaisBase, conteudo: string) => (
+    <div className={styles.calcReferenceCell}>
+      {form.custoProfissionaisModo === 'percentual' && (
+        <label className={styles.calcRowCheckbox}>
+          <input
+            type="checkbox"
+            checked={form.custoProfissionaisBases.includes(base)}
+            onChange={() => handleToggleCustoProfissionaisBase(base)}
+          />
+        </label>
+      )}
+      <span>{conteudo}</span>
+    </div>
+  )
+
   const handleSalvarPrecoVenda = async () => {
     const precoNumerico = parsePreco(precoVendaEditado)
 
@@ -684,7 +692,7 @@ function CalculadoraPrecificacaoModal({
               />
               {form.custoProfissionaisModo === 'percentual' && (
                 <span className={styles.modalFieldHint}>
-                  Selecione as referências na coluna da direita para compor o cálculo percentual.
+                  Marque os procedimentos na lista ao lado para compor o cálculo percentual.
                 </span>
               )}
             </label>
@@ -724,27 +732,6 @@ function CalculadoraPrecificacaoModal({
           </div>
 
           <div className={styles.calcSummary}>
-            {form.custoProfissionaisModo === 'percentual' && (
-              <div className={styles.calcSelectionCard}>
-                <div className={styles.calcSelectionHeader}>
-                  <strong>Descontar percentual sobre</strong>
-                  <span>{getCustoProfissionaisBasesLabel(form.custoProfissionaisBases)}</span>
-                </div>
-                <div className={styles.calcSelectionList}>
-                  {CUSTO_PROFISSIONAIS_BASE_OPTIONS.map(option => (
-                    <label key={option.value} className={styles.calcSelectionOption}>
-                      <input
-                        type="checkbox"
-                        checked={form.custoProfissionaisBases.includes(option.value)}
-                        onChange={() => handleToggleCustoProfissionaisBase(option.value)}
-                      />
-                      <span>{option.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <div className={styles.calcTable}>
               <div className={styles.calcTableHead}>
                 <span>Procedimento</span>
@@ -754,22 +741,25 @@ function CalculadoraPrecificacaoModal({
 
               <div className={styles.calcRow}>
                 <span>Custo insumos</span>
-                <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
+                {renderReferenciaComSelecao('custoInsumos', calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-')}
                 <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
                 <span>Custo material aplicado</span>
-                <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
+                {renderReferenciaComSelecao(
+                  'custoMaterialAplicado',
+                  calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-',
+                )}
                 <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
                 <span>Custo laboratório</span>
-                <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
+                {renderReferenciaComSelecao('custoLaboratorio', calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-')}
                 <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
                 <span>Royalties e FNP</span>
-                <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
+                {renderReferenciaComSelecao('royalties', calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-')}
                 <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
@@ -787,17 +777,17 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcRow}>
                 <span>Impostos</span>
-                <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
+                {renderReferenciaComSelecao('impostos', calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-')}
                 <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
                 <span>Comissões vendas</span>
-                <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
+                {renderReferenciaComSelecao('comissoes', calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-')}
                 <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
                 <span>Taxa máquina</span>
-                <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
+                {renderReferenciaComSelecao('taxaMaquina', calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-')}
                 <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
               </div>
             </div>
