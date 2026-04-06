@@ -707,6 +707,7 @@ export interface Database {
           data_envio:             string
           data_entrega_prometida: string | null
           data_consulta:          string | null
+          urgente:                boolean
           etapas:                 Json
           pago:                   boolean
           data_pagamento:         string | null
@@ -729,6 +730,7 @@ export interface Database {
           data_envio?:             string
           data_entrega_prometida?: string | null
           data_consulta?:          string | null
+          urgente?:                boolean
           etapas?:                 Json
           pago?:                   boolean
           data_pagamento?:         string | null
@@ -747,6 +749,7 @@ export interface Database {
           data_envio?:             string
           data_entrega_prometida?: string | null
           data_consulta?:          string | null
+          urgente?:                boolean
           etapas?:                 Json
           pago?:                   boolean
           data_pagamento?:         string | null

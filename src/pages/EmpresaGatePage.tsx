@@ -44,6 +44,7 @@ type EmpresaFormModalProps = {
   onNomeChange: (value: string) => void
   onCnpjChange: (value: string) => void
   onBackgroundChange: (file: File | null) => void
+  onRemoveBackground: () => void
 }
 
 const IconSettings = () => (
@@ -108,6 +109,7 @@ function EmpresaFormModal({
   onNomeChange,
   onCnpjChange,
   onBackgroundChange,
+  onRemoveBackground,
 }: EmpresaFormModalProps) {
   const [membros, setMembros] = useState<EmpresaMembroResumo[]>([])
   const [loadingMembros, setLoadingMembros] = useState(false)
@@ -192,10 +194,15 @@ function EmpresaFormModal({
             <span className={styles.inputHint}>Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.</span>
           </label>
           {cardBackgroundPreview && (
-            <div
-              className={styles.cardBackgroundPreview}
-              style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
-            />
+            <>
+              <div
+                className={styles.cardBackgroundPreview}
+                style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
+              />
+              <button type="button" className={styles.removeImageButton} onClick={onRemoveBackground} disabled={salvando}>
+                Excluir imagem atual
+              </button>
+            </>
           )}
           {erro && <p className={styles.erro}>{erro}</p>}
 
@@ -336,6 +343,7 @@ export default function EmpresaGatePage({
   const [empresaRoles, setEmpresaRoles]   = useState<EmpresaRoleMap>({})
   const [backgroundFile, setBackgroundFile] = useState<File | null>(null)
   const [backgroundPreview, setBackgroundPreview] = useState('')
+  const [backgroundMarkedForRemoval, setBackgroundMarkedForRemoval] = useState(false)
 
   const resetBackgroundPreview = (nextValue = '') => {
     setBackgroundPreview(current => {
@@ -426,6 +434,7 @@ export default function EmpresaGatePage({
     setNome('')
     setCnpj('')
     setBackgroundFile(null)
+    setBackgroundMarkedForRemoval(false)
     resetBackgroundPreview('')
     setErro('')
     setSalvando(false)
@@ -495,6 +504,7 @@ export default function EmpresaGatePage({
     setNome('')
     setCnpj('')
     setBackgroundFile(null)
+    setBackgroundMarkedForRemoval(false)
     resetBackgroundPreview('')
     setErro('')
   }
@@ -505,6 +515,7 @@ export default function EmpresaGatePage({
     setNome(empresa.nome)
     setCnpj(formatarCnpj(empresa.cnpj ?? ''))
     setBackgroundFile(null)
+    setBackgroundMarkedForRemoval(false)
     resetBackgroundPreview(empresa.card_background_url ?? '')
     setErro('')
   }
@@ -512,6 +523,7 @@ export default function EmpresaGatePage({
   function handleBackgroundChange(file: File | null) {
     if (!file) {
       setBackgroundFile(null)
+      setBackgroundMarkedForRemoval(false)
       resetBackgroundPreview(empresaEmEdicao?.card_background_url ?? '')
       return
     }
@@ -519,12 +531,20 @@ export default function EmpresaGatePage({
     try {
       validateCompanyCardBackground(file)
       setBackgroundFile(file)
+      setBackgroundMarkedForRemoval(false)
       resetBackgroundPreview(URL.createObjectURL(file))
       setErro('')
     } catch (err) {
       setBackgroundFile(null)
       setErro(err instanceof Error ? err.message : 'Nao foi possivel validar a imagem.')
     }
+  }
+
+  function handleRemoveBackground() {
+    setBackgroundFile(null)
+    setBackgroundMarkedForRemoval(true)
+    resetBackgroundPreview('')
+    setErro('')
   }
 
   async function handleSalvarEmpresa(e: React.FormEvent) {
@@ -538,6 +558,10 @@ export default function EmpresaGatePage({
     const cnpjNormalizado = normalizarCnpj(cnpj)
     let cardBackgroundUrl = modalModo === 'editar' ? (empresaEmEdicao?.card_background_url ?? null) : null
     const previousCardBackgroundUrl = empresaEmEdicao?.card_background_url ?? null
+
+    if (backgroundMarkedForRemoval) {
+      cardBackgroundUrl = null
+    }
 
     if (backgroundFile) {
       try {
@@ -580,6 +604,16 @@ export default function EmpresaGatePage({
       }
 
       if (backgroundFile && previousCardBackgroundUrl && previousCardBackgroundUrl !== cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(previousCardBackgroundUrl)
+        } catch (err) {
+          setErro(err instanceof Error ? err.message : 'A empresa foi salva, mas nao foi possivel excluir a imagem antiga.')
+          setSalvando(false)
+          return
+        }
+      }
+
+      if (!backgroundFile && !cardBackgroundUrl && previousCardBackgroundUrl) {
         try {
           await deleteCompanyCardBackground(previousCardBackgroundUrl)
         } catch (err) {
@@ -824,6 +858,7 @@ export default function EmpresaGatePage({
           onNomeChange={setNome}
           onCnpjChange={setCnpj}
           onBackgroundChange={handleBackgroundChange}
+          onRemoveBackground={handleRemoveBackground}
         />
       )}
 

@@ -571,6 +571,18 @@
   background-repeat: no-repeat;
 }
 
+.removeImageButton {
+  align-self: flex-start;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 85, 85, 0.24);
+  background: rgba(224, 85, 85, 0.08);
+  color: #ff8b8b;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .erro {
   color: #e06060;
   font-size: 12px;

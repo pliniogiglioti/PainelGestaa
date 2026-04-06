@@ -734,6 +734,7 @@ function CompanyFormModal({
   onSubmit,
   onChange,
   onBackgroundChange,
+  onRemoveBackground,
 }: {
   mode: 'create' | 'edit'
   form: CompanyFormState
@@ -744,6 +745,7 @@ function CompanyFormModal({
   onSubmit: (e: React.FormEvent) => void
   onChange: (field: keyof CompanyFormState, value: string) => void
   onBackgroundChange: (file: File | null) => void
+  onRemoveBackground: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose, saving)
   return (
@@ -794,10 +796,15 @@ function CompanyFormModal({
             />
             <p className={styles.modalHint}>Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.</p>
             {cardBackgroundPreview && (
-              <div
-                className={styles.companyBackgroundPreview}
-                style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
-              />
+              <>
+                <div
+                  className={styles.companyBackgroundPreview}
+                  style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
+                />
+                <button type="button" className={styles.modalRemoveButton} onClick={onRemoveBackground} disabled={saving}>
+                  Excluir imagem atual
+                </button>
+              </>
             )}
           </div>
           {error && <p className={styles.formError}>{error}</p>}
@@ -1183,6 +1190,13 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }
   }
 
+  const handleRemoveCompanyBackground = () => {
+    setCompanyBackgroundFile(null)
+    resetCompanyBackgroundPreview('')
+    setCompanyForm(prev => ({ ...prev, cardBackgroundUrl: '' }))
+    setCompanyFormError('')
+  }
+
   const handleSubmitCompany = async (e: React.FormEvent) => {
     e.preventDefault()
 
@@ -1250,6 +1264,16 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       }
 
       if (companyBackgroundFile && previousCardBackgroundUrl && previousCardBackgroundUrl !== cardBackgroundUrl) {
+        try {
+          await deleteCompanyCardBackground(previousCardBackgroundUrl)
+        } catch (err) {
+          setCompanyFormError(err instanceof Error ? err.message : 'A empresa foi salva, mas nao foi possivel excluir a imagem antiga.')
+          setSavingCompany(false)
+          return
+        }
+      }
+
+      if (!companyBackgroundFile && !cardBackgroundUrl && previousCardBackgroundUrl) {
         try {
           await deleteCompanyCardBackground(previousCardBackgroundUrl)
         } catch (err) {
@@ -1750,6 +1774,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
           onSubmit={handleSubmitCompany}
           onChange={handleCompanyFormChange}
           onBackgroundChange={handleCompanyBackgroundChange}
+          onRemoveBackground={handleRemoveCompanyBackground}
         />
       )}
     </div>
