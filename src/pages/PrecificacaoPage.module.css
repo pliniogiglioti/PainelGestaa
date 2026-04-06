@@ -596,6 +596,52 @@
   padding: 16px;
 }
 
+.calcSelectionCard {
+  border: 1px solid rgba(201, 162, 42, 0.18);
+  border-radius: 14px;
+  background: rgba(201, 162, 42, 0.06);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calcSelectionHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.calcSelectionHeader strong {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calcSelectionHeader span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.calcSelectionList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+}
+
+.calcSelectionOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.calcSelectionOption input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold);
+}
+
 .calcTable {
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -1457,6 +1503,10 @@
 
   .calcLayout,
   .calcHighlights {
+    grid-template-columns: 1fr;
+  }
+
+  .calcSelectionList {
     grid-template-columns: 1fr;
   }
 
