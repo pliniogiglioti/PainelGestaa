@@ -568,8 +568,8 @@ function CalculadoraPrecificacaoModal({
     }))
   }
 
-  const renderReferenciaComSelecao = (base: CustoProfissionaisBase, conteudo: string) => (
-    <div className={styles.calcReferenceCell}>
+  const renderProcedimentoComSelecao = (base: CustoProfissionaisBase, label: string) => (
+    <div className={styles.calcProcedureCell}>
       {form.custoProfissionaisModo === 'percentual' && (
         <label className={styles.calcRowCheckbox}>
           <input
@@ -579,7 +579,7 @@ function CalculadoraPrecificacaoModal({
           />
         </label>
       )}
-      <span>{conteudo}</span>
+      <span>{label}</span>
     </div>
   )
 
@@ -740,26 +740,23 @@ function CalculadoraPrecificacaoModal({
               </div>
 
               <div className={styles.calcRow}>
-                <span>Custo insumos</span>
-                {renderReferenciaComSelecao('custoInsumos', calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-')}
+                {renderProcedimentoComSelecao('custoInsumos', 'Custo insumos')}
+                <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
                 <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Custo material aplicado</span>
-                {renderReferenciaComSelecao(
-                  'custoMaterialAplicado',
-                  calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-',
-                )}
+                {renderProcedimentoComSelecao('custoMaterialAplicado', 'Custo material aplicado')}
+                <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
                 <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Custo laboratório</span>
-                {renderReferenciaComSelecao('custoLaboratorio', calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-')}
+                {renderProcedimentoComSelecao('custoLaboratorio', 'Custo laboratório')}
+                <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
                 <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Royalties e FNP</span>
-                {renderReferenciaComSelecao('royalties', calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-')}
+                {renderProcedimentoComSelecao('royalties', 'Royalties e FNP')}
+                <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
                 <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
@@ -776,18 +773,18 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Impostos</span>
-                {renderReferenciaComSelecao('impostos', calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-')}
+                {renderProcedimentoComSelecao('impostos', 'Impostos')}
+                <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
                 <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Comissões vendas</span>
-                {renderReferenciaComSelecao('comissoes', calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-')}
+                {renderProcedimentoComSelecao('comissoes', 'Comissões vendas')}
+                <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
                 <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
               </div>
               <div className={styles.calcRow}>
-                <span>Taxa máquina</span>
-                {renderReferenciaComSelecao('taxaMaquina', calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-')}
+                {renderProcedimentoComSelecao('taxaMaquina', 'Taxa máquina')}
+                <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
                 <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
               </div>
             </div>

@@ -596,16 +596,16 @@
   padding: 16px;
 }
 
-.calcReferenceCell {
+.calcProcedureCell {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
-.calcReferenceCell span {
-  text-align: right;
+.calcProcedureCell span {
+  text-align: left;
 }
 
 .calcRowCheckbox {
@@ -1484,7 +1484,7 @@
     grid-template-columns: 1fr;
   }
 
-  .calcReferenceCell {
+  .calcProcedureCell {
     justify-content: flex-start;
   }
 
