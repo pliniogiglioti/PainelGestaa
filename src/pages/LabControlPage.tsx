@@ -1039,6 +1039,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
               </select>
             </div>
           )}
+          {currentLab && currentPrecos.length === 0 && (
+            <div className={styles.summaryAlert}>
+              <IconAlert /> Este laboratório não tem produto ou serviço cadastrado na lista de preços. Você pode adicionar um serviço manual agora ou cadastrar os produtos depois.
+            </div>
+          )}
           <p className={styles.stepHint}>Selecione um ou mais serviços da lista de preços. Se precisar, adicione também um serviço manual.</p>
           <div className={styles.precosGrid}>
             {currentPrecos.map(p => (

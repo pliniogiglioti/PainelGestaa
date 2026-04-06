@@ -218,24 +218,34 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     comissoes,
     taxaMaquina,
   }
-  const custoProfissionaisBaseValor = form.custoProfissionaisBases.reduce(
+  const custoProfissionaisAbatimentos = form.custoProfissionaisBases.reduce(
     (total, base) => total + custoProfissionaisBaseValores[base],
     0,
   )
-  const custoProfissionais =
-    form.custoProfissionaisModo === 'valor'
-      ? custoProfissionaisValor
-      : custoProfissionaisBaseValor * (custoProfissionaisPercent / 100)
-
-  const custoTotal =
+  const subtotalAntesProfissionais =
     custoInsumos +
     custoMaterialAplicado +
     custoLaboratorio +
     royalties +
-    custoProfissionais +
     impostos +
     comissoes +
     taxaMaquina
+  const custoProfissionais =
+    form.custoProfissionaisModo === 'valor'
+      ? custoProfissionaisValor
+      : (() => {
+          const percentual = custoProfissionaisPercent / 100
+          const baseLiquida = Math.max(subtotalAntesProfissionais - custoProfissionaisAbatimentos, 0)
+
+          if (percentual <= 0) return 0
+          if (percentual >= 1) return baseLiquida
+
+          return (baseLiquida * percentual) / (1 - percentual)
+        })()
+
+  const custoTotal =
+    subtotalAntesProfissionais +
+    custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
 
@@ -246,7 +256,8 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     royaltiesPercent,
     custoProfissionaisModo: form.custoProfissionaisModo,
     custoProfissionaisBases: form.custoProfissionaisBases,
-    custoProfissionaisBaseValor,
+    custoProfissionaisBaseValor: Math.max(custoTotal - custoProfissionaisAbatimentos, 0),
+    custoProfissionaisAbatimentos,
     custoProfissionaisPercent,
     custoProfissionaisValor,
     impostosPercent,
@@ -692,7 +703,7 @@ function CalculadoraPrecificacaoModal({
               />
               {form.custoProfissionaisModo === 'percentual' && (
                 <span className={styles.modalFieldHint}>
-                  Marque os procedimentos na lista ao lado para compor o cálculo percentual.
+                  A porcentagem será aplicada sobre o custo total. Os procedimentos marcados ao lado entram como abatimento dessa base.
                 </span>
               )}
             </label>
@@ -766,7 +777,7 @@ function CalculadoraPrecificacaoModal({
                     ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
                     : (
                       calculo.custoProfissionaisPercent > 0
-                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}`
+                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre custo total${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
                         : '-'
                     )}
                 </span>
