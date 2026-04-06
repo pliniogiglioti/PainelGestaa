@@ -489,28 +489,14 @@ export default function VendaModal({
                   <div className={styles.vendaResultadoHeader}>
                     <strong className={styles.vendaResultadoTitulo}>{clienteNomeExibicao}</strong>
                     <span className={styles.vendaResultadoSub}>
-                      Foram encontradas condicoes exclusivas.
+                      Foram encontradas condicoes exclusivas dos produtos selecionados.
                     </span>
-                  </div>
-
-                  <div className={styles.vendaProdutosResumo}>
-                    <div className={styles.vendaProdutosResumoHeader}>
-                      <strong>Produtos selecionados</strong>
-                      <span>{formatCurrency(subtotalSelecionado)}</span>
-                    </div>
-                    <div className={styles.vendaProdutosResumoList}>
+                    <div className={styles.vendaProdutosResumoInline}>
                       {itens.map(item => (
-                        <div key={item.id} className={styles.vendaProdutosResumoCard}>
-                          <div className={styles.vendaProdutosResumoMeta}>
-                            <strong>{item.descricao}</strong>
-                            <span>
-                              {item.quantidade}x {formatCurrency(item.precoUnitario)}
-                            </span>
-                          </div>
-                          <strong className={styles.vendaProdutosResumoValor}>
-                            {formatCurrency(item.precoUnitario * item.quantidade)}
-                          </strong>
-                        </div>
+                        <span key={item.id} className={styles.vendaProdutoTag}>
+                          {item.descricao}
+                          {item.quantidade > 1 ? ` x${item.quantidade}` : ''}
+                        </span>
                       ))}
                     </div>
                   </div>
