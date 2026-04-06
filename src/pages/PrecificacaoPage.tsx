@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -582,8 +582,6 @@ function CalculadoraPrecificacaoModal({
   }))
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
   const [erroPrecoLocal, setErroPrecoLocal] = useState('')
-  const [savingDraft, setSavingDraft] = useState(false)
-  const lastSavedPayloadRef = useRef('')
   const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item.preco
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
@@ -605,35 +603,14 @@ function CalculadoraPrecificacaoModal({
     })
     setPrecoVendaEditado(persisted.precoVenda)
     setErroPrecoLocal('')
-    lastSavedPayloadRef.current = JSON.stringify(persisted)
   }, [configPadrao, item])
 
   const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
     ...form,
     precoVenda: precoVendaEditado,
   }), [form, precoVendaEditado])
-
-  useEffect(() => {
-    if (!canManage) return
-
-    const precoNumerico = parsePreco(precoVendaEditado)
-    if (precoNumerico <= 0) return
-
-    const serialized = JSON.stringify(calculadoraPersistida)
-    if (serialized === lastSavedPayloadRef.current) return
-
-    const timer = window.setTimeout(async () => {
-      setSavingDraft(true)
-      try {
-        await onPersistCalculo(item.id, calculadoraPersistida, precoNumerico)
-        lastSavedPayloadRef.current = serialized
-      } finally {
-        setSavingDraft(false)
-      }
-    }, 500)
-
-    return () => window.clearTimeout(timer)
-  }, [calculadoraPersistida, canManage, item.id, onPersistCalculo, precoVendaEditado])
+  const savedPayload = useMemo(() => getCalculadoraPersistida(item, configPadrao), [configPadrao, item])
+  const hasChanges = JSON.stringify(calculadoraPersistida) !== JSON.stringify(savedPayload)
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -666,6 +643,18 @@ function CalculadoraPrecificacaoModal({
       <span>{label}</span>
     </div>
   )
+
+  const handleSalvarCalculo = async () => {
+    const precoNumerico = parsePreco(precoVendaEditado)
+
+    if (precoNumerico <= 0) {
+      setErroPrecoLocal('Informe um preço de venda válido.')
+      return
+    }
+
+    setErroPrecoLocal('')
+    await onPersistCalculo(item.id, calculadoraPersistida, precoNumerico)
+  }
 
   return (
     <div
@@ -887,7 +876,9 @@ function CalculadoraPrecificacaoModal({
                     />
                     {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
                     {!erroPrecoLocal && !error && (
-                      <p className={styles.modalFieldHint}>{savingDraft || savingPreco ? 'Salvando alterações...' : 'Alterações salvas automaticamente neste produto.'}</p>
+                      <p className={styles.modalFieldHint}>
+                        {hasChanges ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.' : 'Alterações salvas neste produto.'}
+                      </p>
                     )}
                   </>
                 ) : (
@@ -899,6 +890,42 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.resultadoMargem}</strong>
               </div>
             </div>
+            {canManage && (hasChanges || erroPrecoLocal) && (
+              <div className={styles.inlineActions}>
+                <button
+                  type="button"
+                  className={styles.modalCancel}
+                  onClick={() => {
+                    setForm({
+                      custoInsumos: savedPayload.custoInsumos,
+                      custoMaterialAplicado: savedPayload.custoMaterialAplicado,
+                      custoLaboratorio: savedPayload.custoLaboratorio,
+                      royaltiesPercent: savedPayload.royaltiesPercent,
+                      custoProfissionaisModo: savedPayload.custoProfissionaisModo,
+                      custoProfissionaisBases: savedPayload.custoProfissionaisBases,
+                      custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
+                      custoProfissionaisValor: savedPayload.custoProfissionaisValor,
+                      impostosPercent: savedPayload.impostosPercent,
+                      comissoesPercent: savedPayload.comissoesPercent,
+                      taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
+                    })
+                    setPrecoVendaEditado(savedPayload.precoVenda)
+                    setErroPrecoLocal('')
+                  }}
+                  disabled={savingPreco}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={styles.modalSubmit}
+                  onClick={() => void handleSalvarCalculo()}
+                  disabled={savingPreco}
+                >
+                  {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
