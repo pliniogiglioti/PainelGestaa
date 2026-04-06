@@ -2064,6 +2064,7 @@
 .vendaInlineBackRow {
   display: flex;
   justify-content: center;
+  margin-top: auto;
   padding-top: 20px;
 }
 
