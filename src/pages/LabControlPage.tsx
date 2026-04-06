@@ -694,6 +694,8 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
   const [novaCor,  setNovaCor]  = useState('#6366f1')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
+  const [editingColId, setEditingColId] = useState<string | null>(null)
+  const [editingColNome, setEditingColNome] = useState('')
 
   const addColuna = async () => {
     if (!novoNome.trim()) return
@@ -731,6 +733,43 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
     onSaved()
   }
 
+  const startEditColuna = (coluna: LabKanbanColuna) => {
+    setEditingColId(coluna.id)
+    setEditingColNome(coluna.nome)
+    setError('')
+  }
+
+  const cancelEditColuna = () => {
+    setEditingColId(null)
+    setEditingColNome('')
+  }
+
+  const saveEditColuna = async (id: string) => {
+    if (!editingColNome.trim()) {
+      setError('Informe o nome da coluna.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    const nome = editingColNome.trim()
+    const { error: err } = await supabase
+      .from('lab_kanban_colunas')
+      .update({ nome })
+      .eq('id', id)
+
+    if (err) {
+      setError(err.message)
+      setSaving(false)
+      return
+    }
+
+    setCols(prev => prev.map(col => col.id === id ? { ...col, nome } : col))
+    setSaving(false)
+    cancelEditColuna()
+    onSaved()
+  }
+
   return (
     <Modal title="Configurar Colunas do Kanban" onClose={onClose}>
       <div className={styles.kanbanConfigWrap}>
@@ -738,8 +777,32 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
           {cols.map((c, i) => (
             <div key={c.id} className={styles.kanbanColRow}>
               <span className={styles.kanbanColDot} style={{ background: c.cor }} />
-              <span className={styles.kanbanColNome}>{c.nome}</span>
+              {editingColId === c.id ? (
+                <input
+                  className={`${styles.input} ${styles.kanbanColInput}`}
+                  value={editingColNome}
+                  onChange={e => setEditingColNome(e.target.value)}
+                  autoFocus
+                  disabled={saving}
+                />
+              ) : (
+                <span className={styles.kanbanColNome}>{c.nome}</span>
+              )}
               <div className={styles.kanbanColActions}>
+                {editingColId === c.id ? (
+                  <>
+                    <button type="button" className={styles.btnIcon} onClick={() => void saveEditColuna(c.id)} disabled={saving} title="Salvar">
+                      <IconEdit />
+                    </button>
+                    <button type="button" className={styles.btnIcon} onClick={cancelEditColuna} disabled={saving} title="Cancelar">
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={styles.btnIcon} onClick={() => startEditColuna(c)} title="Editar nome">
+                    <IconEdit />
+                  </button>
+                )}
                 <button type="button" className={styles.btnIcon} disabled={i === 0} onClick={() => moveCol(c.id, -1)}>↑</button>
                 <button type="button" className={styles.btnIcon} disabled={i === cols.length - 1} onClick={() => moveCol(c.id, 1)}>↓</button>
                 <button type="button" className={styles.btnIcon} onClick={() => removeColuna(c.id)} title="Remover"><IconTrash /></button>

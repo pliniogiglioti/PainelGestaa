@@ -710,6 +710,10 @@
   font-size: 13px;
   color: var(--text);
 }
+.kanbanColInput {
+  flex: 1;
+  min-width: 0;
+}
 .kanbanColActions {
   display: flex;
   gap: 4px;

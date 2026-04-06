@@ -235,12 +235,10 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
       ? custoProfissionaisValor
       : (() => {
           const percentual = custoProfissionaisPercent / 100
-          const baseLiquida = Math.max(subtotalAntesProfissionais - custoProfissionaisAbatimentos, 0)
+          const baseLiquida = Math.max(precoVenda - custoProfissionaisAbatimentos, 0)
 
           if (percentual <= 0) return 0
-          if (percentual >= 1) return baseLiquida
-
-          return (baseLiquida * percentual) / (1 - percentual)
+          return baseLiquida * percentual
         })()
 
   const custoTotal =
@@ -256,7 +254,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     royaltiesPercent,
     custoProfissionaisModo: form.custoProfissionaisModo,
     custoProfissionaisBases: form.custoProfissionaisBases,
-    custoProfissionaisBaseValor: Math.max(custoTotal - custoProfissionaisAbatimentos, 0),
+    custoProfissionaisBaseValor: Math.max(precoVenda - custoProfissionaisAbatimentos, 0),
     custoProfissionaisAbatimentos,
     custoProfissionaisPercent,
     custoProfissionaisValor,
@@ -703,7 +701,7 @@ function CalculadoraPrecificacaoModal({
               />
               {form.custoProfissionaisModo === 'percentual' && (
                 <span className={styles.modalFieldHint}>
-                  A porcentagem será aplicada sobre o custo total. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                  A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
                 </span>
               )}
             </label>
@@ -777,7 +775,7 @@ function CalculadoraPrecificacaoModal({
                     ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
                     : (
                       calculo.custoProfissionaisPercent > 0
-                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre custo total${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
+                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre valor da venda${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
                         : '-'
                     )}
                 </span>
