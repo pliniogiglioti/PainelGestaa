@@ -190,6 +190,7 @@ export interface Database {
           nome_produto: string
           categoria:    string | null
           preco:        number
+          precificacao_calculo: Json
           ativo:        boolean
           created_at:   string
           updated_at:   string
@@ -200,6 +201,7 @@ export interface Database {
           nome_produto:  string
           categoria?:    string | null
           preco?:        number
+          precificacao_calculo?: Json
           ativo?:        boolean
           created_at?:   string
           updated_at?:   string
@@ -210,6 +212,7 @@ export interface Database {
           nome_produto?: string
           categoria?:    string | null
           preco?:        number
+          precificacao_calculo?: Json
           ativo?:        boolean
           updated_at?:   string
         }

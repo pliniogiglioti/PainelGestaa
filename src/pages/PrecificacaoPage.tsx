@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -40,6 +40,10 @@ type CalculadoraForm = {
   impostosPercent: string
   comissoesPercent: string
   taxaMaquinaPercent: string
+}
+
+type CalculadoraPersistida = CalculadoraForm & {
+  precoVenda: string
 }
 
 type ConfiguracaoGeralForm = {
@@ -192,6 +196,49 @@ function getCustoProfissionaisBasesLabel(bases: CustoProfissionaisBase[]) {
   const labels = bases.map(getCustoProfissionaisBaseLabel)
   if (labels.length <= 2) return labels.join(' + ')
   return `${labels.length} referências selecionadas`
+}
+
+function isCustoProfissionaisBase(value: unknown): value is CustoProfissionaisBase {
+  return typeof value === 'string' && value in CUSTO_PROFISSIONAIS_BASE_LABELS
+}
+
+function getCalculadoraPersistida(
+  item: EmpresaPreco,
+  configPadrao: ConfiguracaoGeralForm,
+): CalculadoraPersistida {
+  const raw = item.precificacao_calculo
+  const saved = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {}
+
+  const formBase: CalculadoraForm = {
+    custoInsumos: typeof saved.custoInsumos === 'string' ? saved.custoInsumos : '',
+    custoMaterialAplicado: typeof saved.custoMaterialAplicado === 'string' ? saved.custoMaterialAplicado : '',
+    custoLaboratorio: typeof saved.custoLaboratorio === 'string' ? saved.custoLaboratorio : '',
+    royaltiesPercent: typeof saved.royaltiesPercent === 'string' ? saved.royaltiesPercent : configPadrao.royaltiesPercent,
+    custoProfissionaisModo: saved.custoProfissionaisModo === 'valor' ? 'valor' : 'percentual',
+    custoProfissionaisBases: Array.isArray(saved.custoProfissionaisBases)
+      ? saved.custoProfissionaisBases.filter(isCustoProfissionaisBase)
+      : [],
+    custoProfissionaisPercent: typeof saved.custoProfissionaisPercent === 'string' ? saved.custoProfissionaisPercent : configPadrao.custoProfissionaisPercent,
+    custoProfissionaisValor: typeof saved.custoProfissionaisValor === 'string' ? saved.custoProfissionaisValor : '',
+    impostosPercent: typeof saved.impostosPercent === 'string' ? saved.impostosPercent : configPadrao.impostosPercent,
+    comissoesPercent: typeof saved.comissoesPercent === 'string' ? saved.comissoesPercent : configPadrao.comissoesPercent,
+    taxaMaquinaPercent: typeof saved.taxaMaquinaPercent === 'string' ? saved.taxaMaquinaPercent : configPadrao.taxaMaquinaPercent,
+  }
+
+  return {
+    ...formBase,
+    precoVenda: typeof saved.precoVenda === 'string' ? saved.precoVenda : formatCurrencyInput(item.preco),
+  }
+}
+
+function hasGestaaCalculatedPrice(item: EmpresaPreco) {
+  const raw = item.precificacao_calculo
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
+
+  const saved = raw as Record<string, unknown>
+  return Object.keys(saved).length > 0 && typeof saved.precoVenda === 'string' && saved.precoVenda.trim() !== ''
 }
 
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
@@ -530,7 +577,7 @@ function CalculadoraPrecificacaoModal({
   canManage,
   savingPreco,
   error,
-  onUpdatePreco,
+  onPersistCalculo,
   onClose,
 }: {
   item: EmpresaPreco
@@ -538,27 +585,81 @@ function CalculadoraPrecificacaoModal({
   canManage: boolean
   savingPreco: boolean
   error: string
-  onUpdatePreco: (itemId: string, preco: number) => Promise<boolean>
+  onPersistCalculo: (itemId: string, payload: CalculadoraPersistida, preco: number) => Promise<void>
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
-  const [form, setForm] = useState<CalculadoraForm>({
-    custoInsumos: '',
-    custoMaterialAplicado: '',
-    custoLaboratorio: '',
-    ...configFormToCalculadoraForm(configPadrao),
-  })
-  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => formatCurrencyInput(item.preco))
+  const initialPersisted = useMemo(() => getCalculadoraPersistida(item, configPadrao), [configPadrao, item])
+  const [form, setForm] = useState<CalculadoraForm>(() => ({
+    custoInsumos: initialPersisted.custoInsumos,
+    custoMaterialAplicado: initialPersisted.custoMaterialAplicado,
+    custoLaboratorio: initialPersisted.custoLaboratorio,
+    royaltiesPercent: initialPersisted.royaltiesPercent,
+    custoProfissionaisModo: initialPersisted.custoProfissionaisModo,
+    custoProfissionaisBases: initialPersisted.custoProfissionaisBases,
+    custoProfissionaisPercent: initialPersisted.custoProfissionaisPercent,
+    custoProfissionaisValor: initialPersisted.custoProfissionaisValor,
+    impostosPercent: initialPersisted.impostosPercent,
+    comissoesPercent: initialPersisted.comissoesPercent,
+    taxaMaquinaPercent: initialPersisted.taxaMaquinaPercent,
+  }))
+  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
   const [erroPrecoLocal, setErroPrecoLocal] = useState('')
-  const precoVendaMudou = Math.abs(parsePreco(precoVendaEditado) - item.preco) > 0.001
+  const [savingDraft, setSavingDraft] = useState(false)
+  const lastSavedPayloadRef = useRef('')
   const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item.preco
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
 
   useEffect(() => {
-    setPrecoVendaEditado(formatCurrencyInput(item.preco))
+    const persisted = getCalculadoraPersistida(item, configPadrao)
+    setForm({
+      custoInsumos: persisted.custoInsumos,
+      custoMaterialAplicado: persisted.custoMaterialAplicado,
+      custoLaboratorio: persisted.custoLaboratorio,
+      royaltiesPercent: persisted.royaltiesPercent,
+      custoProfissionaisModo: persisted.custoProfissionaisModo,
+      custoProfissionaisBases: persisted.custoProfissionaisBases,
+      custoProfissionaisPercent: persisted.custoProfissionaisPercent,
+      custoProfissionaisValor: persisted.custoProfissionaisValor,
+      impostosPercent: persisted.impostosPercent,
+      comissoesPercent: persisted.comissoesPercent,
+      taxaMaquinaPercent: persisted.taxaMaquinaPercent,
+    })
+    setPrecoVendaEditado(persisted.precoVenda)
     setErroPrecoLocal('')
-  }, [item.preco])
+    lastSavedPayloadRef.current = JSON.stringify({
+      precoVenda: persisted.precoVenda,
+      ...persisted,
+    })
+  }, [configPadrao, item])
+
+  const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
+    ...form,
+    precoVenda: precoVendaEditado,
+  }), [form, precoVendaEditado])
+
+  useEffect(() => {
+    if (!canManage) return
+
+    const precoNumerico = parsePreco(precoVendaEditado)
+    if (precoNumerico <= 0) return
+
+    const serialized = JSON.stringify(calculadoraPersistida)
+    if (serialized === lastSavedPayloadRef.current) return
+
+    const timer = window.setTimeout(async () => {
+      setSavingDraft(true)
+      try {
+        await onPersistCalculo(item.id, calculadoraPersistida, precoNumerico)
+        lastSavedPayloadRef.current = serialized
+      } finally {
+        setSavingDraft(false)
+      }
+    }, 500)
+
+    return () => window.clearTimeout(timer)
+  }, [calculadoraPersistida, canManage, item.id, onPersistCalculo, precoVendaEditado])
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -591,18 +692,6 @@ function CalculadoraPrecificacaoModal({
       <span>{label}</span>
     </div>
   )
-
-  const handleSalvarPrecoVenda = async () => {
-    const precoNumerico = parsePreco(precoVendaEditado)
-
-    if (precoNumerico <= 0) {
-      setErroPrecoLocal('Informe um preço de venda válido.')
-      return
-    }
-
-    setErroPrecoLocal('')
-    await onUpdatePreco(item.id, precoNumerico)
-  }
 
   return (
     <div
@@ -823,6 +912,9 @@ function CalculadoraPrecificacaoModal({
                       disabled={savingPreco}
                     />
                     {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
+                    {!erroPrecoLocal && !error && (
+                      <p className={styles.modalFieldHint}>{savingDraft || savingPreco ? 'Salvando alterações...' : 'Alterações salvas automaticamente neste produto.'}</p>
+                    )}
                   </>
                 ) : (
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
@@ -833,29 +925,6 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.resultadoMargem}</strong>
               </div>
             </div>
-            {canManage && (precoVendaMudou || erroPrecoLocal) && (
-              <div className={styles.inlineActions}>
-                <button
-                  type="button"
-                  className={styles.modalCancel}
-                  onClick={() => {
-                    setPrecoVendaEditado(formatCurrencyInput(item.preco))
-                    setErroPrecoLocal('')
-                  }}
-                  disabled={savingPreco}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  className={styles.modalSubmit}
-                  onClick={() => void handleSalvarPrecoVenda()}
-                  disabled={savingPreco}
-                >
-                  {savingPreco ? 'Salvando...' : 'Salvar preço'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1610,23 +1679,26 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setSavingPreco(false)
   }
 
-  const handleUpdatePreco = async (itemId: string, preco: number) => {
+  const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
     setSavingPreco(true)
     setError('')
-    setFeedback('')
 
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
-      .update({ preco })
+      .update({
+        preco,
+        precificacao_calculo: payload,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', itemId)
       .eq('empresa_id', empresa.id)
       .select('*')
       .single()
 
     if (updateError) {
-      setError(updateError.message ?? 'Não foi possível atualizar o preço.')
+      setError(updateError.message ?? 'Não foi possível salvar a calculadora do produto.')
       setSavingPreco(false)
-      return false
+      return
     }
 
     setPrecos(prev =>
@@ -1634,9 +1706,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
     )
     setItemCalculadora(data)
-    setFeedback('Preço atualizado com sucesso.')
     setSavingPreco(false)
-    return true
   }
 
   const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
@@ -1975,6 +2045,9 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                   <div key={item.id} className={styles.priceRow}>
                     <div className={styles.priceNameWrap}>
                       <span className={styles.priceName}>{item.nome_produto}</span>
+                      {hasGestaaCalculatedPrice(item) && (
+                        <span className={styles.priceCalculatedBadge}>Preco ajustado pela calculadora da Gestaa</span>
+                      )}
                       <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
                     </div>
                     <div className={styles.priceActions}>
@@ -2038,7 +2111,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           canManage={canManage}
           savingPreco={savingPreco}
           error={error}
-          onUpdatePreco={handleUpdatePreco}
+          onPersistCalculo={handlePersistCalculo}
           onClose={() => setItemCalculadora(null)}
         />
       )}

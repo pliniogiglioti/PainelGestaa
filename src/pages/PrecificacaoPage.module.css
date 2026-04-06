@@ -303,6 +303,18 @@
   line-height: 1.2;
 }
 
+.priceCalculatedBadge {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .priceActions {
   display: flex;
   align-items: center;
