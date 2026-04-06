@@ -170,6 +170,8 @@ export default function VendaModal({
 
   const input1Ref = useRef<HTMLInputElement>(null)
   const input2Ref = useRef<HTMLInputElement>(null)
+  const fullscreenHostRef = useRef<HTMLDivElement>(null)
+  const entrouFullscreenRef = useRef(false)
 
   const precosPorCategoria = buildPrecosPorCategoria(precos)
   const categorias = precosPorCategoria.map(([cat]) => cat)
@@ -220,6 +222,25 @@ export default function VendaModal({
     if (step === 1) input1Ref.current?.focus()
     if (step === 2) input2Ref.current?.focus()
   }, [step])
+
+  useEffect(() => {
+    const host = fullscreenHostRef.current
+    if (!host || typeof host.requestFullscreen !== 'function' || document.fullscreenElement) return undefined
+
+    void host.requestFullscreen()
+      .then(() => {
+        entrouFullscreenRef.current = true
+      })
+      .catch(() => {
+        entrouFullscreenRef.current = false
+      })
+
+    return () => {
+      if (document.fullscreenElement === host || entrouFullscreenRef.current) {
+        void document.exitFullscreen().catch(() => undefined)
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!verificacaoIniciada || meiosLiberadosEm == null || meiosLiberadosEm <= 0) return undefined
@@ -310,7 +331,11 @@ export default function VendaModal({
   }
 
   return (
-    <div className={styles.vendaOverlay} onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }}>
+    <div
+      ref={fullscreenHostRef}
+      className={styles.vendaOverlay}
+      onClick={e => { if (e.target === e.currentTarget && !saving) onClose() }}
+    >
       <div className={styles.vendaContainer}>
 
         {/* Botão X flutuante */}
