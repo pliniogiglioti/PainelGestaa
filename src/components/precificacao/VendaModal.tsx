@@ -350,14 +350,14 @@ export default function VendaModal({
           {step === 1 && (
             <div className={styles.vendaStepWrapper}>
               <div className={styles.vendaStepCenter}>
-                <span className={styles.vendaStepLabel}>Como se chama o seu paciente?</span>
+                <span className={styles.vendaStepLabel}>Paciente</span>
                 <input
                   ref={input1Ref}
                   className={styles.vendaStepInput}
                   value={clienteNome}
                   onChange={e => { setClienteNome(e.target.value); setErroLocal('') }}
                   onKeyDown={e => { if (e.key === 'Enter') handleNextStep1() }}
-                  placeholder="Nome completo"
+                  placeholder=""
                   disabled={saving}
                 />
                 {erroLocal && <span className={styles.vendaErro}>{erroLocal}</span>}
@@ -370,7 +370,7 @@ export default function VendaModal({
           {step === 2 && (
             <div className={styles.vendaStepWrapper}>
               <div className={styles.vendaStepCenter}>
-                <span className={styles.vendaStepLabel}>Nome da proposta</span>
+                <span className={styles.vendaStepLabel}>Proposta</span>
                 <input
                   ref={input2Ref}
                   className={styles.vendaStepInput}
