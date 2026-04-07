@@ -303,6 +303,18 @@
   line-height: 1.2;
 }
 
+.priceCalculatedBadge {
+  align-self: flex-start;
+  border-radius: 999px;
+  padding: 4px 9px;
+  background: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.24);
+  color: #93c5fd;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
 .priceActions {
   display: flex;
   align-items: center;
@@ -385,7 +397,11 @@
 }
 
 .calcModal {
-  max-width: 1080px;
+  max-width: 1380px;
+}
+
+.choiceModal {
+  max-width: 640px;
 }
 
 .modalHeader {
@@ -453,6 +469,42 @@
   border-radius: 14px;
   padding: 14px;
   background: rgba(201, 162, 42, 0.08);
+}
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.choiceCard {
+  border: 1px solid rgba(201, 162, 42, 0.22);
+  border-radius: 16px;
+  padding: 18px;
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.choiceCard:hover {
+  transform: translateY(-1px);
+  border-color: rgba(201, 162, 42, 0.38);
+  background: rgba(201, 162, 42, 0.10);
+}
+
+.choiceCard strong {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.choiceCard span {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
 }
 
 .inlineActions {
@@ -606,8 +658,9 @@
 
 .calcLayout {
   display: grid;
-  grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 320px) minmax(240px, 320px) minmax(380px, 1fr);
   gap: 18px;
+  align-items: start;
 }
 
 .calcForm,
@@ -615,6 +668,36 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.calcFormCard {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calcFormHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.calcFormTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.calcFormHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .calcSummary {
@@ -1491,6 +1574,16 @@
   }
 }
 
+@media (max-width: 1180px) {
+  .calcLayout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .calcSummary {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 640px) {
   .page {
     padding: 20px 16px 28px;
@@ -1539,7 +1632,8 @@
   }
 
   .calcLayout,
-  .calcHighlights {
+  .calcHighlights,
+  .choiceGrid {
     grid-template-columns: 1fr;
   }
 

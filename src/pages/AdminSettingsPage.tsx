@@ -607,7 +607,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       <div className={styles.tabs}>
         {([
           { key: 'modelo',         label: 'Modelo IA'         },
-          { key: 'classificacoes', label: 'Classificações DRE' },
+          { key: 'classificacoes', label: 'Classificações DFC' },
           { key: 'exemplos',       label: 'Exemplos de Upload' },
           { key: 'usuarios',       label: 'Usuários'           },
         ] as { key: Tab; label: string }[]).map(t => (
@@ -638,7 +638,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                 ))}
               </select>
               <p className={styles.hint}>
-                Modelo usado para sugerir a classificação automática nos lançamentos do DRE.
+                Modelo usado para sugerir a classificação automática nos lançamentos do DFC.
               </p>
               {modelsLoading && <p className={styles.hint}>Atualizando catálogo de modelos disponíveis...</p>}
             </div>

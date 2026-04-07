@@ -81,6 +81,19 @@
   font-weight: 600;
 }
 
+.urgentBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.34);
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ── Tabs ─────────────────────────────────────────────────────────────────── */
 
 .tabs {
@@ -470,6 +483,19 @@
   padding: 3px 8px;
 }
 
+.kanbanCardUrgent {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fbbf24;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .kanbanCardPatient {
   font-size: 13px;
   font-weight: 700;
@@ -683,6 +709,10 @@
   flex: 1;
   font-size: 13px;
   color: var(--text);
+}
+.kanbanColInput {
+  flex: 1;
+  min-width: 0;
 }
 .kanbanColActions {
   display: flex;
@@ -966,6 +996,12 @@
   color: #f87171;
   font-size: 12px;
   font-weight: 700;
+}
+
+.summaryAlertUrgent {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.24);
+  color: #fbbf24;
 }
 
 .summarySteps {

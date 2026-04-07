@@ -138,6 +138,7 @@ export interface Database {
           nome:       string
           cnpj:       string | null
           logo_url:   string | null
+          card_background_url: string | null
           created_by: string
           ativo:      boolean
           created_at: string
@@ -148,6 +149,7 @@ export interface Database {
           nome:       string
           cnpj?:      string | null
           logo_url?:  string | null
+          card_background_url?: string | null
           created_by: string
           ativo?:     boolean
           created_at?: string
@@ -158,6 +160,7 @@ export interface Database {
           nome?:      string
           cnpj?:      string | null
           logo_url?:  string | null
+          card_background_url?: string | null
           ativo?:     boolean
           updated_at?: string
         }
@@ -190,6 +193,7 @@ export interface Database {
           nome_produto: string
           categoria:    string | null
           preco:        number
+          precificacao_calculo: Json
           ativo:        boolean
           created_at:   string
           updated_at:   string
@@ -200,6 +204,7 @@ export interface Database {
           nome_produto:  string
           categoria?:    string | null
           preco?:        number
+          precificacao_calculo?: Json
           ativo?:        boolean
           created_at?:   string
           updated_at?:   string
@@ -210,6 +215,7 @@ export interface Database {
           nome_produto?: string
           categoria?:    string | null
           preco?:        number
+          precificacao_calculo?: Json
           ativo?:        boolean
           updated_at?:   string
         }
@@ -707,6 +713,7 @@ export interface Database {
           data_envio:             string
           data_entrega_prometida: string | null
           data_consulta:          string | null
+          urgente:                boolean
           etapas:                 Json
           pago:                   boolean
           data_pagamento:         string | null
@@ -729,6 +736,7 @@ export interface Database {
           data_envio?:             string
           data_entrega_prometida?: string | null
           data_consulta?:          string | null
+          urgente?:                boolean
           etapas?:                 Json
           pago?:                   boolean
           data_pagamento?:         string | null
@@ -747,6 +755,7 @@ export interface Database {
           data_envio?:             string
           data_entrega_prometida?: string | null
           data_consulta?:          string | null
+          urgente?:                boolean
           etapas?:                 Json
           pago?:                   boolean
           data_pagamento?:         string | null

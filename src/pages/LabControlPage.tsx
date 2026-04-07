@@ -694,6 +694,8 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
   const [novaCor,  setNovaCor]  = useState('#6366f1')
   const [saving,   setSaving]   = useState(false)
   const [error,    setError]    = useState('')
+  const [editingColId, setEditingColId] = useState<string | null>(null)
+  const [editingColNome, setEditingColNome] = useState('')
 
   const addColuna = async () => {
     if (!novoNome.trim()) return
@@ -731,6 +733,43 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
     onSaved()
   }
 
+  const startEditColuna = (coluna: LabKanbanColuna) => {
+    setEditingColId(coluna.id)
+    setEditingColNome(coluna.nome)
+    setError('')
+  }
+
+  const cancelEditColuna = () => {
+    setEditingColId(null)
+    setEditingColNome('')
+  }
+
+  const saveEditColuna = async (id: string) => {
+    if (!editingColNome.trim()) {
+      setError('Informe o nome da coluna.')
+      return
+    }
+
+    setSaving(true)
+    setError('')
+    const nome = editingColNome.trim()
+    const { error: err } = await supabase
+      .from('lab_kanban_colunas')
+      .update({ nome })
+      .eq('id', id)
+
+    if (err) {
+      setError(err.message)
+      setSaving(false)
+      return
+    }
+
+    setCols(prev => prev.map(col => col.id === id ? { ...col, nome } : col))
+    setSaving(false)
+    cancelEditColuna()
+    onSaved()
+  }
+
   return (
     <Modal title="Configurar Colunas do Kanban" onClose={onClose}>
       <div className={styles.kanbanConfigWrap}>
@@ -738,8 +777,32 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
           {cols.map((c, i) => (
             <div key={c.id} className={styles.kanbanColRow}>
               <span className={styles.kanbanColDot} style={{ background: c.cor }} />
-              <span className={styles.kanbanColNome}>{c.nome}</span>
+              {editingColId === c.id ? (
+                <input
+                  className={`${styles.input} ${styles.kanbanColInput}`}
+                  value={editingColNome}
+                  onChange={e => setEditingColNome(e.target.value)}
+                  autoFocus
+                  disabled={saving}
+                />
+              ) : (
+                <span className={styles.kanbanColNome}>{c.nome}</span>
+              )}
               <div className={styles.kanbanColActions}>
+                {editingColId === c.id ? (
+                  <>
+                    <button type="button" className={styles.btnIcon} onClick={() => void saveEditColuna(c.id)} disabled={saving} title="Salvar">
+                      <IconEdit />
+                    </button>
+                    <button type="button" className={styles.btnIcon} onClick={cancelEditColuna} disabled={saving} title="Cancelar">
+                      ✕
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" className={styles.btnIcon} onClick={() => startEditColuna(c)} title="Editar nome">
+                    <IconEdit />
+                  </button>
+                )}
                 <button type="button" className={styles.btnIcon} disabled={i === 0} onClick={() => moveCol(c.id, -1)}>↑</button>
                 <button type="button" className={styles.btnIcon} disabled={i === cols.length - 1} onClick={() => moveCol(c.id, 1)}>↓</button>
                 <button type="button" className={styles.btnIcon} onClick={() => removeColuna(c.id)} title="Remover"><IconTrash /></button>
@@ -769,6 +832,7 @@ interface EnvioFormState {
   tipo_trabalho: string; preco_servico: string
   paciente_nome: string; dentes: string; cor: string; observacoes: string
   data_envio: string; data_entrega_prometida: string; data_consulta: string
+  urgente: boolean
 }
 
 interface ServicoSelecionado {
@@ -781,8 +845,9 @@ interface ServicoSelecionado {
   data_conclusao: string
 }
 
-function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, onSaved }: {
-  lab: Lab; precos: LabPreco[]; empresaId: string; userId: string
+function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, onClose, onSaved }: {
+  lab?: Lab | null; labs?: Lab[]; precos?: LabPreco[]; precosByLab?: Record<string, LabPreco[]>
+  empresaId: string; userId: string
   envio: LabEnvio | null; colunas: LabKanbanColuna[]
   onClose: () => void; onSaved: () => void
 }) {
@@ -791,7 +856,14 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   const [error,  setError]  = useState('')
   const [manualNome, setManualNome] = useState('')
   const [manualPreco, setManualPreco] = useState('')
-  const feriadosLab = getLabFeriados(lab)
+  const availableLabs = lab ? [lab, ...labs.filter(item => item.id !== lab.id)] : labs
+  const labsById = Object.fromEntries(availableLabs.map(item => [item.id, item]))
+  const [selectedLabId, setSelectedLabId] = useState(envio?.lab_id ?? lab?.id ?? '')
+  const currentLab = selectedLabId ? (labsById[selectedLabId] ?? null) : (lab ?? null)
+  const currentPrecos = currentLab
+    ? (precosByLab?.[currentLab.id] ?? (currentLab.id === lab?.id ? precos : []))
+    : []
+  const feriadosLab = currentLab ? getLabFeriados(currentLab) : []
   const [servicosSelecionados, setServicosSelecionados] = useState<ServicoSelecionado[]>(() => {
     if (!envio) return []
 
@@ -817,8 +889,9 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
     cor:                    envio?.cor ?? '',
     observacoes:            envio?.observacoes ?? '',
     data_envio:             envio?.data_envio ?? today(),
-    data_entrega_prometida: envio?.data_entrega_prometida ?? addBusinessDays(envio?.data_envio ?? today(), lab.prazo_medio_dias, feriadosLab),
+    data_entrega_prometida: envio?.data_entrega_prometida ?? addBusinessDays(envio?.data_envio ?? today(), currentLab?.prazo_medio_dias ?? 0, feriadosLab),
     data_consulta:          envio?.data_consulta ?? '',
+    urgente:                envio?.urgente ?? false,
   })
 
   const set = (f: keyof EnvioFormState) =>
@@ -845,13 +918,13 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   useEffect(() => {
     if (!usarPrazoAutomatico) return
 
-    const prazoCalculado = addBusinessDays(form.data_envio, lab.prazo_medio_dias, feriadosLab)
+    const prazoCalculado = addBusinessDays(form.data_envio, currentLab?.prazo_medio_dias ?? 0, feriadosLab)
     setForm(prev => (
       prev.data_entrega_prometida === prazoCalculado
         ? prev
         : { ...prev, data_entrega_prometida: prazoCalculado }
     ))
-  }, [feriadosLab, form.data_envio, lab.prazo_medio_dias, usarPrazoAutomatico])
+  }, [currentLab?.prazo_medio_dias, feriadosLab, form.data_envio, usarPrazoAutomatico])
 
   const handlePrazoPrometidoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsarPrazoAutomatico(false)
@@ -928,6 +1001,9 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
 
   const nextStep = () => {
     if (step === 1) {
+      if (!currentLab) {
+        setError('Selecione o laboratório.'); return
+      }
       if (servicosSelecionados.length === 0) {
         setError('Selecione ao menos um serviço.'); return
       }
@@ -946,9 +1022,11 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
     const precoNormalizado = form.preco_servico.trim().replace(',', '.')
     const precoConvertido = precoNormalizado === '' ? null : Number(precoNormalizado)
 
+    if (!currentLab) { setError('Selecione o laboratório.'); return }
     setSaving(true); setError('')
+
     const payload = {
-      lab_id:                 lab.id,
+      lab_id:                 currentLab.id,
       empresa_id:             empresaId,
       user_id:                userId,
       tipo_trabalho:          trabalho.trim(),
@@ -961,6 +1039,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       data_envio:             form.data_envio || today(),
       data_entrega_prometida: form.data_entrega_prometida || null,
       data_consulta:          form.data_consulta || null,
+      urgente:                form.urgente,
       etapas:                 servicosSelecionados.map(servico => ({
         id: servico.key,
         nome: servico.nome.trim(),
@@ -989,7 +1068,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
   const displayTrabalho = form.tipo_trabalho
 
   return (
-    <Modal title={envio ? 'Editar Envio' : `Novo Envio — ${lab.nome}`} onClose={onClose} wide>
+    <Modal title={envio ? 'Editar Envio' : `Novo Envio${currentLab ? ` — ${currentLab.nome}` : ''}`} onClose={onClose} wide>
       {/* Step indicator */}
       <div className={styles.stepIndicator}>
         {stepTitles.map((t, i) => (
@@ -1003,9 +1082,34 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       {/* ── Step 1: Tipo de trabalho ── */}
       {step === 1 && (
         <div className={styles.stepContent}>
+          {availableLabs.length > 1 && (
+            <div className={styles.formField} style={{ marginBottom: 16 }}>
+              <label className={styles.label}>Laboratório</label>
+              <select
+                className={styles.select}
+                value={selectedLabId}
+                onChange={e => {
+                  setSelectedLabId(e.target.value)
+                  setServicosSelecionados([])
+                  setManualNome('')
+                  setManualPreco('')
+                }}
+              >
+                <option value="">Selecione o laboratório</option>
+                {availableLabs.map(item => (
+                  <option key={item.id} value={item.id}>{item.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {currentLab && currentPrecos.length === 0 && (
+            <div className={styles.summaryAlert}>
+              <IconAlert /> Este laboratório não tem produto ou serviço cadastrado na lista de preços. Você pode adicionar um serviço manual agora ou cadastrar os produtos depois.
+            </div>
+          )}
           <p className={styles.stepHint}>Selecione um ou mais serviços da lista de preços. Se precisar, adicione também um serviço manual.</p>
           <div className={styles.precosGrid}>
-            {precos.map(p => (
+            {currentPrecos.map(p => (
               <button
                 key={p.id}
                 type="button"
@@ -1062,7 +1166,7 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
               ))}
             </div>
           )}
-          {precos.length === 0 && (
+          {currentLab && currentPrecos.length === 0 && (
             <p className={styles.stepHint} style={{ marginTop: 12 }}>
               Nenhum serviço na lista de preços. Adicione um serviço manual ou peça ao administrador para cadastrar os serviços.
             </p>
@@ -1132,9 +1236,17 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
               <input className={styles.input} type="date" value={form.data_consulta} onChange={set('data_consulta')} />
             </div>
           </div>
-          {lab.prazo_medio_dias > 0 && (
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={form.urgente}
+              onChange={e => setForm(prev => ({ ...prev, urgente: e.target.checked }))}
+            />
+            <span>{form.urgente ? 'Marcado como urgente' : 'Marcar este envio como urgente'}</span>
+          </label>
+          {currentLab && currentLab.prazo_medio_dias > 0 && (
             <p className={styles.stepHint} style={{ marginTop: 12 }}>
-              Prazo médio deste laboratório: <strong>{lab.prazo_medio_dias} dias úteis</strong>. {usarPrazoAutomatico ? 'A data prometida foi calculada automaticamente.' : 'A data prometida foi ajustada manualmente.'}
+              Prazo médio deste laboratório: <strong>{currentLab.prazo_medio_dias} dias úteis</strong>. {usarPrazoAutomatico ? 'A data prometida foi calculada automaticamente.' : 'A data prometida foi ajustada manualmente.'}
             </p>
           )}
           {servicosSelecionados.length > 0 && (
@@ -1180,8 +1292,9 @@ function EnvioSteps({ lab, precos, empresaId, userId, envio, colunas, onClose, o
       {step === 4 && (
         <div className={styles.stepContent}>
           <div className={styles.reviewGrid}>
-            <ReviewRow label="Laboratório"    value={lab.nome} />
+            <ReviewRow label="Laboratório"    value={currentLab?.nome ?? 'Nao selecionado'} />
             <ReviewRow label="Tipo de trabalho" value={displayTrabalho || form.tipo_trabalho} />
+            <ReviewRow label="Urgência" value={form.urgente ? 'Urgente' : 'Normal'} />
             {form.preco_servico && (
               <ReviewRow label="Valor" value={parseFloat(form.preco_servico.replace(',', '.')).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
             )}
@@ -1271,6 +1384,11 @@ function EnvioResumoModal({ envio, labNome, isAdmin, onClose, onEdit, onTogglePa
       {overdueEtapas.length > 0 && (
         <div className={styles.summaryAlert}>
           <IconAlert /> {overdueEtapas.length} etapa(s) atrasada(s)
+        </div>
+      )}
+      {envio.urgente && (
+        <div className={`${styles.summaryAlert} ${styles.summaryAlertUrgent}`}>
+          <IconAlert /> Envio marcado como urgente
         </div>
       )}
 
@@ -1450,6 +1568,7 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResu
           <IconAlert /> {overdueEtapas[0] ? `Etapa atrasada: ${overdueEtapas[0].nome}` : 'Prazo vencido'}
         </div>
       )}
+      {envio.urgente && <div className={styles.kanbanCardUrgent}>Urgente</div>}
       {labNome && <div className={styles.kanbanCardLab}>{labNome}</div>}
       <div className={styles.kanbanCardPatient}>{envio.paciente_nome}</div>
       <div className={styles.kanbanCardService}>{resumoTrabalho || envio.tipo_trabalho}</div>
@@ -2032,11 +2151,6 @@ function LabsAggregateDetailView({
   })
 
   const overdueCount = envios.filter(isOverdue).length
-  const canCreateEnvio = labFilterId !== LAB_FILTER_ALL
-  const currentModalLab = editingEnvio
-    ? (labsById[editingEnvio.lab_id] ?? null)
-    : (labFilterId !== LAB_FILTER_ALL ? (labsById[labFilterId] ?? null) : null)
-  const currentPrecos = currentModalLab ? (precosByLab[currentModalLab.id] ?? []) : []
   const aggregateLabCount = new Set(visibleEnvios.map(envio => envio.lab_id)).size
 
   return (
@@ -2063,9 +2177,9 @@ function LabsAggregateDetailView({
           <button
             type="button"
             className={styles.btnPrimary}
-            disabled={!canCreateEnvio}
+            disabled={labs.length === 0}
             onClick={() => {
-              if (!canCreateEnvio) return
+              if (labs.length === 0) return
               setEditingEnvio(null)
               setShowEnvioSteps(true)
             }}
@@ -2108,7 +2222,6 @@ function LabsAggregateDetailView({
             {labFilterId === LAB_FILTER_ALL
               ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
               : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
-            {!canCreateEnvio && ' Selecione um laboratório para criar um novo envio por aqui.'}
           </div>
 
           <KanbanBoard
@@ -2125,10 +2238,11 @@ function LabsAggregateDetailView({
         </>
       )}
 
-      {showEnvioSteps && currentModalLab && (
+      {showEnvioSteps && (
         <EnvioSteps
-          lab={currentModalLab}
-          precos={currentPrecos}
+          lab={editingEnvio ? (labsById[editingEnvio.lab_id] ?? null) : (labFilterId !== LAB_FILTER_ALL ? (labsById[labFilterId] ?? null) : null)}
+          labs={labs}
+          precosByLab={precosByLab}
           empresaId={empresaId}
           userId={userId}
           envio={editingEnvio}

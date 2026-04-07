@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -40,6 +40,10 @@ type CalculadoraForm = {
   impostosPercent: string
   comissoesPercent: string
   taxaMaquinaPercent: string
+}
+
+type CalculadoraPersistida = CalculadoraForm & {
+  precoVenda: string
 }
 
 type ConfiguracaoGeralForm = {
@@ -194,6 +198,53 @@ function getCustoProfissionaisBasesLabel(bases: CustoProfissionaisBase[]) {
   return `${labels.length} referências selecionadas`
 }
 
+function isCustoProfissionaisBase(value: unknown): value is CustoProfissionaisBase {
+  return typeof value === 'string' && value in CUSTO_PROFISSIONAIS_BASE_LABELS
+}
+
+function getCalculadoraPersistida(
+  item: EmpresaPreco | null,
+  configPadrao: ConfiguracaoGeralForm,
+): CalculadoraPersistida {
+  const raw = item?.precificacao_calculo
+  const saved = raw && typeof raw === 'object' && !Array.isArray(raw)
+    ? raw as Record<string, unknown>
+    : {}
+
+  const formBase: CalculadoraForm = {
+    custoInsumos: typeof saved.custoInsumos === 'string' ? saved.custoInsumos : '',
+    custoMaterialAplicado: typeof saved.custoMaterialAplicado === 'string' ? saved.custoMaterialAplicado : '',
+    custoLaboratorio: typeof saved.custoLaboratorio === 'string' ? saved.custoLaboratorio : '',
+    royaltiesPercent: typeof saved.royaltiesPercent === 'string' ? saved.royaltiesPercent : configPadrao.royaltiesPercent,
+    custoProfissionaisModo: saved.custoProfissionaisModo === 'valor' ? 'valor' : 'percentual',
+    custoProfissionaisBases: Array.isArray(saved.custoProfissionaisBases)
+      ? saved.custoProfissionaisBases.filter(isCustoProfissionaisBase)
+      : [],
+    custoProfissionaisPercent: typeof saved.custoProfissionaisPercent === 'string' ? saved.custoProfissionaisPercent : configPadrao.custoProfissionaisPercent,
+    custoProfissionaisValor: typeof saved.custoProfissionaisValor === 'string' ? saved.custoProfissionaisValor : '',
+    impostosPercent: typeof saved.impostosPercent === 'string' ? saved.impostosPercent : configPadrao.impostosPercent,
+    comissoesPercent: typeof saved.comissoesPercent === 'string' ? saved.comissoesPercent : configPadrao.comissoesPercent,
+    taxaMaquinaPercent: typeof saved.taxaMaquinaPercent === 'string' ? saved.taxaMaquinaPercent : configPadrao.taxaMaquinaPercent,
+  }
+
+  return {
+    ...formBase,
+    precoVenda: typeof saved.precoVenda === 'string'
+      ? saved.precoVenda
+      : item
+        ? formatCurrencyInput(item.preco)
+        : '',
+  }
+}
+
+function hasGestaaCalculatedPrice(item: EmpresaPreco) {
+  const raw = item.precificacao_calculo
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return false
+
+  const saved = raw as Record<string, unknown>
+  return Object.keys(saved).length > 0 && typeof saved.precoVenda === 'string' && saved.precoVenda.trim() !== ''
+}
+
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const custoInsumos = parsePreco(form.custoInsumos)
   const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
@@ -218,24 +269,32 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     comissoes,
     taxaMaquina,
   }
-  const custoProfissionaisBaseValor = form.custoProfissionaisBases.reduce(
+  const custoProfissionaisAbatimentos = form.custoProfissionaisBases.reduce(
     (total, base) => total + custoProfissionaisBaseValores[base],
     0,
   )
-  const custoProfissionais =
-    form.custoProfissionaisModo === 'valor'
-      ? custoProfissionaisValor
-      : custoProfissionaisBaseValor * (custoProfissionaisPercent / 100)
-
-  const custoTotal =
+  const subtotalAntesProfissionais =
     custoInsumos +
     custoMaterialAplicado +
     custoLaboratorio +
     royalties +
-    custoProfissionais +
     impostos +
     comissoes +
     taxaMaquina
+  const custoProfissionais =
+    form.custoProfissionaisModo === 'valor'
+      ? custoProfissionaisValor
+      : (() => {
+          const percentual = custoProfissionaisPercent / 100
+          const baseLiquida = Math.max(precoVenda - custoProfissionaisAbatimentos, 0)
+
+          if (percentual <= 0) return 0
+          return baseLiquida * percentual
+        })()
+
+  const custoTotal =
+    subtotalAntesProfissionais +
+    custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
   const precoSugerido = custoTotal * 1.5
@@ -247,7 +306,8 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     royaltiesPercent,
     custoProfissionaisModo: form.custoProfissionaisModo,
     custoProfissionaisBases: form.custoProfissionaisBases,
-    custoProfissionaisBaseValor,
+    custoProfissionaisBaseValor: Math.max(precoVenda - custoProfissionaisAbatimentos, 0),
+    custoProfissionaisAbatimentos,
     custoProfissionaisPercent,
     custoProfissionaisValor,
     impostosPercent,
@@ -284,29 +344,6 @@ function configToVendasForm(config: EmpresaPrecificacaoConfig | null): Configura
     tempoApresentacaoSegundos: config ? String(config.vendas_tempo_apresentacao_segundos) : '0',
     ofertaValidaMinutos: config ? String(config.vendas_oferta_valida_minutos) : '15',
     exibirCampanhaPromocional: config ? config.vendas_exibir_campanha_promocional : false,
-  }
-}
-
-function configFormToCalculadoraForm(config: ConfiguracaoGeralForm): Pick<
-  CalculadoraForm,
-  | 'royaltiesPercent'
-  | 'custoProfissionaisModo'
-  | 'custoProfissionaisBases'
-  | 'custoProfissionaisPercent'
-  | 'custoProfissionaisValor'
-  | 'impostosPercent'
-  | 'comissoesPercent'
-  | 'taxaMaquinaPercent'
-> {
-  return {
-    royaltiesPercent: config.royaltiesPercent,
-    custoProfissionaisModo: 'percentual',
-    custoProfissionaisBases: [],
-    custoProfissionaisPercent: config.custoProfissionaisPercent,
-    custoProfissionaisValor: '',
-    impostosPercent: config.impostosPercent,
-    comissoesPercent: config.comissoesPercent,
-    taxaMaquinaPercent: config.taxaMaquinaPercent,
   }
 }
 
@@ -537,6 +574,7 @@ function PrecoModal({
             nome_produto: nome.trim() || 'Novo item',
             categoria: categoria || CATEGORIA_SEM_CADASTRO,
             preco: parsePreco(preco),
+            precificacao_calculo: null,
             ativo: initialItem?.ativo ?? true,
             created_at: initialItem?.created_at ?? new Date().toISOString(),
             updated_at: initialItem?.updated_at ?? new Date().toISOString(),
@@ -558,6 +596,54 @@ function PrecoModal({
   )
 }
 
+function EscolhaCriacaoPrecoModal({
+  onClose,
+  onSelectSimple,
+  onSelectCalculated,
+}: {
+  onClose: () => void
+  onSelectSimple: () => void
+  onSelectCalculated: () => void
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose)
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.choiceModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <div>
+            <h2 className={styles.modalTitle}>Como deseja criar o preço?</h2>
+            <p className={styles.calcItemName}>Escolha entre cadastro direto ou cálculo completo antes de salvar.</p>
+          </div>
+          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
+        </div>
+
+        <div className={styles.choiceGrid}>
+          <button type="button" className={styles.choiceCard} onClick={onSelectSimple}>
+            <strong>Simples</strong>
+            <span>Abre o cadastro atual com nome, categoria e preço.</span>
+          </button>
+
+          <button type="button" className={styles.choiceCard} onClick={onSelectCalculated}>
+            <strong>Calculada</strong>
+            <span>Abre a calculadora de precificação e salva o novo produto ou serviço ao final.</span>
+          </button>
+        </div>
+
+        <div className={styles.modalActions}>
+          <button type="button" className={styles.modalCancel} onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CalculadoraPrecificacaoModal({
   item,
   configPadrao,
@@ -565,34 +651,75 @@ function CalculadoraPrecificacaoModal({
   savingPreco,
   error,
   onSavePrice,
+  onPersistCalculo,
+  onCreatePrecoCalculado,
   onClose,
 }: {
-  item: EmpresaPreco
+  item?: EmpresaPreco | null
   configPadrao: ConfiguracaoGeralForm
   canManage: boolean
   savingPreco: boolean
   error: string
-  onSavePrice: (preco: number) => Promise<boolean> | boolean
+  onSavePrice?: (preco: number) => Promise<boolean> | boolean
+  onPersistCalculo?: (itemId: string, payload: CalculadoraPersistida, preco: number) => Promise<void>
+  onCreatePrecoCalculado?: (item: PrecoFormPayload, calculo: CalculadoraPersistida) => Promise<void>
   onClose: () => void
 }) {
+  const isCreating = !item
   const backdropDismiss = useBackdropDismiss(onClose)
-  const [form, setForm] = useState<CalculadoraForm>({
-    custoInsumos: '',
-    custoMaterialAplicado: '',
-    custoLaboratorio: '',
-    ...configFormToCalculadoraForm(configPadrao),
-  })
-  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => formatCurrencyInput(item.preco))
-  const [erroPrecoLocal, setErroPrecoLocal] = useState('')
-  const precoVendaMudou = Math.abs(parsePreco(precoVendaEditado) - item.preco) > 0.001
-  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item.preco
+  const initialPersisted = useMemo(() => getCalculadoraPersistida(item ?? null, configPadrao), [configPadrao, item])
+  const [nome, setNome] = useState(item?.nome_produto ?? '')
+  const [categoria, setCategoria] = useState(item?.categoria ?? '')
+  const [form, setForm] = useState<CalculadoraForm>(() => ({
+    custoInsumos: initialPersisted.custoInsumos,
+    custoMaterialAplicado: initialPersisted.custoMaterialAplicado,
+    custoLaboratorio: initialPersisted.custoLaboratorio,
+    royaltiesPercent: initialPersisted.royaltiesPercent,
+    custoProfissionaisModo: initialPersisted.custoProfissionaisModo,
+    custoProfissionaisBases: initialPersisted.custoProfissionaisBases,
+    custoProfissionaisPercent: initialPersisted.custoProfissionaisPercent,
+    custoProfissionaisValor: initialPersisted.custoProfissionaisValor,
+    impostosPercent: initialPersisted.impostosPercent,
+    comissoesPercent: initialPersisted.comissoesPercent,
+    taxaMaquinaPercent: initialPersisted.taxaMaquinaPercent,
+  }))
+  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
+  const [erroLocal, setErroLocal] = useState('')
+  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
 
   useEffect(() => {
-    setPrecoVendaEditado(formatCurrencyInput(item.preco))
-    setErroPrecoLocal('')
-  }, [item.preco])
+    const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
+    setNome(item?.nome_produto ?? '')
+    setCategoria(item?.categoria ?? '')
+    setForm({
+      custoInsumos: persisted.custoInsumos,
+      custoMaterialAplicado: persisted.custoMaterialAplicado,
+      custoLaboratorio: persisted.custoLaboratorio,
+      royaltiesPercent: persisted.royaltiesPercent,
+      custoProfissionaisModo: persisted.custoProfissionaisModo,
+      custoProfissionaisBases: persisted.custoProfissionaisBases,
+      custoProfissionaisPercent: persisted.custoProfissionaisPercent,
+      custoProfissionaisValor: persisted.custoProfissionaisValor,
+      impostosPercent: persisted.impostosPercent,
+      comissoesPercent: persisted.comissoesPercent,
+      taxaMaquinaPercent: persisted.taxaMaquinaPercent,
+    })
+    setPrecoVendaEditado(persisted.precoVenda)
+    setErroLocal('')
+  }, [configPadrao, item])
+
+  const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
+    ...form,
+    precoVenda: precoVendaEditado,
+  }), [form, precoVendaEditado])
+  const savedPayload = useMemo(() => getCalculadoraPersistida(item ?? null, configPadrao), [configPadrao, item])
+  const hasChanges = useMemo(() => {
+    const baseChanged = JSON.stringify(calculadoraPersistida) !== JSON.stringify(savedPayload)
+    if (isCreating) return baseChanged || nome.trim() !== '' || categoria !== ''
+    return baseChanged
+  }, [calculadoraPersistida, categoria, isCreating, nome, savedPayload])
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -626,16 +753,41 @@ function CalculadoraPrecificacaoModal({
     </div>
   )
 
-  const handleSalvarPrecoVenda = async () => {
-    const precoNumerico = parsePreco(precoVendaEditado)
-
-    if (precoNumerico <= 0) {
-      setErroPrecoLocal('Informe um preço de venda válido.')
+  const handleSalvarCalculo = async () => {
+    if (isCreating && !nome.trim()) {
+      setErroLocal('Informe o nome do produto ou servico.')
+      return
+    }
+    if (isCreating && !categoria) {
+      setErroLocal('Selecione uma categoria odontologica.')
       return
     }
 
-    setErroPrecoLocal('')
-    await onSavePrice(precoNumerico)
+    const precoNumerico = parsePreco(precoVendaEditado)
+
+    if (precoNumerico <= 0) {
+      setErroLocal('Informe um preço de venda válido.')
+      return
+    }
+
+    setErroLocal('')
+
+    if (onSavePrice) {
+      await onSavePrice(precoNumerico)
+      return
+    }
+
+    if (isCreating) {
+      await onCreatePrecoCalculado?.({
+        nome: nome.trim(),
+        categoria,
+        preco: precoNumerico,
+      }, calculadoraPersistida)
+      return
+    }
+
+    if (!item) return
+    await onPersistCalculo?.(item.id, calculadoraPersistida, precoNumerico)
   }
 
   return (
@@ -647,8 +799,12 @@ function CalculadoraPrecificacaoModal({
       <div className={`${styles.modal} ${styles.calcModal}`} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
-            <h2 className={styles.modalTitle}>Verificar cálculo de precificação</h2>
-            <p className={styles.calcItemName}>{item.nome_produto} - {getCategoriaLabel(item.categoria)}</p>
+            <h2 className={styles.modalTitle}>{isCreating ? 'Criar preço calculado' : 'Verificar cálculo de precificação'}</h2>
+            <p className={styles.calcItemName}>
+              {isCreating
+                ? 'Preencha os dados do produto ou servico e salve tudo em uma etapa.'
+                : `${item.nome_produto} - ${getCategoriaLabel(item.categoria)}`}
+            </p>
           </div>
           <div className={styles.modalHeaderActions}>
             <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
@@ -657,121 +813,203 @@ function CalculadoraPrecificacaoModal({
 
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo insumos (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoInsumos}
-                onChange={e => handleChange('custoInsumos', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 40,00"
-              />
-            </label>
+            {isCreating && (
+              <div className={styles.calcFormCard}>
+                <div className={styles.calcFormHeader}>
+                  <h3 className={styles.calcFormTitle}>Dados do item</h3>
+                  <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
+                </div>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoMaterialAplicado}
-                onChange={e => handleChange('custoMaterialAplicado', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 700,00"
-              />
-            </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Nome do produto ou servico</span>
+                  <input
+                    className={styles.modalInput}
+                    value={nome}
+                    onChange={e => {
+                      setNome(e.target.value)
+                      setErroLocal('')
+                    }}
+                    placeholder="Ex: Consulta de avaliação"
+                    autoFocus
+                    disabled={savingPreco}
+                  />
+                </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo laboratório (R$)</span>
-              <input
-                className={styles.modalInput}
-                value={form.custoLaboratorio}
-                onChange={e => handleChange('custoLaboratorio', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 120,00"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Royalties e FNP (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.royaltiesPercent}
-                onChange={e => handleChange('royaltiesPercent', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 9"
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Custo profissionais</span>
-              <div className={styles.switchRow}>
-                <button
-                  type="button"
-                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
-                  onClick={() => handleToggleCustoProfissionais('percentual')}
-                >
-                  Porcentagem
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
-                  onClick={() => handleToggleCustoProfissionais('valor')}
-                >
-                  Valor
-                </button>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Categoria odontologica</span>
+                  <select
+                    className={styles.modalInput}
+                    value={categoria}
+                    onChange={e => {
+                      setCategoria(e.target.value)
+                      setErroLocal('')
+                    }}
+                    disabled={savingPreco}
+                  >
+                    <option value="">Selecione uma categoria</option>
+                    {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
+                      <option key={itemCategoria} value={itemCategoria}>
+                        {itemCategoria}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
-              <input
-                className={styles.modalInput}
-                value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
-                onChange={e =>
-                  handleChange(
-                    form.custoProfissionaisModo === 'percentual'
-                      ? 'custoProfissionaisPercent'
-                      : 'custoProfissionaisValor',
-                    e.target.value,
-                  )
-                }
-                inputMode="decimal"
-                placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
-              />
-              {form.custoProfissionaisModo === 'percentual' && (
-                <span className={styles.modalFieldHint}>
-                  Marque os procedimentos na lista ao lado para compor o cálculo percentual.
-                </span>
-              )}
-            </label>
+            )}
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Impostos (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.impostosPercent}
-                onChange={e => handleChange('impostosPercent', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 8"
-              />
-            </label>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Custos diretos</h3>
+                <p className={styles.calcFormHint}>Valores que entram diretamente na execução do procedimento.</p>
+              </div>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Comissões vendas (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.comissoesPercent}
-                onChange={e => handleChange('comissoesPercent', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 3"
-              />
-            </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo insumos (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoInsumos}
+                  onChange={e => {
+                    handleChange('custoInsumos', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 40,00"
+                />
+              </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Taxa máquina (%)</span>
-              <input
-                className={styles.modalInput}
-                value={form.taxaMaquinaPercent}
-                onChange={e => handleChange('taxaMaquinaPercent', e.target.value)}
-                inputMode="decimal"
-                placeholder="Ex: 2"
-              />
-            </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoMaterialAplicado}
+                  onChange={e => {
+                    handleChange('custoMaterialAplicado', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 700,00"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoLaboratorio}
+                  onChange={e => {
+                    handleChange('custoLaboratorio', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 120,00"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className={styles.calcForm}>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Encargos e repasses</h3>
+                <p className={styles.calcFormHint}>Percentuais e remunerações que impactam a margem final.</p>
+              </div>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.royaltiesPercent}
+                  onChange={e => {
+                    handleChange('royaltiesPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 9"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Custo profissionais</span>
+                <div className={styles.switchRow}>
+                  <button
+                    type="button"
+                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
+                    onClick={() => handleToggleCustoProfissionais('percentual')}
+                  >
+                    Porcentagem
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
+                    onClick={() => handleToggleCustoProfissionais('valor')}
+                  >
+                    Valor
+                  </button>
+                </div>
+                <input
+                  className={styles.modalInput}
+                  value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
+                  onChange={e => {
+                    handleChange(
+                      form.custoProfissionaisModo === 'percentual'
+                        ? 'custoProfissionaisPercent'
+                        : 'custoProfissionaisValor',
+                      e.target.value,
+                    )
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
+                />
+                {form.custoProfissionaisModo === 'percentual' && (
+                  <span className={styles.modalFieldHint}>
+                    A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                  </span>
+                )}
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Impostos (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.impostosPercent}
+                  onChange={e => {
+                    handleChange('impostosPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 8"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Comissões vendas (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.comissoesPercent}
+                  onChange={e => {
+                    handleChange('comissoesPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 3"
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Taxa máquina (%)</span>
+                <input
+                  className={styles.modalInput}
+                  value={form.taxaMaquinaPercent}
+                  onChange={e => {
+                    handleChange('taxaMaquinaPercent', e.target.value)
+                    setErroLocal('')
+                  }}
+                  inputMode="decimal"
+                  placeholder="Ex: 2"
+                />
+              </label>
+            </div>
           </div>
 
           <div className={styles.calcSummary}>
@@ -809,7 +1047,7 @@ function CalculadoraPrecificacaoModal({
                     ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
                     : (
                       calculo.custoProfissionaisPercent > 0
-                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}`
+                        ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre valor da venda${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
                         : '-'
                     )}
                 </span>
@@ -851,7 +1089,7 @@ function CalculadoraPrecificacaoModal({
                     className={styles.calcSuggestButton}
                     onClick={() => {
                       setPrecoVendaEditado(formatCurrencyInput(calculo.precoSugerido))
-                      setErroPrecoLocal('')
+                      setErroLocal('')
                     }}
                     disabled={savingPreco}
                   >
@@ -868,13 +1106,22 @@ function CalculadoraPrecificacaoModal({
                       value={precoVendaEditado}
                       onChange={e => {
                         setPrecoVendaEditado(sanitizeDecimalInput(e.target.value))
-                        setErroPrecoLocal('')
+                        setErroLocal('')
                       }}
                       inputMode="decimal"
                       placeholder="Ex: 1.250,00"
                       disabled={savingPreco}
                     />
-                    {(erroPrecoLocal || error) && <p className={styles.formError}>{erroPrecoLocal || error}</p>}
+                    {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
+                    {!erroLocal && !error && (
+                      <p className={styles.modalFieldHint}>
+                        {isCreating
+                          ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
+                          : hasChanges
+                            ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
+                            : 'Alterações salvas neste produto.'}
+                      </p>
+                    )}
                   </>
                 ) : (
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
@@ -885,26 +1132,44 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.resultadoMargem}</strong>
               </div>
             </div>
-            {canManage && (precoVendaMudou || erroPrecoLocal) && (
+            {canManage && (
               <div className={styles.inlineActions}>
                 <button
                   type="button"
                   className={styles.modalCancel}
                   onClick={() => {
-                    setPrecoVendaEditado(formatCurrencyInput(item.preco))
-                    setErroPrecoLocal('')
+                    if (isCreating) {
+                      onClose()
+                      return
+                    }
+
+                    setForm({
+                      custoInsumos: savedPayload.custoInsumos,
+                      custoMaterialAplicado: savedPayload.custoMaterialAplicado,
+                      custoLaboratorio: savedPayload.custoLaboratorio,
+                      royaltiesPercent: savedPayload.royaltiesPercent,
+                      custoProfissionaisModo: savedPayload.custoProfissionaisModo,
+                      custoProfissionaisBases: savedPayload.custoProfissionaisBases,
+                      custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
+                      custoProfissionaisValor: savedPayload.custoProfissionaisValor,
+                      impostosPercent: savedPayload.impostosPercent,
+                      comissoesPercent: savedPayload.comissoesPercent,
+                      taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
+                    })
+                    setPrecoVendaEditado(savedPayload.precoVenda)
+                    setErroLocal('')
                   }}
                   disabled={savingPreco}
                 >
-                  Cancelar
+                  {isCreating ? 'Cancelar' : 'Reverter'}
                 </button>
                 <button
                   type="button"
                   className={styles.modalSubmit}
-                  onClick={() => void handleSalvarPrecoVenda()}
-                  disabled={savingPreco}
+                  onClick={() => void handleSalvarCalculo()}
+                  disabled={savingPreco || (!isCreating && !hasChanges && !erroLocal)}
                 >
-                  {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                  {savingPreco ? 'Salvando...' : isCreating ? 'Criar e salvar preço' : 'Salvar preço'}
                 </button>
               </div>
             )}
@@ -1473,7 +1738,9 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
   const [view, setView] = useState<ViewMode>('vendas')
+  const [showCreatePrecoModal, setShowCreatePrecoModal] = useState(false)
   const [showPrecoModal, setShowPrecoModal] = useState(false)
+  const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [showVendasConfigModal, setShowVendasConfigModal] = useState(false)
   const [showVendaModal, setShowVendaModal] = useState(false)
@@ -1623,7 +1890,41 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     )
     setFeedback('Preço salvo com sucesso.')
     setPrecoEditando(null)
+    setShowCreatePrecoModal(false)
     setShowPrecoModal(false)
+    setSavingPreco(false)
+    setView('lista')
+  }
+
+  const handleAddPrecoCalculado = async (item: PrecoFormPayload, calculo: CalculadoraPersistida) => {
+    setSavingPreco(true)
+    setError('')
+    setFeedback('')
+
+    const { data, error: insertError } = await supabase
+      .from('empresa_precos')
+      .insert({
+        empresa_id: empresa.id,
+        nome_produto: item.nome,
+        categoria: item.categoria,
+        preco: item.preco,
+        precificacao_calculo: calculo,
+      })
+      .select('*')
+      .single()
+
+    if (insertError) {
+      setError(insertError.message ?? 'Não foi possível salvar o preço calculado.')
+      setSavingPreco(false)
+      return
+    }
+
+    setPrecos(prev =>
+      [...prev, data].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+    )
+    setFeedback('Preço calculado salvo com sucesso.')
+    setShowCreatePrecoModal(false)
+    setShowPrecoCalculadoModal(false)
     setSavingPreco(false)
     setView('lista')
   }
@@ -1662,23 +1963,26 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setSavingPreco(false)
   }
 
-  const handleUpdatePreco = async (itemId: string, preco: number) => {
+  const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
     setSavingPreco(true)
     setError('')
-    setFeedback('')
 
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
-      .update({ preco })
+      .update({
+        preco,
+        precificacao_calculo: payload,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', itemId)
       .eq('empresa_id', empresa.id)
       .select('*')
       .single()
 
     if (updateError) {
-      setError(updateError.message ?? 'Não foi possível atualizar o preço.')
+      setError(updateError.message ?? 'Não foi possível salvar a calculadora do produto.')
       setSavingPreco(false)
-      return false
+      return
     }
 
     setPrecos(prev =>
@@ -1686,9 +1990,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         .sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
     )
     setItemCalculadora(data)
-    setFeedback('Preço atualizado com sucesso.')
     setSavingPreco(false)
-    return true
   }
 
   const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
@@ -1977,7 +2279,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                   setError('')
                   setFeedback('')
                   setPrecoEditando(null)
-                  setShowPrecoModal(true)
+                  setShowCreatePrecoModal(true)
                 }}
               >
                 <IconPlus /> Criar preços
@@ -2027,6 +2329,9 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                   <div key={item.id} className={styles.priceRow}>
                     <div className={styles.priceNameWrap}>
                       <span className={styles.priceName}>{item.nome_produto}</span>
+                      {hasGestaaCalculatedPrice(item) && (
+                        <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
+                      )}
                       <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
                     </div>
                     <div className={styles.priceActions}>
@@ -2084,6 +2389,32 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         />
       )}
 
+      {showCreatePrecoModal && (
+        <EscolhaCriacaoPrecoModal
+          onClose={() => setShowCreatePrecoModal(false)}
+          onSelectSimple={() => {
+            setShowCreatePrecoModal(false)
+            setPrecoEditando(null)
+            setShowPrecoModal(true)
+          }}
+          onSelectCalculated={() => {
+            setShowCreatePrecoModal(false)
+            setShowPrecoCalculadoModal(true)
+          }}
+        />
+      )}
+
+      {showPrecoCalculadoModal && (
+        <CalculadoraPrecificacaoModal
+          configPadrao={configToForm(configGeral)}
+          canManage={canManage}
+          savingPreco={savingPreco}
+          error={error}
+          onCreatePrecoCalculado={handleAddPrecoCalculado}
+          onClose={() => setShowPrecoCalculadoModal(false)}
+        />
+      )}
+
       {itemCalculadora && (
         <CalculadoraPrecificacaoModal
           item={itemCalculadora}
@@ -2091,7 +2422,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           canManage={canManage}
           savingPreco={savingPreco}
           error={error}
-          onSavePrice={preco => handleUpdatePreco(itemCalculadora.id, preco)}
+          onPersistCalculo={handlePersistCalculo}
           onClose={() => setItemCalculadora(null)}
         />
       )}
