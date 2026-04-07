@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
 import styles from './LabControlPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import { useSessionStorageState } from '../hooks/useSessionStorageState'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -37,9 +38,28 @@ type LabEtapa = {
 
 type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
+type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' }
 
 const LAB_FILTER_ALL = '__all__'
 const FINAL_ENVIO_STATUSES = ['Concluído', 'Entregue']
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isLabDetailTab(value: unknown): value is 'kanban' | 'info' {
+  return value === 'kanban' || value === 'info'
+}
+
+function isLabViewSelectionPersisted(value: unknown): value is LabViewSelectionPersisted | null {
+  if (value === null) return true
+  if (!value || typeof value !== 'object') return false
+
+  const candidate = value as Record<string, unknown>
+  if (candidate.kind === 'all') return true
+
+  return candidate.kind === 'lab' && typeof candidate.labId === 'string'
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -1712,10 +1732,15 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   colunas: LabKanbanColuna[]
   onBack: () => void; onLabUpdated: () => void; onColunasUpdated: () => void
 }) {
+  const storagePrefix = `lab-control:${empresaId}:lab:${lab.id}`
   const [envios,          setEnvios]          = useState<LabEnvio[]>([])
   const [precos,          setPrecos]          = useState<LabPreco[]>([])
   const [loading,         setLoading]         = useState(true)
-  const [activeTab,       setActiveTab]       = useState<'kanban' | 'info'>('kanban')
+  const [activeTab, setActiveTab] = useSessionStorageState<'kanban' | 'info'>(
+    `${storagePrefix}:active-tab`,
+    'kanban',
+    isLabDetailTab,
+  )
   const [showEnvioSteps,  setShowEnvioSteps]  = useState(false)
   const [editingEnvio,    setEditingEnvio]    = useState<LabEnvio | null>(null)
   const [resumoEnvio,     setResumoEnvio]     = useState<LabEnvio | null>(null)
@@ -1723,7 +1748,11 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   const [showPrecos,      setShowPrecos]      = useState(false)
   const [showKanbanCfg,   setShowKanbanCfg]   = useState(false)
   const [editingPrecoId,  setEditingPrecoId]  = useState<string | null>(null)
-  const [patientSearch,   setPatientSearch]   = useState('')
+  const [patientSearch, setPatientSearch] = useSessionStorageState(
+    `${storagePrefix}:patient-search`,
+    '',
+    isString,
+  )
   const [novoFeriado,     setNovoFeriado]     = useState('')
 
   const fetchEnvios = useCallback(async () => {
@@ -2050,6 +2079,7 @@ function LabsAggregateDetailView({
   onBack: () => void
   onColunasUpdated: () => void
 }) {
+  const storagePrefix = `lab-control:${empresaId}:aggregate`
   const [envios,         setEnvios]         = useState<LabEnvio[]>([])
   const [precosByLab,    setPrecosByLab]    = useState<Record<string, LabPreco[]>>({})
   const [loading,        setLoading]        = useState(true)
@@ -2057,8 +2087,16 @@ function LabsAggregateDetailView({
   const [editingEnvio,   setEditingEnvio]   = useState<LabEnvio | null>(null)
   const [resumoEnvio,    setResumoEnvio]    = useState<LabEnvio | null>(null)
   const [showKanbanCfg,  setShowKanbanCfg]  = useState(false)
-  const [patientSearch,  setPatientSearch]  = useState('')
-  const [labFilterId,    setLabFilterId]    = useState(LAB_FILTER_ALL)
+  const [patientSearch, setPatientSearch] = useSessionStorageState(
+    `${storagePrefix}:patient-search`,
+    '',
+    isString,
+  )
+  const [labFilterId, setLabFilterId] = useSessionStorageState(
+    `${storagePrefix}:lab-filter`,
+    LAB_FILTER_ALL,
+    isString,
+  )
 
   const labsById = Object.fromEntries(labs.map(item => [item.id, item]))
 
@@ -2097,6 +2135,14 @@ function LabsAggregateDetailView({
     setLoading(true)
     void Promise.all([fetchEnvios(), fetchPrecos()]).then(() => setLoading(false))
   }, [fetchEnvios, fetchPrecos])
+
+  useEffect(() => {
+    if (labFilterId === LAB_FILTER_ALL) return
+
+    if (!labs.some(item => item.id === labFilterId)) {
+      setLabFilterId(LAB_FILTER_ALL)
+    }
+  }, [labFilterId, labs, setLabFilterId])
 
   const moveEnvio = async (envioId: string, status: string) => {
     await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
@@ -2509,10 +2555,16 @@ function TodosLabsCard({ labs, envios, colunas, getLabName, onClick }: {
 export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVoltar }: {
   userId: string; empresa: Empresa; onTrocarEmpresa: () => void; onVoltar: () => void
 }) {
+  const storagePrefix = `lab-control:${empresa.id}`
   const [isAdmin,      setIsAdmin]      = useState(false)
   const [labs,         setLabs]         = useState<Lab[]>([])
   const [enviosMap,    setEnviosMap]    = useState<Record<string, LabEnvio[]>>({})
   const [colunas,      setColunas]      = useState<LabKanbanColuna[]>([])
+  const [selectedViewPersisted, setSelectedViewPersisted] = useSessionStorageState<LabViewSelectionPersisted | null>(
+    `${storagePrefix}:selected-view`,
+    null,
+    isLabViewSelectionPersisted,
+  )
   const [selectedView, setSelectedView] = useState<LabViewSelection | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [showLabModal, setShowLabModal] = useState(false)
@@ -2621,6 +2673,45 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     Promise.all([fetchLabs(), fetchEnvios(), fetchColunas()]).then(() => setLoading(false))
   }, [fetchLabs, fetchEnvios, fetchColunas])
 
+  useEffect(() => {
+    if (loading) return
+
+    if (!selectedViewPersisted) {
+      setSelectedView(null)
+      return
+    }
+
+    if (selectedViewPersisted.kind === 'all') {
+      setSelectedView({ kind: 'all' })
+      return
+    }
+
+    const restoredLab = labs.find(item => item.id === selectedViewPersisted.labId)
+    if (!restoredLab) {
+      setSelectedView(null)
+      setSelectedViewPersisted(null)
+      return
+    }
+
+    setSelectedView({ kind: 'lab', lab: restoredLab })
+  }, [labs, loading, selectedViewPersisted, setSelectedViewPersisted])
+
+  const abrirVisaoTodos = () => {
+    setSelectedView({ kind: 'all' })
+    setSelectedViewPersisted({ kind: 'all' })
+  }
+
+  const abrirVisaoLab = (lab: Lab) => {
+    setSelectedView({ kind: 'lab', lab })
+    setSelectedViewPersisted({ kind: 'lab', labId: lab.id })
+  }
+
+  const voltarParaLista = () => {
+    setSelectedView(null)
+    setSelectedViewPersisted(null)
+    void fetchEnvios()
+  }
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -2643,7 +2734,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           userId={userId}
           isAdmin={isAdmin}
           colunas={colunas}
-          onBack={() => { setSelectedView(null); fetchEnvios() }}
+          onBack={voltarParaLista}
           onColunasUpdated={fetchColunas}
         />
       )
@@ -2656,7 +2747,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         userId={userId}
         isAdmin={isAdmin}
         colunas={colunas}
-        onBack={() => { setSelectedView(null); fetchEnvios() }}
+        onBack={voltarParaLista}
         onLabUpdated={() => { fetchLabs() }}
         onColunasUpdated={fetchColunas}
       />
@@ -2711,7 +2802,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
             envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
             colunas={colunas}
             getLabName={labId => labs.find(item => item.id === labId)?.nome ?? 'Laboratório removido'}
-            onClick={() => setSelectedView({ kind: 'all' })}
+            onClick={abrirVisaoTodos}
           />
           {labs.map(lab => (
             <LabCard
@@ -2720,7 +2811,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               envios={enviosMap[lab.id] ?? []}
               isAdmin={isAdmin}
               colunas={colunas}
-              onClick={() => setSelectedView({ kind: 'lab', lab })}
+              onClick={() => abrirVisaoLab(lab)}
               onEdit={e => { e.stopPropagation(); setEditingLab(lab); setShowLabModal(true) }}
               onOpenFinanceiro={e => { e.stopPropagation(); setFinanceiroLab(lab) }}
             />

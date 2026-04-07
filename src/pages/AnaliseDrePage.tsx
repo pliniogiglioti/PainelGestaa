@@ -5,10 +5,13 @@ import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/
 import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePanel'
 import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import { useSessionStorageState } from '../hooks/useSessionStorageState'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6
+
+type TipoFiltro = 'todos' | 'receita' | 'despesa'
 
 type FormState = {
   tipo:              '' | 'receita' | 'despesa'  // Step 1: entrada ou saída
@@ -29,6 +32,18 @@ const DEFAULT_AI_MODEL = 'gpt-4o-mini'
 
 const moeda = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 const pct   = (v: number) => `${v.toFixed(1)}%`
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(item => typeof item === 'string')
+}
+
+function isTipoFiltro(value: unknown): value is TipoFiltro {
+  return value === 'todos' || value === 'receita' || value === 'despesa'
+}
 
 /** Chave estável para o histórico: remove datas e tokens numéricos ≥ 4 dígitos.
  *  Espelha normalizeKey de ExtratoUpload.tsx. */
@@ -384,6 +399,7 @@ interface AnaliseDreProps {
 }
 
 export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: AnaliseDreProps) {
+  const storagePrefix = `dre:${empresa.id}`
   const [showWizard,     setShowWizard]     = useState(false)
   const [editingId,      setEditingId]      = useState<string | null>(null)
   const [step,           setStep]           = useState<Step>(1)
@@ -396,14 +412,30 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
-  const [anoFiltro,        setAnoFiltro]        = useState(String(new Date().getFullYear()))
-  const [mesesFiltro,      setMesesFiltro]      = useState<string[]>([])
-  const [tipoFiltro,       setTipoFiltro]       = useState<'todos' | 'receita' | 'despesa'>('todos')
+  const [anoFiltro, setAnoFiltro] = useSessionStorageState(
+    `${storagePrefix}:ano-filtro`,
+    () => String(new Date().getFullYear()),
+    isString,
+  )
+  const [mesesFiltro, setMesesFiltro] = useSessionStorageState<string[]>(
+    `${storagePrefix}:meses-filtro`,
+    [],
+    isStringArray,
+  )
+  const [tipoFiltro, setTipoFiltro] = useSessionStorageState<TipoFiltro>(
+    `${storagePrefix}:tipo-filtro`,
+    'todos',
+    isTipoFiltro,
+  )
   const [showAssistente,   setShowAssistente]   = useState(false)
   const [showUpload,       setShowUpload]       = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
-  const [buscaLancamento,  setBuscaLancamento]  = useState('')
+  const [buscaLancamento, setBuscaLancamento] = useSessionStorageState(
+    `${storagePrefix}:busca-lancamento`,
+    '',
+    isString,
+  )
   const [showMesesListbox, setShowMesesListbox] = useState(false)
   // Accordion lançamentos
   const [expandedGrupos,   setExpandedGrupos]   = useState<Set<string>>(new Set())

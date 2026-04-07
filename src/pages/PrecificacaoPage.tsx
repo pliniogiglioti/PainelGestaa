@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import { useSessionStorageState } from '../hooks/useSessionStorageState'
 import PrecificacaoVendaModal from '../components/precificacao/VendaModal'
 import type {
   Empresa,
@@ -18,6 +19,10 @@ interface PrecificacaoPageProps {
 }
 
 type ViewMode = 'vendas' | 'lista'
+
+function isViewMode(value: unknown): value is ViewMode {
+  return value === 'vendas' || value === 'lista'
+}
 
 type CustoProfissionaisBase =
   | 'custoInsumos'
@@ -1739,7 +1744,11 @@ function ApresentacaoVendaModal({
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
-  const [view, setView] = useState<ViewMode>('vendas')
+  const [view, setView] = useSessionStorageState<ViewMode>(
+    `precificacao:${empresa.id}:view`,
+    'vendas',
+    isViewMode,
+  )
   const [showCreatePrecoModal, setShowCreatePrecoModal] = useState(false)
   const [showPrecoModal, setShowPrecoModal] = useState(false)
   const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)

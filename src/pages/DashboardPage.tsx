@@ -12,6 +12,7 @@ import {
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import { useSessionStorageState } from '../hooks/useSessionStorageState'
 
 type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 
@@ -33,6 +34,16 @@ interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'card_b
 }
 
 type TipoUsuario = 'titular' | 'colaborador'
+
+const DASHBOARD_PAGES: Page[] = ['aplicativos', 'minhas-empresas', 'comunidade']
+
+function isDashboardPage(value: unknown): value is Page {
+  return typeof value === 'string' && DASHBOARD_PAGES.includes(value as Page)
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string'
+}
 
 interface EmpresaMembroListItem {
   user_id: string
@@ -886,9 +897,22 @@ function AppCard({
 // ── Main Component ────────────────────────────────────────────────────────
 
 export default function DashboardPage({ user, onLogout, theme, onToggleTheme, onNavigate }: DashboardPageProps) {
-  const [activePage, setActivePage]   = useState<Page>('aplicativos')
-  const [activeCategory, setActiveCategory] = useState('todos')
-  const [forumFilter, setForumFilter] = useState('todos')
+  const storagePrefix = `dashboard:${user.email.toLowerCase()}`
+  const [activePage, setActivePage] = useSessionStorageState<Page>(
+    `${storagePrefix}:active-page`,
+    'aplicativos',
+    isDashboardPage,
+  )
+  const [activeCategory, setActiveCategory] = useSessionStorageState(
+    `${storagePrefix}:active-category`,
+    'todos',
+    isString,
+  )
+  const [forumFilter, setForumFilter] = useSessionStorageState(
+    `${storagePrefix}:forum-filter`,
+    'todos',
+    isString,
+  )
   const [openTopicId, setOpenTopicId] = useState<string | null>(null)
   const [isAdmin,     setIsAdmin]     = useState(false)
   const [tipoUsuario, setTipoUsuario] = useState<TipoUsuario>('titular')
@@ -1364,6 +1388,20 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     ? apps
     : apps.filter(app => allowedAppIds.includes(app.id))
   const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
+
+  useEffect(() => {
+    if (categories.length === 0) return
+
+    const availableFilters = new Set(['todos', ...categories.map(category => category.slug)])
+
+    if (!availableFilters.has(activeCategory)) {
+      setActiveCategory('todos')
+    }
+
+    if (!availableFilters.has(forumFilter)) {
+      setForumFilter('todos')
+    }
+  }, [activeCategory, categories, forumFilter, setActiveCategory, setForumFilter])
 
   const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
 
