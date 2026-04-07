@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
-import type { DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
+import type { App, DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
 
 // ── Constantes ────────────────────────────────────────────────────────────
 
@@ -67,6 +67,18 @@ interface AdminUsuario extends Profile {
   titularesResponsaveis: string[]
 }
 
+type AdminAppOption = Pick<App, 'id' | 'name' | 'internal_link' | 'external_link'>
+
+function arraysIguais(a: string[], b: string[]) {
+  if (a.length !== b.length) return false
+  return a.every((value, index) => value === b[index])
+}
+
+function normalizarSelecaoApps(appAccessIds: string[] | null | undefined, allAppIds: string[]) {
+  if (appAccessIds == null) return allAppIds
+  return allAppIds.filter(id => appAccessIds.includes(id))
+}
+
 // ── Componente principal ──────────────────────────────────────────────────
 
 interface AdminSettingsPageProps {
@@ -119,6 +131,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [currentUserId,   setCurrentUserId]   = useState<string | null>(null)
   const [usuariosBusca,   setUsuariosBusca]   = useState('')
   const [usuariosPagina,  setUsuariosPagina]  = useState(1)
+  const [appsDisponiveis, setAppsDisponiveis] = useState<AdminAppOption[]>([])
+  const [appsLoading,     setAppsLoading]     = useState(false)
+  const [appAccessDrafts, setAppAccessDrafts] = useState<Record<string, string[]>>({})
+  const [savingAppId,     setSavingAppId]     = useState<string | null>(null)
 
   // ── Fetch: Modelo IA ──────────────────────────────────────────────────
 
@@ -139,6 +155,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     fetchClassificacoes()
     fetchExemplos()
     fetchUsuarios()
+    fetchAppsDisponiveis()
     fetchCurrentUser()
   }, [])
 
@@ -261,13 +278,24 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setExemplos(p => p.filter(e => e.id !== id))
   }
 
+  const fetchAppsDisponiveis = async () => {
+    setAppsLoading(true)
+    const { data } = await supabase
+      .from('apps')
+      .select('id, name, internal_link, external_link')
+      .order('name')
+
+    setAppsDisponiveis((data ?? []) as AdminAppOption[])
+    setAppsLoading(false)
+  }
+
   // ── Fetch: Usuários ───────────────────────────────────────────────────
 
   const fetchUsuarios = async () => {
     setUsuariosLoading(true)
     const { data } = await supabase
       .from('profiles')
-      .select('id, name, email, role, tipo_usuario, ativo, expires_at, created_at, updated_at, plan, avatar_url')
+      .select('id, name, email, role, tipo_usuario, ativo, expires_at, app_access_ids, created_at, updated_at, plan, avatar_url')
       .order('created_at', { ascending: false })
 
     const perfis = (data ?? []) as Profile[]
@@ -349,6 +377,29 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setExpiresDrafts(Object.fromEntries(usuarios.map(usuario => [usuario.id, toDateInputValue(usuario.expires_at)])))
   }, [usuarios])
 
+  useEffect(() => {
+    const allAppIds = appsDisponiveis.map(app => app.id)
+    setAppAccessDrafts(
+      Object.fromEntries(
+        usuarios.map(usuario => [
+          usuario.id,
+          normalizarSelecaoApps(usuario.app_access_ids, allAppIds),
+        ]),
+      ),
+    )
+  }, [appsDisponiveis, usuarios])
+
+  const getAppsLiberadosTexto = (usuario: AdminUsuario) => {
+    if (usuario.role === 'admin') return 'Todos os apps (admin)'
+    if (usuario.app_access_ids == null) return 'Todos os apps'
+
+    const nomes = appsDisponiveis
+      .filter(app => usuario.app_access_ids?.includes(app.id))
+      .map(app => app.name)
+
+    return nomes.length > 0 ? nomes.join(', ') : 'Nenhum app liberado'
+  }
+
   const roleOrder: Record<string, number> = { admin: 0, editor: 1, user: 2 }
 
   const usuariosOrdenados = useMemo(
@@ -373,13 +424,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         usuario.tipo_usuario,
         usuario.empresasAcesso.join(' '),
         usuario.titularesResponsaveis.join(' '),
+        getAppsLiberadosTexto(usuario),
       ]
         .join(' ')
         .toLocaleLowerCase('pt-BR')
 
       return textoBusca.includes(buscaUsuariosNormalizada)
     })
-  }, [buscaUsuariosNormalizada, usuariosOrdenados])
+  }, [appsDisponiveis, buscaUsuariosNormalizada, usuariosOrdenados])
 
   const totalPaginasUsuarios = Math.max(1, Math.ceil(usuariosFiltrados.length / USERS_PER_PAGE))
 
@@ -457,6 +509,32 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     }
 
     setSavingRoleId(null)
+  }
+
+  const salvarAppsUsuario = async (usuario: AdminUsuario) => {
+    if (usuario.role === 'admin') return
+
+    const allAppIds = appsDisponiveis.map(app => app.id)
+    const selecionados = normalizarSelecaoApps(appAccessDrafts[usuario.id] ?? [], allAppIds)
+    const app_access_ids = selecionados.length === allAppIds.length ? null : selecionados
+
+    setSavingAppId(usuario.id)
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        app_access_ids,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', usuario.id)
+
+    if (!error) {
+      setUsuarios(atual => atual.map(item => (
+        item.id === usuario.id ? { ...item, app_access_ids } : item
+      )))
+    }
+
+    setSavingAppId(null)
   }
 
   const deletarUsuario = async (usuario: Profile) => {
@@ -908,6 +986,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           <span className={styles.userLinksLabel}>Empresas:</span>{' '}
                           {u.empresasAcesso.length > 0 ? u.empresasAcesso.join(', ') : 'Sem acesso'}
                         </span>
+                        <span className={styles.userLinksLine}>
+                          <span className={styles.userLinksLabel}>Apps:</span>{' '}
+                          {getAppsLiberadosTexto(u)}
+                        </span>
                       </div>
 
                       <div className={styles.userMetaCards}>
@@ -962,6 +1044,61 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           <span className={styles.userCardLabel}>Desde -</span>
                           <span className={styles.userCardValue}>{formatDate(u.created_at)}</span>
                         </div>
+                      </div>
+
+                      <div className={styles.appAccessCard}>
+                        <div className={styles.appAccessHeader}>
+                          <span className={styles.userCardLabel}>Apps liberados</span>
+                          {u.role === 'admin' && (
+                            <span className={styles.statusMuted}>Admins mantêm acesso total.</span>
+                          )}
+                        </div>
+
+                        {u.role === 'admin' ? (
+                          <p className={styles.hint}>Esse usuário continua com acesso a todos os apps por ser admin.</p>
+                        ) : appsLoading ? (
+                          <p className={styles.hint}>Carregando apps disponíveis...</p>
+                        ) : appsDisponiveis.length === 0 ? (
+                          <p className={styles.hint}>Nenhum app cadastrado para liberar.</p>
+                        ) : (
+                          <>
+                            <select
+                              multiple
+                              className={styles.appAccessSelect}
+                              size={Math.min(6, Math.max(3, appsDisponiveis.length))}
+                              value={appAccessDrafts[u.id] ?? []}
+                              onChange={e => setAppAccessDrafts(atual => ({
+                                ...atual,
+                                [u.id]: Array.from(e.target.selectedOptions, option => option.value),
+                              }))}
+                              disabled={savingAppId === u.id}
+                            >
+                              {appsDisponiveis.map(app => (
+                                <option key={app.id} value={app.id}>
+                                  {app.name}
+                                </option>
+                              ))}
+                            </select>
+
+                            <div className={styles.appAccessActions}>
+                              <span className={styles.hint}>Use Ctrl ou Cmd para selecionar mais de um app.</span>
+                              <button
+                                type="button"
+                                className={styles.btnSecondary}
+                                onClick={() => salvarAppsUsuario(u)}
+                                disabled={
+                                  savingAppId === u.id
+                                  || arraysIguais(
+                                    appAccessDrafts[u.id] ?? [],
+                                    normalizarSelecaoApps(u.app_access_ids, appsDisponiveis.map(app => app.id)),
+                                  )
+                                }
+                              >
+                                {savingAppId === u.id ? 'Salvando...' : 'Salvar apps'}
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </div>
 

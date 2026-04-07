@@ -11,7 +11,7 @@ import EmpresaGatePage from './pages/EmpresaGatePage'
 import LabControlPage from './pages/LabControlPage'
 import LoginPage from './pages/LoginPage'
 import PrecificacaoPage from './pages/PrecificacaoPage'
-import RegisterPage from './pages/RegisterPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import TermosPage from './pages/TermosPage'
 
 const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao'] as const
@@ -31,19 +31,70 @@ function sessionToUser(session: Session): User {
   return { name, email }
 }
 
-async function validarUsuarioAtivo(session: Session) {
+function getProtectedAppPath(pathname: string) {
+  if (pathname === '/analise-dre/termospage') return '/analise-dre'
+  if (pathname === '/analise-dre' || pathname === '/lab-control' || pathname === '/precificacao') {
+    return pathname
+  }
+  return null
+}
+
+async function carregarAcessoUsuario(session: Session) {
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role, ativo')
+    .select('role, ativo, app_access_ids')
     .eq('id', session.user.id)
     .single()
 
   if (profile?.role !== 'admin' && profile?.ativo === false) {
     await supabase.auth.signOut()
-    return false
+    return { permitido: false, allowedInternalPaths: null as string[] | null }
   }
 
-  return true
+  if (profile?.role === 'admin' || profile?.app_access_ids == null) {
+    return { permitido: true, allowedInternalPaths: null as string[] | null }
+  }
+
+  if (profile.app_access_ids.length === 0) {
+    return { permitido: true, allowedInternalPaths: [] as string[] }
+  }
+
+  const { data: apps, error: appsError } = await supabase
+    .from('apps')
+    .select('internal_link')
+    .in('id', profile.app_access_ids)
+
+  if (appsError) {
+    return { permitido: true, allowedInternalPaths: null as string[] | null }
+  }
+
+  const allowedInternalPaths = Array.from(
+    new Set(
+      (apps ?? [])
+        .map(app => app.internal_link?.trim() ?? '')
+        .filter(link => link.startsWith('/')),
+    ),
+  )
+
+  return { permitido: true, allowedInternalPaths }
+}
+
+async function sairDoFluxoRecuperacao() {
+  await supabase.auth.signOut()
+}
+
+function limparEmpresaSelecionada(pathname: string) {
+  if (pathname === '/analise-dre') {
+    localStorage.removeItem('empresa_selecionada')
+  }
+
+  if (pathname === '/lab-control') {
+    localStorage.removeItem('empresa_selecionada_lab_control')
+  }
+
+  if (pathname === '/precificacao') {
+    localStorage.removeItem('empresa_selecionada_precificacao')
+  }
 }
 
 function App() {
@@ -59,11 +110,12 @@ function App() {
   const [user, setUser] = useState<User | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showRegister, setShowRegister] = useState(false)
   const [pathname, setPathname] = useState(window.location.pathname)
   const [isInviteFlow, setIsInviteFlow] = useState(false)
+  const [isRecoveryFlow, setIsRecoveryFlow] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [termosAceitos, setTermosAceitos] = useState<boolean | null>(null)
+  const [allowedInternalPaths, setAllowedInternalPaths] = useState<string[] | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme')
     return saved === 'light' ? 'light' : 'dark'
@@ -90,23 +142,29 @@ function App() {
     if (hash.includes('type=invite')) {
       setIsInviteFlow(true)
     }
+    if (hash.includes('type=recovery')) {
+      setIsRecoveryFlow(true)
+    }
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        const permitido = await validarUsuarioAtivo(session)
+        const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
           setUser(sessionToUser(session))
           setUserId(session.user.id)
+          setAllowedInternalPaths(nextAllowedPaths)
           if (session.user.email && hash.includes('type=invite')) {
             setInviteEmail(session.user.email)
           }
         } else {
           setUser(null)
           setUserId(null)
+          setAllowedInternalPaths(null)
         }
       } else {
         setUser(null)
         setUserId(null)
+        setAllowedInternalPaths(null)
       }
       setLoading(false)
     })
@@ -116,22 +174,30 @@ function App() {
         setUser(null)
         setUserId(null)
         setTermosAceitos(null)
+        setAllowedInternalPaths(null)
+        setIsInviteFlow(false)
+        setIsRecoveryFlow(false)
         return
       }
 
       void (async () => {
-        const permitido = await validarUsuarioAtivo(session)
+        const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
           setUser(sessionToUser(session))
           setUserId(session.user.id)
+          setAllowedInternalPaths(nextAllowedPaths)
           if (event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
             setIsInviteFlow(true)
             setInviteEmail(session.user.email)
+          }
+          if (event === 'PASSWORD_RECOVERY' || window.location.hash.includes('type=recovery')) {
+            setIsRecoveryFlow(true)
           }
         } else {
           setUser(null)
           setUserId(null)
           setTermosAceitos(null)
+          setAllowedInternalPaths(null)
         }
       })()
     })
@@ -159,6 +225,25 @@ function App() {
       navigate('/analise-dre/termospage')
     }
   }, [pathname, termosAceitos])
+
+  useEffect(() => {
+    const appPath = getProtectedAppPath(pathname)
+    if (!user || !appPath || allowedInternalPaths === null) return
+
+    if (!allowedInternalPaths.includes(appPath)) {
+      limparEmpresaSelecionada(appPath)
+      if (appPath === '/analise-dre') {
+        setEmpresaSelecionada(null)
+      }
+      if (appPath === '/lab-control') {
+        setEmpresaSelecionadaLab(null)
+      }
+      if (appPath === '/precificacao') {
+        setEmpresaSelecionadaPrecificacao(null)
+      }
+      navigate('/')
+    }
+  }, [allowedInternalPaths, pathname, user])
 
   useEffect(() => {
     const onPopState = () => setPathname(window.location.pathname)
@@ -247,6 +332,27 @@ function App() {
               setIsInviteFlow(false)
               window.history.replaceState({}, '', '/')
               navigate('/')
+            }}
+          />
+        </ErrorBoundary>
+      )
+    }
+
+    if (pathname === '/reset-password') {
+      return (
+        <ErrorBoundary>
+          <ResetPasswordPage
+            recoveryMode={isRecoveryFlow}
+            onBack={() => {
+              setIsRecoveryFlow(false)
+              window.history.replaceState({}, '', '/')
+              setPathname('/')
+            }}
+            onRecoveryComplete={async () => {
+              setIsRecoveryFlow(false)
+              await sairDoFluxoRecuperacao()
+              window.history.replaceState({}, '', '/')
+              setPathname('/')
             }}
           />
         </ErrorBoundary>
@@ -386,11 +492,28 @@ function App() {
     )
   }
 
-  if (showRegister) {
-    return <RegisterPage onBack={() => setShowRegister(false)} />
+  if (pathname === '/reset-password') {
+    return (
+      <ErrorBoundary>
+        <ResetPasswordPage
+          recoveryMode={isRecoveryFlow}
+          onBack={() => {
+            setIsRecoveryFlow(false)
+            window.history.replaceState({}, '', '/')
+            setPathname('/')
+          }}
+          onRecoveryComplete={async () => {
+            setIsRecoveryFlow(false)
+            await sairDoFluxoRecuperacao()
+            window.history.replaceState({}, '', '/')
+            setPathname('/')
+          }}
+        />
+      </ErrorBoundary>
+    )
   }
 
-  return <LoginPage onRegister={() => setShowRegister(true)} />
+  return <LoginPage onForgotPassword={() => navigate('/reset-password')} />
 }
 
 export default App

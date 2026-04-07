@@ -238,6 +238,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     taxaMaquina
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
+  const precoSugerido = custoTotal * 1.5
 
   return {
     custoInsumos,
@@ -258,6 +259,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     comissoes,
     taxaMaquina,
     custoTotal,
+    precoSugerido,
     margem,
     resultadoMargem: margem < 50 ? 'Baixa - Rever Preço' : 'Adequada',
   }
@@ -382,12 +384,14 @@ function formatCountdown(totalSeconds: number) {
 
 function PrecoModal({
   initialItem,
+  configPadrao,
   onClose,
   onSubmit,
   saving,
   error,
 }: {
   initialItem?: EmpresaPreco | null
+  configPadrao: ConfiguracaoGeralForm
   onClose: () => void
   onSubmit: (item: PrecoFormPayload) => Promise<void>
   saving: boolean
@@ -397,6 +401,7 @@ function PrecoModal({
   const [categoria, setCategoria] = useState(initialItem?.categoria ?? '')
   const [preco, setPreco] = useState(initialItem ? formatCurrencyInput(initialItem.preco) : '')
   const [erroLocal, setErroLocal] = useState('')
+  const [showCalculadora, setShowCalculadora] = useState(false)
   const backdropDismiss = useBackdropDismiss(onClose, saving)
   const isEditing = Boolean(initialItem)
 
@@ -405,6 +410,7 @@ function PrecoModal({
     setCategoria(initialItem?.categoria ?? '')
     setPreco(initialItem ? formatCurrencyInput(initialItem.preco) : '')
     setErroLocal('')
+    setShowCalculadora(false)
   }, [initialItem])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -486,17 +492,28 @@ function PrecoModal({
 
           <label className={styles.modalField}>
             <span className={styles.modalLabel}>Preço</span>
-            <input
-              className={styles.modalInput}
-              placeholder="Ex: 120,00"
-              value={preco}
-              onChange={e => {
-                setPreco(e.target.value)
-                setErroLocal('')
-              }}
-              inputMode="decimal"
-              disabled={saving}
-            />
+            <div className={styles.priceInputRow}>
+              <input
+                className={styles.modalInput}
+                placeholder="Ex: 120,00"
+                value={preco}
+                onChange={e => {
+                  setPreco(e.target.value)
+                  setErroLocal('')
+                }}
+                inputMode="decimal"
+                disabled={saving}
+              />
+              <button
+                type="button"
+                className={styles.calcShortcutButton}
+                onClick={() => setShowCalculadora(true)}
+                disabled={saving}
+              >
+                Preço calculado
+              </button>
+            </div>
+            <span className={styles.modalFieldHint}>Use a calculadora para montar o preço com base no custo total.</span>
           </label>
 
           {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
@@ -511,6 +528,32 @@ function PrecoModal({
           </div>
         </form>
       </div>
+
+      {showCalculadora && (
+        <CalculadoraPrecificacaoModal
+          item={{
+            id: initialItem?.id ?? 'novo-preco',
+            empresa_id: initialItem?.empresa_id ?? '',
+            nome_produto: nome.trim() || 'Novo item',
+            categoria: categoria || CATEGORIA_SEM_CADASTRO,
+            preco: parsePreco(preco),
+            ativo: initialItem?.ativo ?? true,
+            created_at: initialItem?.created_at ?? new Date().toISOString(),
+            updated_at: initialItem?.updated_at ?? new Date().toISOString(),
+          }}
+          configPadrao={configPadrao}
+          canManage
+          savingPreco={saving}
+          error={error}
+          onSavePrice={async precoCalculado => {
+            setPreco(formatCurrencyInput(precoCalculado))
+            setErroLocal('')
+            setShowCalculadora(false)
+            return true
+          }}
+          onClose={() => setShowCalculadora(false)}
+        />
+      )}
     </div>
   )
 }
@@ -521,7 +564,7 @@ function CalculadoraPrecificacaoModal({
   canManage,
   savingPreco,
   error,
-  onUpdatePreco,
+  onSavePrice,
   onClose,
 }: {
   item: EmpresaPreco
@@ -529,7 +572,7 @@ function CalculadoraPrecificacaoModal({
   canManage: boolean
   savingPreco: boolean
   error: string
-  onUpdatePreco: (itemId: string, preco: number) => Promise<boolean>
+  onSavePrice: (preco: number) => Promise<boolean> | boolean
   onClose: () => void
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
@@ -592,7 +635,7 @@ function CalculadoraPrecificacaoModal({
     }
 
     setErroPrecoLocal('')
-    await onUpdatePreco(item.id, precoNumerico)
+    await onSavePrice(precoNumerico)
   }
 
   return (
@@ -797,6 +840,24 @@ function CalculadoraPrecificacaoModal({
               <div className={styles.calcHighlight}>
                 <span>Margem</span>
                 <strong>{formatPercent(calculo.margem)}</strong>
+              </div>
+              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
+                <span>Preço sugerido</span>
+                <strong>{formatCurrency(calculo.precoSugerido)}</strong>
+                <span className={styles.calcHighlightHint}>Sugestão com 50% sobre o custo total.</span>
+                {canManage && calculo.precoSugerido > 0 && (
+                  <button
+                    type="button"
+                    className={styles.calcSuggestButton}
+                    onClick={() => {
+                      setPrecoVendaEditado(formatCurrencyInput(calculo.precoSugerido))
+                      setErroPrecoLocal('')
+                    }}
+                    disabled={savingPreco}
+                  >
+                    Usar preço sugerido
+                  </button>
+                )}
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
                 <span>Preço de venda</span>
@@ -2010,6 +2071,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {showPrecoModal && (
         <PrecoModal
           initialItem={precoEditando}
+          configPadrao={configToForm(configGeral)}
           onClose={() => {
             setShowPrecoModal(false)
             setPrecoEditando(null)
@@ -2029,7 +2091,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           canManage={canManage}
           savingPreco={savingPreco}
           error={error}
-          onUpdatePreco={handleUpdatePreco}
+          onSavePrice={preco => handleUpdatePreco(itemCalculadora.id, preco)}
           onClose={() => setItemCalculadora(null)}
         />
       )}

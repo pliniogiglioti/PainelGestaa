@@ -481,6 +481,52 @@
   gap: 12px;
 }
 
+.appAccessCard {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.02);
+}
+
+.appAccessHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.appAccessSelect {
+  min-height: 132px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  font-size: 13px;
+  outline: none;
+}
+
+.appAccessSelect:focus {
+  border-color: var(--gold-light);
+  box-shadow: 0 0 0 3px rgba(213, 175, 69, 0.12);
+}
+
+.appAccessSelect option {
+  padding: 6px 4px;
+}
+
+.appAccessActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .userMetaCard {
   display: flex;
   align-items: center;

@@ -18,6 +18,7 @@ export interface Database {
           avatar_url: string | null
           ativo:      boolean
           expires_at: string | null
+          app_access_ids: string[] | null
           created_at: string
           updated_at: string
         }
@@ -31,6 +32,7 @@ export interface Database {
           avatar_url?: string | null
           ativo?:     boolean
           expires_at?: string | null
+          app_access_ids?: string[] | null
           created_at?: string
           updated_at?: string
         }
@@ -44,6 +46,7 @@ export interface Database {
           avatar_url?: string | null
           ativo?:     boolean
           expires_at?: string | null
+          app_access_ids?: string[] | null
           updated_at?: string
         }
         Relationships: []

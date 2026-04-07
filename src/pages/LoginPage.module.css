@@ -130,6 +130,10 @@
   font-size: 12px;
   color: var(--gold);
   text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
   transition: color 0.2s;
 }
 
@@ -228,6 +232,56 @@
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
+}
+
+.secondaryButton {
+  width: 100%;
+  padding: 13px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s;
+}
+
+.secondaryButton:hover {
+  border-color: var(--gold);
+  color: var(--gold-light);
+  background: rgba(201, 162, 42, 0.08);
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.infoMsg,
+.successMsg {
+  font-size: 13px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  margin: 0;
+}
+
+.infoMsg {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.successMsg {
+  color: #7cd992;
+  background: rgba(52, 199, 89, 0.1);
+  border: 1px solid rgba(52, 199, 89, 0.22);
+}
+
+.stackActions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 /* ── Footer ──────────────────────────────────────────────────────────────── */

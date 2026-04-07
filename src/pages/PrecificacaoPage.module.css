@@ -442,6 +442,12 @@
   gap: 6px;
 }
 
+.priceInputRow {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
 .calcInlineCard {
   border: 1px solid rgba(201, 162, 42, 0.22);
   border-radius: 14px;
@@ -557,6 +563,28 @@
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   font-family: inherit;
+}
+
+.calcShortcutButton {
+  flex-shrink: 0;
+  border: 1px solid rgba(201, 162, 42, 0.3);
+  background: rgba(201, 162, 42, 0.12);
+  color: var(--gold-light);
+  border-radius: 12px;
+  padding: 11px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.calcShortcutButton:hover {
+  opacity: 0.9;
+}
+
+.calcShortcutButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .modalInput:focus {
@@ -686,10 +714,21 @@
   gap: 10px;
 }
 
+.calcHighlightSuggested {
+  border-color: rgba(201, 162, 42, 0.3);
+  background: rgba(201, 162, 42, 0.1);
+}
+
 .calcHighlightInput {
   font-size: 18px;
   font-weight: 700;
   padding: 10px 12px;
+}
+
+.calcHighlightHint {
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
 }
 
 .calcHighlightGood {
@@ -700,6 +739,22 @@
 .calcHighlightBad {
   border-color: rgba(201, 73, 73, 0.34);
   background: rgba(201, 73, 73, 0.12);
+}
+
+.calcSuggestButton {
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--gold-light), var(--gold-dark));
+  color: #080808;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 10px 12px;
+  cursor: pointer;
+}
+
+.calcSuggestButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .saleModal {
@@ -1486,6 +1541,11 @@
   .calcLayout,
   .calcHighlights {
     grid-template-columns: 1fr;
+  }
+
+  .priceInputRow {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .calcProcedureCell {

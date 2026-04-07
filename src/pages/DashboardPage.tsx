@@ -857,6 +857,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [openTopicId, setOpenTopicId] = useState<string | null>(null)
   const [isAdmin,     setIsAdmin]     = useState(false)
   const [tipoUsuario, setTipoUsuario] = useState<TipoUsuario>('titular')
+  const [allowedAppIds, setAllowedAppIds] = useState<string[] | null>(null)
 
   // Supabase data
   const [apps,       setApps]       = useState<App[]>([])
@@ -891,10 +892,11 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) return
-      supabase.from('profiles').select('role, tipo_usuario').eq('id', data.user.id).single()
+      supabase.from('profiles').select('role, tipo_usuario, app_access_ids').eq('id', data.user.id).single()
         .then(({ data: profile }) => {
           setIsAdmin(profile?.role === 'admin')
           setTipoUsuario((profile?.tipo_usuario as TipoUsuario | undefined) ?? 'titular')
+          setAllowedAppIds(profile?.role === 'admin' ? null : (profile?.app_access_ids ?? null))
         })
     })
   }, [])
@@ -1235,7 +1237,9 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   }, [])
 
   const allCategories = [{ id: 'all', name: 'Todos', slug: 'todos' } as AppCategory, ...categories]
-  const filteredApps  = apps
+  const filteredApps  = allowedAppIds === null
+    ? apps
+    : apps.filter(app => allowedAppIds.includes(app.id))
   const filteredTopics = forumFilter === 'todos' ? topics : topics.filter(t => t.forum_categories?.slug === forumFilter)
 
   const getCategoryLabel = (slug: string) => categories.find(c => c.slug === slug)?.name ?? slug
