@@ -79,6 +79,14 @@ function normalizarSelecaoApps(appAccessIds: string[] | null | undefined, allApp
   return allAppIds.filter(id => appAccessIds.includes(id))
 }
 
+function toggleAppSelection(current: string[], appId: string, allAppIds: string[]) {
+  const next = current.includes(appId)
+    ? current.filter(id => id !== appId)
+    : [...current, appId]
+
+  return allAppIds.filter(id => next.includes(id))
+}
+
 // ── Componente principal ──────────────────────────────────────────────────
 
 interface AdminSettingsPageProps {
@@ -400,6 +408,18 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     return nomes.length > 0 ? nomes.join(', ') : 'Nenhum app liberado'
   }
 
+  const getAppsLiberadosResumo = (usuario: AdminUsuario) => {
+    if (usuario.role === 'admin' || usuario.app_access_ids == null) {
+      return `Todos os ${appsDisponiveis.length} apps liberados`
+    }
+
+    if (usuario.app_access_ids.length === 0) {
+      return 'Nenhum app liberado'
+    }
+
+    return `${usuario.app_access_ids.length} de ${appsDisponiveis.length} apps liberados`
+  }
+
   const roleOrder: Record<string, number> = { admin: 0, editor: 1, user: 2 }
 
   const usuariosOrdenados = useMemo(
@@ -536,6 +556,19 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
     setSavingAppId(null)
   }
+
+  const getAppIdsDisponiveis = () => appsDisponiveis.map(app => app.id)
+
+  const getAppIdsSelecionados = (usuario: AdminUsuario) => (
+    appAccessDrafts[usuario.id] ?? normalizarSelecaoApps(usuario.app_access_ids, getAppIdsDisponiveis())
+  )
+
+  const hasAlteracaoApps = (usuario: AdminUsuario) => (
+    !arraysIguais(
+      getAppIdsSelecionados(usuario),
+      normalizarSelecaoApps(usuario.app_access_ids, getAppIdsDisponiveis()),
+    )
+  )
 
   const deletarUsuario = async (usuario: Profile) => {
     setDeletingId(usuario.id)
@@ -1048,7 +1081,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
                       <div className={styles.appAccessCard}>
                         <div className={styles.appAccessHeader}>
-                          <span className={styles.userCardLabel}>Apps liberados</span>
+                          <div className={styles.appAccessHeaderInfo}>
+                            <span className={styles.userCardLabel}>Apps liberados</span>
+                            <span className={styles.appAccessSummary}>{getAppsLiberadosResumo(u)}</span>
+                          </div>
                           {u.role === 'admin' && (
                             <span className={styles.statusMuted}>Admins mantêm acesso total.</span>
                           )}
@@ -1062,37 +1098,73 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           <p className={styles.hint}>Nenhum app cadastrado para liberar.</p>
                         ) : (
                           <>
-                            <select
-                              multiple
-                              className={styles.appAccessSelect}
-                              size={Math.min(6, Math.max(3, appsDisponiveis.length))}
-                              value={appAccessDrafts[u.id] ?? []}
-                              onChange={e => setAppAccessDrafts(atual => ({
-                                ...atual,
-                                [u.id]: Array.from(e.target.selectedOptions, option => option.value),
-                              }))}
-                              disabled={savingAppId === u.id}
-                            >
+                            <div className={styles.appAccessToolbar}>
+                              <div className={styles.appAccessToolbarButtons}>
+                                <button
+                                  type="button"
+                                  className={styles.appAccessMiniButton}
+                                  onClick={() => setAppAccessDrafts(atual => ({
+                                    ...atual,
+                                    [u.id]: getAppIdsDisponiveis(),
+                                  }))}
+                                  disabled={savingAppId === u.id || arraysIguais(getAppIdsSelecionados(u), getAppIdsDisponiveis())}
+                                >
+                                  Marcar todos
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.appAccessMiniButton}
+                                  onClick={() => setAppAccessDrafts(atual => ({
+                                    ...atual,
+                                    [u.id]: [],
+                                  }))}
+                                  disabled={savingAppId === u.id || getAppIdsSelecionados(u).length === 0}
+                                >
+                                  Limpar
+                                </button>
+                              </div>
+                              <span className={styles.hint}>Marque os apps que esse usuário pode acessar.</span>
+                            </div>
+
+                            <div className={styles.appAccessGrid}>
                               {appsDisponiveis.map(app => (
-                                <option key={app.id} value={app.id}>
-                                  {app.name}
-                                </option>
+                                <label
+                                  key={app.id}
+                                  className={`${styles.appAccessOption} ${getAppIdsSelecionados(u).includes(app.id) ? styles.appAccessOptionActive : ''}`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className={styles.appAccessCheckbox}
+                                    checked={getAppIdsSelecionados(u).includes(app.id)}
+                                    onChange={() => setAppAccessDrafts(atual => ({
+                                      ...atual,
+                                      [u.id]: toggleAppSelection(getAppIdsSelecionados(u), app.id, getAppIdsDisponiveis()),
+                                    }))}
+                                    disabled={savingAppId === u.id}
+                                  />
+                                  <div className={styles.appAccessOptionBody}>
+                                    <span className={styles.appAccessOptionName}>{app.name}</span>
+                                    <span className={styles.appAccessOptionMeta}>
+                                      {app.internal_link ? `Interno: ${app.internal_link}` : 'App externo'}
+                                    </span>
+                                  </div>
+                                </label>
                               ))}
-                            </select>
+                            </div>
 
                             <div className={styles.appAccessActions}>
-                              <span className={styles.hint}>Use Ctrl ou Cmd para selecionar mais de um app.</span>
+                              <span className={styles.hint}>
+                                {getAppIdsSelecionados(u).length === getAppIdsDisponiveis().length
+                                  ? 'Todos os apps ficarão liberados para esse usuário.'
+                                  : getAppIdsSelecionados(u).length === 0
+                                    ? 'Esse usuário ficará sem acesso a apps.'
+                                    : `${getAppIdsSelecionados(u).length} app${getAppIdsSelecionados(u).length === 1 ? '' : 's'} selecionado${getAppIdsSelecionados(u).length === 1 ? '' : 's'}.`}
+                              </span>
                               <button
                                 type="button"
                                 className={styles.btnSecondary}
                                 onClick={() => salvarAppsUsuario(u)}
-                                disabled={
-                                  savingAppId === u.id
-                                  || arraysIguais(
-                                    appAccessDrafts[u.id] ?? [],
-                                    normalizarSelecaoApps(u.app_access_ids, appsDisponiveis.map(app => app.id)),
-                                  )
-                                }
+                                disabled={savingAppId === u.id || !hasAlteracaoApps(u)}
                               >
                                 {savingAppId === u.id ? 'Salvando...' : 'Salvar apps'}
                               </button>

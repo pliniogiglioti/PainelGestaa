@@ -499,24 +499,105 @@
   flex-wrap: wrap;
 }
 
-.appAccessSelect {
-  min-height: 132px;
-  padding: 10px 12px;
+.appAccessHeaderInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.appAccessSummary {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.appAccessToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.appAccessToolbarButtons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.appAccessMiniButton {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(213, 175, 69, 0.24);
+  background: rgba(213, 175, 69, 0.08);
+  color: var(--gold-light);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s, background 0.15s;
+}
+
+.appAccessMiniButton:hover:not(:disabled) {
+  background: rgba(213, 175, 69, 0.14);
+}
+
+.appAccessMiniButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.appAccessGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.appAccessOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  background: var(--bg-elevated);
-  color: var(--text);
+  background: rgba(255,255,255,0.03);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.appAccessOption:hover {
+  border-color: rgba(213, 175, 69, 0.32);
+  background: rgba(255,255,255,0.05);
+}
+
+.appAccessOptionActive {
+  border-color: rgba(213, 175, 69, 0.42);
+  background: rgba(213, 175, 69, 0.1);
+}
+
+.appAccessCheckbox {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--gold-light);
+  flex-shrink: 0;
+}
+
+.appAccessOptionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.appAccessOptionName {
   font-size: 13px;
-  outline: none;
+  font-weight: 700;
+  color: var(--text);
 }
 
-.appAccessSelect:focus {
-  border-color: var(--gold-light);
-  box-shadow: 0 0 0 3px rgba(213, 175, 69, 0.12);
-}
-
-.appAccessSelect option {
-  padding: 6px 4px;
+.appAccessOptionMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+  word-break: break-word;
 }
 
 .appAccessActions {

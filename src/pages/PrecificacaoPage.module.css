@@ -658,13 +658,14 @@
 
 .calcLayout {
   display: grid;
-  grid-template-columns: minmax(240px, 320px) minmax(240px, 320px) minmax(380px, 1fr);
+  grid-template-columns: minmax(220px, 280px) minmax(220px, 280px) minmax(320px, 1fr) minmax(260px, 320px);
   gap: 18px;
   align-items: start;
 }
 
 .calcForm,
-.calcSummary {
+.calcSummary,
+.calcSummaryAside {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -705,6 +706,11 @@
   border-radius: 16px;
   background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
   padding: 16px;
+}
+
+.calcSummaryAside {
+  position: sticky;
+  top: 16px;
 }
 
 .calcProcedureCell {
@@ -769,7 +775,7 @@
 
 .calcHighlights {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -1579,8 +1585,13 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .calcSummary {
+  .calcSummary,
+  .calcSummaryAside {
     grid-column: 1 / -1;
+  }
+
+  .calcSummaryAside {
+    position: static;
   }
 }
 
@@ -1635,6 +1646,10 @@
   .calcHighlights,
   .choiceGrid {
     grid-template-columns: 1fr;
+  }
+
+  .calcSummaryAside {
+    position: static;
   }
 
   .priceInputRow {

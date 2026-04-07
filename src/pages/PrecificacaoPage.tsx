@@ -1069,7 +1069,9 @@ function CalculadoraPrecificacaoModal({
                 <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
               </div>
             </div>
+          </div>
 
+          <div className={styles.calcSummaryAside}>
             <div className={styles.calcHighlights}>
               <div className={styles.calcHighlight}>
                 <span>Custo total</span>
