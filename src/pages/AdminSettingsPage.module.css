@@ -189,7 +189,12 @@
   white-space: nowrap;
 }
 
-.btnSecondary:hover {
+.btnSecondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btnSecondary:not(:disabled):hover {
   color: var(--text);
   border-color: var(--text-muted);
   background: rgba(255,255,255,0.04);

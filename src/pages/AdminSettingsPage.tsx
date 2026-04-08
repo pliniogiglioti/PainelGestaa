@@ -512,6 +512,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setSavingExpiryId(null)
   }
 
+  const hasAlteracaoExpiracao = (usuario: Profile) => (
+    (expiresDrafts[usuario.id] ?? '') !== toDateInputValue(usuario.expires_at)
+  )
+
   const alterarFuncaoUsuario = async (usuario: Profile, novaFuncao: string) => {
     if (usuario.id === currentUserId) return
     if (novaFuncao === usuario.role) return
@@ -1061,9 +1065,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                               />
                               <button
                                 type="button"
-                                className={styles.btnSecondary}
+                                className={hasAlteracaoExpiracao(u) ? styles.btnPrimary : styles.btnSecondary}
                                 onClick={() => salvarExpiracaoUsuario(u)}
-                                disabled={savingExpiryId === u.id}
+                                disabled={savingExpiryId === u.id || !hasAlteracaoExpiracao(u)}
                               >
                                 {savingExpiryId === u.id ? 'Salvando...' : 'Salvar'}
                               </button>
@@ -1162,7 +1166,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                               </span>
                               <button
                                 type="button"
-                                className={styles.btnSecondary}
+                                className={hasAlteracaoApps(u) ? styles.btnPrimary : styles.btnSecondary}
                                 onClick={() => salvarAppsUsuario(u)}
                                 disabled={savingAppId === u.id || !hasAlteracaoApps(u)}
                               >
