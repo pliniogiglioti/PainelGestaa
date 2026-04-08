@@ -762,7 +762,6 @@ function CalculadoraPrecificacaoModal({
   const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
-  const suggestedPriceApplied = Math.abs(precoVendaAtual - calculo.precoSugerido) < 0.005
 
   useEffect(() => {
     const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
@@ -1167,19 +1166,6 @@ function CalculadoraPrecificacaoModal({
                       ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
                       : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
                 </span>
-                {canManage && calculo.precoSugerido > 0 && (
-                  <button
-                    type="button"
-                    className={styles.calcSuggestButton}
-                    onClick={() => {
-                      setPrecoVendaEditado(formatCurrencyInput(calculo.precoSugerido))
-                      setErroLocal('')
-                    }}
-                    disabled={savingPreco || suggestedPriceApplied}
-                  >
-                    {suggestedPriceApplied ? 'Preço sugerido aplicado' : 'Usar preço sugerido'}
-                  </button>
-                )}
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
                 <span>Preço de venda</span>
