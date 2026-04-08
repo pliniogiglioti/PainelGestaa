@@ -760,6 +760,7 @@ function CalculadoraPrecificacaoModal({
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
   const [erroLocal, setErroLocal] = useState('')
   const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
+  const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
 
@@ -782,7 +783,7 @@ function CalculadoraPrecificacaoModal({
     })
     setPrecoVendaEditado(persisted.precoVenda)
     setErroLocal('')
-  }, [configPadrao, item])
+  }, [modalStateKey])
 
   const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
     ...form,
@@ -1846,6 +1847,8 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     ofertaValidaMinutos: '15',
     exibirCampanhaPromocional: false,
   })
+  const configPadraoMemo = useMemo(() => configToForm(configGeral), [configGeral])
+  const configVendasPadraoMemo = useMemo(() => configToVendasForm(configGeral), [configGeral])
   const taxaMaquinaPercent = configGeral?.taxa_maquina_percent ?? parsePreco(configForm.taxaMaquinaPercent)
   const maxParcelasCartaoPadrao = configGeral?.vendas_max_cartao ?? parsePositiveInteger(configVendasForm.maxCartao, 12, 1)
 
@@ -2324,7 +2327,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 onClick={() => {
                   setError('')
                   setFeedback('')
-                  setConfigForm(configToForm(configGeral))
+                  setConfigForm(configPadraoMemo)
                   setShowConfigModal(true)
                 }}
               >
@@ -2338,7 +2341,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 onClick={() => {
                   setError('')
                   setFeedback('')
-                  setConfigVendasForm(configToVendasForm(configGeral))
+                  setConfigVendasForm(configVendasPadraoMemo)
                   setShowVendasConfigModal(true)
                 }}
               >
@@ -2450,7 +2453,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {showPrecoModal && (
         <PrecoModal
           initialItem={precoEditando}
-          configPadrao={configToForm(configGeral)}
+          configPadrao={configPadraoMemo}
           onClose={() => {
             setShowPrecoModal(false)
             setPrecoEditando(null)
@@ -2480,7 +2483,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
 
       {showPrecoCalculadoModal && (
         <CalculadoraPrecificacaoModal
-          configPadrao={configToForm(configGeral)}
+          configPadrao={configPadraoMemo}
           canManage={canManage}
           savingPreco={savingPreco}
           error={error}
@@ -2492,7 +2495,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       {itemCalculadora && (
         <CalculadoraPrecificacaoModal
           item={itemCalculadora}
-          configPadrao={configToForm(configGeral)}
+          configPadrao={configPadraoMemo}
           canManage={canManage}
           savingPreco={savingPreco}
           error={error}
