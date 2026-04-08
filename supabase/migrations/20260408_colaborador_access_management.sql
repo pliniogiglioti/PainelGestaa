@@ -137,3 +137,49 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.listar_membros_empresa(UUID) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.atualizar_acesso_colaborador_empresa(UUID, UUID, UUID[], BOOLEAN) TO authenticated;
+
+CREATE OR REPLACE FUNCTION public.listar_convites_pendentes_empresa(p_empresa_id UUID)
+RETURNS TABLE (
+  id UUID,
+  email TEXT,
+  app_access_ids UUID[],
+  created_at TIMESTAMPTZ
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RAISE EXCEPTION 'Sessao invalida.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.profiles p
+    WHERE p.id = auth.uid()
+      AND p.role = 'admin'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM public.empresa_membros em
+    WHERE em.empresa_id = p_empresa_id
+      AND em.user_id = auth.uid()
+      AND em.role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Acesso negado.';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    ec.id,
+    ec.email,
+    ec.app_access_ids,
+    ec.created_at
+  FROM public.empresa_convites ec
+  WHERE ec.empresa_id = p_empresa_id
+    AND ec.used_at IS NULL
+  ORDER BY ec.created_at DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.listar_convites_pendentes_empresa(UUID) TO authenticated;

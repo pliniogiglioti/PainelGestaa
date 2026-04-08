@@ -57,6 +57,13 @@ interface EmpresaMembroListItem {
   created_at: string
 }
 
+interface EmpresaConvitePendenteItem {
+  id: string
+  email: string
+  app_access_ids: string[] | null
+  created_at: string
+}
+
 interface CompanyFormState {
   nome: string
   cnpj: string
@@ -1238,10 +1245,12 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
   const [topics,     setTopics]     = useState<ForumTopicWithMeta[]>([])
   const [empresas,   setEmpresas]   = useState<EmpresaListItem[]>([])
   const [empresaMembros, setEmpresaMembros] = useState<Record<string, EmpresaMembroListItem[]>>({})
+  const [empresaConvitesPendentes, setEmpresaConvitesPendentes] = useState<Record<string, EmpresaConvitePendenteItem[]>>({})
   const [loadingApps,   setLoadingApps]   = useState(true)
   const [loadingEmpresas, setLoadingEmpresas] = useState(true)
   const [loadingTopics, setLoadingTopics] = useState(true)
   const [loadingEmpresaMembros, setLoadingEmpresaMembros] = useState<Record<string, boolean>>({})
+  const [loadingEmpresaConvites, setLoadingEmpresaConvites] = useState<Record<string, boolean>>({})
   const [savingEmpresaMembros, setSavingEmpresaMembros] = useState<Record<string, boolean>>({})
   const [inviteEmailByEmpresa, setInviteEmailByEmpresa] = useState<Record<string, string>>({})
   const [empresaMemberErrors, setEmpresaMemberErrors] = useState<Record<string, string>>({})
@@ -1387,6 +1396,29 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
   }
 
+  const fetchEmpresaConvitesPendentes = async (empresaId: string) => {
+    setLoadingEmpresaConvites(prev => ({ ...prev, [empresaId]: true }))
+
+    const { data, error } = await supabase.rpc('listar_convites_pendentes_empresa', {
+      p_empresa_id: empresaId,
+    })
+
+    if (error) {
+      setEmpresaMemberErrors(prev => ({
+        ...prev,
+        [empresaId]: error.message ?? 'Nao foi possivel carregar os convites pendentes.',
+      }))
+      setLoadingEmpresaConvites(prev => ({ ...prev, [empresaId]: false }))
+      return
+    }
+
+    setEmpresaConvitesPendentes(prev => ({
+      ...prev,
+      [empresaId]: (data ?? []) as EmpresaConvitePendenteItem[],
+    }))
+    setLoadingEmpresaConvites(prev => ({ ...prev, [empresaId]: false }))
+  }
+
   const getResumoAppsColaborador = (membro: EmpresaMembroListItem) => {
     if (membro.empresa_role === 'admin') return 'Titular com acesso total'
     if (membro.app_access_ids == null) return 'Todos os apps liberados'
@@ -1399,6 +1431,17 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     return `${membro.app_access_ids.length} de ${totalApps} apps liberados`
   }
 
+  const getResumoAppsConvite = (convite: EmpresaConvitePendenteItem) => {
+    if (convite.app_access_ids == null) return 'Todos os apps liberados'
+
+    const totalApps = apps.length
+    if (totalApps === 0) return 'Nenhum app cadastrado'
+    if (convite.app_access_ids.length === 0) return 'Sem apps liberados'
+    if (convite.app_access_ids.length === totalApps) return `Todos os ${totalApps} apps liberados`
+
+    return `${convite.app_access_ids.length} de ${totalApps} apps liberados`
+  }
+
   const toggleEmpresaColaboradores = async (empresaId: string) => {
     if (empresaAberta === empresaId) {
       setEmpresaAberta(null)
@@ -1408,6 +1451,9 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     setEmpresaAberta(empresaId)
     if (!empresaMembros[empresaId]) {
       await fetchEmpresaMembros(empresaId)
+    }
+    if (!empresaConvitesPendentes[empresaId]) {
+      await fetchEmpresaConvitesPendentes(empresaId)
     }
   }
 
@@ -1515,11 +1561,13 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
         [empresaId]: 'Colaborador vinculado com sucesso.',
       }))
       await fetchEmpresaMembros(empresaId)
+      await fetchEmpresaConvitesPendentes(empresaId)
     } else {
       setEmpresaMemberSuccess(prev => ({
         ...prev,
-        [empresaId]: 'Convite enviado por e-mail para concluir o cadastro.',
+        [empresaId]: 'Convite enviado. O colaborador ficara como pendente ate aceitar.',
       }))
+      await fetchEmpresaConvitesPendentes(empresaId)
     }
 
     setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
@@ -2044,7 +2092,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
                             <div className={styles.companyMembersHeader}>
                               <strong>Acessos da empresa</strong>
                               <span className={styles.companyMembersCount}>
-                                {(empresaMembros[empresa.id] ?? []).length} acesso{(empresaMembros[empresa.id] ?? []).length === 1 ? '' : 's'}
+                                {((empresaMembros[empresa.id] ?? []).length + (empresaConvitesPendentes[empresa.id] ?? []).length)} registro{((empresaMembros[empresa.id] ?? []).length + (empresaConvitesPendentes[empresa.id] ?? []).length) === 1 ? '' : 's'}
                               </span>
                             </div>
 
@@ -2067,8 +2115,8 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
                               <p className={styles.companyMembersSuccess}>{empresaMemberSuccess[empresa.id]}</p>
                             )}
 
-                            {loadingEmpresaMembros[empresa.id] ? (
-                              <p className={styles.companyMembersHint}>Carregando colaboradores...</p>
+                            {(loadingEmpresaMembros[empresa.id] || loadingEmpresaConvites[empresa.id]) ? (
+                              <p className={styles.companyMembersHint}>Carregando acessos...</p>
                             ) : (
                               <div className={styles.companyMembersList}>
                                 {(empresaMembros[empresa.id] ?? []).map(membro => (
@@ -2123,7 +2171,24 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
                                   </div>
                                 ))}
 
-                                {(empresaMembros[empresa.id] ?? []).length === 0 && (
+                                {(empresaConvitesPendentes[empresa.id] ?? []).map(convite => (
+                                  <div key={convite.id} className={`${styles.companyMemberItem} ${styles.companyPendingItem}`}>
+                                    <div>
+                                      <p className={styles.companyMemberName}>{convite.email}</p>
+                                      <p className={styles.companyMemberApps}>{getResumoAppsConvite(convite)}</p>
+                                    </div>
+                                    <div className={styles.companyMemberMeta}>
+                                      <span className={`${styles.companyMemberStatusBadge} ${styles.companyMemberStatusPending}`}>
+                                        Pendente
+                                      </span>
+                                      <span className={styles.companyPendingDate}>
+                                        Convidado em {new Date(convite.created_at).toLocaleDateString('pt-BR')}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+
+                                {(empresaMembros[empresa.id] ?? []).length === 0 && (empresaConvitesPendentes[empresa.id] ?? []).length === 0 && (
                                   <p className={styles.companyMembersHint}>Nenhum colaborador vinculado ainda.</p>
                                 )}
                               </div>

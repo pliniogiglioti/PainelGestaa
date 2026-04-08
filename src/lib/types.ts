@@ -804,6 +804,15 @@ export interface Database {
           created_at: string
         }[]
       }
+      listar_convites_pendentes_empresa: {
+        Args: { p_empresa_id: string }
+        Returns: {
+          id: string
+          email: string
+          app_access_ids: string[] | null
+          created_at: string
+        }[]
+      }
       vincular_colaborador_empresa: {
         Args: { p_empresa_id: string; p_email: string }
         Returns: {
