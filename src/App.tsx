@@ -22,12 +22,20 @@ export interface User {
   email: string
 }
 
-function sessionToUser(session: Session): User {
+async function sessionToUser(session: Session): Promise<User> {
   const meta = session.user.user_metadata
   const email = session.user.email ?? ''
-  const name = meta?.full_name
+  const fallbackName = meta?.full_name
     ?? meta?.name
     ?? email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('name')
+    .eq('id', session.user.id)
+    .maybeSingle()
+
+  const name = profile?.name?.trim() || fallbackName
   return { name, email }
 }
 
@@ -132,6 +140,55 @@ function App() {
 
   const toggleTheme = () => setTheme(current => current === 'dark' ? 'light' : 'dark')
 
+  const refreshAuthenticatedUser = useCallback(async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      setUser(null)
+      setUserId(null)
+      return
+    }
+
+    setUser(await sessionToUser(session))
+    setUserId(session.user.id)
+  }, [])
+
+  const updateAuthenticatedUserName = useCallback(async (nextName: string) => {
+    const trimmedName = nextName.trim()
+
+    if (!trimmedName) {
+      return 'Informe seu nome.'
+    }
+
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session) {
+      return 'Sessao expirada. Entre novamente para continuar.'
+    }
+
+    const { error: profileError } = await supabase
+      .from('profiles')
+      .update({
+        name: trimmedName,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', session.user.id)
+
+    if (profileError) {
+      return profileError.message ?? 'Nao foi possivel salvar seu nome.'
+    }
+
+    await supabase.auth.updateUser({
+      data: {
+        full_name: trimmedName,
+        name: trimmedName,
+      },
+    })
+
+    setUser(current => current ? { ...current, name: trimmedName } : current)
+    return null
+  }, [])
+
   const navigate = (path: string) => {
     window.history.pushState({}, '', path)
     setPathname(path)
@@ -150,7 +207,7 @@ function App() {
       if (session) {
         const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
-          setUser(sessionToUser(session))
+          setUser(await sessionToUser(session))
           setUserId(session.user.id)
           setAllowedInternalPaths(nextAllowedPaths)
           if (session.user.email && hash.includes('type=invite')) {
@@ -183,7 +240,7 @@ function App() {
       void (async () => {
         const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
-          setUser(sessionToUser(session))
+          setUser(await sessionToUser(session))
           setUserId(session.user.id)
           setAllowedInternalPaths(nextAllowedPaths)
           if (event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
@@ -328,7 +385,8 @@ function App() {
         <ErrorBoundary>
           <AcceptInvitePage
             email={inviteEmail || user.email}
-            onSuccess={() => {
+            onSuccess={async () => {
+              await refreshAuthenticatedUser()
               setIsInviteFlow(false)
               window.history.replaceState({}, '', '/')
               navigate('/')
@@ -406,6 +464,7 @@ function App() {
               <DashboardPage
                 user={user}
                 onLogout={handleLogout}
+                onUpdateUserName={updateAuthenticatedUserName}
                 theme={theme}
                 onToggleTheme={toggleTheme}
                 onNavigate={navigate}

@@ -781,6 +781,26 @@ export interface Database {
           email: string | null
           tipo_usuario: 'titular' | 'colaborador'
           empresa_role: 'admin' | 'membro'
+          ativo: boolean
+          app_access_ids: string[] | null
+          created_at: string
+        }[]
+      }
+      atualizar_acesso_colaborador_empresa: {
+        Args: {
+          p_empresa_id: string
+          p_user_id: string
+          p_app_access_ids: string[]
+          p_ativo: boolean
+        }
+        Returns: {
+          user_id: string
+          name: string | null
+          email: string | null
+          tipo_usuario: 'titular' | 'colaborador'
+          empresa_role: 'admin' | 'membro'
+          ativo: boolean
+          app_access_ids: string[] | null
           created_at: string
         }[]
       }

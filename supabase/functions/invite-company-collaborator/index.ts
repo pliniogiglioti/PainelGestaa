@@ -84,9 +84,12 @@ serve(async (req: Request) => {
       return jsonResponse({ error: 'Nao autorizado.' }, 401)
     }
 
-    const { email, empresa_id } = await req.json()
+    const { email, empresa_id, app_access_ids } = await req.json()
     const normalizedEmail = String(email ?? '').trim().toLowerCase()
     const empresaId = String(empresa_id ?? '').trim()
+    const requestedAppIds = Array.isArray(app_access_ids)
+      ? Array.from(new Set(app_access_ids.map(value => String(value ?? '').trim()).filter(Boolean)))
+      : []
 
     if (!normalizedEmail) {
       return jsonResponse({ error: 'Informe o e-mail do colaborador.' }, 400)
@@ -94,6 +97,25 @@ serve(async (req: Request) => {
 
     if (!empresaId) {
       return jsonResponse({ error: 'Empresa nao informada.' }, 400)
+    }
+
+    let normalizedAppAccessIds: string[] = []
+
+    if (requestedAppIds.length > 0) {
+      const { data: availableApps, error: appsError } = await adminClient
+        .from('apps')
+        .select('id')
+        .in('id', requestedAppIds)
+
+      if (appsError) {
+        return jsonResponse({ error: appsError.message }, 500)
+      }
+
+      normalizedAppAccessIds = (availableApps ?? []).map(app => app.id)
+
+      if (normalizedAppAccessIds.length !== requestedAppIds.length) {
+        return jsonResponse({ error: 'Alguns apps selecionados nao foram encontrados.' }, 400)
+      }
     }
 
     const { data: callerProfile } = await adminClient
@@ -130,7 +152,7 @@ serve(async (req: Request) => {
 
     const { data: existingProfiles } = await adminClient
       .from('profiles')
-      .select('id, role, tipo_usuario, email')
+      .select('id, role, tipo_usuario, email, app_access_ids')
       .ilike('email', normalizedEmail)
       .limit(1)
 
@@ -174,9 +196,17 @@ serve(async (req: Request) => {
         .eq('role', 'admin')
 
       if (existingProfile.role !== 'admin' && (adminMembershipCount ?? 0) === 0) {
+        const nextAppAccessIds = existingProfile.app_access_ids == null
+          ? normalizedAppAccessIds
+          : Array.from(new Set([...(existingProfile.app_access_ids ?? []), ...normalizedAppAccessIds]))
+
         await adminClient
           .from('profiles')
-          .update({ tipo_usuario: 'colaborador', updated_at: new Date().toISOString() })
+          .update({
+            tipo_usuario: 'colaborador',
+            app_access_ids: nextAppAccessIds,
+            updated_at: new Date().toISOString(),
+          })
           .eq('id', existingProfile.id)
       }
 
@@ -198,6 +228,7 @@ serve(async (req: Request) => {
         empresa_id: empresaId,
         email: normalizedEmail,
         invited_by: callerUser.id,
+        app_access_ids: normalizedAppAccessIds,
       })
 
     if (insertInviteError) {

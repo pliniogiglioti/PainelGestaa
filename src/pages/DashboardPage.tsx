@@ -20,6 +20,7 @@ type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 interface DashboardPageProps {
   user: User
   onLogout: () => void
+  onUpdateUserName: (name: string) => Promise<string | null>
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onNavigate: (path: string) => void
@@ -51,6 +52,8 @@ interface EmpresaMembroListItem {
   email: string | null
   tipo_usuario: TipoUsuario
   empresa_role: 'admin' | 'membro'
+  ativo: boolean
+  app_access_ids: string[] | null
   created_at: string
 }
 
@@ -69,6 +72,11 @@ const getTipoUsuarioDescricao = (tipo: TipoUsuario) => (
     ? 'Pode criar empresas e liberar acesso para colaboradores.'
     : 'Recebe acesso as empresas concedidas por um titular.'
 )
+
+const normalizarSelecaoApps = (selectedIds: string[] | null | undefined, allAppIds: string[]) => {
+  if (selectedIds == null) return allAppIds
+  return allAppIds.filter(id => selectedIds.includes(id))
+}
 
 const normalizarCnpj = (value: string) => value.replace(/\D/g, '')
 
@@ -198,6 +206,7 @@ function TopNavigation({
   isAdmin,
   onSettings,
   onLogout,
+  onUpdateUserName,
   theme,
   onToggleTheme,
 }: {
@@ -209,14 +218,29 @@ function TopNavigation({
   isAdmin: boolean
   onSettings: () => void
   onLogout: () => void
+  onUpdateUserName: (name: string) => Promise<string | null>
   theme: 'dark' | 'light'
   onToggleTheme: () => void
 }) {
   const isDark = theme === 'dark'
   const [menuOpen, setMenuOpen] = useState(false)
+  const [showEditNameModal, setShowEditNameModal] = useState(false)
+  const [nameDraft, setNameDraft] = useState(user.name)
+  const [savingName, setSavingName] = useState(false)
+  const [nameError, setNameError] = useState('')
   const menuRef = useRef<HTMLDivElement | null>(null)
   const userInitial = user.name.trim().charAt(0).toUpperCase() || user.email.trim().charAt(0).toUpperCase() || 'U'
   const roleLabel = isAdmin ? 'Admin' : 'Usuario'
+  const backdropDismiss = useBackdropDismiss(() => {
+    if (savingName) return
+    setShowEditNameModal(false)
+    setNameError('')
+    setNameDraft(user.name)
+  }, savingName)
+
+  useEffect(() => {
+    setNameDraft(user.name)
+  }, [user.name])
 
   useEffect(() => {
     if (!menuOpen) return
@@ -348,6 +372,19 @@ function TopNavigation({
                 )}
                 <button
                   type="button"
+                  className={styles.userMenuActionButton}
+                  onClick={() => {
+                    setMenuOpen(false)
+                    setNameDraft(user.name)
+                    setNameError('')
+                    setShowEditNameModal(true)
+                  }}
+                >
+                  <IconSettings />
+                  <span>Editar nome</span>
+                </button>
+                <button
+                  type="button"
                   className={`${styles.userMenuActionButton} ${styles.userMenuLogoutButton}`}
                   onClick={onLogout}
                 >
@@ -359,6 +396,58 @@ function TopNavigation({
           )}
         </div>
       </div>
+
+      {showEditNameModal && (
+        <div
+          className={styles.modalOverlay}
+          onPointerDown={backdropDismiss.handleBackdropPointerDown}
+          onClick={backdropDismiss.handleBackdropClick}
+        >
+          <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Editar nome</h2>
+              <button className={styles.modalClose} onClick={() => setShowEditNameModal(false)} disabled={savingName}>×</button>
+            </div>
+            <form
+              className={styles.modalForm}
+              onSubmit={async e => {
+                e.preventDefault()
+                setSavingName(true)
+                setNameError('')
+                const error = await onUpdateUserName(nameDraft)
+                if (error) {
+                  setNameError(error)
+                  setSavingName(false)
+                  return
+                }
+                setSavingName(false)
+                setShowEditNameModal(false)
+              }}
+            >
+              <div className={styles.modalField}>
+                <label className={styles.modalLabel}>Seu nome</label>
+                <input
+                  className={styles.modalInput}
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  placeholder="Digite seu nome completo"
+                  autoFocus
+                  disabled={savingName}
+                />
+              </div>
+              {nameError && <p className={styles.formError}>{nameError}</p>}
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.modalCancel} onClick={() => setShowEditNameModal(false)} disabled={savingName}>
+                  Cancelar
+                </button>
+                <button type="submit" className={styles.modalSubmit} disabled={savingName}>
+                  {savingName ? 'Salvando...' : 'Salvar nome'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </header>
   )
 }
@@ -831,6 +920,222 @@ function CompanyFormModal({
   )
 }
 
+function InviteCollaboratorModal({
+  empresaNome,
+  email,
+  apps,
+  selectedAppIds,
+  saving,
+  error,
+  onClose,
+  onToggleApp,
+  onSelectAll,
+  onClearAll,
+  onSubmit,
+}: {
+  empresaNome: string
+  email: string
+  apps: App[]
+  selectedAppIds: string[]
+  saving: boolean
+  error: string
+  onClose: () => void
+  onToggleApp: (appId: string) => void
+  onSelectAll: () => void
+  onClearAll: () => void
+  onSubmit: () => void
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.modalLg}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Adicionar colaborador</h2>
+          <button className={styles.modalClose} onClick={onClose} disabled={saving}>×</button>
+        </div>
+
+        <div className={styles.modalForm}>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Empresa</label>
+            <input className={styles.modalInput} value={empresaNome} readOnly />
+          </div>
+
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>E-mail do colaborador</label>
+            <input className={styles.modalInput} value={email} readOnly />
+          </div>
+
+          <div className={styles.modalField}>
+            <div className={styles.collaboratorAppsHeader}>
+              <div>
+                <label className={styles.modalLabel}>Apps com acesso liberado</label>
+                <p className={styles.modalHint}>
+                  Escolha quais apps esse colaborador podera acessar depois que entrar na plataforma.
+                </p>
+              </div>
+              <div className={styles.collaboratorAppsActions}>
+                <button type="button" className={styles.modalCancel} onClick={onSelectAll} disabled={saving || apps.length === 0}>
+                  Marcar todos
+                </button>
+                <button type="button" className={styles.modalCancel} onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {apps.length === 0 ? (
+              <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
+            ) : (
+              <div className={styles.collaboratorAppsGrid}>
+                {apps.map(app => (
+                  <label
+                    key={app.id}
+                    className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAppIds.includes(app.id)}
+                      onChange={() => onToggleApp(app.id)}
+                      disabled={saving}
+                    />
+                    <div>
+                      <strong>{app.name}</strong>
+                      <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {error && <p className={styles.formError}>{error}</p>}
+
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="button" className={styles.modalSubmit} onClick={onSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Enviar convite'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditCollaboratorAppsModal({
+  empresaNome,
+  colaboradorNome,
+  apps,
+  selectedAppIds,
+  saving,
+  error,
+  onClose,
+  onToggleApp,
+  onSelectAll,
+  onClearAll,
+  onSubmit,
+}: {
+  empresaNome: string
+  colaboradorNome: string
+  apps: App[]
+  selectedAppIds: string[]
+  saving: boolean
+  error: string
+  onClose: () => void
+  onToggleApp: (appId: string) => void
+  onSelectAll: () => void
+  onClearAll: () => void
+  onSubmit: () => void
+}) {
+  const backdropDismiss = useBackdropDismiss(onClose, saving)
+
+  return (
+    <div
+      className={styles.modalOverlay}
+      onPointerDown={backdropDismiss.handleBackdropPointerDown}
+      onClick={backdropDismiss.handleBackdropClick}
+    >
+      <div className={`${styles.modal} ${styles.modalLg}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalTitle}>Editar acessos do colaborador</h2>
+          <button className={styles.modalClose} onClick={onClose} disabled={saving}>×</button>
+        </div>
+
+        <div className={styles.modalForm}>
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Empresa</label>
+            <input className={styles.modalInput} value={empresaNome} readOnly />
+          </div>
+
+          <div className={styles.modalField}>
+            <label className={styles.modalLabel}>Colaborador</label>
+            <input className={styles.modalInput} value={colaboradorNome} readOnly />
+          </div>
+
+          <div className={styles.modalField}>
+            <div className={styles.collaboratorAppsHeader}>
+              <div>
+                <label className={styles.modalLabel}>Apps liberados</label>
+                <p className={styles.modalHint}>A selecao abaixo atualiza os apps que esse colaborador pode acessar.</p>
+              </div>
+              <div className={styles.collaboratorAppsActions}>
+                <button type="button" className={styles.modalCancel} onClick={onSelectAll} disabled={saving || apps.length === 0}>
+                  Marcar todos
+                </button>
+                <button type="button" className={styles.modalCancel} onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
+                  Limpar
+                </button>
+              </div>
+            </div>
+
+            {apps.length === 0 ? (
+              <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
+            ) : (
+              <div className={styles.collaboratorAppsGrid}>
+                {apps.map(app => (
+                  <label
+                    key={app.id}
+                    className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedAppIds.includes(app.id)}
+                      onChange={() => onToggleApp(app.id)}
+                      disabled={saving}
+                    />
+                    <div>
+                      <strong>{app.name}</strong>
+                      <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {error && <p className={styles.formError}>{error}</p>}
+
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
+              Cancelar
+            </button>
+            <button type="button" className={styles.modalSubmit} onClick={onSubmit} disabled={saving}>
+              {saving ? 'Salvando...' : 'Salvar acessos'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function AppCard({
   app,
   categoryLabel,
@@ -896,7 +1201,7 @@ function AppCard({
 
 // ── Main Component ────────────────────────────────────────────────────────
 
-export default function DashboardPage({ user, onLogout, theme, onToggleTheme, onNavigate }: DashboardPageProps) {
+export default function DashboardPage({ user, onLogout, onUpdateUserName, theme, onToggleTheme, onNavigate }: DashboardPageProps) {
   const storagePrefix = `dashboard:${user.email.toLowerCase()}`
   const [activePage, setActivePage] = useSessionStorageState<Page>(
     `${storagePrefix}:active-page`,
@@ -933,6 +1238,10 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
   const [empresaMemberErrors, setEmpresaMemberErrors] = useState<Record<string, string>>({})
   const [empresaMemberSuccess, setEmpresaMemberSuccess] = useState<Record<string, string>>({})
   const [empresaAberta, setEmpresaAberta] = useState<string | null>(null)
+  const [empresaConviteAppsModal, setEmpresaConviteAppsModal] = useState<EmpresaListItem | null>(null)
+  const [empresaConviteAppIds, setEmpresaConviteAppIds] = useState<string[]>([])
+  const [colaboradorEditando, setColaboradorEditando] = useState<{ empresa: EmpresaListItem; membro: EmpresaMembroListItem } | null>(null)
+  const [colaboradorEditandoAppIds, setColaboradorEditandoAppIds] = useState<string[]>([])
   const [companyModalMode, setCompanyModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingCompany, setEditingCompany] = useState<EmpresaListItem | null>(null)
   const [companyForm, setCompanyForm] = useState<CompanyFormState>({ nome: '', cnpj: '', cardBackgroundUrl: '' })
@@ -1069,6 +1378,18 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
   }
 
+  const getResumoAppsColaborador = (membro: EmpresaMembroListItem) => {
+    if (membro.empresa_role === 'admin') return 'Titular com acesso total'
+    if (membro.app_access_ids == null) return 'Todos os apps liberados'
+
+    const totalApps = apps.length
+    if (totalApps === 0) return 'Nenhum app cadastrado'
+    if (membro.app_access_ids.length === 0) return 'Sem apps liberados'
+    if (membro.app_access_ids.length === totalApps) return `Todos os ${totalApps} apps liberados`
+
+    return `${membro.app_access_ids.length} de ${totalApps} apps liberados`
+  }
+
   const toggleEmpresaColaboradores = async (empresaId: string) => {
     if (empresaAberta === empresaId) {
       setEmpresaAberta(null)
@@ -1081,7 +1402,75 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }
   }
 
-  const handleAdicionarColaborador = async (empresaId: string) => {
+  const abrirModalEditarAppsColaborador = (empresa: EmpresaListItem, membro: EmpresaMembroListItem) => {
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresa.id]: '' }))
+    setEmpresaMemberSuccess(prev => ({ ...prev, [empresa.id]: '' }))
+    setColaboradorEditando({ empresa, membro })
+    setColaboradorEditandoAppIds(normalizarSelecaoApps(membro.app_access_ids, apps.map(app => app.id)))
+  }
+
+  const handleSalvarAcessoColaborador = async (
+    empresaId: string,
+    userId: string,
+    appAccessIds: string[],
+    ativo: boolean,
+  ) => {
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: true }))
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: '' }))
+    setEmpresaMemberSuccess(prev => ({ ...prev, [empresaId]: '' }))
+
+    const { data, error } = await supabase.rpc('atualizar_acesso_colaborador_empresa', {
+      p_empresa_id: empresaId,
+      p_user_id: userId,
+      p_app_access_ids: appAccessIds,
+      p_ativo: ativo,
+    })
+
+    if (error) {
+      setEmpresaMemberErrors(prev => ({
+        ...prev,
+        [empresaId]: error.message ?? 'Nao foi possivel atualizar o colaborador.',
+      }))
+      setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+      return false
+    }
+
+    const membroAtualizado = (data?.[0] as EmpresaMembroListItem | undefined) ?? null
+
+    if (membroAtualizado) {
+      setEmpresaMembros(prev => ({
+        ...prev,
+        [empresaId]: (prev[empresaId] ?? []).map(membro => (
+          membro.user_id === userId ? membroAtualizado : membro
+        )),
+      }))
+    } else {
+      await fetchEmpresaMembros(empresaId)
+    }
+
+    setEmpresaMemberSuccess(prev => ({
+      ...prev,
+      [empresaId]: ativo ? 'Acessos do colaborador atualizados.' : 'Acesso do colaborador desativado.',
+    }))
+    setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
+    return true
+  }
+
+  const abrirModalAdicionarColaborador = (empresa: EmpresaListItem) => {
+    const email = inviteEmailByEmpresa[empresa.id]?.trim().toLowerCase() ?? ''
+
+    if (!email) {
+      setEmpresaMemberErrors(prev => ({ ...prev, [empresa.id]: 'Informe o e-mail do colaborador.' }))
+      return
+    }
+
+    setEmpresaMemberErrors(prev => ({ ...prev, [empresa.id]: '' }))
+    setEmpresaMemberSuccess(prev => ({ ...prev, [empresa.id]: '' }))
+    setEmpresaConviteAppsModal(empresa)
+    setEmpresaConviteAppIds(normalizarSelecaoApps(null, apps.map(app => app.id)))
+  }
+
+  const handleAdicionarColaborador = async (empresaId: string, appAccessIds: string[]) => {
     const email = inviteEmailByEmpresa[empresaId]?.trim().toLowerCase() ?? ''
     if (!email) {
       setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: 'Informe o e-mail do colaborador.' }))
@@ -1097,6 +1486,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       body: {
         empresa_id: empresaId,
         email,
+        app_access_ids: appAccessIds,
       },
       headers: {
         Authorization: `Bearer ${sessionData.session?.access_token ?? ''}`,
@@ -1113,6 +1503,8 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
     }
 
     setInviteEmailByEmpresa(prev => ({ ...prev, [empresaId]: '' }))
+    setEmpresaConviteAppsModal(null)
+    setEmpresaConviteAppIds([])
 
     if (data?.mode === 'linked') {
       setEmpresaMemberSuccess(prev => ({
@@ -1456,6 +1848,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
           isAdmin={isAdmin}
           onSettings={() => onNavigate('/admin-settings')}
           onLogout={onLogout}
+          onUpdateUserName={onUpdateUserName}
           theme={theme}
           onToggleTheme={onToggleTheme}
         />
@@ -1477,6 +1870,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
         isAdmin={isAdmin}
         onSettings={() => onNavigate('/admin-settings')}
         onLogout={onLogout}
+        onUpdateUserName={onUpdateUserName}
         theme={theme}
         onToggleTheme={onToggleTheme}
       />
@@ -1666,7 +2060,7 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                                 type="button"
                                 className={styles.companyMembersAddButton}
                                 disabled={!!savingEmpresaMembros[empresa.id]}
-                                onClick={() => void handleAdicionarColaborador(empresa.id)}
+                                onClick={() => abrirModalAdicionarColaborador(empresa)}
                               >
                                 {savingEmpresaMembros[empresa.id] ? 'Salvando...' : 'Adicionar'}
                               </button>
@@ -1688,12 +2082,40 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                                   <div key={membro.user_id} className={styles.companyMemberItem}>
                                     <div>
                                       <p className={styles.companyMemberName}>{membro.name?.trim() || membro.email || 'Usuario'}</p>
-                                      <p className={styles.companyMemberEmail}>{membro.email || 'E-mail nao informado'}</p>
+                                      <p className={styles.companyMemberApps}>{getResumoAppsColaborador(membro)}</p>
                                     </div>
                                     <div className={styles.companyMemberMeta}>
                                       <span className={`${styles.companyRoleBadge} ${membro.empresa_role === 'admin' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
                                         {getEmpresaRoleLabel(membro.empresa_role)}
                                       </span>
+                                      <span className={`${styles.companyMemberStatusBadge} ${membro.ativo ? styles.companyMemberStatusActive : styles.companyMemberStatusInactive}`}>
+                                        {membro.ativo ? 'Ativo' : 'Inativo'}
+                                      </span>
+                                      {membro.empresa_role !== 'admin' && (
+                                        <button
+                                          type="button"
+                                          className={styles.companyMemberAction}
+                                          disabled={!!savingEmpresaMembros[empresa.id]}
+                                          onClick={() => abrirModalEditarAppsColaborador(empresa, membro)}
+                                        >
+                                          Editar apps
+                                        </button>
+                                      )}
+                                      {membro.empresa_role !== 'admin' && (
+                                        <button
+                                          type="button"
+                                          className={styles.companyMemberAction}
+                                          disabled={!!savingEmpresaMembros[empresa.id]}
+                                          onClick={() => void handleSalvarAcessoColaborador(
+                                            empresa.id,
+                                            membro.user_id,
+                                            normalizarSelecaoApps(membro.app_access_ids, apps.map(app => app.id)),
+                                            !membro.ativo,
+                                          )}
+                                        >
+                                          {membro.ativo ? 'Desativar acesso' : 'Ativar acesso'}
+                                        </button>
+                                      )}
                                       {membro.empresa_role !== 'admin' && (
                                         <button
                                           type="button"
@@ -1802,6 +2224,67 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
       )}
       {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
       {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
+      {empresaConviteAppsModal && (
+        <InviteCollaboratorModal
+          empresaNome={empresaConviteAppsModal.nome}
+          email={inviteEmailByEmpresa[empresaConviteAppsModal.id] ?? ''}
+          apps={apps}
+          selectedAppIds={empresaConviteAppIds}
+          saving={!!savingEmpresaMembros[empresaConviteAppsModal.id]}
+          error={empresaMemberErrors[empresaConviteAppsModal.id] ?? ''}
+          onClose={() => {
+            if (savingEmpresaMembros[empresaConviteAppsModal.id]) return
+            setEmpresaConviteAppsModal(null)
+            setEmpresaConviteAppIds([])
+          }}
+          onToggleApp={appId => {
+            setEmpresaConviteAppIds(prev => (
+              prev.includes(appId)
+                ? prev.filter(id => id !== appId)
+                : [...prev, appId]
+            ))
+          }}
+          onSelectAll={() => setEmpresaConviteAppIds(apps.map(app => app.id))}
+          onClearAll={() => setEmpresaConviteAppIds([])}
+          onSubmit={() => void handleAdicionarColaborador(empresaConviteAppsModal.id, empresaConviteAppIds)}
+        />
+      )}
+      {colaboradorEditando && (
+        <EditCollaboratorAppsModal
+          empresaNome={colaboradorEditando.empresa.nome}
+          colaboradorNome={colaboradorEditando.membro.name?.trim() || colaboradorEditando.membro.email || 'Usuario'}
+          apps={apps}
+          selectedAppIds={colaboradorEditandoAppIds}
+          saving={!!savingEmpresaMembros[colaboradorEditando.empresa.id]}
+          error={empresaMemberErrors[colaboradorEditando.empresa.id] ?? ''}
+          onClose={() => {
+            if (savingEmpresaMembros[colaboradorEditando.empresa.id]) return
+            setColaboradorEditando(null)
+            setColaboradorEditandoAppIds([])
+          }}
+          onToggleApp={appId => {
+            setColaboradorEditandoAppIds(prev => (
+              prev.includes(appId)
+                ? prev.filter(id => id !== appId)
+                : [...prev, appId]
+            ))
+          }}
+          onSelectAll={() => setColaboradorEditandoAppIds(apps.map(app => app.id))}
+          onClearAll={() => setColaboradorEditandoAppIds([])}
+          onSubmit={() => void (async () => {
+            const ok = await handleSalvarAcessoColaborador(
+              colaboradorEditando.empresa.id,
+              colaboradorEditando.membro.user_id,
+              colaboradorEditandoAppIds,
+              colaboradorEditando.membro.ativo,
+            )
+            if (ok) {
+              setColaboradorEditando(null)
+              setColaboradorEditandoAppIds([])
+            }
+          })()}
+        />
+      )}
       {companyModalMode && (
         <CompanyFormModal
           mode={companyModalMode}

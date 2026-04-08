@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 
 interface AcceptInvitePageProps {
   email: string
-  onSuccess: () => void
+  onSuccess: () => void | Promise<void>
 }
 
 export default function AcceptInvitePage({ email, onSuccess }: AcceptInvitePageProps) {
@@ -50,14 +50,20 @@ export default function AcceptInvitePage({ email, onSuccess }: AcceptInvitePageP
     // Atualiza o nome no profile
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ name: name.trim(), updated_at: new Date().toISOString() })
         .eq('id', user.id)
+
+      if (profileError) {
+        setError(profileError.message)
+        setLoading(false)
+        return
+      }
     }
 
     setLoading(false)
-    onSuccess()
+    await onSuccess()
   }
 
   return (
