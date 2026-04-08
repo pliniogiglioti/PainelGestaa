@@ -370,6 +370,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
   const precoSugerido = calcularPrecoSugerido(form)
+  const diferencaParaMargemIdeal = roundCurrencyValue(precoSugerido - precoVenda)
 
   return {
     custoInsumos,
@@ -392,8 +393,9 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     taxaMaquina,
     custoTotal,
     precoSugerido,
+    diferencaParaMargemIdeal,
     margem,
-    resultadoMargem: margem < 50 ? 'Baixa - Rever Preço' : 'Adequada',
+    resultadoMargem: margem < 50 ? 'Abaixo da meta de 50%' : 'Meta de 50% atingida',
   }
 }
 
@@ -1157,7 +1159,14 @@ function CalculadoraPrecificacaoModal({
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
                 <span>Preço sugerido</span>
                 <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                <span className={styles.calcHighlightHint}>Sugestão com o dobro do custo total.</span>
+                <span className={styles.calcHighlightHint}>Sugestão para atingir 50% de margem.</span>
+                <span className={styles.calcHighlightHint}>
+                  {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
+                    ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                    : calculo.diferencaParaMargemIdeal > 0
+                      ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
+                      : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                </span>
                 {canManage && calculo.precoSugerido > 0 && (
                   <button
                     type="button"
