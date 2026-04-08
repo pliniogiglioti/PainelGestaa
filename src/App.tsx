@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { ErrorBoundary } from './ErrorBoundary'
 import { supabase } from './lib/supabase'
@@ -279,30 +279,30 @@ function App() {
     setEmpresaSelecionada(emp)
   }
 
-  const trocarEmpresa = () => {
+  const trocarEmpresa = useCallback(() => {
     localStorage.removeItem('empresa_selecionada')
     setEmpresaSelecionada(null)
-  }
+  }, [])
 
   const selecionarEmpresaLab = (emp: Empresa) => {
     localStorage.setItem('empresa_selecionada_lab_control', JSON.stringify(emp))
     setEmpresaSelecionadaLab(emp)
   }
 
-  const trocarEmpresaLab = () => {
+  const trocarEmpresaLab = useCallback(() => {
     localStorage.removeItem('empresa_selecionada_lab_control')
     setEmpresaSelecionadaLab(null)
-  }
+  }, [])
 
   const selecionarEmpresaPrecificacao = (emp: Empresa) => {
     localStorage.setItem('empresa_selecionada_precificacao', JSON.stringify(emp))
     setEmpresaSelecionadaPrecificacao(emp)
   }
 
-  const trocarEmpresaPrecificacao = () => {
+  const trocarEmpresaPrecificacao = useCallback(() => {
     localStorage.removeItem('empresa_selecionada_precificacao')
     setEmpresaSelecionadaPrecificacao(null)
-  }
+  }, [])
 
   if (loading) {
     return (
