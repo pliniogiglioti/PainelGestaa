@@ -928,6 +928,7 @@ function InviteCollaboratorModal({
   saving,
   error,
   onClose,
+  onChangeEmail,
   onToggleApp,
   onSelectAll,
   onClearAll,
@@ -940,6 +941,7 @@ function InviteCollaboratorModal({
   saving: boolean
   error: string
   onClose: () => void
+  onChangeEmail: (value: string) => void
   onToggleApp: (appId: string) => void
   onSelectAll: () => void
   onClearAll: () => void
@@ -967,7 +969,14 @@ function InviteCollaboratorModal({
 
           <div className={styles.modalField}>
             <label className={styles.modalLabel}>E-mail do colaborador</label>
-            <input className={styles.modalInput} value={email} readOnly />
+            <input
+              className={styles.modalInput}
+              value={email}
+              onChange={e => onChangeEmail(e.target.value)}
+              placeholder="email@colaborador.com"
+              autoFocus
+              disabled={saving}
+            />
           </div>
 
           <div className={styles.modalField}>
@@ -1457,17 +1466,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
   }
 
   const abrirModalAdicionarColaborador = (empresa: EmpresaListItem) => {
-    const email = inviteEmailByEmpresa[empresa.id]?.trim().toLowerCase() ?? ''
-
-    if (!email) {
-      setEmpresaMemberErrors(prev => ({ ...prev, [empresa.id]: 'Informe o e-mail do colaborador.' }))
-      return
-    }
-
     setEmpresaMemberErrors(prev => ({ ...prev, [empresa.id]: '' }))
     setEmpresaMemberSuccess(prev => ({ ...prev, [empresa.id]: '' }))
     setEmpresaConviteAppsModal(empresa)
     setEmpresaConviteAppIds(normalizarSelecaoApps(null, apps.map(app => app.id)))
+    setInviteEmailByEmpresa(prev => ({ ...prev, [empresa.id]: prev[empresa.id] ?? '' }))
   }
 
   const handleAdicionarColaborador = async (empresaId: string, appAccessIds: string[]) => {
@@ -2046,23 +2049,13 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
                             </div>
 
                             <div className={styles.companyMembersAddRow}>
-                              <input
-                                type="email"
-                                className={styles.companyMembersInput}
-                                placeholder="email@colaborador.com"
-                                value={inviteEmailByEmpresa[empresa.id] ?? ''}
-                                onChange={e => {
-                                  const value = e.target.value
-                                  setInviteEmailByEmpresa(prev => ({ ...prev, [empresa.id]: value }))
-                                }}
-                              />
                               <button
                                 type="button"
                                 className={styles.companyMembersAddButton}
                                 disabled={!!savingEmpresaMembros[empresa.id]}
                                 onClick={() => abrirModalAdicionarColaborador(empresa)}
                               >
-                                {savingEmpresaMembros[empresa.id] ? 'Salvando...' : 'Adicionar'}
+                                {savingEmpresaMembros[empresa.id] ? 'Salvando...' : 'Adicionar colaborador'}
                               </button>
                             </div>
 
@@ -2236,6 +2229,9 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
             if (savingEmpresaMembros[empresaConviteAppsModal.id]) return
             setEmpresaConviteAppsModal(null)
             setEmpresaConviteAppIds([])
+          }}
+          onChangeEmail={value => {
+            setInviteEmailByEmpresa(prev => ({ ...prev, [empresaConviteAppsModal.id]: value }))
           }}
           onToggleApp={appId => {
             setEmpresaConviteAppIds(prev => (
