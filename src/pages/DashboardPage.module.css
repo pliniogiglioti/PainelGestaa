@@ -860,23 +860,8 @@
 .companyCardTop {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-}
-
-.companyAvatar {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--gold-glow);
-  border: 1px solid var(--border-gold);
-  color: var(--gold);
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
 }
 
 .companyRoleBadge {

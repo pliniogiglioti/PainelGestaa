@@ -1614,9 +1614,6 @@ export default function DashboardPage({ user, onLogout, theme, onToggleTheme, on
                     }}
                   >
                     <div className={styles.companyCardTop}>
-                      <div className={styles.companyAvatar}>
-                        {empresa.nome.split(' ').slice(0, 2).map(p => p[0]?.toUpperCase() ?? '').join('')}
-                      </div>
                       <span className={`${styles.companyRoleBadge} ${empresa.role === 'admin' ? styles.companyRoleAdmin : styles.companyRoleMember}`}>
                         {getEmpresaRoleLabel(empresa.role)}
                       </span>

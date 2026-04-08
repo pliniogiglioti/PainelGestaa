@@ -663,9 +663,6 @@ export default function EmpresaGatePage({
     onSelecionar(data as Empresa)
   }
 
-  const inicialEmpresa = (empresaNome: string) =>
-    empresaNome.split(' ').slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('')
-
   const podeCriarEmpresa = isSystemAdmin || tipoUsuario === 'titular'
 
   const podeEditarEmpresa = useMemo(() => (
@@ -809,7 +806,6 @@ export default function EmpresaGatePage({
               )}
               <div className={styles.cardContent}>
                 <span className={styles.cardLabel}>EMPRESA</span>
-                <div className={styles.cardInitiais}>{inicialEmpresa(emp.nome)}</div>
                 <h3 className={styles.cardNome}>{emp.nome}</h3>
                 <p className={styles.cardDono}>
                   Empresa de: {emp.donoNome ?? 'Usuário'}
