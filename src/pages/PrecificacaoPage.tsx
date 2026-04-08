@@ -302,7 +302,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
-  const precoSugerido = custoTotal * 1.5
+  const precoSugerido = custoTotal * 2
 
   return {
     custoInsumos,
@@ -1089,7 +1089,7 @@ function CalculadoraPrecificacaoModal({
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
                 <span>Preço sugerido</span>
                 <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                <span className={styles.calcHighlightHint}>Sugestão com 50% sobre o custo total.</span>
+                <span className={styles.calcHighlightHint}>Sugestão com o dobro do custo total.</span>
                 {canManage && calculo.precoSugerido > 0 && (
                   <button
                     type="button"
