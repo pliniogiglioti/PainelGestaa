@@ -179,6 +179,10 @@ function parsePreco(value: string) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function roundCurrencyValue(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100
+}
+
 function sanitizeDecimalInput(value: string) {
   return value.replace(/[^\d,.\s]/g, '')
 }
@@ -250,6 +254,69 @@ function hasGestaaCalculatedPrice(item: EmpresaPreco) {
   return Object.keys(saved).length > 0 && typeof saved.precoVenda === 'string' && saved.precoVenda.trim() !== ''
 }
 
+function calcularPrecoSugerido(form: CalculadoraForm) {
+  const custoInsumos = parsePreco(form.custoInsumos)
+  const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
+  const custoLaboratorio = parsePreco(form.custoLaboratorio)
+  const royaltiesRate = parsePreco(form.royaltiesPercent) / 100
+  const impostosRate = parsePreco(form.impostosPercent) / 100
+  const comissoesRate = parsePreco(form.comissoesPercent) / 100
+  const taxaMaquinaRate = parsePreco(form.taxaMaquinaPercent) / 100
+  const custoProfissionaisRate = parsePreco(form.custoProfissionaisPercent) / 100
+  const custoProfissionaisValor = parsePreco(form.custoProfissionaisValor)
+
+  const custoFixoBase =
+    custoInsumos +
+    custoMaterialAplicado +
+    custoLaboratorio
+  const encargosSobreVendaRate =
+    royaltiesRate +
+    impostosRate +
+    comissoesRate +
+    taxaMaquinaRate
+
+  const solveSuggestedPrice = (fixedCost: number, variableRate: number) => {
+    const denominator = 1 - (2 * variableRate)
+    if (denominator <= 0) return 0
+    return roundCurrencyValue((2 * fixedCost) / denominator)
+  }
+
+  if (form.custoProfissionaisModo === 'valor') {
+    return solveSuggestedPrice(custoFixoBase + custoProfissionaisValor, encargosSobreVendaRate)
+  }
+
+  const abatimentosFixos = form.custoProfissionaisBases.reduce((total, base) => {
+    if (base === 'custoInsumos') return total + custoInsumos
+    if (base === 'custoMaterialAplicado') return total + custoMaterialAplicado
+    if (base === 'custoLaboratorio') return total + custoLaboratorio
+    return total
+  }, 0)
+
+  const abatimentosRate = form.custoProfissionaisBases.reduce((total, base) => {
+    if (base === 'royalties') return total + royaltiesRate
+    if (base === 'impostos') return total + impostosRate
+    if (base === 'comissoes') return total + comissoesRate
+    if (base === 'taxaMaquina') return total + taxaMaquinaRate
+    return total
+  }, 0)
+
+  const precoComProfissionais = solveSuggestedPrice(
+    custoFixoBase - (custoProfissionaisRate * abatimentosFixos),
+    encargosSobreVendaRate + (custoProfissionaisRate * (1 - abatimentosRate)),
+  )
+
+  if (precoComProfissionais > 0) {
+    const baseLiquidaProfissionais =
+      precoComProfissionais -
+      abatimentosFixos -
+      (precoComProfissionais * abatimentosRate)
+
+    if (baseLiquidaProfissionais > 0) return precoComProfissionais
+  }
+
+  return solveSuggestedPrice(custoFixoBase, encargosSobreVendaRate)
+}
+
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   const custoInsumos = parsePreco(form.custoInsumos)
   const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
@@ -302,7 +369,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
-  const precoSugerido = custoTotal * 2
+  const precoSugerido = calcularPrecoSugerido(form)
 
   return {
     custoInsumos,
@@ -693,6 +760,7 @@ function CalculadoraPrecificacaoModal({
   const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
+  const suggestedPriceApplied = Math.abs(precoVendaAtual - calculo.precoSugerido) < 0.005
 
   useEffect(() => {
     const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
@@ -1098,9 +1166,9 @@ function CalculadoraPrecificacaoModal({
                       setPrecoVendaEditado(formatCurrencyInput(calculo.precoSugerido))
                       setErroLocal('')
                     }}
-                    disabled={savingPreco}
+                    disabled={savingPreco || suggestedPriceApplied}
                   >
-                    Usar preço sugerido
+                    {suggestedPriceApplied ? 'Preço sugerido aplicado' : 'Usar preço sugerido'}
                   </button>
                 )}
               </div>
