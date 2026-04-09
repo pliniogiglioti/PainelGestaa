@@ -382,6 +382,13 @@ type CalendarEvent = {
   pacienteNome: string
   servicoNome: string
   labNome: string
+  status: string
+  dataEnvio: string
+  dataEntregaPrometida: string | null
+  urgente: boolean
+  valor: number | null
+  dentes: string | null
+  cor: string | null
   date: string // ISO YYYY-MM-DD
 }
 
@@ -406,6 +413,13 @@ function buildCalendarEvents(
         pacienteNome: envio.paciente_nome,
         servicoNome: etapa.nome,
         labNome: lab?.nome ?? '',
+        status: envio.status,
+        dataEnvio: envio.data_envio,
+        dataEntregaPrometida: envio.data_entrega_prometida,
+        urgente: envio.urgente,
+        valor: etapa.preco,
+        dentes: envio.dentes,
+        cor: envio.cor,
         date,
       })
     }
@@ -2528,6 +2542,11 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
   const { year, month } = currentMonth
   const firstDay = new Date(year, month, 1).getDay() // 0=Sun
   const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const currentMonthPrefix = `${year}-${String(month + 1).padStart(2, '0')}`
+  const monthEvents = events.filter(ev => ev.date.startsWith(currentMonthPrefix))
+  const monthEventsCount = monthEvents.length
+  const labsWithEventsCount = new Set(monthEvents.map(ev => ev.labNome).filter(Boolean)).size
+  const todayIso = today()
 
   const monthLabel = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
 
@@ -2554,6 +2573,10 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
       <div className={styles.calendarHeader}>
         <button type="button" className={styles.btnIcon} onClick={prevMonth}>‹</button>
         <span className={styles.calendarMonthLabel}>{monthLabel}</span>
+        <div className={styles.calendarSummary}>
+          <span>{monthEventsCount} previsoes no mes</span>
+          <span>{labsWithEventsCount} laboratorio(s)</span>
+        </div>
         <button type="button" className={styles.btnIcon} onClick={nextMonth}>›</button>
         <button type="button" className={styles.btnSecondary} onClick={onClose} style={{ marginLeft: 'auto' }}>
           Fechar Calendário
@@ -2570,13 +2593,35 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
           const day = i + 1
           const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
           const dayEvents = eventsByDate[dateStr] ?? []
+          const isToday = dateStr === todayIso
           return (
-            <div key={dateStr} className={styles.calendarCell}>
-              <span className={styles.calendarDayNum}>{day}</span>
+            <div key={dateStr} className={`${styles.calendarCell} ${isToday ? styles.calendarCellToday : ''}`}>
+              <div className={styles.calendarCellHeader}>
+                <span className={styles.calendarDayNum}>{day}</span>
+                {dayEvents.length > 0 && <span className={styles.calendarDayCount}>{dayEvents.length}</span>}
+              </div>
               {dayEvents.map((ev, idx) => (
                 <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent} title={`${ev.pacienteNome} — ${ev.servicoNome} (${ev.labNome})`}>
-                  <span className={styles.calendarEventPatient}>{ev.pacienteNome}</span>
+                  <span className={styles.calendarEventPatient}>{ev.urgente ? 'Urgente | ' : ''}{ev.pacienteNome}</span>
                   <span className={styles.calendarEventService}>{ev.servicoNome}</span>
+                  <div className={styles.calendarEventTooltip}>
+                    <strong>{ev.pacienteNome}</strong>
+                    <span>Laboratorio: {ev.labNome || 'Nao informado'}</span>
+                    <span>Servico: {ev.servicoNome}</span>
+                    <span>Status: {ev.status}</span>
+                    <span>Previsto: {formatDate(ev.date)}</span>
+                    <span>Envio: {formatDate(ev.dataEnvio)}</span>
+                    {ev.dataEntregaPrometida && <span>Prazo geral: {formatDate(ev.dataEntregaPrometida)}</span>}
+                    {(ev.dentes || ev.cor) && (
+                      <span>
+                        {ev.dentes ? `Dentes: ${ev.dentes}` : ''}
+                        {ev.dentes && ev.cor ? ' | ' : ''}
+                        {ev.cor ? `Cor: ${ev.cor}` : ''}
+                      </span>
+                    )}
+                    {ev.valor != null && <span>Valor: {ev.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>}
+                    {ev.urgente && <span className={styles.calendarTooltipUrgent}>Urgente</span>}
+                  </div>
                 </div>
               ))}
             </div>
@@ -3068,10 +3113,17 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           </button>
           <button
             type="button"
-            className={`${styles.btnSecondary} ${calendarMode ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setCalendarMode(v => !v)}
+            className={`${styles.btnSecondary} ${!calendarMode ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setCalendarMode(false)}
           >
-            <IconCalendar /> {calendarMode ? 'Fechar Calendário' : 'Modo Calendário'}
+            Kanban
+          </button>
+          <button
+            type="button"
+            className={`${styles.btnSecondary} ${calendarMode ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setCalendarMode(true)}
+          >
+            <IconCalendar /> Calendário
           </button>
           {isAdmin && (
             <button
