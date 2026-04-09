@@ -651,25 +651,28 @@ export interface Database {
       }
       lab_precos: {
         Row: {
-          id:           string
-          lab_id:       string
-          nome_servico: string
-          preco:        number
-          ativo:        boolean
-          created_at:   string
+          id:                   string
+          lab_id:               string
+          nome_servico:         string
+          preco:                number
+          prazo_producao_dias:  number | null
+          ativo:                boolean
+          created_at:           string
         }
         Insert: {
-          id?:          string
-          lab_id:       string
-          nome_servico: string
-          preco?:       number
-          ativo?:       boolean
-          created_at?:  string
+          id?:                  string
+          lab_id:               string
+          nome_servico:         string
+          preco?:               number
+          prazo_producao_dias?: number | null
+          ativo?:               boolean
+          created_at?:          string
         }
         Update: {
-          nome_servico?: string
-          preco?:        number
-          ativo?:        boolean
+          nome_servico?:        string
+          preco?:               number
+          prazo_producao_dias?: number | null
+          ativo?:               boolean
         }
         Relationships: []
       }

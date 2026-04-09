@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
@@ -32,6 +32,7 @@ type LabEtapa = {
   preco: number | null
   origem: 'catalogo' | 'manual'
   prazo_entrega: string | null
+  prazo_producao_dias: number | null
   concluido: boolean
   data_conclusao: string | null
 }
@@ -103,6 +104,31 @@ function addBusinessDays(startDate: string, businessDays: number, feriados: stri
   return formatIsoDate(date)
 }
 
+// Calculates the promised delivery date based on the longest service deadline
+function calcularPrazoEntrega(
+  dataEnvio: string,
+  servicos: Array<{ prazo_producao_dias: number | null }>,
+  feriados: string[],
+  prazoMedioDias: number,
+): string {
+  const prazos = servicos
+    .map(s => s.prazo_producao_dias)
+    .filter((p): p is number => p !== null && p > 0)
+  const dias = prazos.length > 0 ? Math.max(...prazos) : prazoMedioDias
+  if (!dias) return ''
+  return addBusinessDays(dataEnvio, dias, feriados)
+}
+
+// Calculates the expected completion date for a service step
+function calcularDataPrevista(
+  dataEnvio: string,
+  prazoProducaoDias: number | null,
+  feriados: string[],
+): string | null {
+  if (!prazoProducaoDias || !dataEnvio) return null
+  return addBusinessDays(dataEnvio, prazoProducaoDias, feriados)
+}
+
 function generateEtapaId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -130,6 +156,7 @@ function getEnvioEtapas(envio: LabEnvio): LabEtapa[] {
         preco: typeof etapa.preco === 'number' ? etapa.preco : envio.preco_servico,
         origem: etapa.origem === 'manual' ? 'manual' : 'catalogo',
         prazo_entrega: typeof etapa.prazo_entrega === 'string' ? etapa.prazo_entrega : envio.data_entrega_prometida,
+        prazo_producao_dias: typeof etapa.prazo_producao_dias === 'number' ? etapa.prazo_producao_dias : null,
         concluido: Boolean(etapa.concluido),
         data_conclusao: typeof etapa.data_conclusao === 'string' ? etapa.data_conclusao : envio.data_entrega_real,
       }
@@ -142,6 +169,7 @@ function getEnvioEtapas(envio: LabEnvio): LabEtapa[] {
     preco: envio.preco_servico,
     origem: 'manual',
     prazo_entrega: envio.data_entrega_prometida,
+    prazo_producao_dias: null,
     concluido: Boolean(envio.data_entrega_real),
     data_conclusao: envio.data_entrega_real,
   }]
@@ -187,6 +215,7 @@ function serializeLabEtapas(etapas: LabEtapa[]) {
     preco: etapa.preco,
     origem: etapa.origem,
     prazo_entrega: etapa.prazo_entrega,
+    prazo_producao_dias: etapa.prazo_producao_dias,
     concluido: etapa.concluido,
     data_conclusao: etapa.data_conclusao,
   }))
@@ -296,6 +325,59 @@ function isOverdue(envio: LabEnvio) {
   return envio.data_entrega_prometida < today()
 }
 
+// Formats a digit string as Brazilian currency mask: "12399" → "R$ 123,99"
+function formatCurrencyMask(digits: string): string {
+  const onlyDigits = digits.replace(/\D/g, '')
+  if (!onlyDigits) return ''
+  const num = parseInt(onlyDigits, 10)
+  return (num / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+}
+
+// Parses a masked currency string back to a decimal number: "R$ 123,99" → 123.99
+function parseMaskedCurrency(masked: string): number {
+  const onlyDigits = masked.replace(/\D/g, '')
+  if (!onlyDigits) return 0
+  return parseInt(onlyDigits, 10) / 100
+}
+
+// ── Calendar helpers ───────────────────────────────────────────────────────
+
+type CalendarEvent = {
+  envioId: string
+  pacienteNome: string
+  servicoNome: string
+  labNome: string
+  date: string // ISO YYYY-MM-DD
+}
+
+// Builds calendar events from all active envios
+function buildCalendarEvents(
+  envios: LabEnvio[],
+  precosByLab: Record<string, LabPreco[]>,
+  labsById: Record<string, Lab>,
+): CalendarEvent[] {
+  const finalStatuses = ['Concluído', 'Entregue']
+  const events: CalendarEvent[] = []
+  for (const envio of envios) {
+    if (finalStatuses.includes(envio.status)) continue
+    const lab = labsById[envio.lab_id]
+    const feriados = lab ? getLabFeriados(lab) : []
+    const etapas = getEnvioEtapas(envio)
+    for (const etapa of etapas) {
+      const date = calcularDataPrevista(envio.data_envio, etapa.prazo_producao_dias, feriados)
+      if (!date) continue
+      events.push({
+        envioId: envio.id,
+        pacienteNome: envio.paciente_nome,
+        servicoNome: etapa.nome,
+        labNome: lab?.nome ?? '',
+        date,
+      })
+    }
+  }
+  return events
+}
+
 // ── Icons ──────────────────────────────────────────────────────────────────
 
 const IconBack = () => (
@@ -368,6 +450,16 @@ const IconFlask = () => (
     <line x1="9" y1="3" x2="15" y2="3"/>
   </svg>
 )
+function IconCalendar() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+      <line x1="16" y1="2" x2="16" y2="6" />
+      <line x1="8" y1="2" x2="8" y2="6" />
+      <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
 
 // ── Spinner ────────────────────────────────────────────────────────────────
 
@@ -452,7 +544,7 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
       telefone:         telefoneNormalizado,
       email:            form.email.trim()    || null,
       endereco:         form.endereco.trim() || null,
-      prazo_medio_dias: parseInt(form.prazo_medio_dias) || 7,
+      prazo_medio_dias: lab !== null ? (parseInt(form.prazo_medio_dias) || 7) : 0,
       dia_fechamento:   form.dia_fechamento.trim() ? Math.min(Math.max(parseInt(form.dia_fechamento) || 1, 1), 31) : null,
       observacoes:      form.observacoes.trim() || null,
     }
@@ -492,10 +584,12 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
             <label className={styles.label}>Endereço</label>
             <input className={styles.input} value={form.endereco} onChange={set('endereco')} placeholder="Rua, número, cidade..." />
           </div>
-          <div className={styles.formField}>
-            <label className={styles.label}>Prazo médio (dias)</label>
-            <input className={styles.input} type="number" min="1" value={form.prazo_medio_dias} onChange={set('prazo_medio_dias')} />
-          </div>
+          {lab !== null && (
+            <div className={styles.formField}>
+              <label className={styles.label}>Prazo médio (dias)</label>
+              <input className={styles.input} type="number" min="1" value={form.prazo_medio_dias} onChange={set('prazo_medio_dias')} />
+            </div>
+          )}
           <div className={styles.formField}>
             <label className={styles.label}>Dia do fechamento</label>
             <input className={styles.input} type="number" min="1" max="31" value={form.dia_fechamento} onChange={set('dia_fechamento')} placeholder="Ex: 25" />
@@ -526,11 +620,13 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
   const [loading,    setLoading]    = useState(true)
   const [novoNome,   setNovoNome]   = useState('')
   const [novoPreco,  setNovoPreco]  = useState('')
+  const [novoPrazo,  setNovoPrazo]  = useState('')
   const [saving,     setSaving]     = useState(false)
   const [error,      setError]      = useState('')
   const [editingId,  setEditingId]  = useState<string | null>(null)
   const [editNome,   setEditNome]   = useState('')
   const [editPreco,  setEditPreco]  = useState('')
+  const [editPrazo,  setEditPrazo]  = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   const fetchPrecos = useCallback(async () => {
@@ -546,12 +642,13 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
   const addPreco = async () => {
     if (!novoNome.trim()) return
     setSaving(true); setError('')
-    const preco = parseCurrencyInput(novoPreco) ?? 0
+    const preco = parseMaskedCurrency(novoPreco)
     const { error: err } = await supabase.from('lab_precos').insert({
       lab_id: lab.id, nome_servico: novoNome.trim(), preco,
+      prazo_producao_dias: novoPrazo ? parseInt(novoPrazo) : null,
     })
     if (err) { setError(err.message); setSaving(false); return }
-    setNovoNome(''); setNovoPreco('')
+    setNovoNome(''); setNovoPreco(''); setNovoPrazo('')
     await fetchPrecos()
     setSaving(false)
     onSaved()
@@ -566,7 +663,8 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
   const startEditPreco = (preco: LabPreco) => {
     setEditingId(preco.id)
     setEditNome(preco.nome_servico)
-    setEditPreco(String(preco.preco).replace('.', ','))
+    setEditPreco(formatCurrencyMask(String(Math.round(preco.preco * 100))))
+    setEditPrazo(String(preco.prazo_producao_dias ?? ''))
     setError('')
   }
 
@@ -579,15 +677,16 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
   const saveEditPreco = async () => {
     if (!editingId || !editNome.trim()) return
     setSaving(true); setError('')
-    const preco = parseCurrencyInput(editPreco) ?? 0
+    const preco = parseMaskedCurrency(editPreco)
     const { error: err } = await supabase
       .from('lab_precos')
-      .update({ nome_servico: editNome.trim(), preco })
+      .update({ nome_servico: editNome.trim(), preco, prazo_producao_dias: editPrazo ? parseInt(editPrazo) : null })
       .eq('id', editingId)
     if (err) { setError(err.message); setSaving(false); return }
     setEditingId(null)
     setEditNome('')
     setEditPreco('')
+    setEditPrazo('')
     await fetchPrecos()
     setSaving(false)
     onSaved()
@@ -635,9 +734,17 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
           />
           <input
             className={`${styles.input} ${styles.inputSmall}`}
+            type="number"
+            min="1"
+            placeholder="Prazo (dias)"
+            value={novoPrazo}
+            onChange={e => setNovoPrazo(e.target.value)}
+          />
+          <input
+            className={`${styles.input} ${styles.inputSmall}`}
             placeholder="Preço (R$)"
             value={novoPreco}
-            onChange={e => setNovoPreco(normalizeCurrencyInput(e.target.value))}
+            onChange={e => setNovoPreco(formatCurrencyMask(e.target.value))}
             onKeyDown={e => e.key === 'Enter' && addPreco()}
           />
           <button type="button" className={styles.btnPrimary} onClick={addPreco} disabled={saving}>
@@ -660,7 +767,8 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
                 {editingId === p.id ? (
                   <>
                     <input className={styles.input} value={editNome} onChange={e => setEditNome(e.target.value)} />
-                    <input className={`${styles.input} ${styles.inputSmall}`} value={editPreco} onChange={e => setEditPreco(normalizeCurrencyInput(e.target.value))} />
+                    <input className={`${styles.input} ${styles.inputSmall}`} type="number" min="1" placeholder="Prazo (dias)" value={editPrazo} onChange={e => setEditPrazo(e.target.value)} />
+                    <input className={`${styles.input} ${styles.inputSmall}`} placeholder="Preço (R$)" value={editPreco} onChange={e => setEditPreco(formatCurrencyMask(e.target.value))} />
                     <button type="button" className={styles.btnIcon} onClick={saveEditPreco} title="Salvar">
                       <IconEdit />
                     </button>
@@ -671,6 +779,7 @@ function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
                         setEditingId(null)
                         setEditNome('')
                         setEditPreco('')
+                        setEditPrazo('')
                       }}
                       title="Cancelar"
                     >
@@ -861,6 +970,7 @@ interface ServicoSelecionado {
   preco: number | null
   origem: 'catalogo' | 'manual'
   prazo_entrega: string
+  prazo_producao_dias: number | null
   concluido: boolean
   data_conclusao: string
 }
@@ -895,6 +1005,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         preco: etapa.preco,
         origem: precoCadastrado ? 'catalogo' : etapa.origem,
         prazo_entrega: etapa.prazo_entrega ?? envio.data_entrega_prometida ?? '',
+        prazo_producao_dias: precoCadastrado?.prazo_producao_dias ?? null,
         concluido: etapa.concluido,
         data_conclusao: etapa.data_conclusao ?? '',
       }
@@ -938,13 +1049,13 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
   useEffect(() => {
     if (!usarPrazoAutomatico) return
 
-    const prazoCalculado = addBusinessDays(form.data_envio, currentLab?.prazo_medio_dias ?? 0, feriadosLab)
+    const prazoCalculado = calcularPrazoEntrega(form.data_envio, servicosSelecionados, feriadosLab, currentLab?.prazo_medio_dias ?? 0)
     setForm(prev => (
       prev.data_entrega_prometida === prazoCalculado
         ? prev
         : { ...prev, data_entrega_prometida: prazoCalculado }
     ))
-  }, [currentLab?.prazo_medio_dias, feriadosLab, form.data_envio, usarPrazoAutomatico])
+  }, [currentLab?.prazo_medio_dias, feriadosLab, form.data_envio, servicosSelecionados, usarPrazoAutomatico])
 
   const handlePrazoPrometidoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsarPrazoAutomatico(false)
@@ -962,6 +1073,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
           preco: p.preco,
           origem: 'catalogo',
           prazo_entrega: form.data_entrega_prometida,
+          prazo_producao_dias: p.prazo_producao_dias ?? null,
           concluido: false,
           data_conclusao: '',
         }]
@@ -1005,6 +1117,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         preco: precoConvertido,
         origem: 'manual',
         prazo_entrega: form.data_entrega_prometida,
+        prazo_producao_dias: null,
         concluido: false,
         data_conclusao: '',
       },
@@ -1256,6 +1369,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
               <input className={styles.input} type="date" value={form.data_consulta} onChange={set('data_consulta')} />
             </div>
           </div>
+          {!!(form.data_entrega_prometida && form.data_consulta && form.data_entrega_prometida > form.data_consulta) && (
+            <div className={styles.summaryAlert}>
+              ⚠️ O prazo de entrega prometido ultrapassa a data da consulta.
+            </div>
+          )}
           <label className={styles.checkRow}>
             <input
               type="checkbox"
@@ -1326,6 +1444,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             <ReviewRow label="Prazo prometido" value={formatDate(form.data_entrega_prometida || null)} />
             {form.data_consulta && <ReviewRow label="Data da consulta" value={formatDate(form.data_consulta)} />}
           </div>
+          {!!(form.data_entrega_prometida && form.data_consulta && form.data_entrega_prometida > form.data_consulta) && (
+            <div className={styles.summaryAlert}>
+              ⚠️ O prazo de entrega prometido ultrapassa a data da consulta.
+            </div>
+          )}
         </div>
       )}
 
@@ -1358,9 +1481,10 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function EnvioResumoModal({ envio, labNome, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
+function EnvioResumoModal({ envio, labNome, feriados, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
   envio: LabEnvio
   labNome?: string
+  feriados?: string[]
   isAdmin: boolean
   onClose: () => void
   onEdit: () => void
@@ -1416,6 +1540,7 @@ function EnvioResumoModal({ envio, labNome, isAdmin, onClose, onEdit, onTogglePa
         {etapas.map(etapa => {
           const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
           const savingEtapa = savingEtapaId === etapa.id
+          const dataPrevista = calcularDataPrevista(envio.data_envio, etapa.prazo_producao_dias, feriados ?? [])
           return (
             <div key={etapa.id} className={`${styles.summaryStepCard} ${etapaAtrasada ? styles.summaryStepCardOverdue : ''}`}>
               <div className={styles.summaryStepHeader}>
@@ -1424,13 +1549,13 @@ function EnvioResumoModal({ envio, labNome, isAdmin, onClose, onEdit, onTogglePa
               </div>
               <div className={styles.kanbanCardEtapaGrid}>
                 <label className={styles.kanbanCardField}>
-                  <span>Prazo</span>
+                  <span>Previsto</span>
                   <input
-                    className={styles.input}
-                    type="date"
-                    value={etapa.prazo_entrega ?? ''}
-                    disabled={savingEtapa}
-                    onChange={e => void handleEtapaUpdate(etapa.id, { prazo_entrega: e.target.value || null })}
+                    className={`${styles.input} ${styles.inputReadonly}`}
+                    type="text"
+                    value={dataPrevista ? formatDate(dataPrevista) : '—'}
+                    readOnly
+                    disabled
                   />
                 </label>
                 <label className={styles.kanbanCardField}>
@@ -2048,6 +2173,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
         <EnvioResumoModal
           envio={resumoEnvio}
           isAdmin={isAdmin}
+          feriados={getLabFeriados(lab)}
           onClose={() => setResumoEnvio(null)}
           onEdit={() => {
             setEditingEnvio(resumoEnvio)
@@ -2314,6 +2440,7 @@ function LabsAggregateDetailView({
         <EnvioResumoModal
           envio={resumoEnvio}
           labNome={labsById[resumoEnvio.lab_id]?.nome}
+          feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
           isAdmin={isAdmin}
           onClose={() => setResumoEnvio(null)}
           onEdit={() => {
@@ -2325,6 +2452,84 @@ function LabsAggregateDetailView({
           onUpdateEtapa={updateEnvioEtapa}
         />
       )}
+    </div>
+  )
+}
+
+// ── CalendarView ──────────────────────────────────────────────────────────
+
+function CalendarView({ envios, precosByLab, labs, onClose }: {
+  envios: LabEnvio[]
+  precosByLab: Record<string, LabPreco[]>
+  labs: Lab[]
+  onClose: () => void
+}) {
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() }
+  })
+
+  const labsById = useMemo(() => Object.fromEntries(labs.map(l => [l.id, l])), [labs])
+  const events = useMemo(() => buildCalendarEvents(envios, precosByLab, labsById), [envios, precosByLab, labsById])
+
+  const { year, month } = currentMonth
+  const firstDay = new Date(year, month, 1).getDay() // 0=Sun
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+
+  const monthLabel = new Date(year, month, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+
+  const prevMonth = () => setCurrentMonth(({ year: y, month: m }) =>
+    m === 0 ? { year: y - 1, month: 11 } : { year: y, month: m - 1 }
+  )
+  const nextMonth = () => setCurrentMonth(({ year: y, month: m }) =>
+    m === 11 ? { year: y + 1, month: 0 } : { year: y, month: m + 1 }
+  )
+
+  const eventsByDate = useMemo(() => {
+    const map: Record<string, CalendarEvent[]> = {}
+    for (const ev of events) {
+      if (!map[ev.date]) map[ev.date] = []
+      map[ev.date].push(ev)
+    }
+    return map
+  }, [events])
+
+  const weekDays = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb']
+
+  return (
+    <div className={styles.calendarWrap}>
+      <div className={styles.calendarHeader}>
+        <button type="button" className={styles.btnIcon} onClick={prevMonth}>‹</button>
+        <span className={styles.calendarMonthLabel}>{monthLabel}</span>
+        <button type="button" className={styles.btnIcon} onClick={nextMonth}>›</button>
+        <button type="button" className={styles.btnSecondary} onClick={onClose} style={{ marginLeft: 'auto' }}>
+          Fechar Calendário
+        </button>
+      </div>
+      <div className={styles.calendarGrid}>
+        {weekDays.map(d => (
+          <div key={d} className={styles.calendarDayHeader}>{d}</div>
+        ))}
+        {Array.from({ length: firstDay }).map((_, i) => (
+          <div key={`empty-${i}`} className={styles.calendarCell} />
+        ))}
+        {Array.from({ length: daysInMonth }).map((_, i) => {
+          const day = i + 1
+          const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+          const dayEvents = eventsByDate[dateStr] ?? []
+          return (
+            <div key={dateStr} className={styles.calendarCell}>
+              <span className={styles.calendarDayNum}>{day}</span>
+              {dayEvents.map((ev, idx) => (
+                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent} title={`${ev.pacienteNome} — ${ev.servicoNome} (${ev.labNome})`}>
+                  <span className={styles.calendarEventPatient}>{ev.pacienteNome}</span>
+                  <span className={styles.calendarEventService}>{ev.servicoNome}</span>
+                </div>
+              ))}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -2570,6 +2775,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
   const [financeiroLab, setFinanceiroLab] = useState<Lab | null>(null)
+  const [calendarMode, setCalendarMode] = useState(false)
 
   useEffect(() => {
     const validarAcesso = async () => {
@@ -2782,6 +2988,13 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
             Trocar empresa
           </button>
+          <button
+            type="button"
+            className={`${styles.btnSecondary} ${calendarMode ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setCalendarMode(v => !v)}
+          >
+            <IconCalendar /> {calendarMode ? 'Fechar Calendário' : 'Modo Calendário'}
+          </button>
           {isAdmin && (
             <button
               type="button"
@@ -2808,6 +3021,13 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
             </button>
           )}
         </div>
+      ) : calendarMode ? (
+        <CalendarView
+          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+          precosByLab={Object.fromEntries(labs.map(lab => [lab.id, []]))}
+          labs={labs}
+          onClose={() => setCalendarMode(false)}
+        />
       ) : (
         <div className={styles.labsGrid}>
           <TodosLabsCard

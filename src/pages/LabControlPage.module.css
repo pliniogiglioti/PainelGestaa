@@ -1270,6 +1270,7 @@
 .textarea { resize: vertical; }
 .select { appearance: none; cursor: pointer; }
 .inputSmall { max-width: 130px; }
+.inputReadonly { opacity: 0.65; cursor: default; }
 
 .colorInput {
   width: 40px;
@@ -1414,4 +1415,99 @@
   .kanbanCardEtapaGrid {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Calendar View ────────────────────────────────────────────────────────── */
+
+.btnSecondaryActive {
+  border-color: var(--border-gold);
+  background: var(--gold-glow);
+  color: var(--gold-light);
+}
+
+.calendarWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.calendarHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.calendarMonthLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: capitalize;
+  min-width: 160px;
+  text-align: center;
+}
+
+.calendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.calendarDayHeader {
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 6px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.calendarCell {
+  min-height: 80px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  overflow: hidden;
+}
+
+.calendarDayNum {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  line-height: 1;
+  margin-bottom: 2px;
+}
+
+.calendarEvent {
+  background: rgba(201, 162, 42, 0.12);
+  border: 1px solid rgba(201, 162, 42, 0.22);
+  border-radius: 5px;
+  padding: 3px 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  cursor: default;
+  overflow: hidden;
+}
+
+.calendarEventPatient {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.calendarEventService {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
