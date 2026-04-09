@@ -539,41 +539,6 @@
   color: var(--text-muted);
 }
 .kanbanCardDateOverdue { color: #f87171; }
-.kanbanCardEtapaDates {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.kanbanCardEtapaDate {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 7px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-surface);
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.kanbanCardEtapaDate span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.kanbanCardEtapaDate strong {
-  color: var(--text);
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.kanbanCardEtapaDateOverdue {
-  border-color: rgba(239, 68, 68, 0.35);
-}
-.kanbanCardEtapaDateOverdue strong {
-  color: #f87171;
-}
 .kanbanCardPrice {
   font-size: 12px;
   font-weight: 600;

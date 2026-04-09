@@ -1739,12 +1739,10 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
   const resumoTrabalho = getEnvioResumo(envio)
   const etapas = getEnvioEtapas(envio)
   const etapasConcluidas = etapas.filter(etapa => etapa.concluido).length
-  const etapasPrevistas = etapas
-    .map(etapa => ({
-      etapa,
-      date: getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab),
-    }))
-    .filter((item): item is { etapa: LabEtapa; date: string } => Boolean(item.date))
+  const cardDataPrevista = etapas
+    .map(etapa => getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab))
+    .filter((date): date is string => Boolean(date))
+    .sort()[0] ?? envio.data_entrega_prometida
 
   return (
     <div
@@ -1768,26 +1766,9 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
           {envio.cor    && <span>Cor: {envio.cor}</span>}
         </div>
       )}
-      {envio.data_entrega_prometida && (
+      {cardDataPrevista && (
         <div className={`${styles.kanbanCardDate} ${overdue ? styles.kanbanCardDateOverdue : ''}`}>
-          <IconClock /> {formatDate(envio.data_entrega_prometida)}
-        </div>
-      )}
-      {etapasPrevistas.length > 0 && (
-        <div className={styles.kanbanCardEtapaDates}>
-          {etapasPrevistas.map(({ etapa, date }) => {
-            const etapaAtrasada = !etapa.concluido && date < today()
-            return (
-              <div
-                key={etapa.id}
-                className={`${styles.kanbanCardEtapaDate} ${etapaAtrasada ? styles.kanbanCardEtapaDateOverdue : ''}`}
-                title={`${etapa.nome}: ${formatDate(date)}`}
-              >
-                <span>{etapa.nome}</span>
-                <strong>Previsto {formatDate(date)}</strong>
-              </div>
-            )
-          })}
+          <IconClock /> {formatDate(cardDataPrevista)}
         </div>
       )}
       {envio.preco_servico != null && (
