@@ -2573,6 +2573,19 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
 
   useEffect(() => {
     const validarAcesso = async () => {
+      // Verifica se a empresa ainda existe
+      const { data: empresaExiste } = await supabase
+        .from('empresas')
+        .select('id')
+        .eq('id', empresa.id)
+        .eq('ativo', true)
+        .maybeSingle()
+
+      if (!empresaExiste) {
+        onTrocarEmpresa()
+        return
+      }
+
       const { data: profile } = await supabase
         .from('profiles')
         .select('role')
