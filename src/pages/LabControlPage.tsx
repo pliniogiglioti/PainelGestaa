@@ -129,6 +129,41 @@ function calcularDataPrevista(
   return addBusinessDays(dataEnvio, prazoProducaoDias, feriados)
 }
 
+function normalizeServicoNome(value: string) {
+  return value.trim().toLocaleLowerCase('pt-BR')
+}
+
+function getEtapaPrazoProducaoDias(
+  envio: LabEnvio,
+  etapa: LabEtapa,
+  precosByLab?: Record<string, LabPreco[]>,
+) {
+  if (etapa.prazo_producao_dias != null && etapa.prazo_producao_dias > 0) {
+    return etapa.prazo_producao_dias
+  }
+
+  const etapaNome = normalizeServicoNome(etapa.nome)
+  const preco = (precosByLab?.[envio.lab_id] ?? []).find(item =>
+    normalizeServicoNome(item.nome_servico) === etapaNome,
+  )
+
+  return preco?.prazo_producao_dias != null && preco.prazo_producao_dias > 0
+    ? preco.prazo_producao_dias
+    : null
+}
+
+function getEtapaDataPrevista(
+  envio: LabEnvio,
+  etapa: LabEtapa,
+  feriados: string[],
+  precosByLab?: Record<string, LabPreco[]>,
+) {
+  const prazoProducaoDias = getEtapaPrazoProducaoDias(envio, etapa, precosByLab)
+  return calcularDataPrevista(envio.data_envio, prazoProducaoDias, feriados)
+    ?? etapa.prazo_entrega
+    ?? envio.data_entrega_prometida
+}
+
 function generateEtapaId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID()
@@ -353,7 +388,7 @@ type CalendarEvent = {
 // Builds calendar events from all active envios
 function buildCalendarEvents(
   envios: LabEnvio[],
-  _precosByLab: Record<string, LabPreco[]>,
+  precosByLab: Record<string, LabPreco[]>,
   labsById: Record<string, Lab>,
 ): CalendarEvent[] {
   const finalStatuses = ['Concluído', 'Entregue']
@@ -364,7 +399,7 @@ function buildCalendarEvents(
     const feriados = lab ? getLabFeriados(lab) : []
     const etapas = getEnvioEtapas(envio)
     for (const etapa of etapas) {
-      const date = calcularDataPrevista(envio.data_envio, etapa.prazo_producao_dias, feriados)
+      const date = getEtapaDataPrevista(envio, etapa, feriados, precosByLab)
       if (!date) continue
       events.push({
         envioId: envio.id,
@@ -998,14 +1033,14 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
     if (!envio) return []
 
     return getEnvioEtapas(envio).map(etapa => {
-      const precoCadastrado = precos.find(p => p.nome_servico === etapa.nome)
+      const precoCadastrado = currentPrecos.find(p => normalizeServicoNome(p.nome_servico) === normalizeServicoNome(etapa.nome))
       return {
         key: precoCadastrado ? `preco:${precoCadastrado.id}` : `manual:${etapa.id}`,
         nome: etapa.nome,
         preco: etapa.preco,
         origem: precoCadastrado ? 'catalogo' : etapa.origem,
         prazo_entrega: etapa.prazo_entrega ?? envio.data_entrega_prometida ?? '',
-        prazo_producao_dias: precoCadastrado?.prazo_producao_dias ?? null,
+        prazo_producao_dias: etapa.prazo_producao_dias ?? precoCadastrado?.prazo_producao_dias ?? null,
         concluido: etapa.concluido,
         data_conclusao: etapa.data_conclusao ?? '',
       }
@@ -1179,6 +1214,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         preco: servico.preco,
         origem: servico.origem,
         prazo_entrega: servico.prazo_entrega || null,
+        prazo_producao_dias: servico.prazo_producao_dias,
         concluido: servico.concluido,
         data_conclusao: servico.data_conclusao || null,
       })),
@@ -1481,10 +1517,11 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function EnvioResumoModal({ envio, labNome, feriados, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
+function EnvioResumoModal({ envio, labNome, feriados, precosByLab, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
   envio: LabEnvio
   labNome?: string
   feriados?: string[]
+  precosByLab?: Record<string, LabPreco[]>
   isAdmin: boolean
   onClose: () => void
   onEdit: () => void
@@ -1540,7 +1577,7 @@ function EnvioResumoModal({ envio, labNome, feriados, isAdmin, onClose, onEdit, 
         {etapas.map(etapa => {
           const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
           const savingEtapa = savingEtapaId === etapa.id
-          const dataPrevista = calcularDataPrevista(envio.data_envio, etapa.prazo_producao_dias, feriados ?? [])
+          const dataPrevista = getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab)
           return (
             <div key={etapa.id} className={`${styles.summaryStepCard} ${etapaAtrasada ? styles.summaryStepCardOverdue : ''}`}>
               <div className={styles.summaryStepHeader}>
@@ -1689,8 +1726,10 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResumo, onEdit, onDelete }: {
+function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, onDragStart, onOpenResumo, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean; labNome?: string | null
+  feriados?: string[]
+  precosByLab?: Record<string, LabPreco[]>
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
   onEdit: () => void; onDelete: () => void
@@ -1700,6 +1739,12 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResu
   const resumoTrabalho = getEnvioResumo(envio)
   const etapas = getEnvioEtapas(envio)
   const etapasConcluidas = etapas.filter(etapa => etapa.concluido).length
+  const etapasPrevistas = etapas
+    .map(etapa => ({
+      etapa,
+      date: getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab),
+    }))
+    .filter((item): item is { etapa: LabEtapa; date: string } => Boolean(item.date))
 
   return (
     <div
@@ -1728,6 +1773,23 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResu
           <IconClock /> {formatDate(envio.data_entrega_prometida)}
         </div>
       )}
+      {etapasPrevistas.length > 0 && (
+        <div className={styles.kanbanCardEtapaDates}>
+          {etapasPrevistas.map(({ etapa, date }) => {
+            const etapaAtrasada = !etapa.concluido && date < today()
+            return (
+              <div
+                key={etapa.id}
+                className={`${styles.kanbanCardEtapaDate} ${etapaAtrasada ? styles.kanbanCardEtapaDateOverdue : ''}`}
+                title={`${etapa.nome}: ${formatDate(date)}`}
+              >
+                <span>{etapa.nome}</span>
+                <strong>Previsto {formatDate(date)}</strong>
+              </div>
+            )
+          })}
+        </div>
+      )}
       {envio.preco_servico != null && (
         <div className={styles.kanbanCardPrice}>
           {envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
@@ -1749,10 +1811,12 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, onDragStart, onOpenResu
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   showLabName?: boolean
   getLabName?: (labId: string) => string
+  getLabFeriados?: (labId: string) => string[]
+  precosByLab?: Record<string, LabPreco[]>
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
   onEditEnvio: (envio: LabEnvio) => void
@@ -1830,6 +1894,8 @@ function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, onMove
                   dragging={draggingId === envio.id}
                   isAdmin={isAdmin}
                   labNome={showLabName ? getLabName?.(envio.lab_id) ?? 'Laboratório' : null}
+                  feriados={getLabFeriados?.(envio.lab_id)}
+                  precosByLab={precosByLab}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
                   onEdit={() => onEditEnvio(envio)}
@@ -2019,6 +2085,8 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               envios={filteredEnvios}
               colunas={colunas}
               isAdmin={isAdmin}
+              getLabFeriados={() => getLabFeriados(lab)}
+              precosByLab={{ [lab.id]: precos }}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
@@ -2174,6 +2242,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
           envio={resumoEnvio}
           isAdmin={isAdmin}
           feriados={getLabFeriados(lab)}
+          precosByLab={{ [lab.id]: precos }}
           onClose={() => setResumoEnvio(null)}
           onEdit={() => {
             setEditingEnvio(resumoEnvio)
@@ -2402,6 +2471,8 @@ function LabsAggregateDetailView({
             isAdmin={isAdmin}
             showLabName
             getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
+            getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
+            precosByLab={precosByLab}
             onMoveEnvio={moveEnvio}
             onOpenResumo={setResumoEnvio}
             onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
@@ -2441,6 +2512,7 @@ function LabsAggregateDetailView({
           envio={resumoEnvio}
           labNome={labsById[resumoEnvio.lab_id]?.nome}
           feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
+          precosByLab={precosByLab}
           isAdmin={isAdmin}
           onClose={() => setResumoEnvio(null)}
           onEdit={() => {
@@ -2764,6 +2836,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [isAdmin,      setIsAdmin]      = useState(false)
   const [labs,         setLabs]         = useState<Lab[]>([])
   const [enviosMap,    setEnviosMap]    = useState<Record<string, LabEnvio[]>>({})
+  const [precosByLab,  setPrecosByLab]  = useState<Record<string, LabPreco[]>>({})
   const [colunas,      setColunas]      = useState<LabKanbanColuna[]>([])
   const [selectedViewPersisted, setSelectedViewPersisted] = useSessionStorageState<LabViewSelectionPersisted | null>(
     `${storagePrefix}:selected-view`,
@@ -2823,12 +2896,34 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     void validarAcesso()
   }, [empresa.id, onTrocarEmpresa, userId])
 
+  const fetchPrecosForLabs = useCallback(async (targetLabs: Lab[]) => {
+    if (targetLabs.length === 0) {
+      setPrecosByLab({})
+      return
+    }
+
+    const { data } = await supabase
+      .from('lab_precos')
+      .select('*')
+      .in('lab_id', targetLabs.map(item => item.id))
+      .eq('ativo', true)
+      .order('nome_servico')
+
+    const nextMap: Record<string, LabPreco[]> = {}
+    for (const preco of data ?? []) {
+      if (!nextMap[preco.lab_id]) nextMap[preco.lab_id] = []
+      nextMap[preco.lab_id].push(preco)
+    }
+    setPrecosByLab(nextMap)
+  }, [])
+
   const fetchLabs = useCallback(async () => {
     const { data } = await supabase
       .from('labs').select('*')
       .eq('empresa_id', empresa.id).eq('ativo', true).order('nome')
     if (data) {
       setLabs(data)
+      await fetchPrecosForLabs(data)
       setSelectedView(prev => {
         if (!prev) return prev
         if (prev.kind === 'all') return prev
@@ -2837,7 +2932,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
       })
       setFinanceiroLab(prev => prev ? data.find(item => item.id === prev.id) ?? prev : prev)
     }
-  }, [empresa.id])
+  }, [empresa.id, fetchPrecosForLabs])
 
   const fetchEnvios = useCallback(async () => {
     const { data } = await supabase
@@ -2887,6 +2982,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     setSelectedView(null)
     setLabs([])
     setEnviosMap({})
+    setPrecosByLab({})
     setColunas([])
     setLoading(true)
     Promise.all([fetchLabs(), fetchEnvios(), fetchColunas()]).then(() => setLoading(false))
@@ -2929,6 +3025,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     setSelectedView(null)
     setSelectedViewPersisted(null)
     void fetchEnvios()
+    void fetchPrecosForLabs(labs)
   }
 
   if (loading) {
@@ -3024,7 +3121,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
       ) : calendarMode ? (
         <CalendarView
           envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
-          precosByLab={Object.fromEntries(labs.map(lab => [lab.id, []]))}
+          precosByLab={precosByLab}
           labs={labs}
           onClose={() => setCalendarMode(false)}
         />
