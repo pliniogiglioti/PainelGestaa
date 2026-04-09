@@ -353,7 +353,7 @@ type CalendarEvent = {
 // Builds calendar events from all active envios
 function buildCalendarEvents(
   envios: LabEnvio[],
-  precosByLab: Record<string, LabPreco[]>,
+  _precosByLab: Record<string, LabPreco[]>,
   labsById: Record<string, Lab>,
 ): CalendarEvent[] {
   const finalStatuses = ['Concluído', 'Entregue']
