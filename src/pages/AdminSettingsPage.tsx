@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
+import { getFunctionErrorMessage } from '../lib/functionError'
 import type { App, DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
 
 // ── Constantes ────────────────────────────────────────────────────────────
@@ -584,7 +585,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
       if (error || data?.error) {
-        setDeleteErro(data?.error ?? error?.message ?? 'Erro ao deletar usuário.')
+        setDeleteErro(data?.error ?? await getFunctionErrorMessage(error, 'Erro ao deletar usuário.'))
         setDeletingId(null)
         return
       }
@@ -614,7 +615,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       })
 
       if (error || data?.error) {
-        setAddUserErro(data?.error ?? error?.message ?? 'Erro ao enviar convite.')
+        setAddUserErro(data?.error ?? await getFunctionErrorMessage(error, 'Erro ao enviar convite.'))
       } else {
         setAddUserOk(`Convite enviado para ${novoEmail.trim()}!`)
         setNovoEmail('')

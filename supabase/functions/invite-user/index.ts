@@ -12,6 +12,13 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  })
+}
+
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS })
@@ -30,9 +37,7 @@ serve(async (req: Request) => {
     // Verifica autenticação do chamador
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-        status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Não autorizado' }, 401)
     }
 
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
@@ -43,9 +48,7 @@ serve(async (req: Request) => {
 
     const { data: { user: callerUser }, error: callerErr } = await callerClient.auth.getUser()
     if (callerErr || !callerUser) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-        status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Não autorizado' }, 401)
     }
 
     // Verifica se o chamador é admin
@@ -56,51 +59,41 @@ serve(async (req: Request) => {
       .single()
 
     if (profile?.role !== 'admin') {
-      return new Response(JSON.stringify({ error: 'Acesso negado: apenas admins podem convidar usuários' }), {
-        status: 403, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: 'Acesso negado: apenas admins podem convidar usuários' }, 403)
     }
 
     // Lê o body
     const { email, expires_at } = await req.json()
-    if (!email) {
-      return new Response(JSON.stringify({ error: 'E-mail é obrigatório' }), {
-        status: 400, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+    const normalizedEmail = String(email ?? '').trim().toLowerCase()
+    if (!normalizedEmail) {
+      return jsonResponse({ error: 'E-mail é obrigatório' }, 400)
     }
 
     // Insere convite na tabela user_invitations
     const { error: invErr } = await adminClient.from('user_invitations').insert({
-      email,
+      email: normalizedEmail,
       expires_at: expires_at ?? null,
       invited_by: callerUser.id,
     })
 
     if (invErr) {
-      return new Response(JSON.stringify({ error: invErr.message }), {
-        status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      return jsonResponse({ error: invErr.message }, 500)
     }
 
     // Envia convite via Supabase Auth Admin
-    const { error: authErr } = await adminClient.auth.admin.inviteUserByEmail(email, {
+    const { error: authErr } = await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
       redirectTo: siteUrl,
     })
 
     if (authErr) {
+      console.error('invite-user auth invite error', authErr)
       // Rollback: remove o convite se não conseguiu enviar o e-mail
-      await adminClient.from('user_invitations').delete().eq('email', email).is('used_at', null)
-      return new Response(JSON.stringify({ error: authErr.message }), {
-        status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-      })
+      await adminClient.from('user_invitations').delete().ilike('email', normalizedEmail).is('used_at', null)
+      return jsonResponse({ error: authErr.message }, 500)
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ ok: true })
   } catch (err) {
-    return new Response(JSON.stringify({ error: String(err) }), {
-      status: 500, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
-    })
+    return jsonResponse({ error: String(err) }, 500)
   }
 })
