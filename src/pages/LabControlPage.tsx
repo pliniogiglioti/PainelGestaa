@@ -40,6 +40,7 @@ type LabEtapa = {
 type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
 type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' }
+type LabHomeMode = 'kanban' | 'calendar' | 'list'
 
 const LAB_FILTER_ALL = '__all__'
 const FINAL_ENVIO_STATUSES = ['Concluído', 'Entregue']
@@ -162,23 +163,6 @@ function getEtapaDataPrevista(
   return calcularDataPrevista(envio.data_envio, prazoProducaoDias, feriados)
     ?? etapa.prazo_entrega
     ?? envio.data_entrega_prometida
-}
-
-function generateEtapaId() {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID()
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
-}
-
-function normalizeCurrencyInput(value: string) {
-  return value.replace(/[^\d,.-]/g, '')
-}
-
-function parseCurrencyInput(value: string) {
-  const normalized = value.trim().replace(/\./g, '').replace(',', '.')
-  const parsed = Number(normalized)
-  return Number.isFinite(parsed) ? parsed : null
 }
 
 function getEnvioEtapas(envio: LabEnvio): LabEtapa[] {
@@ -506,6 +490,18 @@ function IconCalendar() {
       <line x1="16" y1="2" x2="16" y2="6" />
       <line x1="8" y1="2" x2="8" y2="6" />
       <line x1="3" y1="10" x2="21" y2="10" />
+    </svg>
+  )
+}
+function IconList() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="8" y1="6" x2="21" y2="6" />
+      <line x1="8" y1="12" x2="21" y2="12" />
+      <line x1="8" y1="18" x2="21" y2="18" />
+      <line x1="3" y1="6" x2="3.01" y2="6" />
+      <line x1="3" y1="12" x2="3.01" y2="12" />
+      <line x1="3" y1="18" x2="3.01" y2="18" />
     </svg>
   )
 }
@@ -1033,8 +1029,6 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
   const [step,   setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
-  const [manualNome, setManualNome] = useState('')
-  const [manualPreco, setManualPreco] = useState('')
   const availableLabs = lab ? [lab, ...labs.filter(item => item.id !== lab.id)] : labs
   const labsById = Object.fromEntries(availableLabs.map(item => [item.id, item]))
   const [selectedLabId, setSelectedLabId] = useState(envio?.lab_id ?? lab?.id ?? '')
@@ -1144,38 +1138,6 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
     }))
   }
 
-  const addManualServico = () => {
-    if (!manualNome.trim()) {
-      setError('Informe o nome do serviço manual.')
-      return
-    }
-
-    const precoNormalizado = normalizeCurrencyInput(manualPreco)
-    const precoConvertido = precoNormalizado === '' ? null : parseCurrencyInput(precoNormalizado)
-
-    if (precoNormalizado !== '' && precoConvertido == null) {
-      setError('Informe um valor válido para o serviço manual.')
-      return
-    }
-
-    setServicosSelecionados(prev => [
-      ...prev,
-      {
-        key: `manual:${generateEtapaId()}`,
-        nome: manualNome.trim(),
-        preco: precoConvertido,
-        origem: 'manual',
-        prazo_entrega: form.data_entrega_prometida,
-        prazo_producao_dias: null,
-        concluido: false,
-        data_conclusao: '',
-      },
-    ])
-    setManualNome('')
-    setManualPreco('')
-    setError('')
-  }
-
   const removeServico = (key: string) => {
     setServicosSelecionados(prev => prev.filter(servico => servico.key !== key))
     setError('')
@@ -1274,8 +1236,6 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
                 onChange={e => {
                   setSelectedLabId(e.target.value)
                   setServicosSelecionados([])
-                  setManualNome('')
-                  setManualPreco('')
                 }}
               >
                 <option value="">Selecione o laboratório</option>
@@ -1287,73 +1247,73 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
           )}
           {currentLab && currentPrecos.length === 0 && (
             <div className={styles.summaryAlert}>
-              <IconAlert /> Este laboratório não tem produto ou serviço cadastrado na lista de preços. Você pode adicionar um serviço manual agora ou cadastrar os produtos depois.
+              <IconAlert /> Este laboratório não tem produto ou serviço cadastrado na lista de preços.
             </div>
           )}
-          <p className={styles.stepHint}>Selecione um ou mais serviços da lista de preços. Se precisar, adicione também um serviço manual.</p>
-          <div className={styles.precosGrid}>
-            {currentPrecos.map(p => (
-              <button
-                key={p.id}
-                type="button"
-                className={`${styles.precoOption} ${servicosSelecionados.some(servico => servico.key === `preco:${p.id}`) ? styles.precoOptionActive : ''}`}
-                onClick={() => togglePreco(p)}
-              >
-                <span className={styles.precoOptionNome}>{p.nome_servico}</span>
-                <span className={styles.precoOptionValor}>
-                  {p.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className={styles.manualServiceBox}>
-            <div className={styles.manualServiceHeader}>
-              <span>Adicionar serviço manual</span>
-              <span>{servicosSelecionados.length} selecionado(s)</span>
-            </div>
-            <div className={styles.formGrid2}>
-              <div className={styles.formField}>
-                <label className={styles.label}>Descrição do serviço</label>
-                <input className={styles.input} value={manualNome} onChange={e => setManualNome(e.target.value)} placeholder="Ex: Coroa de zircônia" />
+          <div className={styles.priceSelectionPanel}>
+            <div className={styles.priceSelectionHeader}>
+              <div>
+                <strong>Lista de preços</strong>
+                <span>Selecione um ou mais serviços cadastrados.</span>
               </div>
-              <div className={styles.formField}>
-                <label className={styles.label}>Valor (R$)</label>
-                <input className={styles.input} value={manualPreco} onChange={e => setManualPreco(normalizeCurrencyInput(e.target.value))} placeholder="0,00" />
+              <div className={styles.priceSelectionSummary}>
+                <span>{servicosSelecionados.length} selecionado(s)</span>
+                <strong>{(form.preco_servico.trim() === '' ? 0 : Number(form.preco_servico)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
               </div>
             </div>
-            <div className={styles.manualServiceActions}>
-              <button type="button" className={styles.btnSecondary} onClick={addManualServico}>
-                <IconPlus /> Adicionar serviço manual
-              </button>
-              <strong className={styles.manualServiceTotal}>
-                Total: {(form.preco_servico.trim() === '' ? 0 : Number(form.preco_servico)).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-              </strong>
-            </div>
-          </div>
-          {servicosSelecionados.length > 0 && (
-            <div className={styles.selectedServicesList}>
-              {servicosSelecionados.map(servico => (
-                <div key={servico.key} className={styles.selectedServiceItem}>
-                  <div className={styles.selectedServiceMeta}>
-                    <span className={styles.selectedServiceName}>{servico.nome}</span>
-                    <span className={styles.selectedServicePrice}>
-                      {servico.preco != null
-                        ? servico.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                        : 'Sem valor'}
-                    </span>
+
+            {currentPrecos.length > 0 ? (
+              <div className={styles.precosGrid}>
+                {currentPrecos.map(p => {
+                  const selected = servicosSelecionados.some(servico => servico.key === `preco:${p.id}`)
+
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`${styles.precoOption} ${selected ? styles.precoOptionActive : ''}`}
+                      onClick={() => togglePreco(p)}
+                    >
+                      <span className={styles.precoOptionCheck}>{selected ? '✓' : '+'}</span>
+                      <span className={styles.precoOptionMeta}>
+                        <span className={styles.precoOptionNome}>{p.nome_servico}</span>
+                        {p.prazo_producao_dias != null && p.prazo_producao_dias > 0 && (
+                          <span className={styles.precoOptionPrazo}>{p.prazo_producao_dias} dias úteis</span>
+                        )}
+                      </span>
+                      <span className={styles.precoOptionValor}>
+                        {p.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className={styles.priceSelectionEmpty}>
+                Cadastre os serviços na lista de preços do laboratório antes de criar o envio.
+              </p>
+            )}
+
+            {servicosSelecionados.length > 0 && (
+              <div className={styles.selectedServicesList}>
+                {servicosSelecionados.map(servico => (
+                  <div key={servico.key} className={styles.selectedServiceItem}>
+                    <div className={styles.selectedServiceMeta}>
+                      <span className={styles.selectedServiceName}>{servico.nome}</span>
+                      <span className={styles.selectedServicePrice}>
+                        {servico.preco != null
+                          ? servico.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                          : 'Sem valor'}
+                      </span>
+                    </div>
+                    <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => removeServico(servico.key)} title="Remover serviço">
+                      <IconTrash />
+                    </button>
                   </div>
-                  <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => removeServico(servico.key)} title="Remover serviço">
-                    <IconTrash />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          {currentLab && currentPrecos.length === 0 && (
-            <p className={styles.stepHint} style={{ marginTop: 12 }}>
-              Nenhum serviço na lista de preços. Adicione um serviço manual ou peça ao administrador para cadastrar os serviços.
-            </p>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
           {/*
                         <div className={styles.formField}>
                           <label className={styles.label}>Data de conclusÃ£o</label>
@@ -2632,6 +2592,91 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
   )
 }
 
+function ServicesListView({ envios, precosByLab, labs }: {
+  envios: LabEnvio[]
+  precosByLab: Record<string, LabPreco[]>
+  labs: Lab[]
+}) {
+  const labsById = useMemo(() => Object.fromEntries(labs.map(lab => [lab.id, lab])), [labs])
+  const rows = useMemo(() => envios.flatMap(envio => {
+    const lab = labsById[envio.lab_id]
+    const feriados = lab ? getLabFeriados(lab) : []
+
+    return getEnvioEtapas(envio).map(etapa => {
+      const dataPrevista = getEtapaDataPrevista(envio, etapa, feriados, precosByLab)
+
+      return {
+        id: `${envio.id}-${etapa.id}`,
+        pacienteNome: envio.paciente_nome,
+        servicoNome: etapa.nome,
+        dentes: envio.dentes,
+        cor: envio.cor,
+        dataEnvio: envio.data_envio,
+        dataPrevista,
+        status: etapa.concluido ? 'Pronto' : envio.status,
+        urgente: envio.urgente,
+        atrasado: !etapa.concluido && dataPrevista != null && dataPrevista < today(),
+        labNome: lab?.nome ?? 'Laboratório removido',
+      }
+    })
+  }), [envios, labsById, precosByLab])
+
+  return (
+    <div className={styles.serviceListWrap}>
+      <div className={styles.serviceListHeader}>
+        <div>
+          <strong>Lista de serviços</strong>
+          <span>{rows.length} serviço{rows.length === 1 ? '' : 's'}</span>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className={styles.serviceListEmpty}>Nenhum serviço cadastrado nos envios.</div>
+      ) : (
+        <div className={styles.serviceTableScroller}>
+          <table className={styles.serviceTable}>
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Serviço</th>
+                <th>Dentes</th>
+                <th>Cor</th>
+                <th>Data de envio</th>
+                <th>Prazo</th>
+                <th>Status</th>
+                <th>Laboratório</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map(row => (
+                <tr key={row.id} className={row.atrasado ? styles.serviceTableRowOverdue : ''}>
+                  <td>
+                    <div className={styles.servicePatientCell}>
+                      <strong>{row.pacienteNome}</strong>
+                      {row.urgente && <span>Urgente</span>}
+                    </div>
+                  </td>
+                  <td>{row.servicoNome}</td>
+                  <td>{row.dentes || '—'}</td>
+                  <td>{row.cor || '—'}</td>
+                  <td>{formatDate(row.dataEnvio)}</td>
+                  <td>{formatDate(row.dataPrevista)}</td>
+                  <td>
+                    <span className={row.atrasado ? styles.serviceStatusOverdue : styles.serviceStatus}>
+                      {row.atrasado ? 'Atrasado' : row.status}
+                    </span>
+                  </td>
+                  <td>{row.labNome}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function InfoRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className={styles.infoRow}>
@@ -2874,7 +2919,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
   const [financeiroLab, setFinanceiroLab] = useState<Lab | null>(null)
-  const [calendarMode, setCalendarMode] = useState(false)
+  const [homeMode, setHomeMode] = useState<LabHomeMode>('kanban')
 
   useEffect(() => {
     const validarAcesso = async () => {
@@ -3113,17 +3158,24 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           </button>
           <button
             type="button"
-            className={`${styles.btnSecondary} ${!calendarMode ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setCalendarMode(false)}
+            className={`${styles.btnSecondary} ${homeMode === 'kanban' ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setHomeMode('kanban')}
           >
             Kanban
           </button>
           <button
             type="button"
-            className={`${styles.btnSecondary} ${calendarMode ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setCalendarMode(true)}
+            className={`${styles.btnSecondary} ${homeMode === 'calendar' ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setHomeMode('calendar')}
           >
             <IconCalendar /> Calendário
+          </button>
+          <button
+            type="button"
+            className={`${styles.btnSecondary} ${homeMode === 'list' ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setHomeMode('list')}
+          >
+            <IconList /> Lista
           </button>
           {isAdmin && (
             <button
@@ -3151,12 +3203,18 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
             </button>
           )}
         </div>
-      ) : calendarMode ? (
+      ) : homeMode === 'calendar' ? (
         <CalendarView
           envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
           precosByLab={precosByLab}
           labs={labs}
-          onClose={() => setCalendarMode(false)}
+          onClose={() => setHomeMode('kanban')}
+        />
+      ) : homeMode === 'list' ? (
+        <ServicesListView
+          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+          precosByLab={precosByLab}
+          labs={labs}
         />
       ) : (
         <div className={styles.labsGrid}>

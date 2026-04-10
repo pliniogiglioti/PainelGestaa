@@ -832,37 +832,142 @@
 }
 
 /* Price selection grid (step 1) */
-.precosGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 8px;
-}
-.precoOption {
-  background: var(--bg-elevated);
+.priceSelectionPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px;
-  cursor: pointer;
-  text-align: left;
+  border-radius: 8px;
+  background: var(--bg-elevated);
+}
+
+.priceSelectionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.priceSelectionHeader > div:first-child {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: border-color 0.15s, background 0.15s;
+  min-width: 0;
 }
-.precoOption:hover { border-color: var(--border-gold); background: var(--bg-hover); }
+
+.priceSelectionHeader strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.priceSelectionHeader span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.priceSelectionSummary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.priceSelectionSummary strong {
+  color: var(--gold-light);
+  font-size: 15px;
+}
+
+.priceSelectionEmpty {
+  margin: 0;
+  padding: 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: var(--bg-surface);
+  font-size: 12px;
+  text-align: center;
+}
+
+.precosGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px;
+}
+.precoOption {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px;
+  cursor: pointer;
+  text-align: left;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 66px;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.precoOption:hover {
+  border-color: var(--border-gold);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
 .precoOptionActive {
   border-color: var(--gold) !important;
   background: var(--gold-glow) !important;
 }
-.precoOptionNome  { font-size: 13px; font-weight: 600; color: var(--text); }
-.precoOptionValor { font-size: 12px; color: var(--gold); font-weight: 600; }
 
-.manualServiceBox {
-  margin-top: 16px;
-  padding: 14px;
+.precoOptionCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
   border: 1px solid var(--border);
-  border-radius: 12px;
   background: var(--bg-elevated);
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.precoOptionActive .precoOptionCheck {
+  border-color: var(--border-gold);
+  background: rgba(201, 162, 42, 0.18);
+  color: var(--gold-light);
+}
+
+.precoOptionMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.precoOptionNome {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.precoOptionPrazo {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.precoOptionValor {
+  font-size: 12px;
+  color: var(--gold);
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .manualServiceHeader {
@@ -875,25 +980,11 @@
   color: var(--text-muted);
 }
 
-.manualServiceActions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 12px;
-  flex-wrap: wrap;
-}
-
-.manualServiceTotal {
-  font-size: 13px;
-  color: var(--gold-light);
-}
-
 .selectedServicesList {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 14px;
+  gap: 10px;
+  padding-top: 2px;
 }
 
 .selectedServiceItem {
@@ -903,7 +994,7 @@
   gap: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--bg-surface);
 }
 
@@ -1415,6 +1506,27 @@
   .kanbanCardEtapaGrid {
     grid-template-columns: 1fr;
   }
+
+  .priceSelectionHeader {
+    flex-direction: column;
+  }
+
+  .priceSelectionSummary {
+    align-items: flex-start;
+  }
+
+  .precosGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .precoOption {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+
+  .precoOptionValor {
+    grid-column: 2;
+    justify-self: start;
+  }
 }
 
 /* ── Calendar View ────────────────────────────────────────────────────────── */
@@ -1603,4 +1715,135 @@
   color: #fbbf24;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+/* ── Services List View ──────────────────────────────────────────────────── */
+
+.serviceListWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.serviceListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.serviceListHeader div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.serviceListHeader strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.serviceListHeader span,
+.serviceListEmpty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.serviceListEmpty {
+  padding: 18px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  text-align: center;
+  background: var(--bg-elevated);
+}
+
+.serviceTableScroller {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.serviceTable {
+  width: 100%;
+  min-width: 940px;
+  border-collapse: collapse;
+  background: var(--bg-elevated);
+}
+
+.serviceTable th,
+.serviceTable td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.serviceTable th {
+  color: var(--text);
+  font-weight: 700;
+  background: var(--bg-surface);
+  white-space: nowrap;
+}
+
+.serviceTable tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.serviceTable tbody tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.serviceTableRowOverdue td {
+  background: rgba(239, 68, 68, 0.06);
+}
+
+.servicePatientCell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.servicePatientCell strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.servicePatientCell span {
+  align-self: flex-start;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  color: #fbbf24;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.serviceStatus,
+.serviceStatusOverdue {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.serviceStatusOverdue {
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.12);
+  color: #f87171;
 }
