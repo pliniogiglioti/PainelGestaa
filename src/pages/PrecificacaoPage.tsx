@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -1883,9 +1884,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [showPrecoModal, setShowPrecoModal] = useState(false)
   const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
-  const [importText, setImportText] = useState('')
+  const [importFile, setImportFile] = useState<File | null>(null)
   const [importError, setImportError] = useState('')
   const [importando, setImportando] = useState(false)
+  const importFileRef = useRef<HTMLInputElement>(null)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [showVendasConfigModal, setShowVendasConfigModal] = useState(false)
   const [showVendaModal, setShowVendaModal] = useState(false)
@@ -2081,37 +2083,47 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const handleImportarLista = async () => {
     setImportError('')
 
-    const linhas = importText
-      .split('\n')
-      .slice(1) // ignora cabeçalho
-      .map(l => l.trim())
-      .filter(l => l.length > 0)
+    if (!importFile) {
+      setImportError('Selecione um arquivo .xlsx.')
+      return
+    }
 
-    if (linhas.length === 0) {
+    let rows: unknown[][]
+    try {
+      const buffer = await importFile.arrayBuffer()
+      const wb = XLSX.read(buffer, { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      rows = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 })
+    } catch {
+      setImportError('Não foi possível ler o arquivo. Verifique se é um .xlsx válido.')
+      return
+    }
+
+    // ignora primeira linha (cabeçalho)
+    const dataRows = rows.slice(1).filter(r => Array.isArray(r) && r.length >= 3)
+
+    if (dataRows.length === 0) {
       setImportError('Nenhuma linha encontrada após o cabeçalho.')
       return
     }
 
     const itens: { nome: string; margem: number | null; preco: number }[] = []
-    for (let i = 0; i < linhas.length; i++) {
-      const cols = linhas[i].split(/[,;\t]/)
-      if (cols.length < 3) {
-        setImportError(`Linha ${i + 2}: esperado nome, margem e preco separados por vírgula, ponto-e-vírgula ou tab.`)
-        return
-      }
-      const nome = cols[0].trim().replace(/^["']|["']$/g, '')
-      const margemRaw = cols[1].trim().replace(/^["']|["']$/g, '')
-      const precoRaw = cols[2].trim().replace(/^["']|["']$/g, '')
-      const preco = parsePreco(precoRaw)
+    for (let i = 0; i < dataRows.length; i++) {
+      const [nomeRaw, margemRaw, precoRaw] = dataRows[i] as unknown[]
+      const nome = String(nomeRaw ?? '').trim()
       if (!nome) {
         setImportError(`Linha ${i + 2}: nome não pode ser vazio.`)
         return
       }
+      const preco = typeof precoRaw === 'number' ? precoRaw : parsePreco(String(precoRaw ?? ''))
       if (preco <= 0) {
         setImportError(`Linha ${i + 2}: preço inválido "${precoRaw}".`)
         return
       }
-      itens.push({ nome, margem: parseMargem(margemRaw), preco })
+      const margem = typeof margemRaw === 'number'
+        ? margemRaw
+        : parseMargem(String(margemRaw ?? ''))
+      itens.push({ nome, margem, preco })
     }
 
     const empresaValida = await ensureEmpresaAtiva()
@@ -2141,7 +2153,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     )
     setFeedback(`${inseridos?.length ?? 0} ite${(inseridos?.length ?? 0) === 1 ? 'm importado' : 'ns importados'} com sucesso.`)
     setShowImportModal(false)
-    setImportText('')
+    setImportFile(null)
     setImportError('')
     setView('lista')
   }
@@ -2518,7 +2530,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 type="button"
                 className={styles.btnSecondary}
                 onClick={() => {
-                  setImportText('')
+                  setImportFile(null)
                   setImportError('')
                   setShowImportModal(true)
                 }}
@@ -2736,16 +2748,19 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             </div>
             <div className={styles.modalBody}>
               <p className={styles.modalFieldHint} style={{ marginBottom: 12 }}>
-                Cole abaixo o conteúdo da planilha. A primeira linha (cabeçalho) será ignorada.<br />
-                Cada linha deve ter: <strong>nome, margem, preco</strong> separados por vírgula, ponto-e-vírgula ou tab.
+                Selecione um arquivo <strong>.xlsx</strong>. A primeira linha (cabeçalho) será ignorada.<br />
+                As colunas devem estar na ordem: <strong>nome, margem, preco</strong>.
               </p>
-              <textarea
+              <input
+                ref={importFileRef}
+                type="file"
+                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 className={styles.modalInput}
-                style={{ minHeight: 200, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
-                value={importText}
-                onChange={e => { setImportText(e.target.value); setImportError('') }}
-                placeholder={'nome;margem;preco\nConsulta inicial;52;350,00\nClareamento;48;1200,00'}
                 disabled={importando}
+                onChange={e => {
+                  setImportFile(e.target.files?.[0] ?? null)
+                  setImportError('')
+                }}
               />
               {importError && <p className={styles.formError}>{importError}</p>}
             </div>
@@ -2753,7 +2768,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
               <button type="button" className={styles.btnSecondary} onClick={() => setShowImportModal(false)} disabled={importando}>
                 Cancelar
               </button>
-              <button type="button" className={styles.btnPrimary} onClick={handleImportarLista} disabled={importando || importText.trim() === ''}>
+              <button type="button" className={styles.btnPrimary} onClick={handleImportarLista} disabled={importando || !importFile}>
                 {importando ? 'Importando...' : 'Importar'}
               </button>
             </div>
