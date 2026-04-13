@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
@@ -1939,11 +1939,45 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     }
   }, [empresa.id, onTrocarEmpresa])
 
+  const ensureEmpresaAtiva = useCallback(async () => {
+    if (!empresa.id) {
+      setError('Selecione uma empresa antes de salvar os precos.')
+      onTrocarEmpresa()
+      return false
+    }
+
+    const { data, error: empresaError } = await supabase
+      .from('empresas')
+      .select('id')
+      .eq('id', empresa.id)
+      .eq('ativo', true)
+      .maybeSingle()
+
+    if (empresaError) {
+      setError(empresaError.message ?? 'Nao foi possivel validar a empresa selecionada.')
+      return false
+    }
+
+    if (!data) {
+      setError('A empresa selecionada nao esta mais disponivel. Escolha outra empresa para continuar.')
+      onTrocarEmpresa()
+      return false
+    }
+
+    return true
+  }, [empresa.id, onTrocarEmpresa])
+
 
   const handleAddPreco = async (item: PrecoFormPayload) => {
     setSavingPreco(true)
     setError('')
     setFeedback('')
+
+    const empresaValida = await ensureEmpresaAtiva()
+    if (!empresaValida) {
+      setSavingPreco(false)
+      return
+    }
 
     const { data, error: insertError } = await supabase
       .from('empresa_precos')
@@ -1978,6 +2012,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setError('')
     setFeedback('')
 
+    const empresaValida = await ensureEmpresaAtiva()
+    if (!empresaValida) {
+      setSavingPreco(false)
+      return
+    }
+
     const { data, error: insertError } = await supabase
       .from('empresa_precos')
       .insert({
@@ -2011,6 +2051,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setError('')
     setFeedback('')
 
+    const empresaValida = await ensureEmpresaAtiva()
+    if (!empresaValida) {
+      setSavingPreco(false)
+      return
+    }
+
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
       .update({
@@ -2043,6 +2089,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
     setSavingPreco(true)
     setError('')
+
+    const empresaValida = await ensureEmpresaAtiva()
+    if (!empresaValida) {
+      setSavingPreco(false)
+      return
+    }
 
     const { data, error: updateError } = await supabase
       .from('empresa_precos')

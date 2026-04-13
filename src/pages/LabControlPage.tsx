@@ -1035,6 +1035,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
   const availableLabs = lab ? [lab, ...labs.filter(item => item.id !== lab.id)] : labs
   const labsById = Object.fromEntries(availableLabs.map(item => [item.id, item]))
   const [selectedLabId, setSelectedLabId] = useState(envio?.lab_id ?? lab?.id ?? '')
+  const shouldSelectLab = !lab || availableLabs.length > 1
   const currentLab = selectedLabId ? (labsById[selectedLabId] ?? null) : (lab ?? null)
   const currentPrecos = currentLab
     ? (precosByLab?.[currentLab.id] ?? (currentLab.id === lab?.id ? precos : []))
@@ -1230,7 +1231,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
       {/* ── Step 1: Tipo de trabalho ── */}
       {step === 1 && (
         <div className={styles.stepContent}>
-          {availableLabs.length > 1 && (
+          {shouldSelectLab && (
             <div className={styles.formField} style={{ marginBottom: 16 }}>
               <label className={styles.label}>Laboratório</label>
               <select
@@ -1246,6 +1247,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
                   <option key={item.id} value={item.id}>{item.nome}</option>
                 ))}
               </select>
+            </div>
+          )}
+          {!currentLab && (
+            <div className={styles.summaryAlert}>
+              <IconAlert /> Selecione o laboratorio para carregar a lista de servicos e continuar o envio.
             </div>
           )}
           {currentLab && currentPrecos.length === 0 && (
@@ -1265,7 +1271,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
               </div>
             </div>
 
-            {currentPrecos.length > 0 ? (
+            {!currentLab ? (
+              <p className={styles.priceSelectionEmpty}>
+                Escolha um laboratorio para visualizar os servicos disponiveis.
+              </p>
+            ) : currentPrecos.length > 0 ? (
               <div className={styles.precosGrid}>
                 {currentPrecos.map(p => {
                   const selected = servicosSelecionados.some(servico => servico.key === `preco:${p.id}`)
@@ -2441,7 +2451,7 @@ function LabsAggregateDetailView({
 
       {showEnvioSteps && (
         <EnvioSteps
-          lab={editingEnvio ? (labsById[editingEnvio.lab_id] ?? null) : (labFilterId !== LAB_FILTER_ALL ? (labsById[labFilterId] ?? null) : null)}
+          lab={editingEnvio ? (labsById[editingEnvio.lab_id] ?? null) : null}
           labs={labs}
           precosByLab={precosByLab}
           empresaId={empresaId}
