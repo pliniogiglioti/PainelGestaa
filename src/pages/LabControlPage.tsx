@@ -9,12 +9,15 @@ import { useSessionStorageState } from '../hooks/useSessionStorageState'
 // ── Constants ──────────────────────────────────────────────────────────────
 
 const DEFAULT_COLUNAS = [
-  { nome: 'Enviado',      ordem: 0, cor: '#6366f1' },
-  { nome: 'Em produção',  ordem: 1, cor: '#f59e0b' },
-  { nome: 'Pronto',       ordem: 2, cor: '#10b981' },
-  { nome: 'Entregue',     ordem: 3, cor: '#3b82f6' },
-  { nome: 'Concluído',    ordem: 4, cor: '#8b5cf6' },
+  { nome: 'Pré-envio',               ordem: 0, cor: '#f59e0b' },
+  { nome: 'Envio / Em laboratório',  ordem: 1, cor: '#3b82f6' },
+  { nome: 'Retorno à clínica',       ordem: 2, cor: '#8b5cf6' },
+  { nome: 'Agendamento do paciente', ordem: 3, cor: '#ec4899' },
+  { nome: 'Instalado',               ordem: 4, cor: '#10b981' },
 ]
+
+const DEFAULT_ENVIO_STATUS = 'Pré-envio'
+const FINAL_ENVIO_STATUSES = ['Instalado', 'Concluído', 'Entregue']
 
 const KANBAN_PAGE_SIZE = 5
 
@@ -43,8 +46,6 @@ type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' 
 type LabHomeMode = 'kanban' | 'calendar' | 'list'
 
 const LAB_FILTER_ALL = '__all__'
-const FINAL_ENVIO_STATUSES = ['Concluído', 'Entregue']
-
 function isString(value: unknown): value is string {
   return typeof value === 'string'
 }
@@ -258,9 +259,13 @@ function sortEnviosByCreatedAt(envios: LabEnvio[]) {
   return [...envios].sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 
+function isFinalEnvioStatus(status: string) {
+  return FINAL_ENVIO_STATUSES.includes(status)
+}
+
 function getEnvioMetrics(envios: LabEnvio[]) {
-  const emAndamento = envios.filter(envio => !FINAL_ENVIO_STATUSES.includes(envio.status))
-  const concluidos = envios.filter(envio => FINAL_ENVIO_STATUSES.includes(envio.status))
+  const emAndamento = envios.filter(envio => !isFinalEnvioStatus(envio.status))
+  const concluidos = envios.filter(envio => isFinalEnvioStatus(envio.status))
   const pagos = envios.filter(envio => envio.pago)
   const overdue = envios.filter(isOverdue)
   const totalValor = envios.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
@@ -339,8 +344,7 @@ function formatDate(d: string | null) {
 function isOverdue(envio: LabEnvio) {
   if (getOverdueEtapas(envio).length > 0) return true
   if (!envio.data_entrega_prometida) return false
-  const finalStatuses = ['Concluído', 'Entregue']
-  if (finalStatuses.includes(envio.status)) return false
+  if (isFinalEnvioStatus(envio.status)) return false
   return envio.data_entrega_prometida < today()
 }
 
@@ -382,10 +386,9 @@ function buildCalendarEvents(
   precosByLab: Record<string, LabPreco[]>,
   labsById: Record<string, Lab>,
 ): CalendarEvent[] {
-  const finalStatuses = ['Concluído', 'Entregue']
   const events: CalendarEvent[] = []
   for (const envio of envios) {
-    if (finalStatuses.includes(envio.status)) continue
+    if (isFinalEnvioStatus(envio.status)) continue
     const lab = labsById[envio.lab_id]
     const feriados = lab ? getLabFeriados(lab) : []
     const etapas = getEnvioEtapas(envio)
@@ -1179,7 +1182,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
       dentes:                 form.dentes.trim() || null,
       cor:                    form.cor || null,
       observacoes:            form.observacoes.trim() || null,
-      status:                 envio?.status ?? colunas[0]?.nome ?? 'Enviado',
+      status:                 envio?.status ?? colunas[0]?.nome ?? DEFAULT_ENVIO_STATUS,
       data_envio:             form.data_envio || today(),
       data_entrega_prometida: form.data_entrega_prometida || null,
       data_consulta:          form.data_consulta || null,
@@ -2696,7 +2699,7 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onOpenFinance
   onClick: () => void; onEdit: (e: React.MouseEvent) => void; onOpenFinanceiro: (e: React.MouseEvent) => void
 }) {
   const overdue = envios.filter(isOverdue).length
-  const enviosEmAndamento = envios.filter(e => !['Concluído', 'Entregue'].includes(e.status))
+  const enviosEmAndamento = envios.filter(e => !isFinalEnvioStatus(e.status))
   const active  = enviosEmAndamento.length
   const valorEmAndamento = enviosEmAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
   const recent  = [...envios].slice(0, 5)
@@ -3245,7 +3248,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           lab={editingLab}
           empresaId={empresa.id}
           onClose={() => setShowLabModal(false)}
-          onSaved={fetchLabs}
+          onSaved={() => { void Promise.all([fetchLabs(), fetchColunas()]) }}
         />
       )}
       {financeiroLab && (
