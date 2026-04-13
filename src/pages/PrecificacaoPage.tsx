@@ -1882,6 +1882,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [showCreatePrecoModal, setShowCreatePrecoModal] = useState(false)
   const [showPrecoModal, setShowPrecoModal] = useState(false)
   const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importError, setImportError] = useState('')
+  const [importando, setImportando] = useState(false)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [showVendasConfigModal, setShowVendasConfigModal] = useState(false)
   const [showVendaModal, setShowVendaModal] = useState(false)
@@ -2071,6 +2075,74 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setShowCreatePrecoModal(false)
     setShowPrecoModal(false)
     setSavingPreco(false)
+    setView('lista')
+  }
+
+  const handleImportarLista = async () => {
+    setImportError('')
+
+    const linhas = importText
+      .split('\n')
+      .slice(1) // ignora cabeçalho
+      .map(l => l.trim())
+      .filter(l => l.length > 0)
+
+    if (linhas.length === 0) {
+      setImportError('Nenhuma linha encontrada após o cabeçalho.')
+      return
+    }
+
+    const itens: { nome: string; margem: number | null; preco: number }[] = []
+    for (let i = 0; i < linhas.length; i++) {
+      const cols = linhas[i].split(/[,;\t]/)
+      if (cols.length < 3) {
+        setImportError(`Linha ${i + 2}: esperado nome, margem e preco separados por vírgula, ponto-e-vírgula ou tab.`)
+        return
+      }
+      const nome = cols[0].trim().replace(/^["']|["']$/g, '')
+      const margemRaw = cols[1].trim().replace(/^["']|["']$/g, '')
+      const precoRaw = cols[2].trim().replace(/^["']|["']$/g, '')
+      const preco = parsePreco(precoRaw)
+      if (!nome) {
+        setImportError(`Linha ${i + 2}: nome não pode ser vazio.`)
+        return
+      }
+      if (preco <= 0) {
+        setImportError(`Linha ${i + 2}: preço inválido "${precoRaw}".`)
+        return
+      }
+      itens.push({ nome, margem: parseMargem(margemRaw), preco })
+    }
+
+    const empresaValida = await ensureEmpresaAtiva()
+    if (!empresaValida) return
+
+    setImportando(true)
+
+    const { data: inseridos, error: insertError } = await supabase
+      .from('empresa_precos')
+      .insert(itens.map(it => ({
+        empresa_id: empresa.id,
+        nome_produto: it.nome,
+        preco: it.preco,
+        margem_percent: it.margem,
+      })))
+      .select('*')
+
+    setImportando(false)
+
+    if (insertError) {
+      setImportError(insertError.message ?? 'Erro ao importar.')
+      return
+    }
+
+    setPrecos(prev =>
+      [...prev, ...(inseridos ?? [])].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
+    )
+    setFeedback(`${inseridos?.length ?? 0} ite${(inseridos?.length ?? 0) === 1 ? 'm importado' : 'ns importados'} com sucesso.`)
+    setShowImportModal(false)
+    setImportText('')
+    setImportError('')
     setView('lista')
   }
 
@@ -2441,9 +2513,19 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             >
               <IconTag /> Minha lista de preço
             </button>
-            <button type="button" className={styles.btnSecondary} disabled>
-              <IconUpload /> Importar lista
-            </button>
+            {canManage && (
+              <button
+                type="button"
+                className={styles.btnSecondary}
+                onClick={() => {
+                  setImportText('')
+                  setImportError('')
+                  setShowImportModal(true)
+                }}
+              >
+                <IconUpload /> Importar lista
+              </button>
+            )}
             {canManage && (
               <button
                 type="button"
@@ -2643,6 +2725,40 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           onPersistCalculo={handlePersistCalculo}
           onClose={() => setItemCalculadora(null)}
         />
+      )}
+
+      {showImportModal && (
+        <div className={styles.modalOverlay} onClick={() => !importando && setShowImportModal(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Importar lista</h2>
+              <button className={styles.modalClose} onClick={() => setShowImportModal(false)} disabled={importando}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.modalFieldHint} style={{ marginBottom: 12 }}>
+                Cole abaixo o conteúdo da planilha. A primeira linha (cabeçalho) será ignorada.<br />
+                Cada linha deve ter: <strong>nome, margem, preco</strong> separados por vírgula, ponto-e-vírgula ou tab.
+              </p>
+              <textarea
+                className={styles.modalInput}
+                style={{ minHeight: 200, resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }}
+                value={importText}
+                onChange={e => { setImportText(e.target.value); setImportError('') }}
+                placeholder={'nome;margem;preco\nConsulta inicial;52;350,00\nClareamento;48;1200,00'}
+                disabled={importando}
+              />
+              {importError && <p className={styles.formError}>{importError}</p>}
+            </div>
+            <div className={styles.modalActions}>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowImportModal(false)} disabled={importando}>
+                Cancelar
+              </button>
+              <button type="button" className={styles.btnPrimary} onClick={handleImportarLista} disabled={importando || importText.trim() === ''}>
+                {importando ? 'Importando...' : 'Importar'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showConfigModal && (
