@@ -193,6 +193,7 @@ export interface Database {
           nome_produto: string
           categoria:    string | null
           preco:        number
+          margem_percent: number | null
           precificacao_calculo: Json
           ativo:        boolean
           created_at:   string
@@ -204,6 +205,7 @@ export interface Database {
           nome_produto:  string
           categoria?:    string | null
           preco?:        number
+          margem_percent?: number | null
           precificacao_calculo?: Json
           ativo?:        boolean
           created_at?:   string
@@ -215,6 +217,7 @@ export interface Database {
           nome_produto?: string
           categoria?:    string | null
           preco?:        number
+          margem_percent?: number | null
           precificacao_calculo?: Json
           ativo?:        boolean
           updated_at?:   string

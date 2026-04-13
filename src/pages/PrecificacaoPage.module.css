@@ -250,7 +250,7 @@
 .priceTableHead,
 .priceRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 260px) 180px;
+  grid-template-columns: minmax(0, 1fr) 140px minmax(220px, 320px) 180px;
   gap: 16px;
   align-items: center;
 }
@@ -322,6 +322,34 @@
   flex-wrap: wrap;
 }
 
+.priceMarginValue {
+  justify-self: start;
+  border-radius: 999px;
+  padding: 6px 10px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.priceMarginGood {
+  background: rgba(49, 160, 93, 0.14);
+  border-color: rgba(49, 160, 93, 0.3);
+  color: #8ee0a9;
+}
+
+.priceMarginBad {
+  background: rgba(201, 73, 73, 0.14);
+  border-color: rgba(201, 73, 73, 0.3);
+  color: #ff9f9f;
+}
+
+.priceMarginEmpty {
+  background: rgba(255,255,255,0.04);
+  border-color: rgba(255,255,255,0.08);
+  color: var(--text-muted);
+}
+
 .priceEditButton {
   border: 1px solid var(--border);
   background: rgba(255,255,255,0.03);
@@ -358,6 +386,28 @@
   background: rgba(201, 162, 42, 0.18);
   border-color: rgba(201, 162, 42, 0.42);
   transform: translateY(-1px);
+}
+
+.calcButtonBad {
+  border-color: rgba(201, 73, 73, 0.3);
+  background: rgba(201, 73, 73, 0.14);
+  color: #ffb0b0;
+}
+
+.calcButtonBad:hover {
+  background: rgba(201, 73, 73, 0.2);
+  border-color: rgba(201, 73, 73, 0.4);
+}
+
+.calcButtonGood {
+  border-color: rgba(49, 160, 93, 0.3);
+  background: rgba(49, 160, 93, 0.14);
+  color: #9de4b2;
+}
+
+.calcButtonGood:hover {
+  background: rgba(49, 160, 93, 0.2);
+  border-color: rgba(49, 160, 93, 0.4);
 }
 
 .calcButton:disabled {

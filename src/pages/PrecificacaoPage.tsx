@@ -85,6 +85,7 @@ type PrecoFormPayload = {
   nome: string
   categoria: string
   preco: number
+  margem: number | null
 }
 
 const IconBack = () => (
@@ -132,7 +133,10 @@ const formatPercent = (value: number) =>
   `${value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 
 const formatCurrencyInput = (value: number) =>
-  value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+
+const formatPercentInput = (value: number) =>
+  value.toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })
 
 const PRECIFICACAO_CATEGORIAS_ODONTO = [
   'Consultas e avaliacao',
@@ -179,12 +183,30 @@ function parsePreco(value: string) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+function parseMargem(value: string) {
+  const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function roundCurrencyValue(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100
 }
 
-function sanitizeDecimalInput(value: string) {
-  return value.replace(/[^\d,.\s]/g, '')
+function sanitizePercentInput(value: string) {
+  return value.replace(/[^\d,.-]/g, '')
+}
+
+function formatCurrencyTypingInput(value: string) {
+  const digits = value.replace(/\D/g, '')
+  if (!digits) return ''
+  return formatCurrencyInput(Number(digits) / 100)
+}
+
+function formatStoredCurrencyInput(value: unknown) {
+  if (typeof value !== 'string') return ''
+  if (value.trim() === '') return ''
+  return formatCurrencyInput(parsePreco(value))
 }
 
 function normalizeCategoria(value?: string | null) {
@@ -221,16 +243,16 @@ function getCalculadoraPersistida(
     : {}
 
   const formBase: CalculadoraForm = {
-    custoInsumos: typeof saved.custoInsumos === 'string' ? saved.custoInsumos : '',
-    custoMaterialAplicado: typeof saved.custoMaterialAplicado === 'string' ? saved.custoMaterialAplicado : '',
-    custoLaboratorio: typeof saved.custoLaboratorio === 'string' ? saved.custoLaboratorio : '',
+    custoInsumos: formatStoredCurrencyInput(saved.custoInsumos),
+    custoMaterialAplicado: formatStoredCurrencyInput(saved.custoMaterialAplicado),
+    custoLaboratorio: formatStoredCurrencyInput(saved.custoLaboratorio),
     royaltiesPercent: typeof saved.royaltiesPercent === 'string' ? saved.royaltiesPercent : configPadrao.royaltiesPercent,
     custoProfissionaisModo: saved.custoProfissionaisModo === 'valor' ? 'valor' : 'percentual',
     custoProfissionaisBases: Array.isArray(saved.custoProfissionaisBases)
       ? saved.custoProfissionaisBases.filter(isCustoProfissionaisBase)
       : [],
     custoProfissionaisPercent: typeof saved.custoProfissionaisPercent === 'string' ? saved.custoProfissionaisPercent : configPadrao.custoProfissionaisPercent,
-    custoProfissionaisValor: typeof saved.custoProfissionaisValor === 'string' ? saved.custoProfissionaisValor : '',
+    custoProfissionaisValor: formatStoredCurrencyInput(saved.custoProfissionaisValor),
     impostosPercent: typeof saved.impostosPercent === 'string' ? saved.impostosPercent : configPadrao.impostosPercent,
     comissoesPercent: typeof saved.comissoesPercent === 'string' ? saved.comissoesPercent : configPadrao.comissoesPercent,
     taxaMaquinaPercent: typeof saved.taxaMaquinaPercent === 'string' ? saved.taxaMaquinaPercent : configPadrao.taxaMaquinaPercent,
@@ -239,7 +261,7 @@ function getCalculadoraPersistida(
   return {
     ...formBase,
     precoVenda: typeof saved.precoVenda === 'string'
-      ? saved.precoVenda
+      ? formatStoredCurrencyInput(saved.precoVenda)
       : item
         ? formatCurrencyInput(item.preco)
         : '',
@@ -252,6 +274,20 @@ function hasGestaaCalculatedPrice(item: EmpresaPreco) {
 
   const saved = raw as Record<string, unknown>
   return Object.keys(saved).length > 0 && typeof saved.precoVenda === 'string' && saved.precoVenda.trim() !== ''
+}
+
+function getItemMargemPercent(item: EmpresaPreco, configPadrao: ConfiguracaoGeralForm) {
+  if (typeof item.margem_percent === 'number' && Number.isFinite(item.margem_percent)) {
+    return item.margem_percent
+  }
+
+  if (!hasGestaaCalculatedPrice(item)) return null
+
+  return calcularPrecificacao(item.preco, getCalculadoraPersistida(item, configPadrao)).margem
+}
+
+function isMargemSaudavel(margem: number | null) {
+  return margem != null && margem >= 50
 }
 
 function calcularPrecoSugerido(form: CalculadoraForm) {
@@ -511,6 +547,10 @@ function PrecoModal({
   const [nome, setNome] = useState(initialItem?.nome_produto ?? '')
   const [categoria, setCategoria] = useState(initialItem?.categoria ?? '')
   const [preco, setPreco] = useState(initialItem ? formatCurrencyInput(initialItem.preco) : '')
+  const [margem, setMargem] = useState(() => {
+    const margemInicial = initialItem ? getItemMargemPercent(initialItem, configPadrao) : null
+    return margemInicial != null ? formatPercentInput(margemInicial) : ''
+  })
   const [erroLocal, setErroLocal] = useState('')
   const [showCalculadora, setShowCalculadora] = useState(false)
   const backdropDismiss = useBackdropDismiss(onClose, saving)
@@ -520,9 +560,11 @@ function PrecoModal({
     setNome(initialItem?.nome_produto ?? '')
     setCategoria(initialItem?.categoria ?? '')
     setPreco(initialItem ? formatCurrencyInput(initialItem.preco) : '')
+    const margemInicial = initialItem ? getItemMargemPercent(initialItem, configPadrao) : null
+    setMargem(margemInicial != null ? formatPercentInput(margemInicial) : '')
     setErroLocal('')
     setShowCalculadora(false)
-  }, [initialItem])
+  }, [configPadrao, initialItem])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -538,6 +580,7 @@ function PrecoModal({
     }
 
     const precoNumerico = parsePreco(preco)
+    const margemPercentual = parseMargem(margem)
     if (precoNumerico <= 0) {
       setErroLocal('Informe um preço válido.')
       return
@@ -545,10 +588,16 @@ function PrecoModal({
 
     setErroLocal('')
 
+    if (!isEditing && margemPercentual == null) {
+      setErroLocal('Informe a margem do preco.')
+      return
+    }
+
     await onSubmit({
       nome: nome.trim(),
       categoria,
       preco: precoNumerico,
+      margem: margemPercentual,
     })
   }
 
@@ -606,10 +655,10 @@ function PrecoModal({
             <div className={styles.priceInputRow}>
               <input
                 className={styles.modalInput}
-                placeholder="Ex: 120,00"
+                placeholder="Ex: R$ 120,00"
                 value={preco}
                 onChange={e => {
-                  setPreco(e.target.value)
+                  setPreco(formatCurrencyTypingInput(e.target.value))
                   setErroLocal('')
                 }}
                 inputMode="decimal"
@@ -625,6 +674,22 @@ function PrecoModal({
               </button>
             </div>
             <span className={styles.modalFieldHint}>Use a calculadora para montar o preço com base no custo total.</span>
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Margem (%)</span>
+            <input
+              className={styles.modalInput}
+              placeholder="Ex: 50"
+              value={margem}
+              onChange={e => {
+                setMargem(sanitizePercentInput(e.target.value))
+                setErroLocal('')
+              }}
+              inputMode="decimal"
+              disabled={saving}
+            />
+            <span className={styles.modalFieldHint}>A margem ajuda a destacar rapidamente itens abaixo da meta de 50%.</span>
           </label>
 
           {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
@@ -648,6 +713,7 @@ function PrecoModal({
             nome_produto: nome.trim() || 'Novo item',
             categoria: categoria || CATEGORIA_SEM_CADASTRO,
             preco: parsePreco(preco),
+            margem_percent: parseMargem(margem),
             precificacao_calculo: null,
             ativo: initialItem?.ativo ?? true,
             created_at: initialItem?.created_at ?? new Date().toISOString(),
@@ -657,8 +723,9 @@ function PrecoModal({
           canManage
           savingPreco={saving}
           error={error}
-          onSavePrice={async precoCalculado => {
+          onSavePrice={async ({ preco: precoCalculado, margem: margemCalculada }) => {
             setPreco(formatCurrencyInput(precoCalculado))
+            setMargem(formatPercentInput(margemCalculada))
             setErroLocal('')
             setShowCalculadora(false)
             return true
@@ -734,7 +801,7 @@ function CalculadoraPrecificacaoModal({
   canManage: boolean
   savingPreco: boolean
   error: string
-  onSavePrice?: (preco: number) => Promise<boolean> | boolean
+  onSavePrice?: (result: { preco: number; margem: number }) => Promise<boolean> | boolean
   onPersistCalculo?: (itemId: string, payload: CalculadoraPersistida, preco: number) => Promise<void>
   onCreatePrecoCalculado?: (item: PrecoFormPayload, calculo: CalculadoraPersistida) => Promise<void>
   onClose: () => void
@@ -848,7 +915,7 @@ function CalculadoraPrecificacaoModal({
     setErroLocal('')
 
     if (onSavePrice) {
-      await onSavePrice(precoNumerico)
+      await onSavePrice({ preco: precoNumerico, margem: calculo.margem })
       return
     }
 
@@ -857,6 +924,7 @@ function CalculadoraPrecificacaoModal({
         nome: nome.trim(),
         categoria,
         preco: precoNumerico,
+        margem: calculo.margem,
       }, calculadoraPersistida)
       return
     }
@@ -944,11 +1012,11 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.custoInsumos}
                   onChange={e => {
-                    handleChange('custoInsumos', e.target.value)
+                    handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
-                  placeholder="Ex: 40,00"
+                  placeholder="Ex: R$ 40,00"
                 />
               </label>
 
@@ -958,11 +1026,11 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.custoMaterialAplicado}
                   onChange={e => {
-                    handleChange('custoMaterialAplicado', e.target.value)
+                    handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
-                  placeholder="Ex: 700,00"
+                  placeholder="Ex: R$ 700,00"
                 />
               </label>
 
@@ -972,11 +1040,11 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.custoLaboratorio}
                   onChange={e => {
-                    handleChange('custoLaboratorio', e.target.value)
+                    handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
-                  placeholder="Ex: 120,00"
+                  placeholder="Ex: R$ 120,00"
                 />
               </label>
             </div>
@@ -995,7 +1063,7 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.royaltiesPercent}
                   onChange={e => {
-                    handleChange('royaltiesPercent', e.target.value)
+                    handleChange('royaltiesPercent', sanitizePercentInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
@@ -1029,12 +1097,14 @@ function CalculadoraPrecificacaoModal({
                       form.custoProfissionaisModo === 'percentual'
                         ? 'custoProfissionaisPercent'
                         : 'custoProfissionaisValor',
-                      e.target.value,
+                      form.custoProfissionaisModo === 'percentual'
+                        ? sanitizePercentInput(e.target.value)
+                        : formatCurrencyTypingInput(e.target.value),
                     )
                     setErroLocal('')
                   }}
                   inputMode="decimal"
-                  placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: 450,00'}
+                  placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
                 />
                 {form.custoProfissionaisModo === 'percentual' && (
                   <span className={styles.modalFieldHint}>
@@ -1049,7 +1119,7 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.impostosPercent}
                   onChange={e => {
-                    handleChange('impostosPercent', e.target.value)
+                    handleChange('impostosPercent', sanitizePercentInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
@@ -1063,7 +1133,7 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.comissoesPercent}
                   onChange={e => {
-                    handleChange('comissoesPercent', e.target.value)
+                    handleChange('comissoesPercent', sanitizePercentInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
@@ -1077,7 +1147,7 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={form.taxaMaquinaPercent}
                   onChange={e => {
-                    handleChange('taxaMaquinaPercent', e.target.value)
+                    handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value))
                     setErroLocal('')
                   }}
                   inputMode="decimal"
@@ -1176,11 +1246,11 @@ function CalculadoraPrecificacaoModal({
                       className={`${styles.modalInput} ${styles.calcHighlightInput}`}
                       value={precoVendaEditado}
                       onChange={e => {
-                        setPrecoVendaEditado(sanitizeDecimalInput(e.target.value))
+                        setPrecoVendaEditado(formatCurrencyTypingInput(e.target.value))
                         setErroLocal('')
                       }}
                       inputMode="decimal"
-                      placeholder="Ex: 1.250,00"
+                      placeholder="Ex: R$ 1.250,00"
                       disabled={savingPreco}
                     />
                     {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
@@ -1514,10 +1584,8 @@ function ApresentacaoVendaModal({
 
   type FormaPagamento = 'cartao' | 'boleto' | 'pix' | 'carne'
 
-  const [precoAvista, setPrecoAvista] = useState(
-    subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-  )
-  const [entradaApresentacao, setEntradaApresentacao] = useState('0,00')
+  const [precoAvista, setPrecoAvista] = useState(formatCurrencyInput(subtotal))
+  const [entradaApresentacao, setEntradaApresentacao] = useState(formatCurrencyInput(0))
   const [meiosLiberadosEm, setMeiosLiberadosEm] = useState(configVendas?.vendas_tempo_apresentacao_segundos ?? 0)
   const [ofertaExpiraEm, setOfertaExpiraEm] = useState((configVendas?.vendas_oferta_valida_minutos ?? 15) * 60)
   const formasDisponiveis = [
@@ -1631,7 +1699,7 @@ function ApresentacaoVendaModal({
     setPrecoAvista(prev => {
       const valorAtual = parsePreco(prev)
       const proximoValor = valorAtual > 0 ? valorAtual + item.preco : subtotal + item.preco
-      return proximoValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      return formatCurrencyInput(proximoValor)
     })
   }
 
@@ -1673,9 +1741,9 @@ function ApresentacaoVendaModal({
                 <input
                   className={styles.presentationPriceInput}
                   value={precoAvista}
-                  onChange={e => setPrecoAvista(e.target.value)}
+                  onChange={e => setPrecoAvista(formatCurrencyTypingInput(e.target.value))}
                   inputMode="decimal"
-                  placeholder="Ex: 3.500,00"
+                  placeholder="Ex: R$ 3.500,00"
                 />
               </div>
             </div>
@@ -1686,9 +1754,9 @@ function ApresentacaoVendaModal({
                 <input
                   className={styles.presentationPriceInput}
                   value={entradaApresentacao}
-                  onChange={e => setEntradaApresentacao(e.target.value)}
+                  onChange={e => setEntradaApresentacao(formatCurrencyTypingInput(e.target.value))}
                   inputMode="decimal"
-                  placeholder="Ex: 1.000,00"
+                  placeholder="Ex: R$ 1.000,00"
                 />
               </div>
             </div>
@@ -1986,6 +2054,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         nome_produto: item.nome,
         categoria: item.categoria,
         preco: item.preco,
+        margem_percent: item.margem,
       })
       .select('*')
       .single()
@@ -2025,6 +2094,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         nome_produto: item.nome,
         categoria: item.categoria,
         preco: item.preco,
+        margem_percent: item.margem,
         precificacao_calculo: calculo,
       })
       .select('*')
@@ -2063,6 +2133,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         nome_produto: item.nome,
         categoria: item.categoria,
         preco: item.preco,
+        margem_percent: item.margem,
       })
       .eq('id', itemId)
       .eq('empresa_id', empresa.id)
@@ -2096,10 +2167,13 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       return
     }
 
+    const margem = calcularPrecificacao(preco, payload).margem
+
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
       .update({
         preco,
+        margem_percent: margem,
         precificacao_calculo: payload,
         updated_at: new Date().toISOString(),
       })
@@ -2450,20 +2524,36 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             <div className={styles.priceTable}>
               <div className={styles.priceTableHead}>
                 <span>Produto / servico</span>
+                <span>Margem</span>
                 <span>Ação</span>
                 <span>Preço</span>
               </div>
               <div className={styles.priceTableBody}>
-                {precos.map(item => (
-                  <div key={item.id} className={styles.priceRow}>
-                    <div className={styles.priceNameWrap}>
+                {precos.map(item => {
+                  const margemPercentual = getItemMargemPercent(item, configPadraoMemo)
+                  const margemSaudavel = isMargemSaudavel(margemPercentual)
+
+                  return (
+                    <div key={item.id} className={styles.priceRow}>
+                      <div className={styles.priceNameWrap}>
                       <span className={styles.priceName}>{item.nome_produto}</span>
                       {hasGestaaCalculatedPrice(item) && (
                         <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
                       )}
                       <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
                     </div>
-                    <div className={styles.priceActions}>
+                      <div
+                        className={`${styles.priceMarginValue} ${
+                          margemSaudavel
+                            ? styles.priceMarginGood
+                            : margemPercentual == null
+                              ? styles.priceMarginEmpty
+                              : styles.priceMarginBad
+                        }`}
+                      >
+                        {margemPercentual == null ? 'Sem margem' : formatPercent(margemPercentual)}
+                      </div>
+                      <div className={styles.priceActions}>
                       {canManage && (
                         <button
                           type="button"
@@ -2480,15 +2570,16 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                       )}
                       <button
                         type="button"
-                        className={styles.calcButton}
+                        className={`${styles.calcButton} ${margemSaudavel ? styles.calcButtonGood : styles.calcButtonBad}`}
                         onClick={() => setItemCalculadora(item)}
                       >
-                        Verificar cálculo de precificação
+                        {margemSaudavel ? 'Preco com margem correta' : 'Rever precificacao'}
                       </button>
+                      </div>
+                      <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                     </div>
-                    <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )
