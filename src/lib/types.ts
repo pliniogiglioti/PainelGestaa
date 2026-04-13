@@ -710,6 +710,7 @@ export interface Database {
           empresa_id:             string
           user_id:                string
           paciente_nome:          string
+          dentista_nome:          string | null
           tipo_trabalho:          string
           preco_servico:          number | null
           dentes:                 string | null
@@ -733,6 +734,7 @@ export interface Database {
           empresa_id:              string
           user_id:                 string
           paciente_nome:           string
+          dentista_nome?:          string | null
           tipo_trabalho:           string
           preco_servico?:          number | null
           dentes?:                 string | null
@@ -752,6 +754,7 @@ export interface Database {
         }
         Update: {
           paciente_nome?:          string
+          dentista_nome?:          string | null
           tipo_trabalho?:          string
           preco_servico?:          number | null
           dentes?:                 string | null

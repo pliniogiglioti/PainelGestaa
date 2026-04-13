@@ -1007,7 +1007,7 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
 
 interface EnvioFormState {
   tipo_trabalho: string; preco_servico: string
-  paciente_nome: string; dentes: string; cor: string; observacoes: string
+  paciente_nome: string; dentista_nome: string; dentes: string; cor: string; observacoes: string
   data_envio: string; data_entrega_prometida: string; data_consulta: string
   urgente: boolean
 }
@@ -1063,6 +1063,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
     tipo_trabalho:          envio?.tipo_trabalho ?? '',
     preco_servico:          envio?.preco_servico != null ? String(envio.preco_servico) : '',
     paciente_nome:          envio?.paciente_nome ?? '',
+    dentista_nome:          envio?.dentista_nome ?? '',
     dentes:                 envio?.dentes ?? '',
     cor:                    envio?.cor ?? '',
     observacoes:            envio?.observacoes ?? '',
@@ -1180,6 +1181,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
       tipo_trabalho:          trabalho.trim(),
       preco_servico:          Number.isFinite(precoConvertido) ? precoConvertido : null,
       paciente_nome:          form.paciente_nome.trim(),
+      dentista_nome:          form.dentista_nome.trim() || null,
       dentes:                 form.dentes.trim() || null,
       cor:                    form.cor || null,
       observacoes:            form.observacoes.trim() || null,
@@ -1352,9 +1354,13 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
       {step === 2 && (
         <div className={styles.stepContent}>
           <div className={styles.formGrid2}>
-            <div className={`${styles.formField} ${styles.colSpan2}`}>
+            <div className={styles.formField}>
               <label className={styles.label}>Nome do paciente *</label>
               <input className={styles.input} value={form.paciente_nome} onChange={set('paciente_nome')} placeholder="Nome completo" />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Dentista</label>
+              <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Dentes</label>
@@ -1460,6 +1466,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
               <ReviewRow label="Valor" value={parseFloat(form.preco_servico.replace(',', '.')).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
             )}
             <ReviewRow label="Paciente"    value={form.paciente_nome} />
+            {form.dentista_nome && <ReviewRow label="Dentista" value={form.dentista_nome} />}
             {form.dentes    && <ReviewRow label="Dentes"  value={form.dentes} />}
             {form.cor       && <ReviewRow label="Cor"     value={form.cor} />}
             {form.observacoes && <ReviewRow label="Observações" value={form.observacoes} />}
