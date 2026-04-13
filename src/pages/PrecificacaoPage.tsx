@@ -262,9 +262,7 @@ function getCalculadoraPersistida(
     ...formBase,
     precoVenda: typeof saved.precoVenda === 'string'
       ? formatStoredCurrencyInput(saved.precoVenda)
-      : item
-        ? formatCurrencyInput(item.preco)
-        : '',
+      : '',
   }
 }
 
