@@ -1085,7 +1085,7 @@ function CalculadoraPrecificacaoModal({
                   />
                   {form.custoProfissionaisModo === 'percentual' && (
                     <span className={styles.modalFieldHint}>
-                      A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                      A porcentagem será aplicada sobre o valor da venda. No resultado você poderá marcar quais procedimentos entram como abatimento dessa base.
                     </span>
                   )}
                 </label>
@@ -1137,22 +1137,22 @@ function CalculadoraPrecificacaoModal({
                       <span>Custo</span>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Custo insumos</span>
+                      {renderProcedimentoComSelecao('custoInsumos', 'Custo insumos')}
                       <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
                       <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Custo material aplicado</span>
+                      {renderProcedimentoComSelecao('custoMaterialAplicado', 'Custo material aplicado')}
                       <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
                       <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Custo laboratório</span>
+                      {renderProcedimentoComSelecao('custoLaboratorio', 'Custo laboratório')}
                       <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
                       <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Royalties e FNP</span>
+                      {renderProcedimentoComSelecao('royalties', 'Royalties e FNP')}
                       <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
                       <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
                     </div>
@@ -1168,17 +1168,17 @@ function CalculadoraPrecificacaoModal({
                       <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Impostos</span>
+                      {renderProcedimentoComSelecao('impostos', 'Impostos')}
                       <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
                       <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Comissões vendas</span>
+                      {renderProcedimentoComSelecao('comissoes', 'Comissões vendas')}
                       <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
                       <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
                     </div>
                     <div className={styles.calcRow}>
-                      <span>Taxa máquina</span>
+                      {renderProcedimentoComSelecao('taxaMaquina', 'Taxa máquina')}
                       <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
                       <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
                     </div>
