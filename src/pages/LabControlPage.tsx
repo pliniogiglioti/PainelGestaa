@@ -704,6 +704,10 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
     } else {
       const { error: err } = await supabase.from('labs').insert(payload)
       if (err) { setError(err.message); setSaving(false); return }
+      // Sempre que criar um novo lab, resetar as colunas do kanban para o padrão
+      await supabase.from('lab_kanban_colunas').delete().eq('empresa_id', empresaId)
+      const defaults = DEFAULT_COLUNAS.map(c => ({ ...c, empresa_id: empresaId }))
+      await supabase.from('lab_kanban_colunas').insert(defaults)
     }
     onSaved(); onClose()
   }
