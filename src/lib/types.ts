@@ -705,71 +705,241 @@ export interface Database {
       }
       lab_envios: {
         Row: {
-          id:                     string
-          lab_id:                 string
-          empresa_id:             string
-          user_id:                string
-          paciente_nome:          string
-          dentista_nome:          string | null
-          tipo_trabalho:          string
-          preco_servico:          number | null
-          dentes:                 string | null
-          cor:                    string | null
-          observacoes:            string | null
-          status:                 string
-          data_envio:             string
-          data_entrega_prometida: string | null
-          data_consulta:          string | null
-          urgente:                boolean
-          etapas:                 Json
-          pago:                   boolean
-          data_pagamento:         string | null
-          data_entrega_real:      string | null
-          created_at:             string
-          updated_at:             string
+          id:                       string
+          lab_id:                   string
+          empresa_id:               string
+          user_id:                  string
+          paciente_nome:            string
+          dentista_nome:            string | null
+          tipo_trabalho:            string
+          classificacao_protese:    string | null
+          categoria_peca:           string | null
+          preco_servico:            number | null
+          desconto:                 number | null
+          observacao_financeira:    string | null
+          dentes:                   string | null
+          cor:                      string | null
+          observacoes:              string | null
+          status:                   string
+          arquivado_em:             string | null
+          data_envio:               string
+          forma_envio:              string | null
+          retirado_por:             string | null
+          data_entrega_prometida:   string | null
+          data_consulta:            string | null
+          data_recebimento:         string | null
+          forma_recebimento:        string | null
+          retirado_por_recebimento: string | null
+          conferencia_ok:           boolean
+          anotacao_recebimento:     string | null
+          urgente:                  boolean
+          etapas:                   Json
+          pago:                     boolean
+          data_pagamento:           string | null
+          data_entrega_real:        string | null
+          created_at:               string
+          updated_at:               string
         }
         Insert: {
-          id?:                     string
-          lab_id:                  string
-          empresa_id:              string
-          user_id:                 string
-          paciente_nome:           string
-          dentista_nome?:          string | null
-          tipo_trabalho:           string
-          preco_servico?:          number | null
-          dentes?:                 string | null
-          cor?:                    string | null
-          observacoes?:            string | null
-          status?:                 string
-          data_envio?:             string
-          data_entrega_prometida?: string | null
-          data_consulta?:          string | null
-          urgente?:                boolean
-          etapas?:                 Json
-          pago?:                   boolean
-          data_pagamento?:         string | null
-          data_entrega_real?:      string | null
-          created_at?:             string
-          updated_at?:             string
+          id?:                       string
+          lab_id:                    string
+          empresa_id:                string
+          user_id:                   string
+          paciente_nome:             string
+          dentista_nome?:            string | null
+          tipo_trabalho:             string
+          classificacao_protese?:    string | null
+          categoria_peca?:           string | null
+          preco_servico?:            number | null
+          desconto?:                 number | null
+          observacao_financeira?:    string | null
+          dentes?:                   string | null
+          cor?:                      string | null
+          observacoes?:              string | null
+          status?:                   string
+          arquivado_em?:             string | null
+          data_envio?:               string
+          forma_envio?:              string | null
+          retirado_por?:             string | null
+          data_entrega_prometida?:   string | null
+          data_consulta?:            string | null
+          data_recebimento?:         string | null
+          forma_recebimento?:        string | null
+          retirado_por_recebimento?: string | null
+          conferencia_ok?:           boolean
+          anotacao_recebimento?:     string | null
+          urgente?:                  boolean
+          etapas?:                   Json
+          pago?:                     boolean
+          data_pagamento?:           string | null
+          data_entrega_real?:        string | null
+          created_at?:               string
+          updated_at?:               string
         }
         Update: {
-          paciente_nome?:          string
-          dentista_nome?:          string | null
-          tipo_trabalho?:          string
-          preco_servico?:          number | null
-          dentes?:                 string | null
-          cor?:                    string | null
-          observacoes?:            string | null
-          status?:                 string
-          data_envio?:             string
-          data_entrega_prometida?: string | null
-          data_consulta?:          string | null
-          urgente?:                boolean
-          etapas?:                 Json
-          pago?:                   boolean
-          data_pagamento?:         string | null
-          data_entrega_real?:      string | null
-          updated_at?:             string
+          paciente_nome?:            string
+          dentista_nome?:            string | null
+          tipo_trabalho?:            string
+          classificacao_protese?:    string | null
+          categoria_peca?:           string | null
+          preco_servico?:            number | null
+          desconto?:                 number | null
+          observacao_financeira?:    string | null
+          dentes?:                   string | null
+          cor?:                      string | null
+          observacoes?:              string | null
+          status?:                   string
+          arquivado_em?:             string | null
+          data_envio?:               string
+          forma_envio?:              string | null
+          retirado_por?:             string | null
+          data_entrega_prometida?:   string | null
+          data_consulta?:            string | null
+          data_recebimento?:         string | null
+          forma_recebimento?:        string | null
+          retirado_por_recebimento?: string | null
+          conferencia_ok?:           boolean
+          anotacao_recebimento?:     string | null
+          urgente?:                  boolean
+          etapas?:                   Json
+          pago?:                     boolean
+          data_pagamento?:           string | null
+          data_entrega_real?:        string | null
+          updated_at?:               string
+        }
+        Relationships: []
+      }
+      lab_dentistas: {
+        Row: {
+          id:            string
+          empresa_id:    string
+          nome:          string
+          especialidade: string | null
+          ativo:         boolean
+          created_at:    string
+        }
+        Insert: {
+          id?:            string
+          empresa_id:     string
+          nome:           string
+          especialidade?: string | null
+          ativo?:         boolean
+          created_at?:    string
+        }
+        Update: {
+          nome?:          string
+          especialidade?: string | null
+          ativo?:         boolean
+        }
+        Relationships: []
+      }
+      lab_etiquetas: {
+        Row: {
+          id:         string
+          empresa_id: string
+          nome:       string
+          cor:        string
+          ativo:      boolean
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          empresa_id:  string
+          nome:        string
+          cor?:        string
+          ativo?:      boolean
+          created_at?: string
+        }
+        Update: {
+          nome?: string
+          cor?:  string
+          ativo?: boolean
+        }
+        Relationships: []
+      }
+      lab_envio_etiquetas: {
+        Row: {
+          envio_id:    string
+          etiqueta_id: string
+        }
+        Insert: {
+          envio_id:    string
+          etiqueta_id: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      lab_tipos_servico: {
+        Row: {
+          id:            string
+          empresa_id:    string
+          nome:          string
+          classificacao: string
+          ativo:         boolean
+          created_at:    string
+        }
+        Insert: {
+          id?:            string
+          empresa_id:     string
+          nome:           string
+          classificacao?: string
+          ativo?:         boolean
+          created_at?:    string
+        }
+        Update: {
+          nome?:          string
+          classificacao?: string
+          ativo?:         boolean
+        }
+        Relationships: []
+      }
+      lab_historico: {
+        Row: {
+          id:         string
+          envio_id:   string
+          empresa_id: string
+          user_id:    string
+          tipo_acao:  string
+          detalhe:    string | null
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          envio_id:    string
+          empresa_id:  string
+          user_id:     string
+          tipo_acao:   string
+          detalhe?:    string | null
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
+      lab_anexos: {
+        Row: {
+          id:             string
+          envio_id:       string
+          empresa_id:     string
+          user_id:        string
+          nome_arquivo:   string
+          storage_path:   string
+          tipo_mime:      string | null
+          tamanho_bytes:  number | null
+          created_at:     string
+        }
+        Insert: {
+          id?:             string
+          envio_id:        string
+          empresa_id:      string
+          user_id:         string
+          nome_arquivo:    string
+          storage_path:    string
+          tipo_mime?:      string | null
+          tamanho_bytes?:  number | null
+          created_at?:     string
+        }
+        Update: {
+          nome_arquivo?: string
         }
         Relationships: []
       }
@@ -886,3 +1056,8 @@ export type Lab              = Database['public']['Tables']['labs']['Row']
 export type LabPreco         = Database['public']['Tables']['lab_precos']['Row']
 export type LabKanbanColuna  = Database['public']['Tables']['lab_kanban_colunas']['Row']
 export type LabEnvio         = Database['public']['Tables']['lab_envios']['Row']
+export type LabDentista      = Database['public']['Tables']['lab_dentistas']['Row']
+export type LabEtiqueta      = Database['public']['Tables']['lab_etiquetas']['Row']
+export type LabTipoServico   = Database['public']['Tables']['lab_tipos_servico']['Row']
+export type LabHistorico     = Database['public']['Tables']['lab_historico']['Row']
+export type LabAnexo         = Database['public']['Tables']['lab_anexos']['Row']

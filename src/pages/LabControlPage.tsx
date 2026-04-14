@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
-import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio } from '../lib/types'
+import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabDentista, LabEtiqueta, LabTipoServico, LabHistorico, LabAnexo } from '../lib/types'
 import styles from './LabControlPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
@@ -43,9 +43,15 @@ type LabEtapa = {
 type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
 type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' }
-type LabHomeMode = 'kanban' | 'calendar' | 'list'
+type LabHomeMode = 'kanban' | 'calendar' | 'list' | 'pecas'
 
 const LAB_FILTER_ALL = '__all__'
+
+const CLASSIFICACAO_PROTESE_OPTIONS = ['Removível', 'Fixa', 'Sobre Implante', 'Ortodôntico', 'Clínico'] as const
+type ClassificacaoProtese = typeof CLASSIFICACAO_PROTESE_OPTIONS[number]
+
+const FORMA_ENVIO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Retirada pelo laboratório', 'Outro'] as const
+const FORMA_RECEBIMENTO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Entrega pelo laboratório', 'Outro'] as const
 function isString(value: unknown): value is string {
   return typeof value === 'string'
 }
@@ -107,6 +113,8 @@ function addBusinessDays(startDate: string, businessDays: number, feriados: stri
 }
 
 // Calculates the promised delivery date based on the longest service deadline
+const MARGEM_INTERNA_DIAS = 2
+
 function calcularPrazoEntrega(
   dataEnvio: string,
   servicos: Array<{ prazo_producao_dias: number | null }>,
@@ -116,9 +124,9 @@ function calcularPrazoEntrega(
   const prazos = servicos
     .map(s => s.prazo_producao_dias)
     .filter((p): p is number => p !== null && p > 0)
-  const dias = prazos.length > 0 ? Math.max(...prazos) : prazoMedioDias
-  if (!dias) return ''
-  return addBusinessDays(dataEnvio, dias, feriados)
+  const diasLab = prazos.length > 0 ? Math.max(...prazos) : prazoMedioDias
+  if (!diasLab) return ''
+  return addBusinessDays(dataEnvio, diasLab + MARGEM_INTERNA_DIAS, feriados)
 }
 
 // Calculates the expected completion date for a service step
@@ -363,6 +371,54 @@ function parseMaskedCurrency(masked: string): number {
   return parseInt(onlyDigits, 10) / 100
 }
 
+// ── Historico auditavel ───────────────────────────────────────────────────
+
+async function registrarHistorico(
+  envioId: string,
+  empresaId: string,
+  userId: string,
+  tipoAcao: string,
+  detalhe?: string | null,
+) {
+  await supabase.from('lab_historico').insert({
+    envio_id:   envioId,
+    empresa_id: empresaId,
+    user_id:    userId,
+    tipo_acao:  tipoAcao,
+    detalhe:    detalhe ?? null,
+  })
+}
+
+// ── Briefing WhatsApp ─────────────────────────────────────────────────────
+
+function buildBriefingText(envio: LabEnvio, labNome: string): string {
+  const lines: string[] = [
+    `*Envio para laboratório: ${labNome}*`,
+    `Paciente: ${envio.paciente_nome}`,
+    envio.dentista_nome ? `Dentista: ${envio.dentista_nome}` : '',
+    `Serviço: ${envio.tipo_trabalho}`,
+    envio.dentes ? `Dentes: ${envio.dentes}` : '',
+    envio.cor ? `Cor/Shade: ${envio.cor}` : '',
+    `Data de envio: ${formatDate(envio.data_envio)}`,
+    envio.data_entrega_prometida ? `Prazo prometido: ${formatDate(envio.data_entrega_prometida)}` : '',
+    envio.urgente ? '⚠️ URGENTE' : '',
+    envio.observacoes ? `Observações: ${envio.observacoes}` : '',
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
+// ── Categorias de peca ────────────────────────────────────────────────────
+
+function derivarCategoriaPeca(tipoTrabalho: string): string {
+  const t = tipoTrabalho.toLowerCase()
+  if (/rolete|prova/.test(t))                           return 'Roletes e Provas'
+  if (/provisório|provisorio|núcleo|nucleo/.test(t))    return 'Provisório e Núcleo'
+  if (/protocolo|overdenture|acrili/.test(t))           return 'Próteses Prontas'
+  if (/coroa|psi|inclu/.test(t))                        return 'Prótese Fixa'
+  if (/placa|contenção|contencao|expansor|orto/.test(t)) return 'Placas e Orto'
+  return 'Outros'
+}
+
 // ── Calendar helpers ───────────────────────────────────────────────────────
 
 type CalendarEvent = {
@@ -505,6 +561,50 @@ function IconList() {
       <line x1="3" y1="6" x2="3.01" y2="6" />
       <line x1="3" y1="12" x2="3.01" y2="12" />
       <line x1="3" y1="18" x2="3.01" y2="18" />
+    </svg>
+  )
+}
+function IconArchive() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/>
+    </svg>
+  )
+}
+function IconTag() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
+    </svg>
+  )
+}
+function IconDownload() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+    </svg>
+  )
+}
+function IconUsers() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  )
+}
+function IconLayers() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+    </svg>
+  )
+}
+function IconStethoscope() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
+      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
+      <circle cx="20" cy="10" r="2"/>
     </svg>
   )
 }
@@ -1003,12 +1103,410 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
   )
 }
 
+// ── DentistasModal ────────────────────────────────────────────────────────
+
+function DentistasModal({ empresaId, onClose }: {
+  empresaId: string; onClose: () => void
+}) {
+  const [dentistas, setDentistas] = useState<LabDentista[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [nome,      setNome]      = useState('')
+  const [espec,     setEspec]     = useState('')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [isNew,     setIsNew]     = useState(false)
+
+  const fetch = useCallback(async () => {
+    const { data } = await supabase.from('lab_dentistas').select('*')
+      .eq('empresa_id', empresaId).order('nome')
+    if (data) setDentistas(data)
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const startNew = () => { setEditingId(null); setNome(''); setEspec(''); setIsNew(true); setError('') }
+  const startEdit = (d: LabDentista) => { setEditingId(d.id); setNome(d.nome); setEspec(d.especialidade ?? ''); setIsNew(false); setError('') }
+  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); setEspec('') }
+
+  const save = async () => {
+    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
+    setSaving(true); setError('')
+    if (isNew) {
+      await supabase.from('lab_dentistas').insert({ empresa_id: empresaId, nome: nome.trim(), especialidade: espec.trim() || null })
+    } else if (editingId) {
+      await supabase.from('lab_dentistas').update({ nome: nome.trim(), especialidade: espec.trim() || null }).eq('id', editingId)
+    }
+    await fetch()
+    cancelEdit()
+    setSaving(false)
+  }
+
+  const toggleAtivo = async (d: LabDentista) => {
+    await supabase.from('lab_dentistas').update({ ativo: !d.ativo }).eq('id', d.id)
+    await fetch()
+  }
+
+  return (
+    <Modal title="Gestão de Dentistas" onClose={onClose} wide>
+      <div className={styles.precosWrap}>
+        {!isNew && editingId === null && (
+          <div className={styles.formActions} style={{ marginBottom: 12 }}>
+            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Novo dentista</button>
+          </div>
+        )}
+        {(isNew || editingId !== null) && (
+          <div className={styles.formGrid2} style={{ marginBottom: 16 }}>
+            <div className={styles.formField}>
+              <label className={styles.label}>Nome *</label>
+              <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do dentista" />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Especialidade</label>
+              <input className={styles.input} value={espec} onChange={e => setEspec(e.target.value)} placeholder="Ex: Implantodontia" />
+            </div>
+            {error && <p className={`${styles.errorMsg} ${styles.colSpan2}`}>{error}</p>}
+            <div className={`${styles.formActions} ${styles.colSpan2}`}>
+              <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
+              <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
+                {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
+              </button>
+            </div>
+          </div>
+        )}
+        {loading ? <Spinner /> : (
+          <div className={styles.precosList}>
+            {dentistas.length === 0 && <p className={styles.emptyMsg}>Nenhum dentista cadastrado.</p>}
+            {dentistas.map(d => (
+              <div key={d.id} className={styles.precosRow} style={{ opacity: d.ativo ? 1 : 0.5 }}>
+                <span className={styles.precosNome}>
+                  {d.nome}
+                  {d.especialidade && <small style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{d.especialidade}</small>}
+                </span>
+                <span className={styles.precosValor} style={{ fontSize: 12 }}>{d.ativo ? 'Ativo' : 'Inativo'}</span>
+                <button type="button" className={styles.btnIcon} onClick={() => startEdit(d)} title="Editar"><IconEdit /></button>
+                <button type="button" className={styles.btnIcon} onClick={() => void toggleAtivo(d)} title={d.ativo ? 'Inativar' : 'Reativar'}>
+                  {d.ativo ? '⏸' : '▶'}
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.formActions} style={{ marginTop: 12 }}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── TiposServicoModal ─────────────────────────────────────────────────────
+
+function TiposServicoModal({ empresaId, onClose }: {
+  empresaId: string; onClose: () => void
+}) {
+  const [tipos,     setTipos]     = useState<LabTipoServico[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [nome,      setNome]      = useState('')
+  const [classif,   setClassif]   = useState<string>(CLASSIFICACAO_PROTESE_OPTIONS[0])
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [isNew,     setIsNew]     = useState(false)
+
+  const fetch = useCallback(async () => {
+    const { data } = await supabase.from('lab_tipos_servico').select('*')
+      .eq('empresa_id', empresaId).order('classificacao').order('nome')
+    if (data) setTipos(data)
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const startNew = () => { setEditingId(null); setNome(''); setClassif(CLASSIFICACAO_PROTESE_OPTIONS[0]); setIsNew(true); setError('') }
+  const startEdit = (t: LabTipoServico) => { setEditingId(t.id); setNome(t.nome); setClassif(t.classificacao); setIsNew(false); setError('') }
+  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); }
+
+  const save = async () => {
+    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
+    setSaving(true); setError('')
+    if (isNew) {
+      await supabase.from('lab_tipos_servico').insert({ empresa_id: empresaId, nome: nome.trim(), classificacao: classif })
+    } else if (editingId) {
+      await supabase.from('lab_tipos_servico').update({ nome: nome.trim(), classificacao: classif }).eq('id', editingId)
+    }
+    await fetch()
+    cancelEdit()
+    setSaving(false)
+  }
+
+  const toggleAtivo = async (t: LabTipoServico) => {
+    await supabase.from('lab_tipos_servico').update({ ativo: !t.ativo }).eq('id', t.id)
+    await fetch()
+  }
+
+  // Group by classificacao
+  const grouped = CLASSIFICACAO_PROTESE_OPTIONS.map(c => ({
+    classif: c as string,
+    items: tipos.filter(t => t.classificacao === c),
+  })).filter(g => g.items.length > 0)
+  const semClassif = tipos.filter(t => !CLASSIFICACAO_PROTESE_OPTIONS.includes(t.classificacao as ClassificacaoProtese))
+  if (semClassif.length > 0) grouped.push({ classif: 'Outros', items: semClassif })
+
+  return (
+    <Modal title="Tipos de Serviço" onClose={onClose} wide>
+      <div className={styles.precosWrap}>
+        {!isNew && editingId === null && (
+          <div className={styles.formActions} style={{ marginBottom: 12 }}>
+            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Novo tipo</button>
+          </div>
+        )}
+        {(isNew || editingId !== null) && (
+          <div className={styles.formGrid2} style={{ marginBottom: 16 }}>
+            <div className={styles.formField}>
+              <label className={styles.label}>Nome *</label>
+              <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Coroa de Zircônia" />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Classificação</label>
+              <select className={styles.select} value={classif} onChange={e => setClassif(e.target.value)}>
+                {CLASSIFICACAO_PROTESE_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            {error && <p className={`${styles.errorMsg} ${styles.colSpan2}`}>{error}</p>}
+            <div className={`${styles.formActions} ${styles.colSpan2}`}>
+              <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
+              <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
+                {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
+              </button>
+            </div>
+          </div>
+        )}
+        {loading ? <Spinner /> : (
+          <div>
+            {tipos.length === 0 && <p className={styles.emptyMsg}>Nenhum tipo de serviço cadastrado.</p>}
+            {grouped.map(g => (
+              <div key={g.classif} style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{g.classif}</div>
+                <div className={styles.precosList}>
+                  {g.items.map(t => (
+                    <div key={t.id} className={styles.precosRow} style={{ opacity: t.ativo ? 1 : 0.5 }}>
+                      <span className={styles.precosNome}>{t.nome}</span>
+                      <span className={styles.precosValor} style={{ fontSize: 12 }}>{t.ativo ? 'Ativo' : 'Inativo'}</span>
+                      <button type="button" className={styles.btnIcon} onClick={() => startEdit(t)} title="Editar"><IconEdit /></button>
+                      <button type="button" className={styles.btnIcon} onClick={() => void toggleAtivo(t)} title={t.ativo ? 'Inativar' : 'Reativar'}>
+                        {t.ativo ? '⏸' : '▶'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.formActions} style={{ marginTop: 12 }}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── EtiquetasModal ────────────────────────────────────────────────────────
+
+function EtiquetasModal({ empresaId, onClose }: {
+  empresaId: string; onClose: () => void
+}) {
+  const [etiquetas, setEtiquetas] = useState<LabEtiqueta[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [nome,      setNome]      = useState('')
+  const [cor,       setCor]       = useState('#6366f1')
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [isNew,     setIsNew]     = useState(false)
+
+  const fetch = useCallback(async () => {
+    const { data } = await supabase.from('lab_etiquetas').select('*')
+      .eq('empresa_id', empresaId).order('nome')
+    if (data) setEtiquetas(data)
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const startNew = () => { setEditingId(null); setNome(''); setCor('#6366f1'); setIsNew(true); setError('') }
+  const startEdit = (e: LabEtiqueta) => { setEditingId(e.id); setNome(e.nome); setCor(e.cor); setIsNew(false); setError('') }
+  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); setCor('#6366f1') }
+
+  const save = async () => {
+    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
+    setSaving(true); setError('')
+    if (isNew) {
+      await supabase.from('lab_etiquetas').insert({ empresa_id: empresaId, nome: nome.trim(), cor })
+    } else if (editingId) {
+      await supabase.from('lab_etiquetas').update({ nome: nome.trim(), cor }).eq('id', editingId)
+    }
+    await fetch()
+    cancelEdit()
+    setSaving(false)
+  }
+
+  const excluir = async (id: string) => {
+    if (!confirm('Excluir esta etiqueta? Ela será removida de todos os cards.')) return
+    await supabase.from('lab_envio_etiquetas').delete().eq('etiqueta_id', id)
+    await supabase.from('lab_etiquetas').delete().eq('id', id)
+    await fetch()
+  }
+
+  return (
+    <Modal title="Etiquetas" onClose={onClose} wide>
+      <div className={styles.precosWrap}>
+        {!isNew && editingId === null && (
+          <div className={styles.formActions} style={{ marginBottom: 12 }}>
+            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Nova etiqueta</button>
+          </div>
+        )}
+        {(isNew || editingId !== null) && (
+          <div className={styles.kanbanAddRow} style={{ marginBottom: 16 }}>
+            <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da etiqueta" />
+            <input type="color" className={styles.colorInput} value={cor} onChange={e => setCor(e.target.value)} />
+            {error && <span className={styles.errorMsg}>{error}</span>}
+            <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
+            <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
+              {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
+            </button>
+          </div>
+        )}
+        {loading ? <Spinner /> : (
+          <div className={styles.precosList}>
+            {etiquetas.length === 0 && <p className={styles.emptyMsg}>Nenhuma etiqueta cadastrada.</p>}
+            {etiquetas.map(e => (
+              <div key={e.id} className={styles.precosRow}>
+                <span className={styles.kanbanColDot} style={{ background: e.cor, width: 16, height: 16, flexShrink: 0 }} />
+                <span className={styles.precosNome}>{e.nome}</span>
+                <button type="button" className={styles.btnIcon} onClick={() => startEdit(e)} title="Editar"><IconEdit /></button>
+                <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => void excluir(e.id)} title="Excluir"><IconTrash /></button>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.formActions} style={{ marginTop: 12 }}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── ArquivadosModal ───────────────────────────────────────────────────────
+
+function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored }: {
+  empresaId: string; userId: string; labId?: string; onClose: () => void; onRestored: () => void
+}) {
+  const [envios,   setEnvios]   = useState<LabEnvio[]>([])
+  const [loading,  setLoading]  = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+  const [confirmText, setConfirmText] = useState('')
+
+  const fetch = useCallback(async () => {
+    let q = supabase.from('lab_envios').select('*').eq('empresa_id', empresaId).not('arquivado_em', 'is', null).order('arquivado_em', { ascending: false })
+    if (labId) q = q.eq('lab_id', labId)
+    const { data } = await q
+    if (data) setEnvios(data)
+    setLoading(false)
+  }, [empresaId, labId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const restaurar = async (envio: LabEnvio) => {
+    await supabase.from('lab_envios').update({ arquivado_em: null, updated_at: new Date().toISOString() }).eq('id', envio.id)
+    await registrarHistorico(envio.id, empresaId, userId, 'Restaurado')
+    await fetch()
+    onRestored()
+  }
+
+  const excluirPermanente = async (envio: LabEnvio) => {
+    if (confirmText !== 'EXCLUIR') { return }
+    setDeleting(envio.id)
+    await registrarHistorico(envio.id, empresaId, userId, 'Excluído permanentemente')
+    await supabase.from('lab_envio_etiquetas').delete().eq('envio_id', envio.id)
+    await supabase.from('lab_historico').delete().eq('envio_id', envio.id)
+    await supabase.from('lab_anexos').delete().eq('envio_id', envio.id)
+    await supabase.from('lab_envios').delete().eq('id', envio.id)
+    setDeleting(null)
+    setConfirmDeleteId(null)
+    setConfirmText('')
+    await fetch()
+    onRestored()
+  }
+
+  return (
+    <Modal title="Envios Arquivados" onClose={onClose} wide>
+      {loading ? <Spinner /> : (
+        <div>
+          {envios.length === 0 && <p className={styles.emptyMsg}>Nenhum envio arquivado.</p>}
+          <div className={styles.financialList}>
+            {envios.map(e => (
+              <div key={e.id} className={styles.financialRow}>
+                <div className={styles.financialMeta}>
+                  <strong>{e.paciente_nome}</strong>
+                  <span>{e.tipo_trabalho}</span>
+                  <small>Arquivado em {formatDate(e.arquivado_em)}</small>
+                  {confirmDeleteId === e.id && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+                      <input
+                        className={styles.input}
+                        value={confirmText}
+                        onChange={ev => setConfirmText(ev.target.value)}
+                        placeholder='Digite EXCLUIR para confirmar'
+                        style={{ flex: 1 }}
+                      />
+                      <button
+                        type="button"
+                        className={`${styles.btnIcon} ${styles.btnIconDanger}`}
+                        disabled={confirmText !== 'EXCLUIR' || deleting === e.id}
+                        onClick={() => void excluirPermanente(e)}
+                      >
+                        Excluir
+                      </button>
+                      <button type="button" className={styles.btnSecondary} onClick={() => { setConfirmDeleteId(null); setConfirmText('') }}>Cancelar</button>
+                    </div>
+                  )}
+                </div>
+                <div className={styles.financialActions}>
+                  <button type="button" className={styles.btnSecondary} onClick={() => void restaurar(e)}>Restaurar</button>
+                  {confirmDeleteId !== e.id && (
+                    <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => { setConfirmDeleteId(e.id); setConfirmText('') }} title="Excluir permanentemente">
+                      <IconTrash />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      <div className={styles.formActions} style={{ marginTop: 12 }}>
+        <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+      </div>
+    </Modal>
+  )
+}
+
 // ── EnvioSteps — wizard de 4 etapas ──────────────────────────────────────
 
 interface EnvioFormState {
   tipo_trabalho: string; preco_servico: string
   paciente_nome: string; dentista_nome: string; dentes: string; cor: string; observacoes: string
+  classificacao_protese: string
   data_envio: string; data_entrega_prometida: string; data_consulta: string
+  forma_envio: string; retirado_por: string
+  data_recebimento: string; forma_recebimento: string; retirado_por_recebimento: string
+  conferencia_ok: boolean; anotacao_recebimento: string
+  desconto: string; observacao_financeira: string
   urgente: boolean
 }
 
@@ -1023,10 +1521,11 @@ interface ServicoSelecionado {
   data_conclusao: string
 }
 
-function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, onClose, onSaved }: {
+function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, dentistas = [], tiposServico = [], onClose, onSaved }: {
   lab?: Lab | null; labs?: Lab[]; precos?: LabPreco[]; precosByLab?: Record<string, LabPreco[]>
   empresaId: string; userId: string
   envio: LabEnvio | null; colunas: LabKanbanColuna[]
+  dentistas?: LabDentista[]; tiposServico?: LabTipoServico[]
   onClose: () => void; onSaved: () => void
 }) {
   const [step,   setStep]   = useState(1)
@@ -1060,17 +1559,27 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
   })
   const [usarPrazoAutomatico, setUsarPrazoAutomatico] = useState(!envio)
   const [form,   setForm]   = useState<EnvioFormState>({
-    tipo_trabalho:          envio?.tipo_trabalho ?? '',
-    preco_servico:          envio?.preco_servico != null ? String(envio.preco_servico) : '',
-    paciente_nome:          envio?.paciente_nome ?? '',
-    dentista_nome:          envio?.dentista_nome ?? '',
-    dentes:                 envio?.dentes ?? '',
-    cor:                    envio?.cor ?? '',
-    observacoes:            envio?.observacoes ?? '',
-    data_envio:             envio?.data_envio ?? today(),
-    data_entrega_prometida: envio?.data_entrega_prometida ?? addBusinessDays(envio?.data_envio ?? today(), currentLab?.prazo_medio_dias ?? 0, feriadosLab),
-    data_consulta:          envio?.data_consulta ?? '',
-    urgente:                envio?.urgente ?? false,
+    tipo_trabalho:               envio?.tipo_trabalho ?? '',
+    preco_servico:               envio?.preco_servico != null ? String(envio.preco_servico) : '',
+    paciente_nome:               envio?.paciente_nome ?? '',
+    dentista_nome:               envio?.dentista_nome ?? '',
+    dentes:                      envio?.dentes ?? '',
+    cor:                         envio?.cor ?? '',
+    observacoes:                 envio?.observacoes ?? '',
+    classificacao_protese:       envio?.classificacao_protese ?? '',
+    data_envio:                  envio?.data_envio ?? today(),
+    data_entrega_prometida:      envio?.data_entrega_prometida ?? addBusinessDays(envio?.data_envio ?? today(), currentLab?.prazo_medio_dias ?? 0, feriadosLab),
+    data_consulta:               envio?.data_consulta ?? '',
+    forma_envio:                 envio?.forma_envio ?? '',
+    retirado_por:                envio?.retirado_por ?? '',
+    data_recebimento:            envio?.data_recebimento ?? '',
+    forma_recebimento:           envio?.forma_recebimento ?? '',
+    retirado_por_recebimento:    envio?.retirado_por_recebimento ?? '',
+    conferencia_ok:              envio?.conferencia_ok ?? false,
+    anotacao_recebimento:        envio?.anotacao_recebimento ?? '',
+    desconto:                    envio?.desconto != null ? formatCurrencyMask(String(Math.round(envio.desconto * 100))) : '',
+    observacao_financeira:       envio?.observacao_financeira ?? '',
+    urgente:                     envio?.urgente ?? false,
   })
 
   const set = (f: keyof EnvioFormState) =>
@@ -1104,6 +1613,13 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         : { ...prev, data_entrega_prometida: prazoCalculado }
     ))
   }, [currentLab?.prazo_medio_dias, feriadosLab, form.data_envio, servicosSelecionados, usarPrazoAutomatico])
+
+  // Auto-suggest classificacao_protese from tiposServico when tipo_trabalho matches
+  useEffect(() => {
+    if (!form.tipo_trabalho || form.classificacao_protese) return
+    const match = tiposServico.find(t => t.nome.toLowerCase() === form.tipo_trabalho.toLowerCase())
+    if (match) setForm(prev => ({ ...prev, classificacao_protese: match.classificacao }))
+  }, [form.tipo_trabalho, tiposServico]) // tiposServico used intentionally here
 
   const handlePrazoPrometidoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsarPrazoAutomatico(false)
@@ -1175,22 +1691,32 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
     setSaving(true); setError('')
 
     const payload = {
-      lab_id:                 currentLab.id,
-      empresa_id:             empresaId,
-      user_id:                userId,
-      tipo_trabalho:          trabalho.trim(),
-      preco_servico:          Number.isFinite(precoConvertido) ? precoConvertido : null,
-      paciente_nome:          form.paciente_nome.trim(),
-      dentista_nome:          form.dentista_nome.trim() || null,
-      dentes:                 form.dentes.trim() || null,
-      cor:                    form.cor || null,
-      observacoes:            form.observacoes.trim() || null,
-      status:                 envio?.status ?? colunas[0]?.nome ?? DEFAULT_ENVIO_STATUS,
-      data_envio:             form.data_envio || today(),
-      data_entrega_prometida: form.data_entrega_prometida || null,
-      data_consulta:          form.data_consulta || null,
-      urgente:                form.urgente,
-      etapas:                 servicosSelecionados.map(servico => ({
+      lab_id:                      currentLab.id,
+      empresa_id:                  empresaId,
+      user_id:                     userId,
+      tipo_trabalho:               trabalho.trim(),
+      preco_servico:               Number.isFinite(precoConvertido) ? precoConvertido : null,
+      classificacao_protese:       form.classificacao_protese || null,
+      paciente_nome:               form.paciente_nome.trim(),
+      dentista_nome:               form.dentista_nome.trim() || null,
+      dentes:                      form.dentes.trim() || null,
+      cor:                         form.cor || null,
+      observacoes:                 form.observacoes.trim() || null,
+      status:                      envio?.status ?? colunas[0]?.nome ?? DEFAULT_ENVIO_STATUS,
+      data_envio:                  form.data_envio || today(),
+      data_entrega_prometida:      form.data_entrega_prometida || null,
+      data_consulta:               form.data_consulta || null,
+      forma_envio:                 form.forma_envio || null,
+      retirado_por:                form.retirado_por.trim() || null,
+      data_recebimento:            form.data_recebimento || null,
+      forma_recebimento:           form.forma_recebimento || null,
+      retirado_por_recebimento:    form.retirado_por_recebimento.trim() || null,
+      conferencia_ok:              form.conferencia_ok,
+      anotacao_recebimento:        form.anotacao_recebimento.trim() || null,
+      desconto:                    form.desconto ? parseMaskedCurrency(form.desconto) : null,
+      observacao_financeira:       form.observacao_financeira.trim() || null,
+      urgente:                     form.urgente,
+      etapas:                      servicosSelecionados.map(servico => ({
         id: servico.key,
         nome: servico.nome.trim(),
         preco: servico.preco,
@@ -1200,22 +1726,34 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         concluido: servico.concluido,
         data_conclusao: servico.data_conclusao || null,
       })),
-      pago:                   envio?.pago ?? false,
-      data_pagamento:         envio?.data_pagamento ?? null,
+      pago:                        envio?.pago ?? false,
+      data_pagamento:              envio?.data_pagamento ?? null,
     }
 
     if (envio) {
+      const changedFields: string[] = []
+      const fieldsToCheck: (keyof typeof payload)[] = ['paciente_nome', 'dentista_nome', 'tipo_trabalho', 'classificacao_protese', 'preco_servico', 'dentes', 'cor', 'observacoes', 'data_envio', 'data_entrega_prometida', 'data_consulta', 'forma_envio', 'retirado_por', 'data_recebimento', 'forma_recebimento', 'urgente', 'desconto', 'observacao_financeira']
+      for (const f of fieldsToCheck) {
+        if (String(payload[f] ?? '') !== String((envio as Record<string, unknown>)[f] ?? '')) changedFields.push(f)
+      }
       const { error: err } = await supabase.from('lab_envios')
         .update({ ...payload, updated_at: new Date().toISOString() }).eq('id', envio.id)
       if (err) { setError(err.message); setSaving(false); return }
+      if (changedFields.length > 0) {
+        await registrarHistorico(envio.id, empresaId, userId, 'Envio editado', `Campos: ${changedFields.join(', ')}`)
+      }
     } else {
-      const { error: err } = await supabase.from('lab_envios').insert(payload)
+      const { data: inserted, error: err } = await supabase.from('lab_envios').insert(payload).select().single()
       if (err) { setError(err.message); setSaving(false); return }
+      if (inserted) {
+        await registrarHistorico(inserted.id, empresaId, userId, 'Envio criado')
+      }
     }
     onSaved(); onClose()
   }
 
-  const stepTitles = ['Tipo de Trabalho', 'Dados do Caso', 'Datas', 'Revisão']
+  const stepTitles = ['Tipo de Trabalho', 'Dados do Caso', 'Envio', 'Retorno', 'Financeiro', 'Revisão']
+  const TOTAL_STEPS = stepTitles.length
   const displayTrabalho = form.tipo_trabalho
 
   return (
@@ -1360,7 +1898,23 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Dentista</label>
-              <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
+              {dentistas.filter(d => d.ativo).length > 0 ? (
+                <select className={styles.select} value={form.dentista_nome} onChange={set('dentista_nome')}>
+                  <option value="">Selecionar dentista</option>
+                  {dentistas.filter(d => d.ativo).map(d => (
+                    <option key={d.id} value={d.nome}>{d.nome}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
+                  ))}
+                </select>
+              ) : (
+                <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
+              )}
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Classificação da prótese</label>
+              <select className={styles.select} value={form.classificacao_protese} onChange={set('classificacao_protese')}>
+                <option value="">Não especificado</option>
+                {CLASSIFICACAO_PROTESE_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Dentes</label>
@@ -1381,7 +1935,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         </div>
       )}
 
-      {/* ── Step 3: Datas ── */}
+      {/* ── Step 3: Envio / Datas ── */}
       {step === 3 && (
         <div className={styles.stepContent}>
           <div className={styles.formGrid2}>
@@ -1396,6 +1950,17 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             <div className={styles.formField}>
               <label className={styles.label}>Data da consulta</label>
               <input className={styles.input} type="date" value={form.data_consulta} onChange={set('data_consulta')} />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Forma de envio</label>
+              <select className={styles.select} value={form.forma_envio} onChange={set('forma_envio')}>
+                <option value="">Não informado</option>
+                {FORMA_ENVIO_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div className={`${styles.formField} ${styles.colSpan2}`}>
+              <label className={styles.label}>Retirado por</label>
+              <input className={styles.input} value={form.retirado_por} onChange={set('retirado_por')} placeholder="Nome de quem retirou" />
             </div>
           </div>
           {!!(form.data_entrega_prometida && form.data_consulta && form.data_entrega_prometida > form.data_consulta) && (
@@ -1437,7 +2002,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
                           <input className={styles.input} type="date" value={servico.prazo_entrega} onChange={e => updateServico(servico.key, 'prazo_entrega', e.target.value)} />
                         </div>
                         <div className={styles.formField}>
-                          <label className={styles.label}>Data de conclusÃ£o</label>
+                          <label className={styles.label}>Data de conclusão</label>
                           <input className={styles.input} type="date" value={servico.data_conclusao} onChange={e => updateServico(servico.key, 'data_conclusao', e.target.value)} />
                         </div>
                       </div>
@@ -1455,16 +2020,84 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         </div>
       )}
 
-      {/* ── Step 4: Revisão ── */}
+      {/* ── Step 4: Retorno ── */}
       {step === 4 && (
         <div className={styles.stepContent}>
+          <div className={styles.formGrid2}>
+            <div className={styles.formField}>
+              <label className={styles.label}>Data de recebimento</label>
+              <input className={styles.input} type="date" value={form.data_recebimento} onChange={set('data_recebimento')} />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Forma de recebimento</label>
+              <select className={styles.select} value={form.forma_recebimento} onChange={set('forma_recebimento')}>
+                <option value="">Não informado</option>
+                {FORMA_RECEBIMENTO_OPTIONS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div className={`${styles.formField} ${styles.colSpan2}`}>
+              <label className={styles.label}>Retirado por (recebimento)</label>
+              <input className={styles.input} value={form.retirado_por_recebimento} onChange={set('retirado_por_recebimento')} placeholder="Nome de quem retirou/recebeu" />
+            </div>
+            <div className={`${styles.formField} ${styles.colSpan2}`}>
+              <label className={styles.label}>Anotação do recebimento</label>
+              <textarea className={styles.textarea} value={form.anotacao_recebimento} onChange={set('anotacao_recebimento')} rows={3} placeholder="Observações sobre o recebimento..." />
+            </div>
+          </div>
+          <label className={styles.checkRow}>
+            <input
+              type="checkbox"
+              checked={form.conferencia_ok}
+              onChange={e => setForm(prev => ({ ...prev, conferencia_ok: e.target.checked }))}
+            />
+            <span>{form.conferencia_ok ? 'Conferência realizada ✓' : 'Marcar conferência como realizada'}</span>
+          </label>
+        </div>
+      )}
+
+      {/* ── Step 5: Financeiro ── */}
+      {step === 5 && (
+        <div className={styles.stepContent}>
+          <div className={styles.formGrid2}>
+            <div className={styles.formField}>
+              <label className={styles.label}>Valor do serviço</label>
+              <input
+                className={styles.input}
+                value={form.preco_servico !== '' ? parseFloat(form.preco_servico.replace(',', '.')).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : ''}
+                readOnly
+                disabled
+                placeholder="Calculado pelos serviços"
+              />
+            </div>
+            <div className={styles.formField}>
+              <label className={styles.label}>Desconto</label>
+              <input
+                className={styles.input}
+                value={form.desconto}
+                onChange={e => setForm(prev => ({ ...prev, desconto: formatCurrencyMask(e.target.value) }))}
+                placeholder="R$ 0,00"
+              />
+            </div>
+            <div className={`${styles.formField} ${styles.colSpan2}`}>
+              <label className={styles.label}>Observação financeira</label>
+              <textarea className={styles.textarea} value={form.observacao_financeira} onChange={set('observacao_financeira')} rows={3} placeholder="Notas sobre pagamento, negociação..." />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 6: Revisão ── */}
+      {step === 6 && (
+        <div className={styles.stepContent}>
           <div className={styles.reviewGrid}>
-            <ReviewRow label="Laboratório"    value={currentLab?.nome ?? 'Nao selecionado'} />
+            <ReviewRow label="Laboratório"    value={currentLab?.nome ?? 'Não selecionado'} />
             <ReviewRow label="Tipo de trabalho" value={displayTrabalho || form.tipo_trabalho} />
             <ReviewRow label="Urgência" value={form.urgente ? 'Urgente' : 'Normal'} />
+            {form.classificacao_protese && <ReviewRow label="Classificação" value={form.classificacao_protese} />}
             {form.preco_servico && (
               <ReviewRow label="Valor" value={parseFloat(form.preco_servico.replace(',', '.')).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
             )}
+            {form.desconto && <ReviewRow label="Desconto" value={form.desconto} />}
             <ReviewRow label="Paciente"    value={form.paciente_nome} />
             {form.dentista_nome && <ReviewRow label="Dentista" value={form.dentista_nome} />}
             {form.dentes    && <ReviewRow label="Dentes"  value={form.dentes} />}
@@ -1473,6 +2106,11 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             <ReviewRow label="Data de envio"  value={formatDate(form.data_envio)} />
             <ReviewRow label="Prazo prometido" value={formatDate(form.data_entrega_prometida || null)} />
             {form.data_consulta && <ReviewRow label="Data da consulta" value={formatDate(form.data_consulta)} />}
+            {form.forma_envio && <ReviewRow label="Forma de envio" value={form.forma_envio} />}
+            {form.retirado_por && <ReviewRow label="Retirado por" value={form.retirado_por} />}
+            {form.data_recebimento && <ReviewRow label="Data de recebimento" value={formatDate(form.data_recebimento)} />}
+            {form.forma_recebimento && <ReviewRow label="Forma de recebimento" value={form.forma_recebimento} />}
+            {form.conferencia_ok && <ReviewRow label="Conferência" value="Realizada" />}
           </div>
           {!!(form.data_entrega_prometida && form.data_consulta && form.data_entrega_prometida > form.data_consulta) && (
             <div className={styles.summaryAlert}>
@@ -1490,10 +2128,10 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         )}
         <span style={{ flex: 1 }} />
         <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
-        {step < 4 ? (
+        {step < TOTAL_STEPS ? (
           <button type="button" className={styles.btnPrimary} onClick={nextStep}>Próximo</button>
         ) : (
-          <button type="button" className={styles.btnPrimary} onClick={handleSubmit} disabled={saving}>
+          <button type="button" className={styles.btnPrimary} onClick={() => void handleSubmit()} disabled={saving}>
             {saving ? 'Salvando...' : envio ? 'Salvar alterações' : 'Confirmar envio'}
           </button>
         )}
@@ -1511,12 +2149,15 @@ function ReviewRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function EnvioResumoModal({ envio, labNome, feriados, precosByLab, isAdmin, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
+function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precosByLab, isAdmin, empresaId, userId, onClose, onEdit, onTogglePago, onUpdateEtapa }: {
   envio: LabEnvio
   labNome?: string
+  labTelefone?: string | null
   feriados?: string[]
   precosByLab?: Record<string, LabPreco[]>
   isAdmin: boolean
+  empresaId: string
+  userId: string
   onClose: () => void
   onEdit: () => void
   onTogglePago: (envio: LabEnvio) => Promise<void>
@@ -1529,6 +2170,94 @@ function EnvioResumoModal({ envio, labNome, feriados, precosByLab, isAdmin, onCl
   const etapas = getEnvioEtapas(envio)
   const overdueEtapas = getOverdueEtapas(envio)
   const [savingEtapaId, setSavingEtapaId] = useState<string | null>(null)
+  const [resumoTab, setResumoTab] = useState<'detalhes' | 'etiquetas' | 'historico' | 'anexos'>('detalhes')
+
+  // Etiquetas
+  const [todasEtiquetas, setTodasEtiquetas] = useState<LabEtiqueta[]>([])
+  const [envioEtiquetaIds, setEnvioEtiquetaIds] = useState<string[]>([])
+  const [loadingEtiq, setLoadingEtiq] = useState(true)
+
+  const fetchEtiquetas = useCallback(async () => {
+    const [{ data: etiqData }, { data: envioEtiqData }] = await Promise.all([
+      supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
+      supabase.from('lab_envio_etiquetas').select('etiqueta_id').eq('envio_id', envio.id),
+    ])
+    if (etiqData) setTodasEtiquetas(etiqData)
+    if (envioEtiqData) setEnvioEtiquetaIds(envioEtiqData.map(e => e.etiqueta_id))
+    setLoadingEtiq(false)
+  }, [empresaId, envio.id])
+
+  useEffect(() => { if (resumoTab === 'etiquetas') void fetchEtiquetas() }, [resumoTab, fetchEtiquetas])
+
+  const toggleEtiqueta = async (etiquetaId: string) => {
+    if (envioEtiquetaIds.includes(etiquetaId)) {
+      await supabase.from('lab_envio_etiquetas').delete().eq('envio_id', envio.id).eq('etiqueta_id', etiquetaId)
+      setEnvioEtiquetaIds(prev => prev.filter(id => id !== etiquetaId))
+    } else {
+      await supabase.from('lab_envio_etiquetas').insert({ envio_id: envio.id, etiqueta_id: etiquetaId })
+      setEnvioEtiquetaIds(prev => [...prev, etiquetaId])
+    }
+  }
+
+  // Histórico
+  const [historico, setHistorico] = useState<LabHistorico[]>([])
+  const [loadingHist, setLoadingHist] = useState(true)
+
+  const fetchHistorico = useCallback(async () => {
+    const { data } = await supabase.from('lab_historico').select('*').eq('envio_id', envio.id).order('created_at', { ascending: false })
+    if (data) setHistorico(data)
+    setLoadingHist(false)
+  }, [envio.id])
+
+  useEffect(() => { if (resumoTab === 'historico') void fetchHistorico() }, [resumoTab, fetchHistorico])
+
+  // Anexos
+  const [anexos, setAnexos] = useState<LabAnexo[]>([])
+  const [loadingAnexos, setLoadingAnexos] = useState(true)
+  const [uploadingAnexo, setUploadingAnexo] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const fetchAnexos = useCallback(async () => {
+    const { data } = await supabase.from('lab_anexos').select('*').eq('envio_id', envio.id).order('created_at', { ascending: false })
+    if (data) setAnexos(data)
+    setLoadingAnexos(false)
+  }, [envio.id])
+
+  useEffect(() => { if (resumoTab === 'anexos') void fetchAnexos() }, [resumoTab, fetchAnexos])
+
+  const handleUploadAnexo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingAnexo(true)
+    const path = `${empresaId}/${envio.id}/${Date.now()}_${file.name}`
+    const { error: uploadErr } = await supabase.storage.from('lab-anexos').upload(path, file)
+    if (!uploadErr) {
+      await supabase.from('lab_anexos').insert({
+        envio_id: envio.id,
+        empresa_id: empresaId,
+        user_id: userId,
+        nome_arquivo: file.name,
+        storage_path: path,
+        tipo_mime: file.type || null,
+        tamanho_bytes: file.size,
+      })
+      await fetchAnexos()
+    }
+    setUploadingAnexo(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const downloadAnexo = async (anexo: LabAnexo) => {
+    const { data } = await supabase.storage.from('lab-anexos').createSignedUrl(anexo.storage_path, 60)
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
+  const excluirAnexo = async (anexo: LabAnexo) => {
+    if (!confirm(`Excluir "${anexo.nome_arquivo}"?`)) return
+    await supabase.storage.from('lab-anexos').remove([anexo.storage_path])
+    await supabase.from('lab_anexos').delete().eq('id', anexo.id)
+    await fetchAnexos()
+  }
 
   const handleEtapaUpdate = async (
     etapaId: string,
@@ -1539,88 +2268,193 @@ function EnvioResumoModal({ envio, labNome, feriados, precosByLab, isAdmin, onCl
     setSavingEtapaId(prev => prev === etapaId ? null : prev)
   }
 
+  const whatsappUrl = labTelefone ? buildWhatsAppUrl(labTelefone) : null
+  const briefingUrl = whatsappUrl
+    ? `${whatsappUrl}?text=${encodeURIComponent(buildBriefingText(envio, labNome ?? ''))}`
+    : null
+
   return (
     <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
-      <div className={styles.summaryGrid}>
-        {labNome && <ReviewRow label="Laboratório" value={labNome} />}
-        <ReviewRow label="Paciente" value={envio.paciente_nome} />
-        <ReviewRow label="Resumo" value={getEnvioResumo(envio) || envio.tipo_trabalho} />
-        <ReviewRow label="Status" value={envio.status} />
-        <ReviewRow label="Data de envio" value={formatDate(envio.data_envio)} />
-        <ReviewRow label="Prazo geral" value={formatDate(envio.data_entrega_prometida)} />
-        {envio.data_consulta && <ReviewRow label="Data da consulta" value={formatDate(envio.data_consulta)} />}
-        {envio.preco_servico != null && (
-          <ReviewRow label="Valor" value={envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
-        )}
-        <ReviewRow label="Pagamento" value={envio.pago ? `Pago em ${formatDate(envio.data_pagamento)}` : 'Pendente'} />
-        {envio.observacoes && <ReviewRow label="Observações" value={envio.observacoes} />}
+      {/* Tabs */}
+      <div className={styles.tabs} style={{ marginBottom: 16 }}>
+        {(['detalhes', 'etiquetas', 'historico', 'anexos'] as const).map(tab => (
+          <button key={tab} className={`${styles.tab} ${resumoTab === tab ? styles.tabActive : ''}`} onClick={() => setResumoTab(tab)}>
+            {tab === 'detalhes' ? 'Detalhes' : tab === 'etiquetas' ? 'Etiquetas' : tab === 'historico' ? 'Histórico' : 'Anexos'}
+          </button>
+        ))}
       </div>
 
-      {overdueEtapas.length > 0 && (
-        <div className={styles.summaryAlert}>
-          <IconAlert /> {overdueEtapas.length} etapa(s) atrasada(s)
-        </div>
-      )}
-      {envio.urgente && (
-        <div className={`${styles.summaryAlert} ${styles.summaryAlertUrgent}`}>
-          <IconAlert /> Envio marcado como urgente
-        </div>
-      )}
+      {/* Detalhes tab */}
+      {resumoTab === 'detalhes' && (
+        <>
+          <div className={styles.summaryGrid}>
+            {labNome && <ReviewRow label="Laboratório" value={labNome} />}
+            <ReviewRow label="Paciente" value={envio.paciente_nome} />
+            {envio.dentista_nome && <ReviewRow label="Dentista" value={envio.dentista_nome} />}
+            <ReviewRow label="Resumo" value={getEnvioResumo(envio) || envio.tipo_trabalho} />
+            {envio.classificacao_protese && <ReviewRow label="Classificação" value={envio.classificacao_protese} />}
+            <ReviewRow label="Status" value={envio.status} />
+            <ReviewRow label="Data de envio" value={formatDate(envio.data_envio)} />
+            <ReviewRow label="Prazo geral" value={formatDate(envio.data_entrega_prometida)} />
+            {envio.data_consulta && <ReviewRow label="Data da consulta" value={formatDate(envio.data_consulta)} />}
+            {envio.forma_envio && <ReviewRow label="Forma de envio" value={envio.forma_envio} />}
+            {envio.retirado_por && <ReviewRow label="Retirado por" value={envio.retirado_por} />}
+            {envio.data_recebimento && <ReviewRow label="Recebido em" value={formatDate(envio.data_recebimento)} />}
+            {envio.forma_recebimento && <ReviewRow label="Forma de recebimento" value={envio.forma_recebimento} />}
+            {envio.conferencia_ok && <ReviewRow label="Conferência" value="Realizada" />}
+            {envio.preco_servico != null && (
+              <ReviewRow label="Valor" value={envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+            )}
+            {envio.desconto != null && envio.desconto > 0 && (
+              <ReviewRow label="Desconto" value={envio.desconto.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })} />
+            )}
+            <ReviewRow label="Pagamento" value={envio.pago ? `Pago em ${formatDate(envio.data_pagamento)}` : 'Pendente'} />
+            {envio.observacoes && <ReviewRow label="Observações" value={envio.observacoes} />}
+            {envio.anotacao_recebimento && <ReviewRow label="Anotação recebimento" value={envio.anotacao_recebimento} />}
+            {envio.observacao_financeira && <ReviewRow label="Obs. financeira" value={envio.observacao_financeira} />}
+          </div>
 
-      <div className={styles.summarySteps}>
-        {etapas.map(etapa => {
-          const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
-          const savingEtapa = savingEtapaId === etapa.id
-          const dataPrevista = getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab)
-          return (
-            <div key={etapa.id} className={`${styles.summaryStepCard} ${etapaAtrasada ? styles.summaryStepCardOverdue : ''}`}>
-              <div className={styles.summaryStepHeader}>
-                <strong>{etapa.nome}</strong>
-                <span>{etapa.preco != null ? etapa.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valor'}</span>
-              </div>
-              <div className={styles.kanbanCardEtapaGrid}>
-                <label className={styles.kanbanCardField}>
-                  <span>Previsto</span>
-                  <input
-                    className={`${styles.input} ${styles.inputReadonly}`}
-                    type="text"
-                    value={dataPrevista ? formatDate(dataPrevista) : '—'}
-                    readOnly
-                    disabled
-                  />
-                </label>
-                <label className={styles.kanbanCardField}>
-                  <span>Concluído em</span>
-                  <input
-                    className={styles.input}
-                    type="date"
-                    value={etapa.data_conclusao ?? ''}
-                    disabled={savingEtapa}
-                    onChange={e => void handleEtapaUpdate(etapa.id, { data_conclusao: e.target.value || null })}
-                  />
-                </label>
-              </div>
-              <label className={styles.checkRow}>
-                <input
-                  type="checkbox"
-                  checked={etapa.concluido}
-                  disabled={savingEtapa}
-                  onChange={e => void handleEtapaUpdate(etapa.id, { concluido: e.target.checked })}
-                />
-                <span>{etapa.concluido ? 'Etapa pronta' : 'Marcar etapa como pronta'}</span>
-              </label>
-              <div className={styles.summaryStepMeta}>
-                <span>{etapa.concluido ? `Pronto em ${formatDate(etapa.data_conclusao)}` : 'Em andamento'}</span>
-              </div>
-              {etapaAtrasada && <span className={styles.etapaAlert}>Etapa atrasada</span>}
+          {overdueEtapas.length > 0 && (
+            <div className={styles.summaryAlert}>
+              <IconAlert /> {overdueEtapas.length} etapa(s) atrasada(s)
             </div>
-          )
-        })}
-      </div>
+          )}
+          {envio.urgente && (
+            <div className={`${styles.summaryAlert} ${styles.summaryAlertUrgent}`}>
+              <IconAlert /> Envio marcado como urgente
+            </div>
+          )}
+
+          <div className={styles.summarySteps}>
+            {etapas.map(etapa => {
+              const etapaAtrasada = !etapa.concluido && etapa.prazo_entrega != null && etapa.prazo_entrega < today()
+              const savingEtapa = savingEtapaId === etapa.id
+              const dataPrevista = getEtapaDataPrevista(envio, etapa, feriados ?? [], precosByLab)
+              return (
+                <div key={etapa.id} className={`${styles.summaryStepCard} ${etapaAtrasada ? styles.summaryStepCardOverdue : ''}`}>
+                  <div className={styles.summaryStepHeader}>
+                    <strong>{etapa.nome}</strong>
+                    <span>{etapa.preco != null ? etapa.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : 'Sem valor'}</span>
+                  </div>
+                  <div className={styles.kanbanCardEtapaGrid}>
+                    <label className={styles.kanbanCardField}>
+                      <span>Previsto</span>
+                      <input className={`${styles.input} ${styles.inputReadonly}`} type="text" value={dataPrevista ? formatDate(dataPrevista) : '—'} readOnly disabled />
+                    </label>
+                    <label className={styles.kanbanCardField}>
+                      <span>Concluído em</span>
+                      <input className={styles.input} type="date" value={etapa.data_conclusao ?? ''} disabled={savingEtapa} onChange={e => void handleEtapaUpdate(etapa.id, { data_conclusao: e.target.value || null })} />
+                    </label>
+                  </div>
+                  <label className={styles.checkRow}>
+                    <input type="checkbox" checked={etapa.concluido} disabled={savingEtapa} onChange={e => void handleEtapaUpdate(etapa.id, { concluido: e.target.checked })} />
+                    <span>{etapa.concluido ? 'Etapa pronta' : 'Marcar etapa como pronta'}</span>
+                  </label>
+                  <div className={styles.summaryStepMeta}>
+                    <span>{etapa.concluido ? `Pronto em ${formatDate(etapa.data_conclusao)}` : 'Em andamento'}</span>
+                  </div>
+                  {etapaAtrasada && <span className={styles.etapaAlert}>Etapa atrasada</span>}
+                </div>
+              )
+            })}
+          </div>
+        </>
+      )}
+
+      {/* Etiquetas tab */}
+      {resumoTab === 'etiquetas' && (
+        <div>
+          {loadingEtiq ? <Spinner /> : (
+            <>
+              {todasEtiquetas.length === 0 && <p className={styles.emptyMsg}>Nenhuma etiqueta cadastrada. Crie etiquetas no painel admin.</p>}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {todasEtiquetas.map(et => {
+                  const ativo = envioEtiquetaIds.includes(et.id)
+                  return (
+                    <button
+                      key={et.id}
+                      type="button"
+                      onClick={() => void toggleEtiqueta(et.id)}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
+                        padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
+                        border: `2px solid ${et.cor}`,
+                        background: ativo ? et.cor : 'transparent',
+                        color: ativo ? '#fff' : et.cor,
+                        fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
+                      }}
+                    >
+                      {ativo ? '✓ ' : ''}{et.nome}
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Histórico tab */}
+      {resumoTab === 'historico' && (
+        <div>
+          {loadingHist ? <Spinner /> : (
+            <>
+              {historico.length === 0 && <p className={styles.emptyMsg}>Nenhum registro no histórico.</p>}
+              <div className={styles.financialList}>
+                {historico.map(h => (
+                  <div key={h.id} className={styles.financialRow}>
+                    <div className={styles.financialMeta}>
+                      <strong>{h.tipo_acao}</strong>
+                      {h.detalhe && <span>{h.detalhe}</span>}
+                      <small>{new Date(h.created_at).toLocaleString('pt-BR')}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Anexos tab */}
+      {resumoTab === 'anexos' && (
+        <div>
+          <div className={styles.formActions} style={{ marginBottom: 12 }}>
+            <label className={`${styles.btnSecondary} ${styles.labelBtn}`}>
+              <IconUpload /> {uploadingAnexo ? 'Enviando...' : 'Enviar arquivo'}
+              <input ref={fileInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }} onChange={handleUploadAnexo} disabled={uploadingAnexo} />
+            </label>
+          </div>
+          {loadingAnexos ? <Spinner /> : (
+            <>
+              {anexos.length === 0 && <p className={styles.emptyMsg}>Nenhum anexo enviado.</p>}
+              <div className={styles.financialList}>
+                {anexos.map(a => (
+                  <div key={a.id} className={styles.financialRow}>
+                    <div className={styles.financialMeta}>
+                      <strong>{a.nome_arquivo}</strong>
+                      <small>{new Date(a.created_at).toLocaleString('pt-BR')}{a.tamanho_bytes ? ` · ${Math.round(a.tamanho_bytes / 1024)} KB` : ''}</small>
+                    </div>
+                    <div className={styles.financialActions}>
+                      <button type="button" className={styles.btnIcon} onClick={() => void downloadAnexo(a)} title="Baixar"><IconDownload /></button>
+                      <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => void excluirAnexo(a)} title="Excluir"><IconTrash /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       <div className={styles.formActions}>
         <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
         <span style={{ flex: 1 }} />
+        {briefingUrl && (
+          <a href={briefingUrl} target="_blank" rel="noopener noreferrer" className={styles.btnSecondary} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}>
+            <IconWhatsApp /> WhatsApp
+          </a>
+        )}
         {isAdmin && (
           <button type="button" className={styles.btnSecondary} onClick={() => void onTogglePago(envio)}>
             {envio.pago ? 'Remover pagamento' : 'Marcar como pago'}
@@ -1693,6 +2527,31 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
         </button>
       </div>
 
+      <div className={styles.filterRow} style={{ marginBottom: 8 }}>
+        <button
+          type="button"
+          className={styles.btnSecondary}
+          onClick={() => {
+            const ws = XLSX.utils.json_to_sheet(filtered.map(e => ({
+              Paciente: e.paciente_nome,
+              Serviço: getEnvioResumo(e) || e.tipo_trabalho,
+              Status: e.status,
+              Valor: e.preco_servico ?? 0,
+              Desconto: e.desconto ?? 0,
+              Pago: e.pago ? 'Sim' : 'Não',
+              'Data Referência': getFinanceiroReferenceDate(e),
+            })))
+            const wb = XLSX.utils.book_new()
+            XLSX.utils.book_append_sheet(wb, ws, 'Financeiro')
+            XLSX.writeFile(wb, `financeiro-${lab.nome}.xlsx`)
+          }}
+        >
+          Exportar Excel
+        </button>
+        <button type="button" className={styles.btnSecondary} onClick={() => window.print()}>
+          Exportar PDF
+        </button>
+      </div>
       <div className={styles.financialList}>
         {filtered.length === 0 && <p className={styles.emptyMsg}>Nenhum trabalho nesse filtro.</p>}
         {filtered.map(envio => (
@@ -1720,10 +2579,11 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, onDragStart, onOpenResumo, onEdit, onDelete }: {
+function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, etiquetas, onDragStart, onOpenResumo, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean; labNome?: string | null
   feriados?: string[]
   precosByLab?: Record<string, LabPreco[]>
+  etiquetas?: LabEtiqueta[]
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
   onEdit: () => void; onDelete: () => void
@@ -1770,6 +2630,15 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
           {envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </div>
       )}
+      {etiquetas && etiquetas.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+          {etiquetas.map(et => (
+            <span key={et.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: et.cor + '33', border: `1px solid ${et.cor}`, color: et.cor, fontSize: 11, fontWeight: 600 }}>
+              {et.nome}
+            </span>
+          ))}
+        </div>
+      )}
       <div className={styles.kanbanCardStageSummary}>
         <span>{etapasConcluidas}/{etapas.length} etapa(s) prontas</span>
         <span>Ver resumo</span>
@@ -1786,12 +2655,13 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, etiquetasByEnvio, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   showLabName?: boolean
   getLabName?: (labId: string) => string
   getLabFeriados?: (labId: string) => string[]
   precosByLab?: Record<string, LabPreco[]>
+  etiquetasByEnvio?: Record<string, LabEtiqueta[]>
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
   onEditEnvio: (envio: LabEnvio) => void
@@ -1871,6 +2741,7 @@ function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLab
                   labNome={showLabName ? getLabName?.(envio.lab_id) ?? 'Laboratório' : null}
                   feriados={getLabFeriados?.(envio.lab_id)}
                   precosByLab={precosByLab}
+                  etiquetas={etiquetasByEnvio?.[envio.id]}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
                   onEdit={() => onEditEnvio(envio)}
@@ -1901,30 +2772,41 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   const storagePrefix = `lab-control:${empresaId}:lab:${lab.id}`
   const [envios,          setEnvios]          = useState<LabEnvio[]>([])
   const [precos,          setPrecos]          = useState<LabPreco[]>([])
+  const [dentistas,       setDentistas]       = useState<LabDentista[]>([])
+  const [tiposServico,    setTiposServico]    = useState<LabTipoServico[]>([])
+  const [todasEtiquetas,  setTodasEtiquetas]  = useState<LabEtiqueta[]>([])
+  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
   const [loading,         setLoading]         = useState(true)
   const [activeTab, setActiveTab] = useSessionStorageState<'kanban' | 'info'>(
     `${storagePrefix}:active-tab`,
     'kanban',
     isLabDetailTab,
   )
-  const [showEnvioSteps,  setShowEnvioSteps]  = useState(false)
-  const [editingEnvio,    setEditingEnvio]    = useState<LabEnvio | null>(null)
-  const [resumoEnvio,     setResumoEnvio]     = useState<LabEnvio | null>(null)
-  const [showEditLab,     setShowEditLab]     = useState(false)
-  const [showPrecos,      setShowPrecos]      = useState(false)
-  const [showKanbanCfg,   setShowKanbanCfg]   = useState(false)
-  const [editingPrecoId,  setEditingPrecoId]  = useState<string | null>(null)
+  const [showEnvioSteps,    setShowEnvioSteps]    = useState(false)
+  const [editingEnvio,      setEditingEnvio]      = useState<LabEnvio | null>(null)
+  const [resumoEnvio,       setResumoEnvio]       = useState<LabEnvio | null>(null)
+  const [showEditLab,       setShowEditLab]       = useState(false)
+  const [showPrecos,        setShowPrecos]        = useState(false)
+  const [showKanbanCfg,     setShowKanbanCfg]     = useState(false)
+  const [showDentistas,     setShowDentistas]     = useState(false)
+  const [showTiposServico,  setShowTiposServico]  = useState(false)
+  const [showEtiquetas,     setShowEtiquetas]     = useState(false)
+  const [showArquivados,    setShowArquivados]    = useState(false)
+  const [editingPrecoId,    setEditingPrecoId]    = useState<string | null>(null)
   const [patientSearch, setPatientSearch] = useSessionStorageState(
     `${storagePrefix}:patient-search`,
     '',
     isString,
   )
+  const [etiquetaFilter, setEtiquetaFilter] = useState('')
   const [novoFeriado,     setNovoFeriado]     = useState('')
 
   const fetchEnvios = useCallback(async () => {
     const { data } = await supabase
       .from('lab_envios').select('*')
-      .eq('lab_id', lab.id).order('created_at', { ascending: false })
+      .eq('lab_id', lab.id)
+      .is('arquivado_em', null)
+      .order('created_at', { ascending: false })
     if (data) setEnvios(data)
     setLoading(false)
   }, [lab.id])
@@ -1936,17 +2818,71 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     if (data) setPrecos(data)
   }, [lab.id])
 
-  useEffect(() => { fetchEnvios(); fetchPrecos() }, [fetchEnvios, fetchPrecos])
+  const fetchDentistas = useCallback(async () => {
+    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (data) setDentistas(data)
+  }, [empresaId])
+
+  const fetchTiposServico = useCallback(async () => {
+    const { data } = await supabase.from('lab_tipos_servico').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (data) setTiposServico(data)
+  }, [empresaId])
+
+  const fetchEtiquetas = useCallback(async () => {
+    const { data: etiqData } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (etiqData) setTodasEtiquetas(etiqData)
+  }, [empresaId])
+
+  const fetchEtiquetasByEnvio = useCallback(async (envioIds: string[], etiquetas: LabEtiqueta[]) => {
+    if (envioIds.length === 0) { setEtiquetasByEnvio({}); return }
+    const { data } = await supabase.from('lab_envio_etiquetas').select('envio_id, etiqueta_id').in('envio_id', envioIds)
+    const etiqMap: Record<string, LabEtiqueta[]> = {}
+    for (const row of data ?? []) {
+      const etq = etiquetas.find(e => e.id === row.etiqueta_id)
+      if (!etq) continue
+      if (!etiqMap[row.envio_id]) etiqMap[row.envio_id] = []
+      etiqMap[row.envio_id].push(etq)
+    }
+    setEtiquetasByEnvio(etiqMap)
+  }, [])
+
+  useEffect(() => {
+    void fetchEnvios()
+    void fetchPrecos()
+    void fetchDentistas()
+    void fetchTiposServico()
+    void fetchEtiquetas()
+  }, [fetchEnvios, fetchPrecos, fetchDentistas, fetchTiposServico, fetchEtiquetas])
+
+  useEffect(() => {
+    void fetchEtiquetasByEnvio(envios.map(e => e.id), todasEtiquetas)
+  }, [envios, todasEtiquetas, fetchEtiquetasByEnvio])
 
   const moveEnvio = async (envioId: string, status: string) => {
     await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
     setEnvios(prev => prev.map(e => e.id === envioId ? { ...e, status } : e))
+    const e = envios.find(x => x.id === envioId)
+    if (e) await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
 
   const deleteEnvio = async (envioId: string) => {
-    if (!confirm('Excluir este envio?')) return
-    await supabase.from('lab_envios').delete().eq('id', envioId)
-    setEnvios(prev => prev.filter(e => e.id !== envioId))
+    const envio = envios.find(e => e.id === envioId)
+    if (!envio) return
+    if (isAdmin) {
+      const choice = confirm('Arquivar este envio?\n\nClique em OK para arquivar.\nClique em Cancelar para outras opções.')
+      if (choice) {
+        const arquivado_em = new Date().toISOString()
+        await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+        await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
+        setEnvios(prev => prev.filter(e => e.id !== envioId))
+      }
+    } else {
+      if (!confirm('Arquivar este envio?')) return
+      const arquivado_em = new Date().toISOString()
+      await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+      await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
+      setEnvios(prev => prev.filter(e => e.id !== envioId))
+    }
   }
 
   const togglePagoEnvio = async (envio: LabEnvio) => {
@@ -1958,6 +2894,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     }
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
     if (error) return
+    await registrarHistorico(envio.id, empresaId, userId, nextPago ? 'Pagamento registrado' : 'Pagamento removido')
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
   }
@@ -1993,9 +2930,11 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     onLabUpdated()
   }
 
-  const filteredEnvios = envios.filter(envio =>
-    envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase()),
-  )
+  const filteredEnvios = envios.filter(envio => {
+    if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
+    if (etiquetaFilter && !etiquetasByEnvio[envio.id]?.some(et => et.id === etiquetaFilter)) return false
+    return true
+  })
 
   const overdueCount = envios.filter(isOverdue).length
 
@@ -2026,6 +2965,18 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
                 <IconSettings2 /> Kanban
               </button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowDentistas(true)}>
+                <IconUsers /> Dentistas
+              </button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowTiposServico(true)}>
+                <IconLayers /> Tipos de Serviço
+              </button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowEtiquetas(true)}>
+                <IconTag /> Etiquetas
+              </button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowArquivados(true)}>
+                <IconArchive /> Arquivados
+              </button>
             </>
           )}
           <button type="button" className={styles.btnPrimary} onClick={() => { setEditingEnvio(null); setShowEnvioSteps(true) }}>
@@ -2055,6 +3006,12 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
                 onChange={e => setPatientSearch(e.target.value)}
                 placeholder="Buscar paciente no kanban"
               />
+              {todasEtiquetas.length > 0 && (
+                <select className={styles.select} value={etiquetaFilter} onChange={e => setEtiquetaFilter(e.target.value)}>
+                  <option value="">Todas as etiquetas</option>
+                  {todasEtiquetas.map(et => <option key={et.id} value={et.id}>{et.nome}</option>)}
+                </select>
+              )}
             </div>
             <KanbanBoard
               envios={filteredEnvios}
@@ -2062,6 +3019,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               isAdmin={isAdmin}
               getLabFeriados={() => getLabFeriados(lab)}
               precosByLab={{ [lab.id]: precos }}
+              etiquetasByEnvio={etiquetasByEnvio}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
@@ -2191,6 +3149,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
         <EnvioSteps
           lab={lab} precos={precos} empresaId={empresaId} userId={userId}
           envio={editingEnvio} colunas={colunas}
+          dentistas={dentistas} tiposServico={tiposServico}
           onClose={() => setShowEnvioSteps(false)} onSaved={fetchEnvios}
         />
       )}
@@ -2201,10 +3160,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
       {showPrecos && (
         <PrecosModal lab={lab}
           initialEditingId={editingPrecoId}
-          onClose={() => {
-            setShowPrecos(false)
-            setEditingPrecoId(null)
-          }}
+          onClose={() => { setShowPrecos(false); setEditingPrecoId(null) }}
           onSaved={fetchPrecos}
         />
       )}
@@ -2212,10 +3168,26 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
         <KanbanConfigModal empresaId={empresaId} colunas={colunas}
           onClose={() => setShowKanbanCfg(false)} onSaved={onColunasUpdated} />
       )}
+      {showDentistas && (
+        <DentistasModal empresaId={empresaId} onClose={() => { setShowDentistas(false); void fetchDentistas() }} />
+      )}
+      {showTiposServico && (
+        <TiposServicoModal empresaId={empresaId} onClose={() => { setShowTiposServico(false); void fetchTiposServico() }} />
+      )}
+      {showEtiquetas && (
+        <EtiquetasModal empresaId={empresaId} onClose={() => { setShowEtiquetas(false); void fetchEtiquetas() }} />
+      )}
+      {showArquivados && (
+        <ArquivadosModal empresaId={empresaId} userId={userId} labId={lab.id} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+      )}
       {resumoEnvio && (
         <EnvioResumoModal
           envio={resumoEnvio}
+          labNome={lab.nome}
+          labTelefone={lab.telefone}
           isAdmin={isAdmin}
+          empresaId={empresaId}
+          userId={userId}
           feriados={getLabFeriados(lab)}
           precosByLab={{ [lab.id]: precos }}
           onClose={() => setResumoEnvio(null)}
@@ -2250,13 +3222,18 @@ function LabsAggregateDetailView({
   onColunasUpdated: () => void
 }) {
   const storagePrefix = `lab-control:${empresaId}:aggregate`
-  const [envios,         setEnvios]         = useState<LabEnvio[]>([])
-  const [precosByLab,    setPrecosByLab]    = useState<Record<string, LabPreco[]>>({})
-  const [loading,        setLoading]        = useState(true)
-  const [showEnvioSteps, setShowEnvioSteps] = useState(false)
-  const [editingEnvio,   setEditingEnvio]   = useState<LabEnvio | null>(null)
-  const [resumoEnvio,    setResumoEnvio]    = useState<LabEnvio | null>(null)
-  const [showKanbanCfg,  setShowKanbanCfg]  = useState(false)
+  const [envios,           setEnvios]           = useState<LabEnvio[]>([])
+  const [precosByLab,      setPrecosByLab]      = useState<Record<string, LabPreco[]>>({})
+  const [dentistas,        setDentistas]        = useState<LabDentista[]>([])
+  const [tiposServico,     setTiposServico]     = useState<LabTipoServico[]>([])
+  const [todasEtiquetas,   setTodasEtiquetas]   = useState<LabEtiqueta[]>([])
+  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
+  const [loading,          setLoading]          = useState(true)
+  const [showEnvioSteps,   setShowEnvioSteps]   = useState(false)
+  const [editingEnvio,     setEditingEnvio]     = useState<LabEnvio | null>(null)
+  const [resumoEnvio,      setResumoEnvio]      = useState<LabEnvio | null>(null)
+  const [showKanbanCfg,    setShowKanbanCfg]    = useState(false)
+  const [showArquivados,   setShowArquivados]   = useState(false)
   const [patientSearch, setPatientSearch] = useSessionStorageState(
     `${storagePrefix}:patient-search`,
     '',
@@ -2267,6 +3244,7 @@ function LabsAggregateDetailView({
     LAB_FILTER_ALL,
     isString,
   )
+  const [etiquetaFilter, setEtiquetaFilter] = useState('')
 
   const labsById = Object.fromEntries(labs.map(item => [item.id, item]))
 
@@ -2275,10 +3253,39 @@ function LabsAggregateDetailView({
       .from('lab_envios')
       .select('*')
       .eq('empresa_id', empresaId)
+      .is('arquivado_em', null)
       .order('created_at', { ascending: false })
 
     setEnvios(data ? sortEnviosByCreatedAt(data) : [])
   }, [empresaId])
+
+  const fetchDentistasAgg = useCallback(async () => {
+    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (data) setDentistas(data)
+  }, [empresaId])
+
+  const fetchTiposServicoAgg = useCallback(async () => {
+    const { data } = await supabase.from('lab_tipos_servico').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (data) setTiposServico(data)
+  }, [empresaId])
+
+  const fetchEtiquetasAgg = useCallback(async () => {
+    const { data } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    if (data) setTodasEtiquetas(data)
+  }, [empresaId])
+
+  const fetchEtiquetasByEnvioAgg = useCallback(async (envioIds: string[], etiquetas: LabEtiqueta[]) => {
+    if (envioIds.length === 0) { setEtiquetasByEnvio({}); return }
+    const { data } = await supabase.from('lab_envio_etiquetas').select('envio_id, etiqueta_id').in('envio_id', envioIds)
+    const etiqMap: Record<string, LabEtiqueta[]> = {}
+    for (const row of data ?? []) {
+      const etq = etiquetas.find(e => e.id === row.etiqueta_id)
+      if (!etq) continue
+      if (!etiqMap[row.envio_id]) etiqMap[row.envio_id] = []
+      etiqMap[row.envio_id].push(etq)
+    }
+    setEtiquetasByEnvio(etiqMap)
+  }, [])
 
   const fetchPrecos = useCallback(async () => {
     if (labs.length === 0) {
@@ -2303,8 +3310,12 @@ function LabsAggregateDetailView({
 
   useEffect(() => {
     setLoading(true)
-    void Promise.all([fetchEnvios(), fetchPrecos()]).then(() => setLoading(false))
-  }, [fetchEnvios, fetchPrecos])
+    void Promise.all([fetchEnvios(), fetchPrecos(), fetchDentistasAgg(), fetchTiposServicoAgg(), fetchEtiquetasAgg()]).then(() => setLoading(false))
+  }, [fetchEnvios, fetchPrecos, fetchDentistasAgg, fetchTiposServicoAgg, fetchEtiquetasAgg])
+
+  useEffect(() => {
+    void fetchEtiquetasByEnvioAgg(envios.map(e => e.id), todasEtiquetas)
+  }, [envios, todasEtiquetas, fetchEtiquetasByEnvioAgg])
 
   useEffect(() => {
     if (labFilterId === LAB_FILTER_ALL) return
@@ -2314,14 +3325,17 @@ function LabsAggregateDetailView({
     }
   }, [labFilterId, labs, setLabFilterId])
 
-  const moveEnvio = async (envioId: string, status: string) => {
+  const moveEnvioAgg = async (envioId: string, status: string) => {
     await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
     setEnvios(prev => prev.map(item => item.id === envioId ? { ...item, status } : item))
+    await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
 
-  const deleteEnvio = async (envioId: string) => {
-    if (!confirm('Excluir este envio?')) return
-    await supabase.from('lab_envios').delete().eq('id', envioId)
+  const deleteEnvioAgg = async (envioId: string) => {
+    if (!confirm('Arquivar este envio?')) return
+    const arquivado_em = new Date().toISOString()
+    await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+    await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
     setEnvios(prev => prev.filter(item => item.id !== envioId))
   }
 
@@ -2334,6 +3348,7 @@ function LabsAggregateDetailView({
     }
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
     if (error) return
+    await registrarHistorico(envio.id, empresaId, userId, nextPago ? 'Pagamento registrado' : 'Pagamento removido')
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
   }
@@ -2363,6 +3378,7 @@ function LabsAggregateDetailView({
   const visibleEnvios = envios.filter(envio => {
     if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
     if (labFilterId !== LAB_FILTER_ALL && envio.lab_id !== labFilterId) return false
+    if (etiquetaFilter && !etiquetasByEnvio[envio.id]?.some(et => et.id === etiquetaFilter)) return false
     return true
   })
 
@@ -2386,9 +3402,14 @@ function LabsAggregateDetailView({
         <span className={styles.headerMetaBadge}>{labs.length} laboratórios ativos</span>
         <div className={styles.headerActions}>
           {isAdmin && (
-            <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
-              <IconSettings2 /> Kanban
-            </button>
+            <>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
+                <IconSettings2 /> Kanban
+              </button>
+              <button type="button" className={styles.btnSecondary} onClick={() => setShowArquivados(true)}>
+                <IconArchive /> Arquivados
+              </button>
+            </>
           )}
           <button
             type="button"
@@ -2432,6 +3453,12 @@ function LabsAggregateDetailView({
                 </option>
               ))}
             </select>
+            {todasEtiquetas.length > 0 && (
+              <select className={styles.select} value={etiquetaFilter} onChange={e => setEtiquetaFilter(e.target.value)}>
+                <option value="">Todas as etiquetas</option>
+                {todasEtiquetas.map(et => <option key={et.id} value={et.id}>{et.nome}</option>)}
+              </select>
+            )}
           </div>
 
           <div className={styles.aggregateFilterHint}>
@@ -2448,10 +3475,11 @@ function LabsAggregateDetailView({
             getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
             getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
             precosByLab={precosByLab}
-            onMoveEnvio={moveEnvio}
+            etiquetasByEnvio={etiquetasByEnvio}
+            onMoveEnvio={moveEnvioAgg}
             onOpenResumo={setResumoEnvio}
             onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
-            onDeleteEnvio={deleteEnvio}
+            onDeleteEnvio={deleteEnvioAgg}
           />
         </>
       )}
@@ -2465,6 +3493,8 @@ function LabsAggregateDetailView({
           userId={userId}
           envio={editingEnvio}
           colunas={colunas}
+          dentistas={dentistas}
+          tiposServico={tiposServico}
           onClose={() => {
             setShowEnvioSteps(false)
             setEditingEnvio(null)
@@ -2482,13 +3512,19 @@ function LabsAggregateDetailView({
           onSaved={onColunasUpdated}
         />
       )}
+      {showArquivados && (
+        <ArquivadosModal empresaId={empresaId} userId={userId} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+      )}
       {resumoEnvio && (
         <EnvioResumoModal
           envio={resumoEnvio}
           labNome={labsById[resumoEnvio.lab_id]?.nome}
+          labTelefone={labsById[resumoEnvio.lab_id]?.telefone}
           feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
           precosByLab={precosByLab}
           isAdmin={isAdmin}
+          empresaId={empresaId}
+          userId={userId}
           onClose={() => setResumoEnvio(null)}
           onEdit={() => {
             setEditingEnvio(resumoEnvio)
@@ -2648,6 +3684,33 @@ function ServicesListView({ envios, precosByLab, labs }: {
           <strong>Lista de serviços</strong>
           <span>{rows.length} serviço{rows.length === 1 ? '' : 's'}</span>
         </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            type="button"
+            className={styles.btnSecondary}
+            onClick={() => {
+              const ws = XLSX.utils.json_to_sheet(rows.map(r => ({
+                Paciente: r.pacienteNome,
+                Serviço: r.servicoNome,
+                Dentes: r.dentes ?? '',
+                Cor: r.cor ?? '',
+                'Data Envio': r.dataEnvio,
+                Prazo: r.dataPrevista ?? '',
+                Status: r.status,
+                Laboratório: r.labNome,
+                Urgente: r.urgente ? 'Sim' : 'Não',
+              })))
+              const wb = XLSX.utils.book_new()
+              XLSX.utils.book_append_sheet(wb, ws, 'Serviços')
+              XLSX.writeFile(wb, 'servicos.xlsx')
+            }}
+          >
+            Exportar Excel
+          </button>
+          <button type="button" className={styles.btnSecondary} onClick={() => window.print()}>
+            Exportar PDF
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
@@ -2687,6 +3750,109 @@ function ServicesListView({ envios, precosByLab, labs }: {
                     </span>
                   </td>
                   <td>{row.labNome}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── PecasClinicaView ──────────────────────────────────────────────────────
+
+const PECAS_RETORNO_STATUSES = ['Retorno à clínica', 'Agendamento do paciente']
+
+function PecasClinicaView({ envios, labs, onClose }: {
+  envios: LabEnvio[]; labs: Lab[]; onClose: () => void
+}) {
+  const labsById = useMemo(() => Object.fromEntries(labs.map(l => [l.id, l])), [labs])
+  const [categoriaFilter, setCategoriaFilter] = useState('')
+  const [dentistaFilter, setDentistaFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const pecas = useMemo(() => {
+    return envios
+      .filter(e => PECAS_RETORNO_STATUSES.includes(e.status))
+      .map(e => ({
+        envio: e,
+        categoria: e.categoria_peca ?? derivarCategoriaPeca(e.tipo_trabalho),
+        lab: labsById[e.lab_id],
+        statusPeca: e.data_consulta ? 'AGENDADO' : 'AGENDAR',
+      }))
+  }, [envios, labsById])
+
+  const categorias = useMemo(() => Array.from(new Set(pecas.map(p => p.categoria))).sort(), [pecas])
+  const dentistas  = useMemo(() => Array.from(new Set(pecas.map(p => p.envio.dentista_nome).filter(Boolean))).sort() as string[], [pecas])
+
+  const filtered = pecas.filter(p => {
+    if (categoriaFilter && p.categoria !== categoriaFilter) return false
+    if (dentistaFilter && p.envio.dentista_nome !== dentistaFilter) return false
+    if (statusFilter && p.statusPeca !== statusFilter) return false
+    return true
+  })
+
+  return (
+    <div className={styles.serviceListWrap}>
+      <div className={styles.serviceListHeader}>
+        <div>
+          <strong>Peças na Clínica</strong>
+          <span>{filtered.length} peça{filtered.length === 1 ? '' : 's'}</span>
+        </div>
+        <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+      </div>
+
+      <div className={styles.filterRow} style={{ marginBottom: 12 }}>
+        <select className={styles.select} value={categoriaFilter} onChange={e => setCategoriaFilter(e.target.value)}>
+          <option value="">Todas as categorias</option>
+          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select className={styles.select} value={dentistaFilter} onChange={e => setDentistaFilter(e.target.value)}>
+          <option value="">Todos os dentistas</option>
+          {dentistas.map(d => <option key={d} value={d}>{d}</option>)}
+        </select>
+        <select className={styles.select} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="">Todos os status</option>
+          <option value="AGENDAR">AGENDAR</option>
+          <option value="AGENDADO">AGENDADO</option>
+        </select>
+      </div>
+
+      {filtered.length === 0 ? (
+        <div className={styles.serviceListEmpty}>Nenhuma peça na clínica.</div>
+      ) : (
+        <div className={styles.serviceTableScroller}>
+          <table className={styles.serviceTable}>
+            <thead>
+              <tr>
+                <th>Paciente</th>
+                <th>Dentista</th>
+                <th>Serviço</th>
+                <th>Categoria</th>
+                <th>Lab</th>
+                <th>Recebido em</th>
+                <th>Status peça</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(({ envio: e, categoria, lab, statusPeca }) => (
+                <tr key={e.id}>
+                  <td><strong>{e.paciente_nome}</strong></td>
+                  <td>{e.dentista_nome || '—'}</td>
+                  <td>{e.tipo_trabalho}</td>
+                  <td>{categoria}</td>
+                  <td>{lab?.nome ?? '—'}</td>
+                  <td>{formatDate(e.data_recebimento)}</td>
+                  <td>
+                    <span style={{
+                      padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                      background: statusPeca === 'AGENDADO' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
+                      color: statusPeca === 'AGENDADO' ? '#10b981' : '#f59e0b',
+                    }}>
+                      {statusPeca}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -3028,7 +4194,9 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const fetchEnvios = useCallback(async () => {
     const { data } = await supabase
       .from('lab_envios').select('*')
-      .eq('empresa_id', empresa.id).order('created_at', { ascending: false })
+      .eq('empresa_id', empresa.id)
+      .is('arquivado_em', null)
+      .order('created_at', { ascending: false })
     if (data) {
       const map: Record<string, LabEnvio[]> = {}
       for (const e of data) {
@@ -3197,6 +4365,13 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           >
             <IconList /> Lista
           </button>
+          <button
+            type="button"
+            className={`${styles.btnSecondary} ${homeMode === 'pecas' ? styles.btnSecondaryActive : ''}`}
+            onClick={() => setHomeMode('pecas')}
+          >
+            <IconStethoscope /> Peças na Clínica
+          </button>
           {isAdmin && (
             <button
               type="button"
@@ -3235,6 +4410,12 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
           precosByLab={precosByLab}
           labs={labs}
+        />
+      ) : homeMode === 'pecas' ? (
+        <PecasClinicaView
+          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+          labs={labs}
+          onClose={() => setHomeMode('kanban')}
         />
       ) : (
         <div className={styles.labsGrid}>
