@@ -2591,12 +2591,12 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                   return (
                     <div key={item.id} className={styles.priceRow}>
                       <div className={styles.priceNameWrap}>
-                      <span className={styles.priceName}>{item.nome_produto}</span>
-                      {hasGestaaCalculatedPrice(item) && (
-                        <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
-                      )}
-                      <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
-                    </div>
+                        <span className={styles.priceName}>{item.nome_produto}</span>
+                        <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
+                        {hasGestaaCalculatedPrice(item) && (
+                          <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
+                        )}
+                      </div>
                       <div
                         className={`${styles.priceMarginValue} ${
                           margemSaudavel
