@@ -250,7 +250,7 @@
 .priceTableHead,
 .priceRow {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 140px minmax(220px, 320px) 180px;
+  grid-template-columns: minmax(0, 1fr) 140px minmax(220px, 320px) 180px 68px;
   gap: 16px;
   align-items: center;
 }
@@ -386,6 +386,44 @@
   border-color: rgba(201, 73, 73, 0.5);
   color: #ffb0b0;
   transform: translateY(-1px);
+}
+
+.priceIconActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.priceIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.priceIconBtn:hover {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.15);
+  color: var(--text);
+}
+
+.priceIconBtnDanger {
+  border-color: rgba(201, 73, 73, 0.3);
+  color: #ff9f9f;
+}
+
+.priceIconBtnDanger:hover {
+  background: rgba(201, 73, 73, 0.15);
+  border-color: rgba(201, 73, 73, 0.5);
+  color: #ffb0b0;
 }
 
 .calcButton {

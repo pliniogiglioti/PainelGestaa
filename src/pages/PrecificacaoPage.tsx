@@ -89,6 +89,22 @@ type PrecoFormPayload = {
   margem: number | null
 }
 
+const IconEdit = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z" />
+  </svg>
+)
+
+const IconTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="3 6 5 6 21 6" />
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+    <path d="M10 11v6M14 11v6" />
+    <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+  </svg>
+)
+
 const IconBack = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polyline points="15 18 9 12 15 6" />
@@ -2902,11 +2918,21 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                         {margemPercentual == null || margemPercentual === 0 ? 'Sem precificação' : formatPercent(margemPercentual)}
                       </div>
                       <div className={styles.priceActions}>
+                        <button
+                          type="button"
+                          className={`${styles.calcButton} ${margemSaudavel ? styles.calcButtonGood : styles.calcButtonBad}`}
+                          onClick={() => setItemCalculadora(item)}
+                        >
+                          {margemSaudavel ? 'Preco com margem correta' : 'Rever precificacao'}
+                        </button>
+                      </div>
+                      <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                       {canManage && (
-                        <>
+                        <div className={styles.priceIconActions}>
                           <button
                             type="button"
-                            className={styles.priceEditButton}
+                            className={styles.priceIconBtn}
+                            title="Editar"
                             onClick={() => {
                               setError('')
                               setFeedback('')
@@ -2914,26 +2940,18 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                               setShowPrecoModal(true)
                             }}
                           >
-                            Editar
+                            <IconEdit />
                           </button>
                           <button
                             type="button"
-                            className={styles.priceDeleteButton}
+                            className={`${styles.priceIconBtn} ${styles.priceIconBtnDanger}`}
+                            title="Excluir"
                             onClick={() => handleDeletePreco(item.id)}
                           >
-                            Excluir
+                            <IconTrash />
                           </button>
-                        </>
+                        </div>
                       )}
-                      <button
-                        type="button"
-                        className={`${styles.calcButton} ${margemSaudavel ? styles.calcButtonGood : styles.calcButtonBad}`}
-                        onClick={() => setItemCalculadora(item)}
-                      >
-                        {margemSaudavel ? 'Preco com margem correta' : 'Rever precificacao'}
-                      </button>
-                      </div>
-                      <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
                     </div>
                   )
                 })}
