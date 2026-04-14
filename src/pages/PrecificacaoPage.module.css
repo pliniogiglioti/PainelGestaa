@@ -454,7 +454,7 @@
 
 .modal {
   width: 100%;
-  max-width: 460px;
+  max-width: 920px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 18px;
