@@ -1085,7 +1085,7 @@ function CalculadoraPrecificacaoModal({
                   />
                   {form.custoProfissionaisModo === 'percentual' && (
                     <span className={styles.modalFieldHint}>
-                      A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? No próximo passo você poderá indicar quais.
+                      A porcentagem será aplicada sobre o valor da venda.
                     </span>
                   )}
                 </label>
@@ -1130,6 +1130,9 @@ function CalculadoraPrecificacaoModal({
             {step === 4 && (
               <div className={styles.calcLayout}>
                 <div className={styles.calcSummary} style={{ gridColumn: '1 / 3' }}>
+                  {form.custoProfissionaisModo === 'percentual' && (
+                    <p className={styles.calcFormHint}>Deseja remover algum custo do procedimento da base de cálculo do profissional? Marque ao lado quais devem ser abatidos.</p>
+                  )}
                   <div className={styles.calcTable}>
                     <div className={styles.calcTableHead}>
                       <span>Procedimento</span>
