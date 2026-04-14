@@ -2240,6 +2240,26 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setSavingPreco(false)
   }
 
+  const handleDeletePreco = async (itemId: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir este preço?')) return
+    setError('')
+    setFeedback('')
+
+    const { error: deleteError } = await supabase
+      .from('empresa_precos')
+      .delete()
+      .eq('id', itemId)
+      .eq('empresa_id', empresa.id)
+
+    if (deleteError) {
+      setError(deleteError.message ?? 'Não foi possível excluir o preço.')
+      return
+    }
+
+    setPrecos(prev => prev.filter(p => p.id !== itemId))
+    setFeedback('Preço excluído com sucesso.')
+  }
+
   const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
     setSavingPreco(true)
     setError('')
@@ -2648,18 +2668,27 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                       </div>
                       <div className={styles.priceActions}>
                       {canManage && (
-                        <button
-                          type="button"
-                          className={styles.priceEditButton}
-                          onClick={() => {
-                            setError('')
-                            setFeedback('')
-                            setPrecoEditando(item)
-                            setShowPrecoModal(true)
-                          }}
-                        >
-                          Editar
-                        </button>
+                        <>
+                          <button
+                            type="button"
+                            className={styles.priceEditButton}
+                            onClick={() => {
+                              setError('')
+                              setFeedback('')
+                              setPrecoEditando(item)
+                              setShowPrecoModal(true)
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.priceDeleteButton}
+                            onClick={() => handleDeletePreco(item.id)}
+                          >
+                            Excluir
+                          </button>
+                        </>
                       )}
                       <button
                         type="button"
