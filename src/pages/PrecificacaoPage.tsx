@@ -2639,7 +2639,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 <span>Produto / servico</span>
                 <span>Margem</span>
                 <span>Ação</span>
-                <span>Preço</span>
+                <span style={{ textAlign: 'right' }}>Preço</span>
               </div>
               <div className={styles.priceTableBody}>
                 {precos.map(item => {
