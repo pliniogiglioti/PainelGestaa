@@ -186,6 +186,7 @@ function parsePreco(value: string) {
 
 function parseMargem(value: string) {
   const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '')
+  if (normalized === '') return null
   const parsed = Number(normalized)
   return Number.isFinite(parsed) ? parsed : null
 }
@@ -2643,7 +2644,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                               : styles.priceMarginBad
                         }`}
                       >
-                        {margemPercentual == null ? 'Sem precificação' : formatPercent(margemPercentual)}
+                        {margemPercentual == null || margemPercentual === 0 ? 'Sem precificação' : formatPercent(margemPercentual)}
                       </div>
                       <div className={styles.priceActions}>
                       {canManage && (
