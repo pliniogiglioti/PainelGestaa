@@ -408,14 +408,14 @@
 }
 
 .calcButtonBad {
-  border-color: rgba(201, 73, 73, 0.3);
-  background: rgba(201, 73, 73, 0.14);
-  color: #ffb0b0;
+  border-color: rgba(220, 120, 20, 0.35);
+  background: rgba(220, 120, 20, 0.14);
+  color: #ffad5c;
 }
 
 .calcButtonBad:hover {
-  background: rgba(201, 73, 73, 0.2);
-  border-color: rgba(201, 73, 73, 0.4);
+  background: rgba(220, 120, 20, 0.22);
+  border-color: rgba(220, 120, 20, 0.5);
 }
 
 .calcButtonGood {
