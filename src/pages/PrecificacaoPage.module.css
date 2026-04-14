@@ -438,7 +438,7 @@
 .priceValue {
   font-size: 14px;
   color: var(--gold-light);
-  text-align: right;
+  text-align: left;
 }
 
 .modalOverlay {
