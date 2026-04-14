@@ -2643,7 +2643,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                               : styles.priceMarginBad
                         }`}
                       >
-                        {margemPercentual == null ? 'Sem margem' : formatPercent(margemPercentual)}
+                        {margemPercentual == null ? 'Sem precificação' : formatPercent(margemPercentual)}
                       </div>
                       <div className={styles.priceActions}>
                       {canManage && (
