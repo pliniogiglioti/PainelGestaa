@@ -469,6 +469,77 @@
   max-width: 1380px;
 }
 
+.calcStepBar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  overflow: hidden;
+}
+
+.calcStepItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.calcStepItem + .calcStepItem {
+  padding-left: 8px;
+}
+
+.calcStepItem + .calcStepItem::before {
+  content: '';
+  display: block;
+  height: 1px;
+  width: 24px;
+  background: var(--border);
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.calcStepNum {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border);
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+  background: transparent;
+}
+
+.calcStepItemActive .calcStepNum {
+  background: var(--primary, #6366f1);
+  border-color: var(--primary, #6366f1);
+  color: #fff;
+}
+
+.calcStepItemActive {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.calcStepItemDone .calcStepNum {
+  background: var(--success, #22c55e);
+  border-color: var(--success, #22c55e);
+  color: #fff;
+}
+
+.calcStepLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .choiceModal {
   max-width: 640px;
 }

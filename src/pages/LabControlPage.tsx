@@ -3881,9 +3881,9 @@ function InfoRow({ label, value, icon }: { label: string; value: string; icon?: 
 
 // ── Lab Card (lista principal) ─────────────────────────────────────────────
 
-function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onOpenFinanceiro }: {
+function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onDelete, onOpenFinanceiro }: {
   lab: Lab; envios: LabEnvio[]; isAdmin: boolean; colunas: LabKanbanColuna[]
-  onClick: () => void; onEdit: (e: React.MouseEvent) => void; onOpenFinanceiro: (e: React.MouseEvent) => void
+  onClick: () => void; onEdit: (e: React.MouseEvent) => void; onDelete: (e: React.MouseEvent) => void; onOpenFinanceiro: (e: React.MouseEvent) => void
 }) {
   const overdue = envios.filter(isOverdue).length
   const enviosEmAndamento = envios.filter(e => !isFinalEnvioStatus(e.status))
@@ -3913,6 +3913,11 @@ function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onOpenFinance
           {isAdmin && (
             <button type="button" className={styles.btnIcon} onClick={onEdit} title="Editar laboratório">
               <IconEdit />
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={onDelete} title="Excluir laboratório">
+              <IconTrash />
             </button>
           )}
         </div>
@@ -4211,6 +4216,13 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     }
   }, [empresa.id])
 
+  const deleteLab = async (lab: Lab) => {
+    const ok = confirm(`Excluir "${lab.nome}"?\n\nTodos os envios do laboratório serão mantidos no histórico, mas o laboratório será removido da lista.\n\nEsta ação não pode ser desfeita.`)
+    if (!ok) return
+    await supabase.from('labs').update({ ativo: false }).eq('id', lab.id)
+    await fetchLabs()
+  }
+
   const togglePagoEnvioLista = async (envio: LabEnvio) => {
     const nextPago = !envio.pago
     const payload = {
@@ -4439,6 +4451,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               colunas={colunas}
               onClick={() => abrirVisaoLab(lab)}
               onEdit={e => { e.stopPropagation(); setEditingLab(lab); setShowLabModal(true) }}
+              onDelete={e => { e.stopPropagation(); void deleteLab(lab) }}
               onOpenFinanceiro={e => { e.stopPropagation(); setFinanceiroLab(lab) }}
             />
           ))}

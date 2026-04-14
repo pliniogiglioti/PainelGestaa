@@ -588,11 +588,6 @@ function PrecoModal({
 
     setErroLocal('')
 
-    if (!isEditing && margemPercentual == null) {
-      setErroLocal('Informe a margem do preco.')
-      return
-    }
-
     await onSubmit({
       nome: nome.trim(),
       categoria,
@@ -674,22 +669,6 @@ function PrecoModal({
               </button>
             </div>
             <span className={styles.modalFieldHint}>Use a calculadora para montar o preço com base no custo total.</span>
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Margem (%)</span>
-            <input
-              className={styles.modalInput}
-              placeholder="Ex: 50"
-              value={margem}
-              onChange={e => {
-                setMargem(sanitizePercentInput(e.target.value))
-                setErroLocal('')
-              }}
-              inputMode="decimal"
-              disabled={saving}
-            />
-            <span className={styles.modalFieldHint}>A margem ajuda a destacar rapidamente itens abaixo da meta de 50%.</span>
           </label>
 
           {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
@@ -807,6 +786,7 @@ function CalculadoraPrecificacaoModal({
   onClose: () => void
 }) {
   const isCreating = !item
+  const [step, setStep] = useState(1)
   const backdropDismiss = useBackdropDismiss(onClose)
   const initialPersisted = useMemo(() => getCalculadoraPersistida(item ?? null, configPadrao), [configPadrao, item])
   const [nome, setNome] = useState(item?.nome_produto ?? '')
@@ -850,6 +830,7 @@ function CalculadoraPrecificacaoModal({
     })
     setPrecoVendaEditado(persisted.precoVenda)
     setErroLocal('')
+    setStep(1)
   }, [modalStateKey])
 
   const calculadoraPersistida = useMemo<CalculadoraPersistida>(() => ({
@@ -933,13 +914,27 @@ function CalculadoraPrecificacaoModal({
     await onPersistCalculo?.(item.id, calculadoraPersistida, precoNumerico)
   }
 
+  const goNextStep = () => {
+    if (step === 1) {
+      if (!nome.trim()) { setErroLocal('Informe o nome do produto ou servico.'); return }
+      if (!categoria) { setErroLocal('Selecione uma categoria odontologica.'); return }
+    }
+    setErroLocal('')
+    setStep(s => s + 1)
+  }
+
+  const goPrevStep = () => {
+    setErroLocal('')
+    setStep(s => s - 1)
+  }
+
   return (
     <div
       className={styles.modalOverlay}
       onPointerDown={backdropDismiss.handleBackdropPointerDown}
       onClick={backdropDismiss.handleBackdropClick}
     >
-      <div className={`${styles.modal} ${styles.calcModal}`} onClick={e => e.stopPropagation()}>
+      <div className={`${styles.modal} ${!isCreating || step === 4 ? styles.calcModal : ''}`} onClick={e => e.stopPropagation()}>
         <div className={styles.modalHeader}>
           <div>
             <h2 className={styles.modalTitle}>{isCreating ? 'Criar preço calculado' : 'Verificar cálculo de precificação'}</h2>
@@ -954,368 +949,581 @@ function CalculadoraPrecificacaoModal({
           </div>
         </div>
 
-        <div className={styles.calcLayout}>
-          <div className={styles.calcForm}>
-            {isCreating && (
-              <div className={styles.calcFormCard}>
-                <div className={styles.calcFormHeader}>
-                  <h3 className={styles.calcFormTitle}>Dados do item</h3>
-                  <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
+        {isCreating ? (
+          <>
+            <div className={styles.calcStepBar}>
+              {(['Dados', 'Custos diretos', 'Encargos', 'Resultado'] as const).map((label, i) => (
+                <div
+                  key={i}
+                  className={`${styles.calcStepItem} ${step === i + 1 ? styles.calcStepItemActive : step > i + 1 ? styles.calcStepItemDone : ''}`}
+                >
+                  <span className={styles.calcStepNum}>{step > i + 1 ? '✓' : i + 1}</span>
+                  <span className={styles.calcStepLabel}>{label}</span>
                 </div>
+              ))}
+            </div>
 
+            {step === 1 && (
+              <div className={styles.modalForm}>
                 <label className={styles.modalField}>
                   <span className={styles.modalLabel}>Nome do produto ou servico</span>
                   <input
                     className={styles.modalInput}
                     value={nome}
-                    onChange={e => {
-                      setNome(e.target.value)
-                      setErroLocal('')
-                    }}
+                    onChange={e => { setNome(e.target.value); setErroLocal('') }}
                     placeholder="Ex: Consulta de avaliação"
                     autoFocus
                     disabled={savingPreco}
                   />
                 </label>
-
                 <label className={styles.modalField}>
                   <span className={styles.modalLabel}>Categoria odontologica</span>
                   <select
                     className={styles.modalInput}
                     value={categoria}
-                    onChange={e => {
-                      setCategoria(e.target.value)
-                      setErroLocal('')
-                    }}
+                    onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
                     disabled={savingPreco}
                   >
                     <option value="">Selecione uma categoria</option>
                     {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
-                      <option key={itemCategoria} value={itemCategoria}>
-                        {itemCategoria}
-                      </option>
+                      <option key={itemCategoria} value={itemCategoria}>{itemCategoria}</option>
                     ))}
                   </select>
                 </label>
+                {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
+                <div className={styles.modalActions}>
+                  <button type="button" className={styles.modalCancel} onClick={onClose} disabled={savingPreco}>Cancelar</button>
+                  <button type="button" className={styles.modalSubmit} onClick={goNextStep} disabled={savingPreco}>Próximo</button>
+                </div>
               </div>
             )}
 
-            <div className={styles.calcFormCard}>
-              <div className={styles.calcFormHeader}>
-                <h3 className={styles.calcFormTitle}>Custos diretos</h3>
-                <p className={styles.calcFormHint}>Valores que entram diretamente na execução do procedimento.</p>
-              </div>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo insumos (R$)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.custoInsumos}
-                  onChange={e => {
-                    handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: R$ 40,00"
-                />
-              </label>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.custoMaterialAplicado}
-                  onChange={e => {
-                    handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: R$ 700,00"
-                />
-              </label>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo laboratório (R$)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.custoLaboratorio}
-                  onChange={e => {
-                    handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: R$ 120,00"
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className={styles.calcForm}>
-            <div className={styles.calcFormCard}>
-              <div className={styles.calcFormHeader}>
-                <h3 className={styles.calcFormTitle}>Encargos e repasses</h3>
-                <p className={styles.calcFormHint}>Percentuais e remunerações que impactam a margem final.</p>
-              </div>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Royalties e FNP (%)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.royaltiesPercent}
-                  onChange={e => {
-                    handleChange('royaltiesPercent', sanitizePercentInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: 9"
-                />
-              </label>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo profissionais</span>
-                <div className={styles.switchRow}>
-                  <button
-                    type="button"
-                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
-                    onClick={() => handleToggleCustoProfissionais('percentual')}
-                  >
-                    Porcentagem
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
-                    onClick={() => handleToggleCustoProfissionais('valor')}
-                  >
-                    Valor
-                  </button>
+            {step === 2 && (
+              <div className={styles.modalForm}>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo insumos (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoInsumos}
+                    onChange={e => { handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 40,00"
+                    autoFocus
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoMaterialAplicado}
+                    onChange={e => { handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 700,00"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoLaboratorio}
+                    onChange={e => { handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 120,00"
+                  />
+                </label>
+                {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
+                <div className={styles.modalActions}>
+                  <button type="button" className={styles.modalCancel} onClick={goPrevStep} disabled={savingPreco}>Anterior</button>
+                  <button type="button" className={styles.modalSubmit} onClick={goNextStep} disabled={savingPreco}>Próximo</button>
                 </div>
-                <input
-                  className={styles.modalInput}
-                  value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
-                  onChange={e => {
-                    handleChange(
-                      form.custoProfissionaisModo === 'percentual'
-                        ? 'custoProfissionaisPercent'
-                        : 'custoProfissionaisValor',
-                      form.custoProfissionaisModo === 'percentual'
-                        ? sanitizePercentInput(e.target.value)
-                        : formatCurrencyTypingInput(e.target.value),
-                    )
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
-                />
-                {form.custoProfissionaisModo === 'percentual' && (
-                  <span className={styles.modalFieldHint}>
-                    A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
-                  </span>
-                )}
-              </label>
+              </div>
+            )}
 
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Impostos (%)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.impostosPercent}
-                  onChange={e => {
-                    handleChange('impostosPercent', sanitizePercentInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: 8"
-                />
-              </label>
+            {step === 3 && (
+              <div className={styles.modalForm}>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.royaltiesPercent}
+                    onChange={e => { handleChange('royaltiesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 9"
+                    autoFocus
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo profissionais</span>
+                  <div className={styles.switchRow}>
+                    <button
+                      type="button"
+                      className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
+                      onClick={() => handleToggleCustoProfissionais('percentual')}
+                    >
+                      Porcentagem
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
+                      onClick={() => handleToggleCustoProfissionais('valor')}
+                    >
+                      Valor
+                    </button>
+                  </div>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
+                    onChange={e => {
+                      handleChange(
+                        form.custoProfissionaisModo === 'percentual' ? 'custoProfissionaisPercent' : 'custoProfissionaisValor',
+                        form.custoProfissionaisModo === 'percentual' ? sanitizePercentInput(e.target.value) : formatCurrencyTypingInput(e.target.value),
+                      )
+                      setErroLocal('')
+                    }}
+                    inputMode="decimal"
+                    placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
+                  />
+                  {form.custoProfissionaisModo === 'percentual' && (
+                    <span className={styles.modalFieldHint}>
+                      A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                    </span>
+                  )}
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Impostos (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.impostosPercent}
+                    onChange={e => { handleChange('impostosPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 8"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Comissões vendas (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.comissoesPercent}
+                    onChange={e => { handleChange('comissoesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 3"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Taxa máquina (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.taxaMaquinaPercent}
+                    onChange={e => { handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 2"
+                  />
+                </label>
+                {erroLocal && <p className={styles.formError}>{erroLocal}</p>}
+                <div className={styles.modalActions}>
+                  <button type="button" className={styles.modalCancel} onClick={goPrevStep} disabled={savingPreco}>Anterior</button>
+                  <button type="button" className={styles.modalSubmit} onClick={goNextStep} disabled={savingPreco}>Ver resultado</button>
+                </div>
+              </div>
+            )}
 
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Comissões vendas (%)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.comissoesPercent}
-                  onChange={e => {
-                    handleChange('comissoesPercent', sanitizePercentInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: 3"
-                />
-              </label>
-
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Taxa máquina (%)</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.taxaMaquinaPercent}
-                  onChange={e => {
-                    handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value))
-                    setErroLocal('')
-                  }}
-                  inputMode="decimal"
-                  placeholder="Ex: 2"
-                />
-              </label>
+            {step === 4 && (
+              <div className={styles.calcLayout}>
+                <div className={styles.calcSummary} style={{ gridColumn: '1 / 3' }}>
+                  <div className={styles.calcTable}>
+                    <div className={styles.calcTableHead}>
+                      <span>Procedimento</span>
+                      <span>Referência</span>
+                      <span>Custo</span>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Custo insumos</span>
+                      <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
+                      <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Custo material aplicado</span>
+                      <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
+                      <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Custo laboratório</span>
+                      <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
+                      <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Royalties e FNP</span>
+                      <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
+                      <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Custo profissionais</span>
+                      <span>
+                        {calculo.custoProfissionaisModo === 'valor'
+                          ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
+                          : (calculo.custoProfissionaisPercent > 0
+                            ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre valor da venda${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
+                            : '-')}
+                      </span>
+                      <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Impostos</span>
+                      <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
+                      <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Comissões vendas</span>
+                      <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
+                      <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
+                    </div>
+                    <div className={styles.calcRow}>
+                      <span>Taxa máquina</span>
+                      <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
+                      <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
+                    </div>
+                  </div>
+                </div>
+                <div className={styles.calcSummaryAside} style={{ gridColumn: '3 / 5' }}>
+                  <div className={styles.calcHighlights}>
+                    <div className={styles.calcHighlight}>
+                      <span>Custo total</span>
+                      <strong>{formatCurrency(calculo.custoTotal)}</strong>
+                    </div>
+                    <div className={styles.calcHighlight}>
+                      <span>Margem</span>
+                      <strong>{formatPercent(calculo.margem)}</strong>
+                    </div>
+                    <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
+                      <span>Preço sugerido</span>
+                      <strong>{formatCurrency(calculo.precoSugerido)}</strong>
+                      <span className={styles.calcHighlightHint}>Sugestão para atingir 50% de margem.</span>
+                      <span className={styles.calcHighlightHint}>
+                        {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
+                          ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                          : calculo.diferencaParaMargemIdeal > 0
+                            ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
+                            : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                      </span>
+                    </div>
+                    <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
+                      <span>Preço de venda</span>
+                      {canManage ? (
+                        <>
+                          <input
+                            className={`${styles.modalInput} ${styles.calcHighlightInput}`}
+                            value={precoVendaEditado}
+                            onChange={e => { setPrecoVendaEditado(formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                            inputMode="decimal"
+                            placeholder="Ex: R$ 1.250,00"
+                            disabled={savingPreco}
+                            autoFocus
+                          />
+                          {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
+                          {!erroLocal && !error && (
+                            <p className={styles.modalFieldHint}>Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.</p>
+                          )}
+                        </>
+                      ) : (
+                        <strong>{formatCurrency(precoVendaAtual)}</strong>
+                      )}
+                    </div>
+                    <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+                      <span>Resultado da margem</span>
+                      <strong>{calculo.resultadoMargem}</strong>
+                    </div>
+                  </div>
+                  {canManage && (
+                    <div className={styles.inlineActions}>
+                      <button type="button" className={styles.modalCancel} onClick={goPrevStep} disabled={savingPreco}>Anterior</button>
+                      <button
+                        type="button"
+                        className={styles.modalSubmit}
+                        onClick={() => void handleSalvarCalculo()}
+                        disabled={savingPreco}
+                      >
+                        {savingPreco ? 'Salvando...' : 'Criar e salvar preço'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className={styles.calcLayout}>
+            <div className={styles.calcForm}>
+              <div className={styles.calcFormCard}>
+                <div className={styles.calcFormHeader}>
+                  <h3 className={styles.calcFormTitle}>Custos diretos</h3>
+                  <p className={styles.calcFormHint}>Valores que entram diretamente na execução do procedimento.</p>
+                </div>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo insumos (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoInsumos}
+                    onChange={e => { handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 40,00"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoMaterialAplicado}
+                    onChange={e => { handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 700,00"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoLaboratorio}
+                    onChange={e => { handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: R$ 120,00"
+                  />
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div className={styles.calcSummary}>
-            <div className={styles.calcTable}>
-              <div className={styles.calcTableHead}>
-                <span>Procedimento</span>
-                <span>Referência</span>
-                <span>Custo</span>
+            <div className={styles.calcForm}>
+              <div className={styles.calcFormCard}>
+                <div className={styles.calcFormHeader}>
+                  <h3 className={styles.calcFormTitle}>Encargos e repasses</h3>
+                  <p className={styles.calcFormHint}>Percentuais e remunerações que impactam a margem final.</p>
+                </div>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.royaltiesPercent}
+                    onChange={e => { handleChange('royaltiesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 9"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Custo profissionais</span>
+                  <div className={styles.switchRow}>
+                    <button
+                      type="button"
+                      className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
+                      onClick={() => handleToggleCustoProfissionais('percentual')}
+                    >
+                      Porcentagem
+                    </button>
+                    <button
+                      type="button"
+                      className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
+                      onClick={() => handleToggleCustoProfissionais('valor')}
+                    >
+                      Valor
+                    </button>
+                  </div>
+                  <input
+                    className={styles.modalInput}
+                    value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
+                    onChange={e => {
+                      handleChange(
+                        form.custoProfissionaisModo === 'percentual' ? 'custoProfissionaisPercent' : 'custoProfissionaisValor',
+                        form.custoProfissionaisModo === 'percentual' ? sanitizePercentInput(e.target.value) : formatCurrencyTypingInput(e.target.value),
+                      )
+                      setErroLocal('')
+                    }}
+                    inputMode="decimal"
+                    placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
+                  />
+                  {form.custoProfissionaisModo === 'percentual' && (
+                    <span className={styles.modalFieldHint}>
+                      A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                    </span>
+                  )}
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Impostos (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.impostosPercent}
+                    onChange={e => { handleChange('impostosPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 8"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Comissões vendas (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.comissoesPercent}
+                    onChange={e => { handleChange('comissoesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 3"
+                  />
+                </label>
+                <label className={styles.modalField}>
+                  <span className={styles.modalLabel}>Taxa máquina (%)</span>
+                  <input
+                    className={styles.modalInput}
+                    value={form.taxaMaquinaPercent}
+                    onChange={e => { handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
+                    inputMode="decimal"
+                    placeholder="Ex: 2"
+                  />
+                </label>
               </div>
+            </div>
 
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('custoInsumos', 'Custo insumos')}
-                <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
-                <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('custoMaterialAplicado', 'Custo material aplicado')}
-                <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
-                <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('custoLaboratorio', 'Custo laboratório')}
-                <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
-                <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('royalties', 'Royalties e FNP')}
-                <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
-                <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                <span>Custo profissionais</span>
-                <span>
-                  {calculo.custoProfissionaisModo === 'valor'
-                    ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
-                    : (
-                      calculo.custoProfissionaisPercent > 0
+            <div className={styles.calcSummary}>
+              <div className={styles.calcTable}>
+                <div className={styles.calcTableHead}>
+                  <span>Procedimento</span>
+                  <span>Referência</span>
+                  <span>Custo</span>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('custoInsumos', 'Custo insumos')}
+                  <span>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</span>
+                  <strong>{calculo.custoInsumos > 0 ? formatCurrency(calculo.custoInsumos) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('custoMaterialAplicado', 'Custo material aplicado')}
+                  <span>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</span>
+                  <strong>{calculo.custoMaterialAplicado > 0 ? formatCurrency(calculo.custoMaterialAplicado) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('custoLaboratorio', 'Custo laboratório')}
+                  <span>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</span>
+                  <strong>{calculo.custoLaboratorio > 0 ? formatCurrency(calculo.custoLaboratorio) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('royalties', 'Royalties e FNP')}
+                  <span>{calculo.royaltiesPercent > 0 ? formatPercent(calculo.royaltiesPercent) : '-'}</span>
+                  <strong>{calculo.royalties > 0 ? formatCurrency(calculo.royalties) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  <span>Custo profissionais</span>
+                  <span>
+                    {calculo.custoProfissionaisModo === 'valor'
+                      ? (calculo.custoProfissionaisValor > 0 ? formatCurrency(calculo.custoProfissionaisValor) : '-')
+                      : (calculo.custoProfissionaisPercent > 0
                         ? `${formatPercent(calculo.custoProfissionaisPercent)} sobre valor da venda${calculo.custoProfissionaisBases.length > 0 ? ` menos ${getCustoProfissionaisBasesLabel(calculo.custoProfissionaisBases)}` : ''}`
-                        : '-'
-                    )}
-                </span>
-                <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('impostos', 'Impostos')}
-                <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
-                <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('comissoes', 'Comissões vendas')}
-                <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
-                <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
-              </div>
-              <div className={styles.calcRow}>
-                {renderProcedimentoComSelecao('taxaMaquina', 'Taxa máquina')}
-                <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
-                <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
+                        : '-')}
+                  </span>
+                  <strong>{calculo.custoProfissionais > 0 ? formatCurrency(calculo.custoProfissionais) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('impostos', 'Impostos')}
+                  <span>{calculo.impostosPercent > 0 ? formatPercent(calculo.impostosPercent) : '-'}</span>
+                  <strong>{calculo.impostos > 0 ? formatCurrency(calculo.impostos) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('comissoes', 'Comissões vendas')}
+                  <span>{calculo.comissoesPercent > 0 ? formatPercent(calculo.comissoesPercent) : '-'}</span>
+                  <strong>{calculo.comissoes > 0 ? formatCurrency(calculo.comissoes) : '-'}</strong>
+                </div>
+                <div className={styles.calcRow}>
+                  {renderProcedimentoComSelecao('taxaMaquina', 'Taxa máquina')}
+                  <span>{calculo.taxaMaquinaPercent > 0 ? formatPercent(calculo.taxaMaquinaPercent) : '-'}</span>
+                  <strong>{calculo.taxaMaquina > 0 ? formatCurrency(calculo.taxaMaquina) : '-'}</strong>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className={styles.calcSummaryAside}>
-            <div className={styles.calcHighlights}>
-              <div className={styles.calcHighlight}>
-                <span>Custo total</span>
-                <strong>{formatCurrency(calculo.custoTotal)}</strong>
-              </div>
-              <div className={styles.calcHighlight}>
-                <span>Margem</span>
-                <strong>{formatPercent(calculo.margem)}</strong>
-              </div>
-              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
-                <span>Preço sugerido</span>
-                <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                <span className={styles.calcHighlightHint}>Sugestão para atingir 50% de margem.</span>
-                <span className={styles.calcHighlightHint}>
-                  {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
-                    ? 'O preço atual já está no ponto de equilíbrio da meta.'
-                    : calculo.diferencaParaMargemIdeal > 0
-                      ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
-                      : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
-                </span>
-              </div>
-              <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
-                <span>Preço de venda</span>
-                {canManage ? (
-                  <>
-                    <input
-                      className={`${styles.modalInput} ${styles.calcHighlightInput}`}
-                      value={precoVendaEditado}
-                      onChange={e => {
-                        setPrecoVendaEditado(formatCurrencyTypingInput(e.target.value))
-                        setErroLocal('')
-                      }}
-                      inputMode="decimal"
-                      placeholder="Ex: R$ 1.250,00"
-                      disabled={savingPreco}
-                    />
-                    {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
-                    {!erroLocal && !error && (
-                      <p className={styles.modalFieldHint}>
-                        {isCreating
-                          ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
-                          : hasChanges
+            <div className={styles.calcSummaryAside}>
+              <div className={styles.calcHighlights}>
+                <div className={styles.calcHighlight}>
+                  <span>Custo total</span>
+                  <strong>{formatCurrency(calculo.custoTotal)}</strong>
+                </div>
+                <div className={styles.calcHighlight}>
+                  <span>Margem</span>
+                  <strong>{formatPercent(calculo.margem)}</strong>
+                </div>
+                <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
+                  <span>Preço sugerido</span>
+                  <strong>{formatCurrency(calculo.precoSugerido)}</strong>
+                  <span className={styles.calcHighlightHint}>Sugestão para atingir 50% de margem.</span>
+                  <span className={styles.calcHighlightHint}>
+                    {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
+                      ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                      : calculo.diferencaParaMargemIdeal > 0
+                        ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
+                        : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                  </span>
+                </div>
+                <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
+                  <span>Preço de venda</span>
+                  {canManage ? (
+                    <>
+                      <input
+                        className={`${styles.modalInput} ${styles.calcHighlightInput}`}
+                        value={precoVendaEditado}
+                        onChange={e => { setPrecoVendaEditado(formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                        inputMode="decimal"
+                        placeholder="Ex: R$ 1.250,00"
+                        disabled={savingPreco}
+                      />
+                      {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
+                      {!erroLocal && !error && (
+                        <p className={styles.modalFieldHint}>
+                          {hasChanges
                             ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
                             : 'Alterações salvas neste produto.'}
-                      </p>
-                    )}
-                  </>
-                ) : (
-                  <strong>{formatCurrency(precoVendaAtual)}</strong>
-                )}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <strong>{formatCurrency(precoVendaAtual)}</strong>
+                  )}
+                </div>
+                <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+                  <span>Resultado da margem</span>
+                  <strong>{calculo.resultadoMargem}</strong>
+                </div>
               </div>
-              <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
-                <span>Resultado da margem</span>
-                <strong>{calculo.resultadoMargem}</strong>
-              </div>
+              {canManage && (
+                <div className={styles.inlineActions}>
+                  <button
+                    type="button"
+                    className={styles.modalCancel}
+                    onClick={() => {
+                      setForm({
+                        custoInsumos: savedPayload.custoInsumos,
+                        custoMaterialAplicado: savedPayload.custoMaterialAplicado,
+                        custoLaboratorio: savedPayload.custoLaboratorio,
+                        royaltiesPercent: savedPayload.royaltiesPercent,
+                        custoProfissionaisModo: savedPayload.custoProfissionaisModo,
+                        custoProfissionaisBases: savedPayload.custoProfissionaisBases,
+                        custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
+                        custoProfissionaisValor: savedPayload.custoProfissionaisValor,
+                        impostosPercent: savedPayload.impostosPercent,
+                        comissoesPercent: savedPayload.comissoesPercent,
+                        taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
+                      })
+                      setPrecoVendaEditado(savedPayload.precoVenda)
+                      setErroLocal('')
+                    }}
+                    disabled={savingPreco}
+                  >
+                    Reverter
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.modalSubmit}
+                    onClick={() => void handleSalvarCalculo()}
+                    disabled={savingPreco || (!hasChanges && !erroLocal)}
+                  >
+                    {savingPreco ? 'Salvando...' : 'Salvar preço'}
+                  </button>
+                </div>
+              )}
             </div>
-            {canManage && (
-              <div className={styles.inlineActions}>
-                <button
-                  type="button"
-                  className={styles.modalCancel}
-                  onClick={() => {
-                    if (isCreating) {
-                      onClose()
-                      return
-                    }
-
-                    setForm({
-                      custoInsumos: savedPayload.custoInsumos,
-                      custoMaterialAplicado: savedPayload.custoMaterialAplicado,
-                      custoLaboratorio: savedPayload.custoLaboratorio,
-                      royaltiesPercent: savedPayload.royaltiesPercent,
-                      custoProfissionaisModo: savedPayload.custoProfissionaisModo,
-                      custoProfissionaisBases: savedPayload.custoProfissionaisBases,
-                      custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
-                      custoProfissionaisValor: savedPayload.custoProfissionaisValor,
-                      impostosPercent: savedPayload.impostosPercent,
-                      comissoesPercent: savedPayload.comissoesPercent,
-                      taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
-                    })
-                    setPrecoVendaEditado(savedPayload.precoVenda)
-                    setErroLocal('')
-                  }}
-                  disabled={savingPreco}
-                >
-                  {isCreating ? 'Cancelar' : 'Reverter'}
-                </button>
-                <button
-                  type="button"
-                  className={styles.modalSubmit}
-                  onClick={() => void handleSalvarCalculo()}
-                  disabled={savingPreco || (!isCreating && !hasChanges && !erroLocal)}
-                >
-                  {savingPreco ? 'Salvando...' : isCreating ? 'Criar e salvar preço' : 'Salvar preço'}
-                </button>
-              </div>
-            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   )
