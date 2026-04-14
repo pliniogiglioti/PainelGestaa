@@ -1085,7 +1085,7 @@ function CalculadoraPrecificacaoModal({
                   />
                   {form.custoProfissionaisModo === 'percentual' && (
                     <span className={styles.modalFieldHint}>
-                      A porcentagem será aplicada sobre o valor da venda. No resultado você poderá marcar quais procedimentos entram como abatimento dessa base.
+                      A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? No próximo passo você poderá indicar quais.
                     </span>
                   )}
                 </label>
@@ -1340,7 +1340,7 @@ function CalculadoraPrecificacaoModal({
                   />
                   {form.custoProfissionaisModo === 'percentual' && (
                     <span className={styles.modalFieldHint}>
-                      A porcentagem será aplicada sobre o valor da venda. Os procedimentos marcados ao lado entram como abatimento dessa base.
+                      A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? Marque ao lado quais devem ser abatidos.
                     </span>
                   )}
                 </label>
