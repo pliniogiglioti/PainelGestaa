@@ -19,7 +19,7 @@
 .pageHeader .btnPrimary,
 .pageHeader .btnSecondary,
 .pageHeader .overviewMenuTrigger {
-  min-height: 48px;
+  min-height: 40px;
 }
 
 .headerMainInfo {
@@ -240,29 +240,32 @@
   position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.05);
-  background: var(--bg-elevated);
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 162, 42, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+    var(--bg-elevated);
   overflow: hidden;
-  min-height: 48px;
+  min-height: 40px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
 }
 
 .viewModeIndicator {
   position: absolute;
-  top: 4px;
-  left: calc(4px + var(--mode-index) * ((100% - 8px) / 3));
-  width: calc((100% - 8px) / 3);
-  height: calc(100% - 8px);
-  border-radius: 9px;
+  top: 3px;
+  left: calc(3px + var(--mode-index) * ((100% - 6px) / 3));
+  width: calc((100% - 6px) / 3);
+  height: calc(100% - 6px);
+  border-radius: 8px;
   background:
-    linear-gradient(135deg, rgba(201, 162, 42, 0.28), rgba(201, 162, 42, 0.14));
-  border: 1px solid rgba(201, 162, 42, 0.34);
+    linear-gradient(135deg, rgba(201, 162, 42, 0.34), rgba(201, 162, 42, 0.18));
+  border: 1px solid rgba(201, 162, 42, 0.42);
   box-shadow:
-    0 10px 24px rgba(0,0,0,0.18),
+    0 8px 18px rgba(0,0,0,0.2),
     inset 0 1px 0 rgba(255,255,255,0.08);
-  transition: left 0.28s ease, width 0.28s ease, background 0.28s ease;
+  transition: left 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.22s ease, box-shadow 0.22s ease;
   pointer-events: none;
 }
 
@@ -273,10 +276,10 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 34px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 9px;
+  border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
   font-size: 13px;
@@ -284,7 +287,7 @@
   cursor: pointer;
   white-space: nowrap;
   font-family: inherit;
-  transition: color 0.2s ease, transform 0.2s ease;
+  transition: color 0.18s ease, transform 0.18s ease;
 }
 
 .viewModeButton:hover {
