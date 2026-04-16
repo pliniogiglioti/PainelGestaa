@@ -584,6 +584,104 @@ function LabPickerModal({ title, labs, onClose, onSelect }: {
   )
 }
 
+function OverviewMenu({
+  labsCount,
+  totalCases,
+  overdueCount,
+  isAdmin,
+  onCreateLab,
+  onOpenEditLabPicker,
+  onOpenPrecosPicker,
+  onOpenKanbanCfg,
+  onOpenArquivados,
+}: {
+  labsCount: number
+  totalCases: number
+  overdueCount: number
+  isAdmin: boolean
+  onCreateLab: () => void
+  onOpenEditLabPicker: () => void
+  onOpenPrecosPicker: () => void
+  onOpenKanbanCfg: () => void
+  onOpenArquivados: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  const actions = [
+    ...(isAdmin ? [
+      { id: 'novo-lab', label: 'Novo laboratório', onClick: onCreateLab },
+      { id: 'editar-labs', label: 'Editar laboratórios', onClick: onOpenEditLabPicker },
+      { id: 'precos', label: 'Lista de preços', onClick: onOpenPrecosPicker },
+      { id: 'kanbans', label: 'Editar Kanbans', onClick: onOpenKanbanCfg },
+    ] : []),
+    { id: 'arquivados', label: 'Arquivados', onClick: onOpenArquivados },
+  ]
+
+  return (
+    <div className={styles.overviewMenu} ref={menuRef}>
+      <button
+        type="button"
+        className={`${styles.btnSecondary} ${styles.overviewMenuTrigger}`}
+        onClick={() => setOpen(prev => !prev)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Visão geral <span aria-hidden="true">v</span>
+      </button>
+
+      {open && (
+        <div className={styles.overviewMenuDropdown} role="menu">
+          <button type="button" className={styles.overviewMenuCard} onClick={() => setOpen(false)}>
+            <span className={styles.overviewMenuBadge}>Visão geral</span>
+            <strong>{totalCases} casos ativos</strong>
+            <span>{labsCount} laboratórios monitorados</span>
+            <span>{overdueCount} atrasados no total</span>
+          </button>
+          <div className={styles.overviewMenuActions}>
+            {actions.map(action => (
+              <button
+                key={action.id}
+                type="button"
+                className={styles.overviewMenuAction}
+                onClick={() => {
+                  setOpen(false)
+                  action.onClick()
+                }}
+                role="menuitem"
+              >
+                {action.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Modal Wrapper ──────────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children, wide }: {
@@ -2609,6 +2707,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
 function LabsAggregateDetailView({
   labs,
   empresaId,
+  empresaNome,
   userId,
   isAdmin,
   colunas,
@@ -2623,6 +2722,7 @@ function LabsAggregateDetailView({
 }: {
   labs: Lab[]
   empresaId: string
+  empresaNome: string
   userId: string
   isAdmin: boolean
   colunas: LabKanbanColuna[]
@@ -2772,45 +2872,22 @@ function LabsAggregateDetailView({
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
             Trocar empresa
           </button>
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            Empresa: <strong style={{ color: 'var(--text)' }}>{empresaNome}</strong>
+          </span>
         </div>
-        <div className={styles.homeToolbar}>
-          <button type="button" className={`${styles.btnSecondary} ${styles.btnSecondaryActive}`}>
-            Visão geral
-          </button>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            disabled={labs.length === 0}
-            onClick={() => {
-              if (labs.length === 0) return
-              setEditingEnvio(null)
-              setShowEnvioSteps(true)
-            }}
-          >
-            <IconPlus /> Novo envio
-          </button>
-          {isAdmin && (
-            <button type="button" className={styles.btnSecondary} onClick={onCreateLab}>
-              <IconPlus /> Novo laboratório
-            </button>
-          )}
-          {isAdmin && (
-            <button type="button" className={styles.btnSecondary} onClick={onOpenEditLabPicker} disabled={labs.length === 0}>
-              <IconEdit /> Editar laboratórios
-            </button>
-          )}
-          {isAdmin && (
-            <button type="button" className={styles.btnSecondary} onClick={onOpenPrecosPicker} disabled={labs.length === 0}>
-              Lista de preços
-            </button>
-          )}
-          {isAdmin && (
-            <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
-              <IconSettings2 /> Editar Kanbans
-            </button>
-          )}
-        </div>
-        <div className={styles.headerActions}>
+        <div className={styles.headerCenter}>
+          <OverviewMenu
+            labsCount={labs.length}
+            totalCases={envios.length}
+            overdueCount={overdueCount}
+            isAdmin={isAdmin}
+            onCreateLab={onCreateLab}
+            onOpenEditLabPicker={onOpenEditLabPicker}
+            onOpenPrecosPicker={onOpenPrecosPicker}
+            onOpenKanbanCfg={() => setShowKanbanCfg(true)}
+            onOpenArquivados={() => setShowArquivados(true)}
+          />
           <div
             className={styles.viewModeSwitcher}
             style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
@@ -2830,18 +2907,20 @@ function LabsAggregateDetailView({
             ))}
           </div>
         </div>
-      </div>
-
-      <div className={styles.aggregateHeaderMeta}>
-        <div className={styles.labDetailTitle}>
-          <h1 className={styles.pageTitle}>Visão geral</h1>
-          {overdueCount > 0 && (
-            <span className={styles.overdueBadge}>
-              <IconAlert /> {overdueCount} atrasado{overdueCount > 1 ? 's' : ''}
-            </span>
-          )}
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            disabled={labs.length === 0}
+            onClick={() => {
+              if (labs.length === 0) return
+              setEditingEnvio(null)
+              setShowEnvioSteps(true)
+            }}
+          >
+            <IconPlus /> Novo envio
+          </button>
         </div>
-        <span className={styles.headerMetaBadge}>{labs.length} laboratórios ativos</span>
       </div>
 
       {homeMode === 'calendar' ? (
@@ -3324,6 +3403,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
       <LabsAggregateDetailView
         labs={labs}
         empresaId={empresa.id}
+        empresaNome={empresa.nome}
         userId={userId}
         isAdmin={isAdmin}
         colunas={colunas}
