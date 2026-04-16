@@ -109,7 +109,7 @@
 .overviewMenuDropdown {
   position: absolute;
   top: calc(100% + 10px);
-  left: 0;
+  right: 0;
   z-index: 50;
   width: min(360px, calc(100vw - 48px));
   padding: 10px;
@@ -168,8 +168,8 @@
   width: 100%;
   display: inline-flex;
   align-items: center;
-  justify-content: flex-start;
-  padding: 11px 12px;
+  justify-content: center;
+  padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--bg-elevated);
@@ -177,9 +177,10 @@
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  text-align: left;
+  text-align: center;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
-  min-height: 42px;
+  min-height: 48px;
+  white-space: nowrap;
 }
 
 .overviewMenuAction:hover {
