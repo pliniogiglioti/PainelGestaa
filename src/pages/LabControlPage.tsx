@@ -642,12 +642,12 @@ function OverviewMenu({
 
   const actions = [
     ...(isAdmin ? [
-      { id: 'novo-lab', label: 'Novo laboratório', onClick: onCreateLab },
-      { id: 'editar-labs', label: 'Editar laboratórios', onClick: onOpenEditLabPicker },
-      { id: 'precos', label: 'Lista de preços', onClick: onOpenPrecosPicker },
-      { id: 'kanbans', label: 'Editar Kanbans', onClick: onOpenKanbanCfg },
+      { id: 'novo-lab', label: 'Novo laboratório', icon: <IconPlus />, onClick: onCreateLab },
+      { id: 'editar-labs', label: 'Editar laboratórios', icon: <IconEdit />, onClick: onOpenEditLabPicker },
+      { id: 'precos', label: 'Lista de preços', icon: <IconList />, onClick: onOpenPrecosPicker },
+      { id: 'kanbans', label: 'Editar Kanbans', icon: <IconSettings2 />, onClick: onOpenKanbanCfg },
     ] : []),
-    { id: 'arquivados', label: 'Arquivados', onClick: onOpenArquivados },
+    { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },
   ]
 
   return (
@@ -767,7 +767,8 @@ function OverviewMenu({
                 }}
                 role="menuitem"
               >
-                {action.label}
+                <span className={styles.overviewMenuActionIcon} aria-hidden="true">{action.icon}</span>
+                <span>{action.label}</span>
               </button>
             ))}
           </div>
