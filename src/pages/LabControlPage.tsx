@@ -40,9 +40,7 @@ type LabEtapa = {
   data_conclusao: string | null
 }
 
-type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
-type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' }
 type LabHomeMode = 'kanban' | 'calendar' | 'list'
 
 const LAB_FILTER_ALL = '__all__'
@@ -62,16 +60,6 @@ function isString(value: unknown): value is string {
 
 function isLabDetailTab(value: unknown): value is 'kanban' | 'info' {
   return value === 'kanban' || value === 'info'
-}
-
-function isLabViewSelectionPersisted(value: unknown): value is LabViewSelectionPersisted | null {
-  if (value === null) return true
-  if (!value || typeof value !== 'object') return false
-
-  const candidate = value as Record<string, unknown>
-  if (candidate.kind === 'all') return true
-
-  return candidate.kind === 'lab' && typeof candidate.labId === 'string'
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -263,37 +251,12 @@ function getEnvioDataEntregaRealFromEtapas(etapas: LabEtapa[]) {
   return datasConcluidas[datasConcluidas.length - 1] ?? null
 }
 
-function getFinanceiroReferenceDate(envio: LabEnvio) {
-  return envio.pago ? (envio.data_pagamento ?? envio.data_envio) : envio.data_envio
-}
-
 function sortEnviosByCreatedAt(envios: LabEnvio[]) {
   return [...envios].sort((a, b) => b.created_at.localeCompare(a.created_at))
 }
 
 function isFinalEnvioStatus(status: string) {
   return FINAL_ENVIO_STATUSES.includes(status)
-}
-
-function getEnvioMetrics(envios: LabEnvio[]) {
-  const emAndamento = envios.filter(envio => !isFinalEnvioStatus(envio.status))
-  const concluidos = envios.filter(envio => isFinalEnvioStatus(envio.status))
-  const pagos = envios.filter(envio => envio.pago)
-  const overdue = envios.filter(isOverdue)
-  const totalValor = envios.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-  const valorEmAndamento = emAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-  const valorPago = pagos.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-
-  return {
-    total: envios.length,
-    emAndamento: emAndamento.length,
-    concluidos: concluidos.length,
-    pagos: pagos.length,
-    overdue: overdue.length,
-    valorEmAndamento,
-    valorPago,
-    ticketMedio: envios.length > 0 ? totalValor / envios.length : 0,
-  }
 }
 
 function normalizeWhatsAppNumber(value: string) {
@@ -528,12 +491,6 @@ const IconAlert = () => (
     <line x1="12" y1="16" x2="12.01" y2="16"/>
   </svg>
 )
-const IconFlask = () => (
-  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 3h6v7l4 8H5l4-8V3z"/>
-    <line x1="9" y1="3" x2="15" y2="3"/>
-  </svg>
-)
 function IconCalendar() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -581,68 +538,49 @@ function Spinner() {
   )
 }
 
-type HeaderMenuItem = {
-  id: string
-  label: string
-  onClick: () => void
-}
-
-function HeaderActionsMenu({ items }: { items: HeaderMenuItem[] }) {
-  const [open, setOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-
-    const handlePointerDown = (event: PointerEvent) => {
-      const target = event.target
-      if (!(target instanceof Node)) return
-      if (menuRef.current?.contains(target)) return
-      setOpen(false)
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(false)
-    }
-
-    window.addEventListener('pointerdown', handlePointerDown)
-    window.addEventListener('keydown', handleEscape)
-    return () => {
-      window.removeEventListener('pointerdown', handlePointerDown)
-      window.removeEventListener('keydown', handleEscape)
-    }
-  }, [open])
+function LabPickerModal({ title, labs, onClose, onSelect }: {
+  title: string
+  labs: Lab[]
+  onClose: () => void
+  onSelect: (lab: Lab) => void
+}) {
+  const [selectedLabId, setSelectedLabId] = useState(labs[0]?.id ?? '')
 
   return (
-    <div className={styles.headerMenu} ref={menuRef}>
-      <button
-        type="button"
-        className={`${styles.btnSecondary} ${styles.headerMenuTrigger}`}
-        onClick={() => setOpen(prev => !prev)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        Menu <span aria-hidden="true">v</span>
-      </button>
-      {open && (
-        <div className={styles.headerMenuDropdown} role="menu">
-          {items.map(item => (
-            <button
-              key={item.id}
-              type="button"
-              className={styles.headerMenuItem}
-              onClick={() => {
-                setOpen(false)
-                item.onClick()
-              }}
-              role="menuitem"
-            >
-              <span>{item.label}</span>
-            </button>
-          ))}
+    <Modal title={title} onClose={onClose}>
+      <div className={styles.form}>
+        <div className={styles.formField}>
+          <label className={styles.label}>Laboratório</label>
+          <select
+            className={styles.select}
+            value={selectedLabId}
+            onChange={e => setSelectedLabId(e.target.value)}
+          >
+            {labs.map(lab => (
+              <option key={lab.id} value={lab.id}>
+                {lab.nome}
+              </option>
+            ))}
+          </select>
         </div>
-      )}
-    </div>
+        <div className={styles.formActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Cancelar</button>
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            disabled={!selectedLabId}
+            onClick={() => {
+              const selectedLab = labs.find(lab => lab.id === selectedLabId)
+              if (!selectedLab) return
+              onSelect(selectedLab)
+              onClose()
+            }}
+          >
+            Abrir
+          </button>
+        </div>
+      </div>
+    </Modal>
   )
 }
 
@@ -2123,117 +2061,6 @@ function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precosByLab, 
   )
 }
 
-function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
-  lab: Lab
-  envios: LabEnvio[]
-  isAdmin: boolean
-  onClose: () => void
-  onTogglePago: (envio: LabEnvio) => Promise<void>
-}) {
-  const [filtro, setFiltro] = useState<FinanceiroFiltro>('todos')
-  const [dataInicial, setDataInicial] = useState('')
-  const [dataFinal, setDataFinal] = useState('')
-
-  const enviosComData = envios.filter(envio => {
-    const dataReferencia = getFinanceiroReferenceDate(envio)
-    if (!dataReferencia) return !dataInicial && !dataFinal
-    if (dataInicial && dataReferencia < dataInicial) return false
-    if (dataFinal && dataReferencia > dataFinal) return false
-    return true
-  })
-
-  const filtered = enviosComData.filter(envio => {
-    if (filtro === 'pagos') return envio.pago
-    if (filtro === 'em_andamento') return !envio.pago
-    return true
-  })
-
-  const totalEmAndamento = enviosComData.filter(envio => !envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-  const totalPagos = enviosComData.filter(envio => envio.pago).reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-
-  return (
-    <Modal title={`Financeiro — ${lab.nome}`} onClose={onClose} wide>
-      <div className={styles.financialSummary}>
-        <div className={styles.financialCard}>
-          <span>Valores em andamento</span>
-          <strong>{totalEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-        </div>
-        <div className={styles.financialCard}>
-          <span>Valores já pagos</span>
-          <strong>{totalPagos.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-        </div>
-      </div>
-
-      <div className={styles.filterRow}>
-        <button type="button" className={`${styles.filterChip} ${filtro === 'todos' ? styles.filterChipActive : ''}`} onClick={() => setFiltro('todos')}>Todos</button>
-        <button type="button" className={`${styles.filterChip} ${filtro === 'em_andamento' ? styles.filterChipActive : ''}`} onClick={() => setFiltro('em_andamento')}>Em andamento</button>
-        <button type="button" className={`${styles.filterChip} ${filtro === 'pagos' ? styles.filterChipActive : ''}`} onClick={() => setFiltro('pagos')}>Pagos</button>
-      </div>
-
-      <div className={styles.financialDateFilters}>
-        <label className={styles.kanbanCardField}>
-          <span>Data inicial</span>
-          <input className={styles.input} type="date" value={dataInicial} onChange={e => setDataInicial(e.target.value)} />
-        </label>
-        <label className={styles.kanbanCardField}>
-          <span>Data final</span>
-          <input className={styles.input} type="date" value={dataFinal} onChange={e => setDataFinal(e.target.value)} />
-        </label>
-        <button type="button" className={styles.btnSecondary} onClick={() => { setDataInicial(''); setDataFinal('') }}>
-          Limpar datas
-        </button>
-      </div>
-
-      <div className={styles.filterRow} style={{ marginBottom: 8 }}>
-        <button
-          type="button"
-          className={styles.btnSecondary}
-          onClick={() => {
-            const ws = XLSX.utils.json_to_sheet(filtered.map(e => ({
-              Paciente: e.paciente_nome,
-              Serviço: getEnvioResumo(e) || e.tipo_trabalho,
-              Status: e.status,
-              Valor: e.preco_servico ?? 0,
-              Desconto: e.desconto ?? 0,
-              Pago: e.pago ? 'Sim' : 'Não',
-              'Data Referência': getFinanceiroReferenceDate(e),
-            })))
-            const wb = XLSX.utils.book_new()
-            XLSX.utils.book_append_sheet(wb, ws, 'Financeiro')
-            XLSX.writeFile(wb, `financeiro-${lab.nome}.xlsx`)
-          }}
-        >
-          Exportar Excel
-        </button>
-        <button type="button" className={styles.btnSecondary} onClick={() => window.print()}>
-          Exportar PDF
-        </button>
-      </div>
-      <div className={styles.financialList}>
-        {filtered.length === 0 && <p className={styles.emptyMsg}>Nenhum trabalho nesse filtro.</p>}
-        {filtered.map(envio => (
-          <div key={envio.id} className={styles.financialRow}>
-            <div className={styles.financialMeta}>
-              <strong>{envio.paciente_nome}</strong>
-              <span>{getEnvioResumo(envio) || envio.tipo_trabalho}</span>
-              <small>{envio.status} · Referência: {formatDate(getFinanceiroReferenceDate(envio))}</small>
-            </div>
-            <div className={styles.financialActions}>
-              <strong>{(envio.preco_servico ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-              <span className={envio.pago ? styles.paidBadge : styles.pendingBadge}>{envio.pago ? 'Pago' : 'Pendente'}</span>
-              {isAdmin && (
-                <button type="button" className={styles.btnSecondary} onClick={() => void onTogglePago(envio)}>
-                  {envio.pago ? 'Desfazer' : 'Marcar pago'}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Modal>
-  )
-}
-
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
 function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, onDragStart, onOpenResumo, onEdit, onDelete }: {
@@ -2786,7 +2613,13 @@ function LabsAggregateDetailView({
   isAdmin,
   colunas,
   onBack,
+  onTrocarEmpresa,
   onColunasUpdated,
+  homeMode,
+  onHomeModeChange,
+  onCreateLab,
+  onOpenEditLabPicker,
+  onOpenPrecosPicker,
 }: {
   labs: Lab[]
   empresaId: string
@@ -2794,7 +2627,13 @@ function LabsAggregateDetailView({
   isAdmin: boolean
   colunas: LabKanbanColuna[]
   onBack: () => void
+  onTrocarEmpresa: () => void
   onColunasUpdated: () => void
+  homeMode: LabHomeMode
+  onHomeModeChange: (mode: LabHomeMode) => void
+  onCreateLab: () => void
+  onOpenEditLabPicker: () => void
+  onOpenPrecosPicker: () => void
 }) {
   const storagePrefix = `lab-control:${empresaId}:aggregate`
   const [envios,           setEnvios]           = useState<LabEnvio[]>([])
@@ -2921,33 +2760,23 @@ function LabsAggregateDetailView({
 
   const overdueCount = envios.filter(isOverdue).length
   const aggregateLabCount = new Set(visibleEnvios.map(envio => envio.lab_id)).size
+  const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
 
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <button type="button" className={styles.backBtn} onClick={onBack}>
-          <IconBack /> Voltar
-        </button>
-        <div className={styles.labDetailTitle}>
-          <h1 className={styles.pageTitle}>Todos os laboratórios</h1>
-          {overdueCount > 0 && (
-            <span className={styles.overdueBadge}>
-              <IconAlert /> {overdueCount} atrasado{overdueCount > 1 ? 's' : ''}
-            </span>
-          )}
+        <div className={styles.headerMainInfo}>
+          <button type="button" className={styles.backBtn} onClick={onBack}>
+            <IconBack /> Voltar
+          </button>
+          <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
+            Trocar empresa
+          </button>
         </div>
-        <span className={styles.headerMetaBadge}>{labs.length} laboratórios ativos</span>
-        <div className={styles.headerActions}>
-          {isAdmin && (
-            <>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
-                <IconSettings2 /> Kanban
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowArquivados(true)}>
-                <IconArchive /> Arquivados
-              </button>
-            </>
-          )}
+        <div className={styles.homeToolbar}>
+          <button type="button" className={`${styles.btnSecondary} ${styles.btnSecondaryActive}`}>
+            Visão geral
+          </button>
           <button
             type="button"
             className={styles.btnPrimary}
@@ -2960,57 +2789,120 @@ function LabsAggregateDetailView({
           >
             <IconPlus /> Novo envio
           </button>
+          {isAdmin && (
+            <button type="button" className={styles.btnSecondary} onClick={onCreateLab}>
+              <IconPlus /> Novo laboratório
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={styles.btnSecondary} onClick={onOpenEditLabPicker} disabled={labs.length === 0}>
+              <IconEdit /> Editar laboratórios
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={styles.btnSecondary} onClick={onOpenPrecosPicker} disabled={labs.length === 0}>
+              Lista de preços
+            </button>
+          )}
+          {isAdmin && (
+            <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
+              <IconSettings2 /> Editar Kanbans
+            </button>
+          )}
+        </div>
+        <div className={styles.headerActions}>
+          <div
+            className={styles.viewModeSwitcher}
+            style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
+          >
+            <span className={styles.viewModeIndicator} aria-hidden="true" />
+            {HOME_MODE_OPTIONS.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.viewModeButton} ${homeMode === option.value ? styles.viewModeButtonActive : ''}`}
+                onClick={() => onHomeModeChange(option.value)}
+              >
+                {option.icon === 'calendar' && <IconCalendar />}
+                {option.icon === 'list' && <IconList />}
+                {option.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      <div className={styles.tabs}>
-        <button className={`${styles.tab} ${styles.tabActive}`}>
-          Kanban ({visibleEnvios.length})
-        </button>
+      <div className={styles.aggregateHeaderMeta}>
+        <div className={styles.labDetailTitle}>
+          <h1 className={styles.pageTitle}>Visão geral</h1>
+          {overdueCount > 0 && (
+            <span className={styles.overdueBadge}>
+              <IconAlert /> {overdueCount} atrasado{overdueCount > 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        <span className={styles.headerMetaBadge}>{labs.length} laboratórios ativos</span>
       </div>
 
-      {loading ? <Spinner /> : (
+      {homeMode === 'calendar' ? (
+        <CalendarView
+          envios={envios}
+          precosByLab={precosByLab}
+          labs={labs}
+          onClose={() => onHomeModeChange('kanban')}
+        />
+      ) : homeMode === 'list' ? (
+        <ServicesListView
+          envios={envios}
+          precosByLab={precosByLab}
+          labs={labs}
+        />
+      ) : (
         <>
-          <div className={styles.searchRow}>
-            <input
-              className={`${styles.input} ${styles.searchGrow}`}
-              value={patientSearch}
-              onChange={e => setPatientSearch(e.target.value)}
-              placeholder="Buscar paciente no kanban"
-            />
-            <select
-              className={styles.select}
-              value={labFilterId}
-              onChange={e => setLabFilterId(e.target.value)}
-            >
-              <option value={LAB_FILTER_ALL}>Todos os laboratórios</option>
-              {labs.map(item => (
-                <option key={item.id} value={item.id}>
-                  {item.nome}
-                </option>
-              ))}
-            </select>
-          </div>
+          {loading ? <Spinner /> : (
+            <>
+              <div className={styles.searchRow}>
+                <input
+                  className={`${styles.input} ${styles.searchGrow}`}
+                  value={patientSearch}
+                  onChange={e => setPatientSearch(e.target.value)}
+                  placeholder="Buscar paciente no kanban"
+                />
+                <select
+                  className={styles.select}
+                  value={labFilterId}
+                  onChange={e => setLabFilterId(e.target.value)}
+                >
+                  <option value={LAB_FILTER_ALL}>Todos os laboratórios</option>
+                  {labs.map(item => (
+                    <option key={item.id} value={item.id}>
+                      {item.nome}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className={styles.aggregateFilterHint}>
-            {labFilterId === LAB_FILTER_ALL
-              ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
-              : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
-          </div>
+              <div className={styles.aggregateFilterHint}>
+                {labFilterId === LAB_FILTER_ALL
+                  ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
+                  : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
+              </div>
 
-          <KanbanBoard
-            envios={visibleEnvios}
-            colunas={colunas}
-            isAdmin={isAdmin}
-            showLabName
-            getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
-            getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
-            precosByLab={precosByLab}
-            onMoveEnvio={moveEnvioAgg}
-            onOpenResumo={setResumoEnvio}
-            onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
-            onDeleteEnvio={deleteEnvioAgg}
-          />
+              <KanbanBoard
+                envios={visibleEnvios}
+                colunas={colunas}
+                isAdmin={isAdmin}
+                showLabName
+                getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
+                getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
+                precosByLab={precosByLab}
+                onMoveEnvio={moveEnvioAgg}
+                onOpenResumo={setResumoEnvio}
+                onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
+                onDeleteEnvio={deleteEnvioAgg}
+              />
+            </>
+          )}
         </>
       )}
 
@@ -3300,245 +3192,19 @@ function InfoRow({ label, value, icon }: { label: string; value: string; icon?: 
   )
 }
 
-// ── Lab Card (lista principal) ─────────────────────────────────────────────
-
-function LabCard({ lab, envios, isAdmin, colunas, onClick, onEdit, onDelete, onOpenFinanceiro }: {
-  lab: Lab; envios: LabEnvio[]; isAdmin: boolean; colunas: LabKanbanColuna[]
-  onClick: () => void; onEdit: (e: React.MouseEvent) => void; onDelete: (e: React.MouseEvent) => void; onOpenFinanceiro: (e: React.MouseEvent) => void
-}) {
-  const overdue = envios.filter(isOverdue).length
-  const enviosEmAndamento = envios.filter(e => !isFinalEnvioStatus(e.status))
-  const active  = enviosEmAndamento.length
-  const valorEmAndamento = enviosEmAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
-  const recent  = [...envios].slice(0, 5)
-  const whatsappUrl = lab.telefone ? buildWhatsAppUrl(lab.telefone) : null
-
-  return (
-    <div className={styles.labCard} onClick={onClick}>
-      <div className={styles.labCardHeader}>
-        <div className={styles.labCardName}>{lab.nome}</div>
-        <div className={styles.labCardHeaderActions}>
-          {whatsappUrl && (
-            <button
-              type="button"
-              className={`${styles.btnIcon} ${styles.btnIconWhatsApp}`}
-              onClick={e => {
-                e.stopPropagation()
-                window.open(whatsappUrl, '_blank', 'noopener,noreferrer')
-              }}
-              title="Abrir no WhatsApp"
-            >
-              <IconWhatsApp />
-            </button>
-          )}
-          {isAdmin && (
-            <button type="button" className={styles.btnIcon} onClick={onEdit} title="Editar laboratório">
-              <IconEdit />
-            </button>
-          )}
-          {isAdmin && (
-            <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={onDelete} title="Excluir laboratório">
-              <IconTrash />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className={styles.labCardContact}>
-        {lab.telefone && <span className={styles.labCardContactItem}><IconPhone /> {formatWhatsAppNumber(lab.telefone)}</span>}
-        {lab.email    && <span className={styles.labCardContactItem}><IconMail /> {lab.email}</span>}
-        {lab.prazo_medio_dias > 0 && (
-          <span className={styles.labCardContactItem}><IconClock /> {lab.prazo_medio_dias}d prazo médio</span>
-        )}
-      </div>
-
-      <div className={styles.labCardStats}>
-        <div className={styles.labCardStat}>
-          <span className={styles.labCardStatNum}>{envios.length}</span>
-          <span className={styles.labCardStatLabel}>total</span>
-        </div>
-        <div className={styles.labCardStat}>
-          <span className={styles.labCardStatNum}>{active}</span>
-          <span className={styles.labCardStatLabel}>em andamento</span>
-        </div>
-        <div className={`${styles.labCardStat} ${styles.labCardStatOverdue}`}>
-          <span className={styles.labCardStatNum}>{overdue}</span>
-          <span className={styles.labCardStatLabel}>atrasados</span>
-        </div>
-      </div>
-
-      <div className={styles.labCardValueSummary}>
-        <span className={styles.labCardValueLabel}>Valores em andamento</span>
-        <strong className={styles.labCardValueAmount}>
-          {valorEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-        </strong>
-      </div>
-      <button type="button" className={styles.btnSecondary} onClick={onOpenFinanceiro}>
-        Ver financeiro
-      </button>
-
-      {/* Mini kanban status bars */}
-      {envios.length > 0 && (
-        <div className={styles.labCardStatusBar}>
-          {[...colunas].sort((a, b) => a.ordem - b.ordem).map(col => {
-            const count = envios.filter(e => e.status === col.nome).length
-            if (count === 0) return null
-            return (
-              <div
-                key={col.id}
-                className={styles.labCardStatusSegment}
-                style={{ background: col.cor, flex: count }}
-                title={`${col.nome}: ${count}`}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {/* Recent envios list */}
-      {recent.length > 0 && (
-        <div className={styles.labCardEnvios}>
-          {recent.map(e => (
-            <div key={e.id} className={`${styles.labCardEnvioItem} ${isOverdue(e) ? styles.labCardEnvioOverdue : ''}`}>
-              <span className={styles.labCardEnvioPatient}>{e.paciente_nome}</span>
-              <span className={styles.labCardEnvioType}>{getEnvioResumo(e) || e.tipo_trabalho}</span>
-              {e.data_entrega_prometida && (
-                <span className={styles.labCardEnvioDate}>{formatDate(e.data_entrega_prometida)}</span>
-              )}
-            </div>
-          ))}
-          {envios.length > 5 && (
-            <div className={styles.labCardMore}>+{envios.length - 5} trabalhos</div>
-          )}
-        </div>
-      )}
-
-      {envios.length === 0 && (
-        <div className={styles.labCardEmpty}>Nenhum envio ainda. Clique para abrir.</div>
-      )}
-    </div>
-  )
-}
-
-// ── Main: LabControlPage ──────────────────────────────────────────────────
-
-function TodosLabsCard({ labs, envios, colunas, getLabName, onClick }: {
-  labs: Lab[]
-  envios: LabEnvio[]
-  colunas: LabKanbanColuna[]
-  getLabName: (labId: string) => string
-  onClick: () => void
-}) {
-  const metrics = getEnvioMetrics(envios)
-  const recent = envios.slice(0, 5)
-
-  return (
-    <div className={`${styles.labCard} ${styles.labCardAggregate}`} onClick={onClick}>
-      <div className={styles.labCardHeader}>
-        <div>
-          <div className={styles.aggregateBadge}>Visão geral</div>
-          <div className={styles.labCardName}>Todos</div>
-        </div>
-      </div>
-
-      <div className={styles.aggregateCardHint}>
-        Acompanhe todos os trabalhos no mesmo kanban e filtre por laboratório quando precisar.
-      </div>
-
-      <div className={styles.aggregateKpiGrid}>
-        <div className={styles.aggregateKpiCard}>
-          <strong>{labs.length}</strong>
-          <span>laboratórios</span>
-        </div>
-        <div className={styles.aggregateKpiCard}>
-          <strong>{metrics.total}</strong>
-          <span>trabalhos</span>
-        </div>
-        <div className={styles.aggregateKpiCard}>
-          <strong>{metrics.emAndamento}</strong>
-          <span>em andamento</span>
-        </div>
-        <div className={`${styles.aggregateKpiCard} ${styles.aggregateKpiCardAlert}`}>
-          <strong>{metrics.overdue}</strong>
-          <span>atrasados</span>
-        </div>
-        <div className={styles.aggregateKpiCard}>
-          <strong>{metrics.pagos}</strong>
-          <span>pagos</span>
-        </div>
-        <div className={styles.aggregateKpiCard}>
-          <strong>{metrics.ticketMedio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
-          <span>ticket médio</span>
-        </div>
-      </div>
-
-      <div className={styles.labCardValueSummary}>
-        <span className={styles.labCardValueLabel}>Valores em andamento</span>
-        <strong className={styles.labCardValueAmount}>
-          {metrics.valorEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-        </strong>
-      </div>
-
-      {envios.length > 0 && (
-        <div className={styles.labCardStatusBar}>
-          {[...colunas].sort((a, b) => a.ordem - b.ordem).map(col => {
-            const count = envios.filter(envio => envio.status === col.nome).length
-            if (count === 0) return null
-            return (
-              <div
-                key={col.id}
-                className={styles.labCardStatusSegment}
-                style={{ background: col.cor, flex: count }}
-                title={`${col.nome}: ${count}`}
-              />
-            )
-          })}
-        </div>
-      )}
-
-      {recent.length > 0 && (
-        <div className={styles.labCardEnvios}>
-          {recent.map(envio => (
-            <div key={envio.id} className={`${styles.labCardEnvioItem} ${isOverdue(envio) ? styles.labCardEnvioOverdue : ''}`}>
-              <span className={styles.labCardEnvioPatient}>{envio.paciente_nome}</span>
-              <span className={styles.labCardEnvioType}>{getLabName(envio.lab_id)}</span>
-              {envio.data_entrega_prometida && (
-                <span className={styles.labCardEnvioDate}>{formatDate(envio.data_entrega_prometida)}</span>
-              )}
-            </div>
-          ))}
-          {envios.length > 5 && (
-            <div className={styles.labCardMore}>+{envios.length - 5} trabalhos</div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVoltar }: {
   userId: string; empresa: Empresa; onTrocarEmpresa: () => void; onVoltar: () => void
 }) {
-  const storagePrefix = `lab-control:${empresa.id}`
   const [isAdmin,      setIsAdmin]      = useState(false)
   const [labs,         setLabs]         = useState<Lab[]>([])
-  const [enviosMap,    setEnviosMap]    = useState<Record<string, LabEnvio[]>>({})
-  const [precosByLab,  setPrecosByLab]  = useState<Record<string, LabPreco[]>>({})
   const [colunas,      setColunas]      = useState<LabKanbanColuna[]>([])
-  const [selectedViewPersisted, setSelectedViewPersisted] = useSessionStorageState<LabViewSelectionPersisted | null>(
-    `${storagePrefix}:selected-view`,
-    null,
-    isLabViewSelectionPersisted,
-  )
   const [selectedView, setSelectedView] = useState<LabViewSelection | null>(null)
   const [loading,      setLoading]      = useState(true)
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
-  const [financeiroLab, setFinanceiroLab] = useState<Lab | null>(null)
-  const [showHomeEnvioSteps, setShowHomeEnvioSteps] = useState(false)
   const [showHomePrecos, setShowHomePrecos] = useState(false)
-  const [showHomeKanbanCfg, setShowHomeKanbanCfg] = useState(false)
-  const [showHomeArquivados, setShowHomeArquivados] = useState(false)
+  const [showEditLabPicker, setShowEditLabPicker] = useState(false)
+  const [showPrecosPicker, setShowPrecosPicker] = useState(false)
   const [homeMode, setHomeMode] = useState<LabHomeMode>('kanban')
 
   useEffect(() => {
@@ -3587,81 +3253,20 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     void validarAcesso()
   }, [empresa.id, onTrocarEmpresa, userId])
 
-  const fetchPrecosForLabs = useCallback(async (targetLabs: Lab[]) => {
-    if (targetLabs.length === 0) {
-      setPrecosByLab({})
-      return
-    }
-
-    const { data } = await supabase
-      .from('lab_precos')
-      .select('*')
-      .in('lab_id', targetLabs.map(item => item.id))
-      .eq('ativo', true)
-      .order('nome_servico')
-
-    const nextMap: Record<string, LabPreco[]> = {}
-    for (const preco of data ?? []) {
-      if (!nextMap[preco.lab_id]) nextMap[preco.lab_id] = []
-      nextMap[preco.lab_id].push(preco)
-    }
-    setPrecosByLab(nextMap)
-  }, [])
-
   const fetchLabs = useCallback(async () => {
     const { data } = await supabase
       .from('labs').select('*')
       .eq('empresa_id', empresa.id).eq('ativo', true).order('nome')
     if (data) {
       setLabs(data)
-      await fetchPrecosForLabs(data)
       setSelectedView(prev => {
         if (!prev) return prev
-        if (prev.kind === 'all') return prev
+        if (prev.kind !== 'lab') return null
         const updatedLab = data.find(item => item.id === prev.lab.id)
         return updatedLab ? { kind: 'lab', lab: updatedLab } : null
       })
-      setFinanceiroLab(prev => prev ? data.find(item => item.id === prev.id) ?? prev : prev)
-    }
-  }, [empresa.id, fetchPrecosForLabs])
-
-  const fetchEnvios = useCallback(async () => {
-    const { data } = await supabase
-      .from('lab_envios').select('*')
-      .eq('empresa_id', empresa.id)
-      .is('arquivado_em', null)
-      .order('created_at', { ascending: false })
-    if (data) {
-      const map: Record<string, LabEnvio[]> = {}
-      for (const e of data) {
-        if (!map[e.lab_id]) map[e.lab_id] = []
-        map[e.lab_id].push(e)
-      }
-      setEnviosMap(map)
     }
   }, [empresa.id])
-
-  const deleteLab = async (lab: Lab) => {
-    const ok = confirm(`Excluir "${lab.nome}"?\n\nTodos os envios do laboratório serão mantidos no histórico, mas o laboratório será removido da lista.\n\nEsta ação não pode ser desfeita.`)
-    if (!ok) return
-    await supabase.from('labs').update({ ativo: false }).eq('id', lab.id)
-    await fetchLabs()
-  }
-
-  const togglePagoEnvioLista = async (envio: LabEnvio) => {
-    const nextPago = !envio.pago
-    const payload = {
-      pago: nextPago,
-      data_pagamento: nextPago ? today() : null,
-      updated_at: new Date().toISOString(),
-    }
-    const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
-    if (error) return
-    setEnviosMap(prev => ({
-      ...prev,
-      [envio.lab_id]: (prev[envio.lab_id] ?? []).map(item => item.id === envio.id ? { ...item, ...payload } : item),
-    }))
-  }
 
   const fetchColunas = useCallback(async () => {
     const { data } = await supabase
@@ -3679,96 +3284,11 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   }, [empresa.id])
 
   useEffect(() => {
-    setSelectedView(null)
     setLabs([])
-    setEnviosMap({})
-    setPrecosByLab({})
     setColunas([])
     setLoading(true)
-    Promise.all([fetchLabs(), fetchEnvios(), fetchColunas()]).then(() => setLoading(false))
-  }, [fetchLabs, fetchEnvios, fetchColunas])
-
-  useEffect(() => {
-    if (loading) return
-
-    if (!selectedViewPersisted) {
-      setSelectedView(null)
-      return
-    }
-
-    if (selectedViewPersisted.kind === 'all') {
-      setSelectedView({ kind: 'all' })
-      return
-    }
-
-    const restoredLab = labs.find(item => item.id === selectedViewPersisted.labId)
-    if (!restoredLab) {
-      setSelectedView(null)
-      setSelectedViewPersisted(null)
-      return
-    }
-
-    setSelectedView({ kind: 'lab', lab: restoredLab })
-  }, [labs, loading, selectedViewPersisted, setSelectedViewPersisted])
-
-  const abrirVisaoTodos = () => {
-    setSelectedView({ kind: 'all' })
-    setSelectedViewPersisted({ kind: 'all' })
-  }
-
-  const abrirVisaoLab = (lab: Lab) => {
-    setSelectedView({ kind: 'lab', lab })
-    setSelectedViewPersisted({ kind: 'lab', labId: lab.id })
-  }
-
-  const voltarParaLista = () => {
-    setSelectedView(null)
-    setSelectedViewPersisted(null)
-    void fetchEnvios()
-    void fetchPrecosForLabs(labs)
-  }
-
-  const todosEnvios = sortEnviosByCreatedAt(Object.values(enviosMap).flat())
-  const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
-  const menuTargetLab = labs[0] ?? null
-  const homeMenuItems: HeaderMenuItem[] = [
-    {
-      id: 'editar-lab',
-      label: 'Editar lab',
-      onClick: () => {
-        if (!isAdmin || !menuTargetLab) return
-        setEditingLab(menuTargetLab)
-        setShowLabModal(true)
-      },
-    },
-    {
-      id: 'lista-precos',
-      label: 'Lista de preços',
-      onClick: () => {
-        if (!menuTargetLab) return
-        setEditingLab(menuTargetLab)
-        setShowHomePrecos(true)
-      },
-    },
-    {
-      id: 'kanban',
-      label: 'Kanban',
-      onClick: () => setShowHomeKanbanCfg(true),
-    },
-    {
-      id: 'arquivados',
-      label: 'Arquivados',
-      onClick: () => setShowHomeArquivados(true),
-    },
-    {
-      id: 'novo-envio',
-      label: 'Novo envio',
-      onClick: () => {
-        if (labs.length === 0) return
-        setShowHomeEnvioSteps(true)
-      },
-    },
-  ]
+    Promise.all([fetchLabs(), fetchColunas()]).then(() => setLoading(false))
+  }, [fetchLabs, fetchColunas])
 
   if (loading) {
     return (
@@ -3783,21 +3303,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   }
 
   // Detalhe do lab selecionado
-  if (selectedView) {
-    if (selectedView.kind === 'all') {
-      return (
-        <LabsAggregateDetailView
-          labs={labs}
-          empresaId={empresa.id}
-          userId={userId}
-          isAdmin={isAdmin}
-          colunas={colunas}
-          onBack={voltarParaLista}
-          onColunasUpdated={fetchColunas}
-        />
-      )
-    }
-
+  if (selectedView?.kind === 'lab') {
     return (
       <LabDetailView
         lab={selectedView.lab}
@@ -3805,7 +3311,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         userId={userId}
         isAdmin={isAdmin}
         colunas={colunas}
-        onBack={voltarParaLista}
+        onBack={() => setSelectedView(null)}
         onLabUpdated={() => { fetchLabs() }}
         onColunasUpdated={fetchColunas}
       />
@@ -3814,113 +3320,22 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
 
   // Lista de labs
   return (
-    <div className={styles.page}>
-      <div className={styles.pageHeader}>
-        <div className={styles.headerMainInfo}>
-          <button type="button" className={styles.backBtn} onClick={onVoltar}>
-            <IconBack /> Voltar
-          </button>
-          <h1 className={styles.pageTitle}>Controle de Laboratórios</h1>
-          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-            Empresa: <strong style={{ color: 'var(--text)' }}>{empresa.nome}</strong>
-          </span>
-        </div>
-        <div className={styles.headerCenter}>
-          <div
-            className={styles.viewModeSwitcher}
-            style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
-          >
-            <span className={styles.viewModeIndicator} aria-hidden="true" />
-            {HOME_MODE_OPTIONS.map(option => (
-              <button
-                key={option.value}
-                type="button"
-                className={`${styles.viewModeButton} ${homeMode === option.value ? styles.viewModeButtonActive : ''}`}
-                onClick={() => setHomeMode(option.value)}
-              >
-                {option.icon === 'calendar' && <IconCalendar />}
-                {option.icon === 'list' && <IconList />}
-                {option.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
-            Trocar empresa
-          </button>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            disabled={labs.length === 0}
-            onClick={() => setShowHomeEnvioSteps(true)}
-          >
-            <IconPlus /> Novo envio
-          </button>
-          {isAdmin && (
-            <button
-              type="button"
-              className={styles.btnSecondary}
-              onClick={() => { setEditingLab(null); setShowLabModal(true) }}
-            >
-              <IconPlus /> Novo laboratório
-            </button>
-          )}
-          <HeaderActionsMenu items={homeMenuItems} />
-        </div>
-      </div>
-
-      {labs.length === 0 ? (
-        <div className={styles.emptyState}>
-          <IconFlask />
-          <p>Nenhum laboratório cadastrado.</p>
-          {isAdmin && (
-            <button
-              type="button"
-              className={styles.btnPrimary}
-              onClick={() => { setEditingLab(null); setShowLabModal(true) }}
-            >
-              <IconPlus /> Cadastrar primeiro laboratório
-            </button>
-          )}
-        </div>
-      ) : homeMode === 'calendar' ? (
-        <CalendarView
-          envios={todosEnvios}
-          precosByLab={precosByLab}
-          labs={labs}
-          onClose={() => setHomeMode('kanban')}
-        />
-      ) : homeMode === 'list' ? (
-        <ServicesListView
-          envios={todosEnvios}
-          precosByLab={precosByLab}
-          labs={labs}
-        />
-      ) : (
-        <div className={styles.labsGrid}>
-          <TodosLabsCard
-            labs={labs}
-            envios={todosEnvios}
-            colunas={colunas}
-            getLabName={labId => labs.find(item => item.id === labId)?.nome ?? 'Laboratório removido'}
-            onClick={abrirVisaoTodos}
-          />
-          {labs.map(lab => (
-            <LabCard
-              key={lab.id}
-              lab={lab}
-              envios={enviosMap[lab.id] ?? []}
-              isAdmin={isAdmin}
-              colunas={colunas}
-              onClick={() => abrirVisaoLab(lab)}
-              onEdit={e => { e.stopPropagation(); setEditingLab(lab); setShowLabModal(true) }}
-              onDelete={e => { e.stopPropagation(); void deleteLab(lab) }}
-              onOpenFinanceiro={e => { e.stopPropagation(); setFinanceiroLab(lab) }}
-            />
-          ))}
-        </div>
-      )}
+    <>
+      <LabsAggregateDetailView
+        labs={labs}
+        empresaId={empresa.id}
+        userId={userId}
+        isAdmin={isAdmin}
+        colunas={colunas}
+        onBack={onVoltar}
+        onTrocarEmpresa={onTrocarEmpresa}
+        onColunasUpdated={fetchColunas}
+        homeMode={homeMode}
+        onHomeModeChange={setHomeMode}
+        onCreateLab={() => { setEditingLab(null); setShowLabModal(true) }}
+        onOpenEditLabPicker={() => setShowEditLabPicker(true)}
+        onOpenPrecosPicker={() => setShowPrecosPicker(true)}
+      />
 
       {showLabModal && (
         <LabModal
@@ -3930,50 +3345,35 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           onSaved={() => { void Promise.all([fetchLabs(), fetchColunas()]) }}
         />
       )}
-      {showHomeEnvioSteps && (
-        <EnvioSteps
+      {showEditLabPicker && labs.length > 0 && (
+        <LabPickerModal
+          title="Selecionar laboratório para editar"
           labs={labs}
-          precosByLab={precosByLab}
-          empresaId={empresa.id}
-          userId={userId}
-          envio={null}
-          colunas={colunas}
-          onClose={() => setShowHomeEnvioSteps(false)}
-          onSaved={() => { void fetchEnvios() }}
+          onClose={() => setShowEditLabPicker(false)}
+          onSelect={lab => {
+            setEditingLab(lab)
+            setShowLabModal(true)
+          }}
+        />
+      )}
+      {showPrecosPicker && labs.length > 0 && (
+        <LabPickerModal
+          title="Selecionar laboratório para lista de preços"
+          labs={labs}
+          onClose={() => setShowPrecosPicker(false)}
+          onSelect={lab => {
+            setEditingLab(lab)
+            setShowHomePrecos(true)
+          }}
         />
       )}
       {showHomePrecos && editingLab && (
         <PrecosModal
           lab={editingLab}
           onClose={() => setShowHomePrecos(false)}
-          onSaved={() => { void fetchPrecosForLabs(labs) }}
+          onSaved={() => { void fetchLabs() }}
         />
       )}
-      {showHomeKanbanCfg && (
-        <KanbanConfigModal
-          empresaId={empresa.id}
-          colunas={colunas}
-          onClose={() => setShowHomeKanbanCfg(false)}
-          onSaved={fetchColunas}
-        />
-      )}
-      {showHomeArquivados && (
-        <ArquivadosModal
-          empresaId={empresa.id}
-          userId={userId}
-          onClose={() => setShowHomeArquivados(false)}
-          onRestored={() => void fetchEnvios()}
-        />
-      )}
-      {financeiroLab && (
-        <FinanceiroModal
-          lab={financeiroLab}
-          envios={enviosMap[financeiroLab.id] ?? []}
-          isAdmin={isAdmin}
-          onClose={() => setFinanceiroLab(null)}
-          onTogglePago={togglePagoEnvioLista}
-        />
-      )}
-    </div>
+    </>
   )
 }
