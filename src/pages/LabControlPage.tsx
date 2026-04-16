@@ -3536,6 +3536,9 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
   const [financeiroLab, setFinanceiroLab] = useState<Lab | null>(null)
   const [showHomeEnvioSteps, setShowHomeEnvioSteps] = useState(false)
+  const [showHomePrecos, setShowHomePrecos] = useState(false)
+  const [showHomeKanbanCfg, setShowHomeKanbanCfg] = useState(false)
+  const [showHomeArquivados, setShowHomeArquivados] = useState(false)
   const [homeMode, setHomeMode] = useState<LabHomeMode>('kanban')
 
   useEffect(() => {
@@ -3727,13 +3730,14 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
 
   const todosEnvios = sortEnviosByCreatedAt(Object.values(enviosMap).flat())
   const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
+  const menuTargetLab = labs[0] ?? null
   const homeMenuItems: HeaderMenuItem[] = [
     {
       id: 'editar-lab',
       label: 'Editar lab',
       onClick: () => {
-        if (!isAdmin || labs.length === 0) return
-        setEditingLab(labs[0])
+        if (!isAdmin || !menuTargetLab) return
+        setEditingLab(menuTargetLab)
         setShowLabModal(true)
       },
     },
@@ -3741,19 +3745,20 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
       id: 'lista-precos',
       label: 'Lista de preços',
       onClick: () => {
-        if (labs.length === 0) return
-        abrirVisaoLab(labs[0])
+        if (!menuTargetLab) return
+        setEditingLab(menuTargetLab)
+        setShowHomePrecos(true)
       },
     },
     {
       id: 'kanban',
       label: 'Kanban',
-      onClick: () => setHomeMode('kanban'),
+      onClick: () => setShowHomeKanbanCfg(true),
     },
     {
       id: 'arquivados',
       label: 'Arquivados',
-      onClick: () => abrirVisaoTodos(),
+      onClick: () => setShowHomeArquivados(true),
     },
     {
       id: 'novo-envio',
@@ -3839,7 +3844,6 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               </button>
             ))}
           </div>
-          <HeaderActionsMenu items={homeMenuItems} />
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
@@ -3862,6 +3866,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               <IconPlus /> Novo laboratório
             </button>
           )}
+          <HeaderActionsMenu items={homeMenuItems} />
         </div>
       </div>
 
@@ -3935,6 +3940,29 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           colunas={colunas}
           onClose={() => setShowHomeEnvioSteps(false)}
           onSaved={() => { void fetchEnvios() }}
+        />
+      )}
+      {showHomePrecos && editingLab && (
+        <PrecosModal
+          lab={editingLab}
+          onClose={() => setShowHomePrecos(false)}
+          onSaved={() => { void fetchPrecosForLabs(labs) }}
+        />
+      )}
+      {showHomeKanbanCfg && (
+        <KanbanConfigModal
+          empresaId={empresa.id}
+          colunas={colunas}
+          onClose={() => setShowHomeKanbanCfg(false)}
+          onSaved={fetchColunas}
+        />
+      )}
+      {showHomeArquivados && (
+        <ArquivadosModal
+          empresaId={empresa.id}
+          userId={userId}
+          onClose={() => setShowHomeArquivados(false)}
+          onRestored={() => void fetchEnvios()}
         />
       )}
       {financeiroLab && (
