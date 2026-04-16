@@ -659,7 +659,14 @@ function OverviewMenu({
         aria-haspopup="menu"
         aria-expanded={open}
       >
-        Visão geral <span aria-hidden="true">v</span>
+        <span className={styles.overviewMenuTriggerLabel}>Visão geral</span>
+        <span
+          aria-hidden="true"
+          className={`${styles.overviewMenuChevron} ${open ? styles.overviewMenuChevronOpen : ''}`}
+        >
+          <span />
+          <span />
+        </span>
       </button>
 
       {open && (

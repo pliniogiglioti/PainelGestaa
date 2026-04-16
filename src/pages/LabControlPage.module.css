@@ -102,8 +102,64 @@
 
 .overviewMenuTrigger {
   min-width: 160px;
-  justify-content: center;
+  justify-content: space-between;
   min-height: 40px;
+  gap: 10px;
+  padding-inline: 14px 12px;
+  border-radius: 12px;
+  border-color: rgba(201, 162, 42, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)),
+    var(--bg-elevated);
+  color: var(--text);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.overviewMenuTrigger:hover {
+  border-color: rgba(201, 162, 42, 0.32);
+  background:
+    linear-gradient(180deg, rgba(201, 162, 42, 0.08), rgba(201, 162, 42, 0.03)),
+    var(--bg-elevated);
+  color: var(--gold-light);
+}
+
+.overviewMenuTriggerLabel {
+  font-weight: 700;
+}
+
+.overviewMenuChevron {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  border-radius: 999px;
+  background: rgba(201, 162, 42, 0.08);
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1), background 0.18s ease;
+}
+
+.overviewMenuChevron span {
+  position: absolute;
+  top: 7px;
+  width: 6px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+  transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.overviewMenuChevron span:first-child {
+  left: 3px;
+  transform: rotate(45deg);
+}
+
+.overviewMenuChevron span:last-child {
+  right: 3px;
+  transform: rotate(-45deg);
+}
+
+.overviewMenuChevronOpen {
+  transform: rotate(180deg);
+  background: rgba(201, 162, 42, 0.16);
 }
 
 .overviewMenuDropdown {
