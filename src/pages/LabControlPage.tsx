@@ -863,10 +863,6 @@ function LabModal({ lab, empresaId, onClose, onSaved }: {
     } else {
       const { error: err } = await supabase.from('labs').insert(payload)
       if (err) { setError(err.message); setSaving(false); return }
-      // Sempre que criar um novo lab, resetar as colunas do kanban para o padrão
-      await supabase.from('lab_kanban_colunas').delete().eq('empresa_id', empresaId)
-      const defaults = DEFAULT_COLUNAS.map(c => ({ ...c, empresa_id: empresaId }))
-      await supabase.from('lab_kanban_colunas').insert(defaults)
     }
     onSaved(); onClose()
   }
@@ -1649,7 +1645,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
           )}
           {!currentLab && (
             <div className={styles.summaryAlert}>
-              <IconAlert /> Selecione o laboratorio para carregar a lista de servicos e continuar o envio.
+              <IconAlert /> Selecione o laboratório para carregar a lista de serviços e continuar o envio.
             </div>
           )}
           {currentLab && currentPrecos.length === 0 && (
@@ -1671,7 +1667,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
 
             {!currentLab ? (
               <p className={styles.priceSelectionEmpty}>
-                Escolha um laboratorio para visualizar os servicos disponiveis.
+                Escolha um laboratório para visualizar os serviços disponíveis.
               </p>
             ) : currentPrecos.length > 0 ? (
               <div className={styles.precosGrid}>
@@ -2482,7 +2478,8 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   }, [fetchEnvios, fetchPrecos])
 
   const moveEnvio = async (envioId: string, status: string) => {
-    await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
+    const { error } = await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
+    if (error) return
     setEnvios(prev => prev.map(e => e.id === envioId ? { ...e, status } : e))
     const e = envios.find(x => x.id === envioId)
     if (e) await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
@@ -2495,14 +2492,16 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
       const choice = confirm('Arquivar este envio?\n\nClique em OK para arquivar.\nClique em Cancelar para outras opções.')
       if (choice) {
         const arquivado_em = new Date().toISOString()
-        await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+        const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+        if (error) return
         await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
         setEnvios(prev => prev.filter(e => e.id !== envioId))
       }
     } else {
       if (!confirm('Arquivar este envio?')) return
       const arquivado_em = new Date().toISOString()
-      await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+      const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+      if (error) return
       await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
       setEnvios(prev => prev.filter(e => e.id !== envioId))
     }
@@ -2737,7 +2736,7 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
                           setEditingPrecoId(p.id)
                           setShowPrecos(true)
                         }}
-                        title="Editar preÃ§o"
+                        title="Editar preço"
                       >
                         <IconEdit />
                       </button>
@@ -2899,7 +2898,8 @@ function LabsAggregateDetailView({
   }, [labFilterId, labs, setLabFilterId])
 
   const moveEnvioAgg = async (envioId: string, status: string) => {
-    await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
+    const { error } = await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
+    if (error) return
     setEnvios(prev => prev.map(item => item.id === envioId ? { ...item, status } : item))
     await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
@@ -2907,7 +2907,8 @@ function LabsAggregateDetailView({
   const deleteEnvioAgg = async (envioId: string) => {
     if (!confirm('Arquivar este envio?')) return
     const arquivado_em = new Date().toISOString()
-    await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+    const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
+    if (error) return
     await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
     setEnvios(prev => prev.filter(item => item.id !== envioId))
   }
@@ -3181,8 +3182,8 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
         <button type="button" className={styles.btnIcon} onClick={prevMonth}>‹</button>
         <span className={styles.calendarMonthLabel}>{monthLabel}</span>
         <div className={styles.calendarSummary}>
-          <span>{monthEventsCount} previsoes no mes</span>
-          <span>{labsWithEventsCount} laboratorio(s)</span>
+          <span>{monthEventsCount} previsões no mês</span>
+          <span>{labsWithEventsCount} laboratório(s)</span>
         </div>
         <button type="button" className={styles.btnIcon} onClick={nextMonth}>›</button>
         <button type="button" className={styles.btnSecondary} onClick={onClose} style={{ marginLeft: 'auto' }}>
@@ -3213,8 +3214,8 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
                   <span className={styles.calendarEventService}>{ev.servicoNome}</span>
                   <div className={styles.calendarEventTooltip}>
                     <strong>{ev.pacienteNome}</strong>
-                    <span>Laboratorio: {ev.labNome || 'Nao informado'}</span>
-                    <span>Servico: {ev.servicoNome}</span>
+                    <span>Laboratório: {ev.labNome || 'Não informado'}</span>
+                    <span>Serviço: {ev.servicoNome}</span>
                     <span>Status: {ev.status}</span>
                     <span>Previsto: {formatDate(ev.date)}</span>
                     <span>Envio: {formatDate(ev.dataEnvio)}</span>
