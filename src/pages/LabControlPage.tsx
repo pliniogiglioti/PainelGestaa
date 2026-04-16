@@ -2964,18 +2964,18 @@ function LabsAggregateDetailView({
           </span>
         </div>
         <div className={styles.headerCenter}>
-          <OverviewMenu
-            labs={labs}
-            envios={envios}
-            colunas={colunas}
-            isAdmin={isAdmin}
-            getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
-            onCreateLab={onCreateLab}
-            onOpenEditLabPicker={onOpenEditLabPicker}
-            onOpenPrecosPicker={onOpenPrecosPicker}
-            onOpenKanbanCfg={() => setShowKanbanCfg(true)}
-            onOpenArquivados={() => setShowArquivados(true)}
-          />
+          <button
+            type="button"
+            className={styles.btnPrimary}
+            disabled={labs.length === 0}
+            onClick={() => {
+              if (labs.length === 0) return
+              setEditingEnvio(null)
+              setShowEnvioSteps(true)
+            }}
+          >
+            <IconPlus /> Novo envio
+          </button>
           <div
             className={styles.viewModeSwitcher}
             style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
@@ -2994,20 +2994,18 @@ function LabsAggregateDetailView({
               </button>
             ))}
           </div>
-        </div>
-        <div className={styles.headerActions}>
-          <button
-            type="button"
-            className={styles.btnPrimary}
-            disabled={labs.length === 0}
-            onClick={() => {
-              if (labs.length === 0) return
-              setEditingEnvio(null)
-              setShowEnvioSteps(true)
-            }}
-          >
-            <IconPlus /> Novo envio
-          </button>
+          <OverviewMenu
+            labs={labs}
+            envios={envios}
+            colunas={colunas}
+            isAdmin={isAdmin}
+            getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
+            onCreateLab={onCreateLab}
+            onOpenEditLabPicker={onOpenEditLabPicker}
+            onOpenPrecosPicker={onOpenPrecosPicker}
+            onOpenKanbanCfg={() => setShowKanbanCfg(true)}
+            onOpenArquivados={() => setShowArquivados(true)}
+          />
         </div>
       </div>
 
@@ -3033,10 +3031,10 @@ function LabsAggregateDetailView({
                   className={`${styles.input} ${styles.searchGrow}`}
                   value={patientSearch}
                   onChange={e => setPatientSearch(e.target.value)}
-                  placeholder="Buscar paciente no kanban"
+                  placeholder="Buscar"
                 />
                 <select
-                  className={styles.select}
+                  className={`${styles.select} ${styles.searchSelect}`}
                   value={labFilterId}
                   onChange={e => setLabFilterId(e.target.value)}
                 >

@@ -15,6 +15,13 @@
   flex-wrap: wrap;
 }
 
+.pageHeader .backBtn,
+.pageHeader .btnPrimary,
+.pageHeader .btnSecondary,
+.pageHeader .overviewMenuTrigger {
+  min-height: 48px;
+}
+
 .headerMainInfo {
   display: flex;
   align-items: center;
@@ -60,11 +67,11 @@
 
 .headerCenter {
   display: flex;
-  flex: 1 1 360px;
-  justify-content: center;
+  flex: 1 1 720px;
+  justify-content: flex-end;
   align-items: center;
   gap: 10px;
-  min-width: min(100%, 360px);
+  min-width: min(100%, 720px);
 }
 
 .viewModeCard {
@@ -96,6 +103,7 @@
 .overviewMenuTrigger {
   min-width: 160px;
   justify-content: center;
+  min-height: 40px;
 }
 
 .overviewMenuDropdown {
@@ -151,8 +159,8 @@
 }
 
 .overviewMenuActions {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -171,6 +179,7 @@
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s, background 0.15s, color 0.15s;
+  min-height: 42px;
 }
 
 .overviewMenuAction:hover {
@@ -236,6 +245,7 @@
   border: 1px solid rgba(255,255,255,0.05);
   background: var(--bg-elevated);
   overflow: hidden;
+  min-height: 48px;
 }
 
 .viewModeIndicator {
@@ -563,12 +573,19 @@
   display: flex;
   gap: 12px;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   margin-bottom: 12px;
 }
 
 .searchGrow {
-  flex: 1 1 280px;
+  flex: 0 1 180px;
+  max-width: 180px;
+}
+
+.searchSelect {
+  flex: 0 1 220px;
+  min-width: 220px;
+  max-width: 220px;
 }
 
 .aggregateFilterHint {
@@ -1780,6 +1797,7 @@
     order: 3;
     flex-basis: 100%;
     min-width: 0;
+    justify-content: flex-start;
   }
 
   .headerActions {
@@ -1791,6 +1809,17 @@
   .viewModeCard {
     width: 100%;
     min-width: 0;
+  }
+
+  .searchRow {
+    flex-wrap: wrap;
+  }
+
+  .searchGrow,
+  .searchSelect {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
   }
 }
 
