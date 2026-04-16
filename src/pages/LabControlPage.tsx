@@ -585,20 +585,22 @@ function LabPickerModal({ title, labs, onClose, onSelect }: {
 }
 
 function OverviewMenu({
-  labsCount,
-  totalCases,
-  overdueCount,
+  labs,
+  envios,
+  colunas,
   isAdmin,
+  getLabName,
   onCreateLab,
   onOpenEditLabPicker,
   onOpenPrecosPicker,
   onOpenKanbanCfg,
   onOpenArquivados,
 }: {
-  labsCount: number
-  totalCases: number
-  overdueCount: number
+  labs: Lab[]
+  envios: LabEnvio[]
+  colunas: LabKanbanColuna[]
   isAdmin: boolean
+  getLabName: (labId: string) => string
   onCreateLab: () => void
   onOpenEditLabPicker: () => void
   onOpenPrecosPicker: () => void
@@ -630,6 +632,14 @@ function OverviewMenu({
     }
   }, [open])
 
+  const recent = envios.slice(0, 5)
+  const emAndamento = envios.filter(envio => !isFinalEnvioStatus(envio.status))
+  const pagos = envios.filter(envio => envio.pago)
+  const overdue = envios.filter(isOverdue)
+  const totalValor = envios.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const valorEmAndamento = emAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
+  const ticketMedio = envios.length > 0 ? totalValor / envios.length : 0
+
   const actions = [
     ...(isAdmin ? [
       { id: 'novo-lab', label: 'Novo laboratório', onClick: onCreateLab },
@@ -654,11 +664,89 @@ function OverviewMenu({
 
       {open && (
         <div className={styles.overviewMenuDropdown} role="menu">
-          <button type="button" className={styles.overviewMenuCard} onClick={() => setOpen(false)}>
-            <span className={styles.overviewMenuBadge}>Visão geral</span>
-            <strong>{totalCases} casos ativos</strong>
-            <span>{labsCount} laboratórios monitorados</span>
-            <span>{overdueCount} atrasados no total</span>
+          <button
+            type="button"
+            className={`${styles.overviewMenuCard} ${styles.labCard} ${styles.labCardAggregate}`}
+            onClick={() => setOpen(false)}
+          >
+            <div className={styles.labCardHeader}>
+              <div>
+                <div className={styles.aggregateBadge}>Visão geral</div>
+                <div className={styles.labCardName}>Todos</div>
+              </div>
+            </div>
+
+            <div className={styles.aggregateCardHint}>
+              Acompanhe todos os trabalhos no mesmo kanban e filtre por laboratório quando precisar.
+            </div>
+
+            <div className={styles.aggregateKpiGrid}>
+              <div className={styles.aggregateKpiCard}>
+                <strong>{labs.length}</strong>
+                <span>laboratórios</span>
+              </div>
+              <div className={styles.aggregateKpiCard}>
+                <strong>{envios.length}</strong>
+                <span>trabalhos</span>
+              </div>
+              <div className={styles.aggregateKpiCard}>
+                <strong>{emAndamento.length}</strong>
+                <span>em andamento</span>
+              </div>
+              <div className={`${styles.aggregateKpiCard} ${styles.aggregateKpiCardAlert}`}>
+                <strong>{overdue.length}</strong>
+                <span>atrasados</span>
+              </div>
+              <div className={styles.aggregateKpiCard}>
+                <strong>{pagos.length}</strong>
+                <span>pagos</span>
+              </div>
+              <div className={styles.aggregateKpiCard}>
+                <strong>{ticketMedio.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>
+                <span>ticket médio</span>
+              </div>
+            </div>
+
+            <div className={styles.labCardValueSummary}>
+              <span className={styles.labCardValueLabel}>Valores em andamento</span>
+              <strong className={styles.labCardValueAmount}>
+                {valorEmAndamento.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+              </strong>
+            </div>
+
+            {envios.length > 0 && (
+              <div className={styles.labCardStatusBar}>
+                {[...colunas].sort((a, b) => a.ordem - b.ordem).map(col => {
+                  const count = envios.filter(envio => envio.status === col.nome).length
+                  if (count === 0) return null
+                  return (
+                    <div
+                      key={col.id}
+                      className={styles.labCardStatusSegment}
+                      style={{ background: col.cor, flex: count }}
+                      title={`${col.nome}: ${count}`}
+                    />
+                  )
+                })}
+              </div>
+            )}
+
+            {recent.length > 0 && (
+              <div className={styles.labCardEnvios}>
+                {recent.map(envio => (
+                  <div key={envio.id} className={`${styles.labCardEnvioItem} ${isOverdue(envio) ? styles.labCardEnvioOverdue : ''}`}>
+                    <span className={styles.labCardEnvioPatient}>{envio.paciente_nome}</span>
+                    <span className={styles.labCardEnvioType}>{getLabName(envio.lab_id)}</span>
+                    {envio.data_entrega_prometida && (
+                      <span className={styles.labCardEnvioDate}>{formatDate(envio.data_entrega_prometida)}</span>
+                    )}
+                  </div>
+                ))}
+                {envios.length > 5 && (
+                  <div className={styles.labCardMore}>+{envios.length - 5} trabalhos</div>
+                )}
+              </div>
+            )}
           </button>
           <div className={styles.overviewMenuActions}>
             {actions.map(action => (
@@ -2858,7 +2946,6 @@ function LabsAggregateDetailView({
     return true
   })
 
-  const overdueCount = envios.filter(isOverdue).length
   const aggregateLabCount = new Set(visibleEnvios.map(envio => envio.lab_id)).size
   const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
 
@@ -2878,10 +2965,11 @@ function LabsAggregateDetailView({
         </div>
         <div className={styles.headerCenter}>
           <OverviewMenu
-            labsCount={labs.length}
-            totalCases={envios.length}
-            overdueCount={overdueCount}
+            labs={labs}
+            envios={envios}
+            colunas={colunas}
             isAdmin={isAdmin}
+            getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
             onCreateLab={onCreateLab}
             onOpenEditLabPicker={onOpenEditLabPicker}
             onOpenPrecosPicker={onOpenPrecosPicker}
