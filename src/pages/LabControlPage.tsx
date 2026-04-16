@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
-import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabDentista, LabEtiqueta, LabTipoServico, LabHistorico, LabAnexo } from '../lib/types'
+import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabHistorico, LabAnexo } from '../lib/types'
 import styles from './LabControlPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
@@ -43,12 +43,11 @@ type LabEtapa = {
 type FinanceiroFiltro = 'todos' | 'em_andamento' | 'pagos'
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
 type LabViewSelectionPersisted = { kind: 'lab'; labId: string } | { kind: 'all' }
-type LabHomeMode = 'kanban' | 'calendar' | 'list' | 'pecas'
+type LabHomeMode = 'kanban' | 'calendar' | 'list'
 
 const LAB_FILTER_ALL = '__all__'
 
 const CLASSIFICACAO_PROTESE_OPTIONS = ['Removível', 'Fixa', 'Sobre Implante', 'Ortodôntico', 'Clínico'] as const
-type ClassificacaoProtese = typeof CLASSIFICACAO_PROTESE_OPTIONS[number]
 
 const FORMA_ENVIO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Retirada pelo laboratório', 'Outro'] as const
 const FORMA_RECEBIMENTO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Entrega pelo laboratório', 'Outro'] as const
@@ -407,18 +406,6 @@ function buildBriefingText(envio: LabEnvio, labNome: string): string {
   return lines.filter(Boolean).join('\n')
 }
 
-// ── Categorias de peca ────────────────────────────────────────────────────
-
-function derivarCategoriaPeca(tipoTrabalho: string): string {
-  const t = tipoTrabalho.toLowerCase()
-  if (/rolete|prova/.test(t))                           return 'Roletes e Provas'
-  if (/provisório|provisorio|núcleo|nucleo/.test(t))    return 'Provisório e Núcleo'
-  if (/protocolo|overdenture|acrili/.test(t))           return 'Próteses Prontas'
-  if (/coroa|psi|inclu/.test(t))                        return 'Prótese Fixa'
-  if (/placa|contenção|contencao|expansor|orto/.test(t)) return 'Placas e Orto'
-  return 'Outros'
-}
-
 // ── Calendar helpers ───────────────────────────────────────────────────────
 
 type CalendarEvent = {
@@ -571,40 +558,10 @@ function IconArchive() {
     </svg>
   )
 }
-function IconTag() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>
-    </svg>
-  )
-}
 function IconDownload() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-    </svg>
-  )
-}
-function IconUsers() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-    </svg>
-  )
-}
-function IconLayers() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
-    </svg>
-  )
-}
-function IconStethoscope() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4.8 2.3A.3.3 0 1 0 5 2H4a2 2 0 0 0-2 2v5a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6V4a2 2 0 0 0-2-2h-1a.2.2 0 1 0 .3.3"/>
-      <path d="M8 15v1a6 6 0 0 0 6 6v0a6 6 0 0 0 6-6v-4"/>
-      <circle cx="20" cy="10" r="2"/>
     </svg>
   )
 }
@@ -1107,303 +1064,6 @@ function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
   )
 }
 
-// ── DentistasModal ────────────────────────────────────────────────────────
-
-function DentistasModal({ empresaId, onClose }: {
-  empresaId: string; onClose: () => void
-}) {
-  const [dentistas, setDentistas] = useState<LabDentista[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [nome,      setNome]      = useState('')
-  const [espec,     setEspec]     = useState('')
-  const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState('')
-  const [isNew,     setIsNew]     = useState(false)
-
-  const fetch = useCallback(async () => {
-    const { data } = await supabase.from('lab_dentistas').select('*')
-      .eq('empresa_id', empresaId).order('nome')
-    if (data) setDentistas(data)
-    setLoading(false)
-  }, [empresaId])
-
-  useEffect(() => { void fetch() }, [fetch])
-
-  const startNew = () => { setEditingId(null); setNome(''); setEspec(''); setIsNew(true); setError('') }
-  const startEdit = (d: LabDentista) => { setEditingId(d.id); setNome(d.nome); setEspec(d.especialidade ?? ''); setIsNew(false); setError('') }
-  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); setEspec('') }
-
-  const save = async () => {
-    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
-    setSaving(true); setError('')
-    if (isNew) {
-      await supabase.from('lab_dentistas').insert({ empresa_id: empresaId, nome: nome.trim(), especialidade: espec.trim() || null })
-    } else if (editingId) {
-      await supabase.from('lab_dentistas').update({ nome: nome.trim(), especialidade: espec.trim() || null }).eq('id', editingId)
-    }
-    await fetch()
-    cancelEdit()
-    setSaving(false)
-  }
-
-  const toggleAtivo = async (d: LabDentista) => {
-    await supabase.from('lab_dentistas').update({ ativo: !d.ativo }).eq('id', d.id)
-    await fetch()
-  }
-
-  return (
-    <Modal title="Gestão de Dentistas" onClose={onClose} wide>
-      <div className={styles.precosWrap}>
-        {!isNew && editingId === null && (
-          <div className={styles.formActions} style={{ marginBottom: 12 }}>
-            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Novo dentista</button>
-          </div>
-        )}
-        {(isNew || editingId !== null) && (
-          <div className={styles.formGrid2} style={{ marginBottom: 16 }}>
-            <div className={styles.formField}>
-              <label className={styles.label}>Nome *</label>
-              <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome do dentista" />
-            </div>
-            <div className={styles.formField}>
-              <label className={styles.label}>Especialidade</label>
-              <input className={styles.input} value={espec} onChange={e => setEspec(e.target.value)} placeholder="Ex: Implantodontia" />
-            </div>
-            {error && <p className={`${styles.errorMsg} ${styles.colSpan2}`}>{error}</p>}
-            <div className={`${styles.formActions} ${styles.colSpan2}`}>
-              <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
-              <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
-                {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
-              </button>
-            </div>
-          </div>
-        )}
-        {loading ? <Spinner /> : (
-          <div className={styles.precosList}>
-            {dentistas.length === 0 && <p className={styles.emptyMsg}>Nenhum dentista cadastrado.</p>}
-            {dentistas.map(d => (
-              <div key={d.id} className={styles.precosRow} style={{ opacity: d.ativo ? 1 : 0.5 }}>
-                <span className={styles.precosNome}>
-                  {d.nome}
-                  {d.especialidade && <small style={{ color: 'var(--text-muted)', marginLeft: 6 }}>{d.especialidade}</small>}
-                </span>
-                <span className={styles.precosValor} style={{ fontSize: 12 }}>{d.ativo ? 'Ativo' : 'Inativo'}</span>
-                <button type="button" className={styles.btnIcon} onClick={() => startEdit(d)} title="Editar"><IconEdit /></button>
-                <button type="button" className={styles.btnIcon} onClick={() => void toggleAtivo(d)} title={d.ativo ? 'Inativar' : 'Reativar'}>
-                  {d.ativo ? '⏸' : '▶'}
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className={styles.formActions} style={{ marginTop: 12 }}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-// ── TiposServicoModal ─────────────────────────────────────────────────────
-
-function TiposServicoModal({ empresaId, onClose }: {
-  empresaId: string; onClose: () => void
-}) {
-  const [tipos,     setTipos]     = useState<LabTipoServico[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [nome,      setNome]      = useState('')
-  const [classif,   setClassif]   = useState<string>(CLASSIFICACAO_PROTESE_OPTIONS[0])
-  const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState('')
-  const [isNew,     setIsNew]     = useState(false)
-
-  const fetch = useCallback(async () => {
-    const { data } = await supabase.from('lab_tipos_servico').select('*')
-      .eq('empresa_id', empresaId).order('classificacao').order('nome')
-    if (data) setTipos(data)
-    setLoading(false)
-  }, [empresaId])
-
-  useEffect(() => { void fetch() }, [fetch])
-
-  const startNew = () => { setEditingId(null); setNome(''); setClassif(CLASSIFICACAO_PROTESE_OPTIONS[0]); setIsNew(true); setError('') }
-  const startEdit = (t: LabTipoServico) => { setEditingId(t.id); setNome(t.nome); setClassif(t.classificacao); setIsNew(false); setError('') }
-  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); }
-
-  const save = async () => {
-    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
-    setSaving(true); setError('')
-    if (isNew) {
-      await supabase.from('lab_tipos_servico').insert({ empresa_id: empresaId, nome: nome.trim(), classificacao: classif })
-    } else if (editingId) {
-      await supabase.from('lab_tipos_servico').update({ nome: nome.trim(), classificacao: classif }).eq('id', editingId)
-    }
-    await fetch()
-    cancelEdit()
-    setSaving(false)
-  }
-
-  const toggleAtivo = async (t: LabTipoServico) => {
-    await supabase.from('lab_tipos_servico').update({ ativo: !t.ativo }).eq('id', t.id)
-    await fetch()
-  }
-
-  // Group by classificacao
-  const grouped = CLASSIFICACAO_PROTESE_OPTIONS.map(c => ({
-    classif: c as string,
-    items: tipos.filter(t => t.classificacao === c),
-  })).filter(g => g.items.length > 0)
-  const semClassif = tipos.filter(t => !CLASSIFICACAO_PROTESE_OPTIONS.includes(t.classificacao as ClassificacaoProtese))
-  if (semClassif.length > 0) grouped.push({ classif: 'Outros', items: semClassif })
-
-  return (
-    <Modal title="Tipos de Serviço" onClose={onClose} wide>
-      <div className={styles.precosWrap}>
-        {!isNew && editingId === null && (
-          <div className={styles.formActions} style={{ marginBottom: 12 }}>
-            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Novo tipo</button>
-          </div>
-        )}
-        {(isNew || editingId !== null) && (
-          <div className={styles.formGrid2} style={{ marginBottom: 16 }}>
-            <div className={styles.formField}>
-              <label className={styles.label}>Nome *</label>
-              <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Ex: Coroa de Zircônia" />
-            </div>
-            <div className={styles.formField}>
-              <label className={styles.label}>Classificação</label>
-              <select className={styles.select} value={classif} onChange={e => setClassif(e.target.value)}>
-                {CLASSIFICACAO_PROTESE_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            {error && <p className={`${styles.errorMsg} ${styles.colSpan2}`}>{error}</p>}
-            <div className={`${styles.formActions} ${styles.colSpan2}`}>
-              <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
-              <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
-                {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
-              </button>
-            </div>
-          </div>
-        )}
-        {loading ? <Spinner /> : (
-          <div>
-            {tipos.length === 0 && <p className={styles.emptyMsg}>Nenhum tipo de serviço cadastrado.</p>}
-            {grouped.map(g => (
-              <div key={g.classif} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{g.classif}</div>
-                <div className={styles.precosList}>
-                  {g.items.map(t => (
-                    <div key={t.id} className={styles.precosRow} style={{ opacity: t.ativo ? 1 : 0.5 }}>
-                      <span className={styles.precosNome}>{t.nome}</span>
-                      <span className={styles.precosValor} style={{ fontSize: 12 }}>{t.ativo ? 'Ativo' : 'Inativo'}</span>
-                      <button type="button" className={styles.btnIcon} onClick={() => startEdit(t)} title="Editar"><IconEdit /></button>
-                      <button type="button" className={styles.btnIcon} onClick={() => void toggleAtivo(t)} title={t.ativo ? 'Inativar' : 'Reativar'}>
-                        {t.ativo ? '⏸' : '▶'}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className={styles.formActions} style={{ marginTop: 12 }}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
-// ── EtiquetasModal ────────────────────────────────────────────────────────
-
-function EtiquetasModal({ empresaId, onClose }: {
-  empresaId: string; onClose: () => void
-}) {
-  const [etiquetas, setEtiquetas] = useState<LabEtiqueta[]>([])
-  const [loading,   setLoading]   = useState(true)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [nome,      setNome]      = useState('')
-  const [cor,       setCor]       = useState('#6366f1')
-  const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState('')
-  const [isNew,     setIsNew]     = useState(false)
-
-  const fetch = useCallback(async () => {
-    const { data } = await supabase.from('lab_etiquetas').select('*')
-      .eq('empresa_id', empresaId).order('nome')
-    if (data) setEtiquetas(data)
-    setLoading(false)
-  }, [empresaId])
-
-  useEffect(() => { void fetch() }, [fetch])
-
-  const startNew = () => { setEditingId(null); setNome(''); setCor('#6366f1'); setIsNew(true); setError('') }
-  const startEdit = (e: LabEtiqueta) => { setEditingId(e.id); setNome(e.nome); setCor(e.cor); setIsNew(false); setError('') }
-  const cancelEdit = () => { setEditingId(null); setIsNew(false); setNome(''); setCor('#6366f1') }
-
-  const save = async () => {
-    if (!nome.trim()) { setError('Nome é obrigatório.'); return }
-    setSaving(true); setError('')
-    if (isNew) {
-      await supabase.from('lab_etiquetas').insert({ empresa_id: empresaId, nome: nome.trim(), cor })
-    } else if (editingId) {
-      await supabase.from('lab_etiquetas').update({ nome: nome.trim(), cor }).eq('id', editingId)
-    }
-    await fetch()
-    cancelEdit()
-    setSaving(false)
-  }
-
-  const excluir = async (id: string) => {
-    if (!confirm('Excluir esta etiqueta? Ela será removida de todos os cards.')) return
-    await supabase.from('lab_envio_etiquetas').delete().eq('etiqueta_id', id)
-    await supabase.from('lab_etiquetas').delete().eq('id', id)
-    await fetch()
-  }
-
-  return (
-    <Modal title="Etiquetas" onClose={onClose} wide>
-      <div className={styles.precosWrap}>
-        {!isNew && editingId === null && (
-          <div className={styles.formActions} style={{ marginBottom: 12 }}>
-            <button type="button" className={styles.btnPrimary} onClick={startNew}><IconPlus /> Nova etiqueta</button>
-          </div>
-        )}
-        {(isNew || editingId !== null) && (
-          <div className={styles.kanbanAddRow} style={{ marginBottom: 16 }}>
-            <input className={styles.input} value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome da etiqueta" />
-            <input type="color" className={styles.colorInput} value={cor} onChange={e => setCor(e.target.value)} />
-            {error && <span className={styles.errorMsg}>{error}</span>}
-            <button type="button" className={styles.btnSecondary} onClick={cancelEdit}>Cancelar</button>
-            <button type="button" className={styles.btnPrimary} onClick={() => void save()} disabled={saving}>
-              {saving ? 'Salvando...' : (isNew ? 'Adicionar' : 'Salvar')}
-            </button>
-          </div>
-        )}
-        {loading ? <Spinner /> : (
-          <div className={styles.precosList}>
-            {etiquetas.length === 0 && <p className={styles.emptyMsg}>Nenhuma etiqueta cadastrada.</p>}
-            {etiquetas.map(e => (
-              <div key={e.id} className={styles.precosRow}>
-                <span className={styles.kanbanColDot} style={{ background: e.cor, width: 16, height: 16, flexShrink: 0 }} />
-                <span className={styles.precosNome}>{e.nome}</span>
-                <button type="button" className={styles.btnIcon} onClick={() => startEdit(e)} title="Editar"><IconEdit /></button>
-                <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => void excluir(e.id)} title="Excluir"><IconTrash /></button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className={styles.formActions} style={{ marginTop: 12 }}>
-          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
-        </div>
-      </div>
-    </Modal>
-  )
-}
-
 // ── ArquivadosModal ───────────────────────────────────────────────────────
 
 function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored }: {
@@ -1525,11 +1185,10 @@ interface ServicoSelecionado {
   data_conclusao: string
 }
 
-function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, dentistas = [], tiposServico = [], onClose, onSaved }: {
+function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, onClose, onSaved }: {
   lab?: Lab | null; labs?: Lab[]; precos?: LabPreco[]; precosByLab?: Record<string, LabPreco[]>
   empresaId: string; userId: string
   envio: LabEnvio | null; colunas: LabKanbanColuna[]
-  dentistas?: LabDentista[]; tiposServico?: LabTipoServico[]
   onClose: () => void; onSaved: () => void
 }) {
   const [step,   setStep]   = useState(1)
@@ -1617,13 +1276,6 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         : { ...prev, data_entrega_prometida: prazoCalculado }
     ))
   }, [currentLab?.prazo_medio_dias, feriadosLab, form.data_envio, servicosSelecionados, usarPrazoAutomatico])
-
-  // Auto-suggest classificacao_protese from tiposServico when tipo_trabalho matches
-  useEffect(() => {
-    if (!form.tipo_trabalho || form.classificacao_protese) return
-    const match = tiposServico.find(t => t.nome.toLowerCase() === form.tipo_trabalho.toLowerCase())
-    if (match) setForm(prev => ({ ...prev, classificacao_protese: match.classificacao }))
-  }, [form.tipo_trabalho, tiposServico]) // tiposServico used intentionally here
 
   const handlePrazoPrometidoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setUsarPrazoAutomatico(false)
@@ -1902,16 +1554,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Dentista</label>
-              {dentistas.filter(d => d.ativo).length > 0 ? (
-                <select className={styles.select} value={form.dentista_nome} onChange={set('dentista_nome')}>
-                  <option value="">Selecionar dentista</option>
-                  {dentistas.filter(d => d.ativo).map(d => (
-                    <option key={d.id} value={d.nome}>{d.nome}{d.especialidade ? ` — ${d.especialidade}` : ''}</option>
-                  ))}
-                </select>
-              ) : (
-                <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
-              )}
+              <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Classificação da prótese</label>
@@ -2174,34 +1817,7 @@ function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precosByLab, 
   const etapas = getEnvioEtapas(envio)
   const overdueEtapas = getOverdueEtapas(envio)
   const [savingEtapaId, setSavingEtapaId] = useState<string | null>(null)
-  const [resumoTab, setResumoTab] = useState<'detalhes' | 'etiquetas' | 'historico' | 'anexos'>('detalhes')
-
-  // Etiquetas
-  const [todasEtiquetas, setTodasEtiquetas] = useState<LabEtiqueta[]>([])
-  const [envioEtiquetaIds, setEnvioEtiquetaIds] = useState<string[]>([])
-  const [loadingEtiq, setLoadingEtiq] = useState(true)
-
-  const fetchEtiquetas = useCallback(async () => {
-    const [{ data: etiqData }, { data: envioEtiqData }] = await Promise.all([
-      supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome'),
-      supabase.from('lab_envio_etiquetas').select('etiqueta_id').eq('envio_id', envio.id),
-    ])
-    if (etiqData) setTodasEtiquetas(etiqData)
-    if (envioEtiqData) setEnvioEtiquetaIds(envioEtiqData.map(e => e.etiqueta_id))
-    setLoadingEtiq(false)
-  }, [empresaId, envio.id])
-
-  useEffect(() => { if (resumoTab === 'etiquetas') void fetchEtiquetas() }, [resumoTab, fetchEtiquetas])
-
-  const toggleEtiqueta = async (etiquetaId: string) => {
-    if (envioEtiquetaIds.includes(etiquetaId)) {
-      await supabase.from('lab_envio_etiquetas').delete().eq('envio_id', envio.id).eq('etiqueta_id', etiquetaId)
-      setEnvioEtiquetaIds(prev => prev.filter(id => id !== etiquetaId))
-    } else {
-      await supabase.from('lab_envio_etiquetas').insert({ envio_id: envio.id, etiqueta_id: etiquetaId })
-      setEnvioEtiquetaIds(prev => [...prev, etiquetaId])
-    }
-  }
+  const [resumoTab, setResumoTab] = useState<'detalhes' | 'historico' | 'anexos'>('detalhes')
 
   // Histórico
   const [historico, setHistorico] = useState<LabHistorico[]>([])
@@ -2278,12 +1894,12 @@ function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precosByLab, 
     : null
 
   return (
-    <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
+      <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
       {/* Tabs */}
       <div className={styles.tabs} style={{ marginBottom: 16 }}>
-        {(['detalhes', 'etiquetas', 'historico', 'anexos'] as const).map(tab => (
+        {(['detalhes', 'historico', 'anexos'] as const).map(tab => (
           <button key={tab} className={`${styles.tab} ${resumoTab === tab ? styles.tabActive : ''}`} onClick={() => setResumoTab(tab)}>
-            {tab === 'detalhes' ? 'Detalhes' : tab === 'etiquetas' ? 'Etiquetas' : tab === 'historico' ? 'Histórico' : 'Anexos'}
+            {tab === 'detalhes' ? 'Detalhes' : tab === 'historico' ? 'Histórico' : 'Anexos'}
           </button>
         ))}
       </div>
@@ -2363,39 +1979,6 @@ function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precosByLab, 
             })}
           </div>
         </>
-      )}
-
-      {/* Etiquetas tab */}
-      {resumoTab === 'etiquetas' && (
-        <div>
-          {loadingEtiq ? <Spinner /> : (
-            <>
-              {todasEtiquetas.length === 0 && <p className={styles.emptyMsg}>Nenhuma etiqueta cadastrada. Crie etiquetas no painel admin.</p>}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {todasEtiquetas.map(et => {
-                  const ativo = envioEtiquetaIds.includes(et.id)
-                  return (
-                    <button
-                      key={et.id}
-                      type="button"
-                      onClick={() => void toggleEtiqueta(et.id)}
-                      style={{
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                        padding: '5px 12px', borderRadius: 999, cursor: 'pointer',
-                        border: `2px solid ${et.cor}`,
-                        background: ativo ? et.cor : 'transparent',
-                        color: ativo ? '#fff' : et.cor,
-                        fontSize: 13, fontWeight: 600, transition: 'all 0.15s',
-                      }}
-                    >
-                      {ativo ? '✓ ' : ''}{et.nome}
-                    </button>
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </div>
       )}
 
       {/* Histórico tab */}
@@ -2583,11 +2166,10 @@ function FinanceiroModal({ lab, envios, isAdmin, onClose, onTogglePago }: {
 
 // ── Kanban Card ───────────────────────────────────────────────────────────
 
-function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, etiquetas, onDragStart, onOpenResumo, onEdit, onDelete }: {
+function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, onDragStart, onOpenResumo, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean; labNome?: string | null
   feriados?: string[]
   precosByLab?: Record<string, LabPreco[]>
-  etiquetas?: LabEtiqueta[]
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
   onEdit: () => void; onDelete: () => void
@@ -2634,15 +2216,6 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
           {envio.preco_servico.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
         </div>
       )}
-      {etiquetas && etiquetas.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-          {etiquetas.map(et => (
-            <span key={et.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', borderRadius: 999, background: et.cor + '33', border: `1px solid ${et.cor}`, color: et.cor, fontSize: 11, fontWeight: 600 }}>
-              {et.nome}
-            </span>
-          ))}
-        </div>
-      )}
       <div className={styles.kanbanCardStageSummary}>
         <span>{etapasConcluidas}/{etapas.length} etapa(s) prontas</span>
         <span>Ver resumo</span>
@@ -2659,13 +2232,12 @@ function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, 
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, etiquetasByEnvio, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   showLabName?: boolean
   getLabName?: (labId: string) => string
   getLabFeriados?: (labId: string) => string[]
   precosByLab?: Record<string, LabPreco[]>
-  etiquetasByEnvio?: Record<string, LabEtiqueta[]>
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
   onEditEnvio: (envio: LabEnvio) => void
@@ -2745,7 +2317,6 @@ function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLab
                   labNome={showLabName ? getLabName?.(envio.lab_id) ?? 'Laboratório' : null}
                   feriados={getLabFeriados?.(envio.lab_id)}
                   precosByLab={precosByLab}
-                  etiquetas={etiquetasByEnvio?.[envio.id]}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
                   onEdit={() => onEditEnvio(envio)}
@@ -2776,10 +2347,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   const storagePrefix = `lab-control:${empresaId}:lab:${lab.id}`
   const [envios,          setEnvios]          = useState<LabEnvio[]>([])
   const [precos,          setPrecos]          = useState<LabPreco[]>([])
-  const [dentistas,       setDentistas]       = useState<LabDentista[]>([])
-  const [tiposServico,    setTiposServico]    = useState<LabTipoServico[]>([])
-  const [todasEtiquetas,  setTodasEtiquetas]  = useState<LabEtiqueta[]>([])
-  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
   const [loading,         setLoading]         = useState(true)
   const [activeTab, setActiveTab] = useSessionStorageState<'kanban' | 'info'>(
     `${storagePrefix}:active-tab`,
@@ -2792,9 +2359,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
   const [showEditLab,       setShowEditLab]       = useState(false)
   const [showPrecos,        setShowPrecos]        = useState(false)
   const [showKanbanCfg,     setShowKanbanCfg]     = useState(false)
-  const [showDentistas,     setShowDentistas]     = useState(false)
-  const [showTiposServico,  setShowTiposServico]  = useState(false)
-  const [showEtiquetas,     setShowEtiquetas]     = useState(false)
   const [showArquivados,    setShowArquivados]    = useState(false)
   const [editingPrecoId,    setEditingPrecoId]    = useState<string | null>(null)
   const [patientSearch, setPatientSearch] = useSessionStorageState(
@@ -2802,7 +2366,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     '',
     isString,
   )
-  const [etiquetaFilter, setEtiquetaFilter] = useState('')
   const [novoFeriado,     setNovoFeriado]     = useState('')
 
   const fetchEnvios = useCallback(async () => {
@@ -2822,45 +2385,10 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
     if (data) setPrecos(data)
   }, [lab.id])
 
-  const fetchDentistas = useCallback(async () => {
-    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (data) setDentistas(data)
-  }, [empresaId])
-
-  const fetchTiposServico = useCallback(async () => {
-    const { data } = await supabase.from('lab_tipos_servico').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (data) setTiposServico(data)
-  }, [empresaId])
-
-  const fetchEtiquetas = useCallback(async () => {
-    const { data: etiqData } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (etiqData) setTodasEtiquetas(etiqData)
-  }, [empresaId])
-
-  const fetchEtiquetasByEnvio = useCallback(async (envioIds: string[], etiquetas: LabEtiqueta[]) => {
-    if (envioIds.length === 0) { setEtiquetasByEnvio({}); return }
-    const { data } = await supabase.from('lab_envio_etiquetas').select('envio_id, etiqueta_id').in('envio_id', envioIds)
-    const etiqMap: Record<string, LabEtiqueta[]> = {}
-    for (const row of data ?? []) {
-      const etq = etiquetas.find(e => e.id === row.etiqueta_id)
-      if (!etq) continue
-      if (!etiqMap[row.envio_id]) etiqMap[row.envio_id] = []
-      etiqMap[row.envio_id].push(etq)
-    }
-    setEtiquetasByEnvio(etiqMap)
-  }, [])
-
   useEffect(() => {
     void fetchEnvios()
     void fetchPrecos()
-    void fetchDentistas()
-    void fetchTiposServico()
-    void fetchEtiquetas()
-  }, [fetchEnvios, fetchPrecos, fetchDentistas, fetchTiposServico, fetchEtiquetas])
-
-  useEffect(() => {
-    void fetchEtiquetasByEnvio(envios.map(e => e.id), todasEtiquetas)
-  }, [envios, todasEtiquetas, fetchEtiquetasByEnvio])
+  }, [fetchEnvios, fetchPrecos])
 
   const moveEnvio = async (envioId: string, status: string) => {
     await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
@@ -2936,7 +2464,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
 
   const filteredEnvios = envios.filter(envio => {
     if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
-    if (etiquetaFilter && !etiquetasByEnvio[envio.id]?.some(et => et.id === etiquetaFilter)) return false
     return true
   })
 
@@ -2968,15 +2495,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               </button>
               <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
                 <IconSettings2 /> Kanban
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowDentistas(true)}>
-                <IconUsers /> Dentistas
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowTiposServico(true)}>
-                <IconLayers /> Tipos de Serviço
-              </button>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowEtiquetas(true)}>
-                <IconTag /> Etiquetas
               </button>
               <button type="button" className={styles.btnSecondary} onClick={() => setShowArquivados(true)}>
                 <IconArchive /> Arquivados
@@ -3010,12 +2528,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
                 onChange={e => setPatientSearch(e.target.value)}
                 placeholder="Buscar paciente no kanban"
               />
-              {todasEtiquetas.length > 0 && (
-                <select className={styles.select} value={etiquetaFilter} onChange={e => setEtiquetaFilter(e.target.value)}>
-                  <option value="">Todas as etiquetas</option>
-                  {todasEtiquetas.map(et => <option key={et.id} value={et.id}>{et.nome}</option>)}
-                </select>
-              )}
             </div>
             <KanbanBoard
               envios={filteredEnvios}
@@ -3023,7 +2535,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
               isAdmin={isAdmin}
               getLabFeriados={() => getLabFeriados(lab)}
               precosByLab={{ [lab.id]: precos }}
-              etiquetasByEnvio={etiquetasByEnvio}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
@@ -3153,7 +2664,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
         <EnvioSteps
           lab={lab} precos={precos} empresaId={empresaId} userId={userId}
           envio={editingEnvio} colunas={colunas}
-          dentistas={dentistas} tiposServico={tiposServico}
           onClose={() => setShowEnvioSteps(false)} onSaved={fetchEnvios}
         />
       )}
@@ -3171,15 +2681,6 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
       {showKanbanCfg && (
         <KanbanConfigModal empresaId={empresaId} colunas={colunas}
           onClose={() => setShowKanbanCfg(false)} onSaved={onColunasUpdated} />
-      )}
-      {showDentistas && (
-        <DentistasModal empresaId={empresaId} onClose={() => { setShowDentistas(false); void fetchDentistas() }} />
-      )}
-      {showTiposServico && (
-        <TiposServicoModal empresaId={empresaId} onClose={() => { setShowTiposServico(false); void fetchTiposServico() }} />
-      )}
-      {showEtiquetas && (
-        <EtiquetasModal empresaId={empresaId} onClose={() => { setShowEtiquetas(false); void fetchEtiquetas() }} />
       )}
       {showArquivados && (
         <ArquivadosModal empresaId={empresaId} userId={userId} labId={lab.id} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
@@ -3228,10 +2729,6 @@ function LabsAggregateDetailView({
   const storagePrefix = `lab-control:${empresaId}:aggregate`
   const [envios,           setEnvios]           = useState<LabEnvio[]>([])
   const [precosByLab,      setPrecosByLab]      = useState<Record<string, LabPreco[]>>({})
-  const [dentistas,        setDentistas]        = useState<LabDentista[]>([])
-  const [tiposServico,     setTiposServico]     = useState<LabTipoServico[]>([])
-  const [todasEtiquetas,   setTodasEtiquetas]   = useState<LabEtiqueta[]>([])
-  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
   const [loading,          setLoading]          = useState(true)
   const [showEnvioSteps,   setShowEnvioSteps]   = useState(false)
   const [editingEnvio,     setEditingEnvio]     = useState<LabEnvio | null>(null)
@@ -3248,7 +2745,6 @@ function LabsAggregateDetailView({
     LAB_FILTER_ALL,
     isString,
   )
-  const [etiquetaFilter, setEtiquetaFilter] = useState('')
 
   const labsById = Object.fromEntries(labs.map(item => [item.id, item]))
 
@@ -3262,34 +2758,6 @@ function LabsAggregateDetailView({
 
     setEnvios(data ? sortEnviosByCreatedAt(data) : [])
   }, [empresaId])
-
-  const fetchDentistasAgg = useCallback(async () => {
-    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (data) setDentistas(data)
-  }, [empresaId])
-
-  const fetchTiposServicoAgg = useCallback(async () => {
-    const { data } = await supabase.from('lab_tipos_servico').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (data) setTiposServico(data)
-  }, [empresaId])
-
-  const fetchEtiquetasAgg = useCallback(async () => {
-    const { data } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
-    if (data) setTodasEtiquetas(data)
-  }, [empresaId])
-
-  const fetchEtiquetasByEnvioAgg = useCallback(async (envioIds: string[], etiquetas: LabEtiqueta[]) => {
-    if (envioIds.length === 0) { setEtiquetasByEnvio({}); return }
-    const { data } = await supabase.from('lab_envio_etiquetas').select('envio_id, etiqueta_id').in('envio_id', envioIds)
-    const etiqMap: Record<string, LabEtiqueta[]> = {}
-    for (const row of data ?? []) {
-      const etq = etiquetas.find(e => e.id === row.etiqueta_id)
-      if (!etq) continue
-      if (!etiqMap[row.envio_id]) etiqMap[row.envio_id] = []
-      etiqMap[row.envio_id].push(etq)
-    }
-    setEtiquetasByEnvio(etiqMap)
-  }, [])
 
   const fetchPrecos = useCallback(async () => {
     if (labs.length === 0) {
@@ -3314,12 +2782,8 @@ function LabsAggregateDetailView({
 
   useEffect(() => {
     setLoading(true)
-    void Promise.all([fetchEnvios(), fetchPrecos(), fetchDentistasAgg(), fetchTiposServicoAgg(), fetchEtiquetasAgg()]).then(() => setLoading(false))
-  }, [fetchEnvios, fetchPrecos, fetchDentistasAgg, fetchTiposServicoAgg, fetchEtiquetasAgg])
-
-  useEffect(() => {
-    void fetchEtiquetasByEnvioAgg(envios.map(e => e.id), todasEtiquetas)
-  }, [envios, todasEtiquetas, fetchEtiquetasByEnvioAgg])
+    void Promise.all([fetchEnvios(), fetchPrecos()]).then(() => setLoading(false))
+  }, [fetchEnvios, fetchPrecos])
 
   useEffect(() => {
     if (labFilterId === LAB_FILTER_ALL) return
@@ -3382,7 +2846,6 @@ function LabsAggregateDetailView({
   const visibleEnvios = envios.filter(envio => {
     if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
     if (labFilterId !== LAB_FILTER_ALL && envio.lab_id !== labFilterId) return false
-    if (etiquetaFilter && !etiquetasByEnvio[envio.id]?.some(et => et.id === etiquetaFilter)) return false
     return true
   })
 
@@ -3457,12 +2920,6 @@ function LabsAggregateDetailView({
                 </option>
               ))}
             </select>
-            {todasEtiquetas.length > 0 && (
-              <select className={styles.select} value={etiquetaFilter} onChange={e => setEtiquetaFilter(e.target.value)}>
-                <option value="">Todas as etiquetas</option>
-                {todasEtiquetas.map(et => <option key={et.id} value={et.id}>{et.nome}</option>)}
-              </select>
-            )}
           </div>
 
           <div className={styles.aggregateFilterHint}>
@@ -3479,7 +2936,6 @@ function LabsAggregateDetailView({
             getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
             getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
             precosByLab={precosByLab}
-            etiquetasByEnvio={etiquetasByEnvio}
             onMoveEnvio={moveEnvioAgg}
             onOpenResumo={setResumoEnvio}
             onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
@@ -3497,8 +2953,6 @@ function LabsAggregateDetailView({
           userId={userId}
           envio={editingEnvio}
           colunas={colunas}
-          dentistas={dentistas}
-          tiposServico={tiposServico}
           onClose={() => {
             setShowEnvioSteps(false)
             setEditingEnvio(null)
@@ -3764,109 +3218,6 @@ function ServicesListView({ envios, precosByLab, labs }: {
   )
 }
 
-// ── PecasClinicaView ──────────────────────────────────────────────────────
-
-const PECAS_RETORNO_STATUSES = ['Retorno à clínica', 'Agendamento do paciente']
-
-function PecasClinicaView({ envios, labs, onClose }: {
-  envios: LabEnvio[]; labs: Lab[]; onClose: () => void
-}) {
-  const labsById = useMemo(() => Object.fromEntries(labs.map(l => [l.id, l])), [labs])
-  const [categoriaFilter, setCategoriaFilter] = useState('')
-  const [dentistaFilter, setDentistaFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
-
-  const pecas = useMemo(() => {
-    return envios
-      .filter(e => PECAS_RETORNO_STATUSES.includes(e.status))
-      .map(e => ({
-        envio: e,
-        categoria: e.categoria_peca ?? derivarCategoriaPeca(e.tipo_trabalho),
-        lab: labsById[e.lab_id],
-        statusPeca: e.data_consulta ? 'AGENDADO' : 'AGENDAR',
-      }))
-  }, [envios, labsById])
-
-  const categorias = useMemo(() => Array.from(new Set(pecas.map(p => p.categoria))).sort(), [pecas])
-  const dentistas  = useMemo(() => Array.from(new Set(pecas.map(p => p.envio.dentista_nome).filter(Boolean))).sort() as string[], [pecas])
-
-  const filtered = pecas.filter(p => {
-    if (categoriaFilter && p.categoria !== categoriaFilter) return false
-    if (dentistaFilter && p.envio.dentista_nome !== dentistaFilter) return false
-    if (statusFilter && p.statusPeca !== statusFilter) return false
-    return true
-  })
-
-  return (
-    <div className={styles.serviceListWrap}>
-      <div className={styles.serviceListHeader}>
-        <div>
-          <strong>Peças na Clínica</strong>
-          <span>{filtered.length} peça{filtered.length === 1 ? '' : 's'}</span>
-        </div>
-        <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
-      </div>
-
-      <div className={styles.filterRow} style={{ marginBottom: 12 }}>
-        <select className={styles.select} value={categoriaFilter} onChange={e => setCategoriaFilter(e.target.value)}>
-          <option value="">Todas as categorias</option>
-          {categorias.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select className={styles.select} value={dentistaFilter} onChange={e => setDentistaFilter(e.target.value)}>
-          <option value="">Todos os dentistas</option>
-          {dentistas.map(d => <option key={d} value={d}>{d}</option>)}
-        </select>
-        <select className={styles.select} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-          <option value="">Todos os status</option>
-          <option value="AGENDAR">AGENDAR</option>
-          <option value="AGENDADO">AGENDADO</option>
-        </select>
-      </div>
-
-      {filtered.length === 0 ? (
-        <div className={styles.serviceListEmpty}>Nenhuma peça na clínica.</div>
-      ) : (
-        <div className={styles.serviceTableScroller}>
-          <table className={styles.serviceTable}>
-            <thead>
-              <tr>
-                <th>Paciente</th>
-                <th>Dentista</th>
-                <th>Serviço</th>
-                <th>Categoria</th>
-                <th>Lab</th>
-                <th>Recebido em</th>
-                <th>Status peça</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(({ envio: e, categoria, lab, statusPeca }) => (
-                <tr key={e.id}>
-                  <td><strong>{e.paciente_nome}</strong></td>
-                  <td>{e.dentista_nome || '—'}</td>
-                  <td>{e.tipo_trabalho}</td>
-                  <td>{categoria}</td>
-                  <td>{lab?.nome ?? '—'}</td>
-                  <td>{formatDate(e.data_recebimento)}</td>
-                  <td>
-                    <span style={{
-                      padding: '2px 8px', borderRadius: 999, fontSize: 11, fontWeight: 700,
-                      background: statusPeca === 'AGENDADO' ? 'rgba(16,185,129,0.15)' : 'rgba(245,158,11,0.15)',
-                      color: statusPeca === 'AGENDADO' ? '#10b981' : '#f59e0b',
-                    }}>
-                      {statusPeca}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
 function InfoRow({ label, value, icon }: { label: string; value: string; icon?: React.ReactNode }) {
   return (
     <div className={styles.infoRow}>
@@ -4114,6 +3465,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [showLabModal, setShowLabModal] = useState(false)
   const [editingLab,   setEditingLab]   = useState<Lab | null>(null)
   const [financeiroLab, setFinanceiroLab] = useState<Lab | null>(null)
+  const [showHomeEnvioSteps, setShowHomeEnvioSteps] = useState(false)
   const [homeMode, setHomeMode] = useState<LabHomeMode>('kanban')
 
   useEffect(() => {
@@ -4303,6 +3655,8 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
     void fetchPrecosForLabs(labs)
   }
 
+  const todosEnvios = sortEnviosByCreatedAt(Object.values(enviosMap).flat())
+
   if (loading) {
     return (
       <div className={styles.page}>
@@ -4362,6 +3716,14 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           </button>
           <button
             type="button"
+            className={styles.btnPrimary}
+            disabled={labs.length === 0}
+            onClick={() => setShowHomeEnvioSteps(true)}
+          >
+            <IconPlus /> Novo envio
+          </button>
+          <button
+            type="button"
             className={`${styles.btnSecondary} ${homeMode === 'kanban' ? styles.btnSecondaryActive : ''}`}
             onClick={() => setHomeMode('kanban')}
           >
@@ -4381,17 +3743,10 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           >
             <IconList /> Lista
           </button>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${homeMode === 'pecas' ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setHomeMode('pecas')}
-          >
-            <IconStethoscope /> Peças na Clínica
-          </button>
           {isAdmin && (
             <button
               type="button"
-              className={styles.btnPrimary}
+              className={styles.btnSecondary}
               onClick={() => { setEditingLab(null); setShowLabModal(true) }}
             >
               <IconPlus /> Novo laboratório
@@ -4416,28 +3771,22 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         </div>
       ) : homeMode === 'calendar' ? (
         <CalendarView
-          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+          envios={todosEnvios}
           precosByLab={precosByLab}
           labs={labs}
           onClose={() => setHomeMode('kanban')}
         />
       ) : homeMode === 'list' ? (
         <ServicesListView
-          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+          envios={todosEnvios}
           precosByLab={precosByLab}
           labs={labs}
-        />
-      ) : homeMode === 'pecas' ? (
-        <PecasClinicaView
-          envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
-          labs={labs}
-          onClose={() => setHomeMode('kanban')}
         />
       ) : (
         <div className={styles.labsGrid}>
           <TodosLabsCard
             labs={labs}
-            envios={sortEnviosByCreatedAt(Object.values(enviosMap).flat())}
+            envios={todosEnvios}
             colunas={colunas}
             getLabName={labId => labs.find(item => item.id === labId)?.nome ?? 'Laboratório removido'}
             onClick={abrirVisaoTodos}
@@ -4464,6 +3813,18 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           empresaId={empresa.id}
           onClose={() => setShowLabModal(false)}
           onSaved={() => { void Promise.all([fetchLabs(), fetchColunas()]) }}
+        />
+      )}
+      {showHomeEnvioSteps && (
+        <EnvioSteps
+          labs={labs}
+          precosByLab={precosByLab}
+          empresaId={empresa.id}
+          userId={userId}
+          envio={null}
+          colunas={colunas}
+          onClose={() => setShowHomeEnvioSteps(false)}
+          onSaved={() => { void fetchEnvios() }}
         />
       )}
       {financeiroLab && (
