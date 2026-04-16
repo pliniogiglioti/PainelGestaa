@@ -15,6 +15,13 @@
   flex-wrap: wrap;
 }
 
+.headerMainInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 .pageTitle {
   font-size: 20px;
   font-weight: 700;
@@ -48,6 +55,14 @@
   gap: 8px;
   flex-wrap: wrap;
   margin-left: auto;
+  justify-content: flex-end;
+}
+
+.headerCenter {
+  display: flex;
+  flex: 1 1 360px;
+  justify-content: center;
+  min-width: min(100%, 360px);
 }
 
 .viewModeCard {
@@ -1623,6 +1638,18 @@
 }
 
 @media (max-width: 760px) {
+  .headerCenter {
+    order: 3;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .headerActions {
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+  }
+
   .viewModeCard {
     width: 100%;
     min-width: 0;

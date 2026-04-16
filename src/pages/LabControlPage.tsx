@@ -3709,17 +3709,16 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   return (
     <div className={styles.page}>
       <div className={styles.pageHeader}>
-        <button type="button" className={styles.backBtn} onClick={onVoltar}>
-          <IconBack /> Voltar
-        </button>
-        <h1 className={styles.pageTitle}>Controle de Laboratórios</h1>
-        <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-          Empresa: <strong style={{ color: 'var(--text)' }}>{empresa.nome}</strong>
-        </span>
-        <div className={styles.headerActions}>
-          <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
-            Trocar empresa
+        <div className={styles.headerMainInfo}>
+          <button type="button" className={styles.backBtn} onClick={onVoltar}>
+            <IconBack /> Voltar
           </button>
+          <h1 className={styles.pageTitle}>Controle de Laboratórios</h1>
+          <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            Empresa: <strong style={{ color: 'var(--text)' }}>{empresa.nome}</strong>
+          </span>
+        </div>
+        <div className={styles.headerCenter}>
           <div className={styles.viewModeCard}>
             <span className={styles.viewModeLabel}>Modo de visualização</span>
             <div
@@ -3741,6 +3740,11 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
               ))}
             </div>
           </div>
+        </div>
+        <div className={styles.headerActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
+            Trocar empresa
+          </button>
           <button
             type="button"
             className={styles.btnPrimary}
