@@ -3009,65 +3009,63 @@ function LabsAggregateDetailView({
         </div>
       </div>
 
-      {homeMode === 'calendar' ? (
+      {loading ? <Spinner /> : (
+        <>
+          <div className={styles.searchRow}>
+            <input
+              className={`${styles.input} ${styles.searchGrow}`}
+              value={patientSearch}
+              onChange={e => setPatientSearch(e.target.value)}
+              placeholder="Buscar"
+            />
+            <select
+              className={`${styles.select} ${styles.searchSelect}`}
+              value={labFilterId}
+              onChange={e => setLabFilterId(e.target.value)}
+            >
+              <option value={LAB_FILTER_ALL}>Todos os laboratórios</option>
+              {labs.map(item => (
+                <option key={item.id} value={item.id}>
+                  {item.nome}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className={styles.aggregateFilterHint}>
+            {labFilterId === LAB_FILTER_ALL
+              ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
+              : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
+          </div>
+
+          {homeMode === 'calendar' ? (
         <CalendarView
-          envios={envios}
+          envios={visibleEnvios}
           precosByLab={precosByLab}
           labs={labs}
           onClose={() => onHomeModeChange('kanban')}
         />
       ) : homeMode === 'list' ? (
         <ServicesListView
-          envios={envios}
+          envios={visibleEnvios}
           precosByLab={precosByLab}
           labs={labs}
         />
       ) : (
-        <>
-          {loading ? <Spinner /> : (
-            <>
-              <div className={styles.searchRow}>
-                <input
-                  className={`${styles.input} ${styles.searchGrow}`}
-                  value={patientSearch}
-                  onChange={e => setPatientSearch(e.target.value)}
-                  placeholder="Buscar"
-                />
-                <select
-                  className={`${styles.select} ${styles.searchSelect}`}
-                  value={labFilterId}
-                  onChange={e => setLabFilterId(e.target.value)}
-                >
-                  <option value={LAB_FILTER_ALL}>Todos os laboratórios</option>
-                  {labs.map(item => (
-                    <option key={item.id} value={item.id}>
-                      {item.nome}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className={styles.aggregateFilterHint}>
-                {labFilterId === LAB_FILTER_ALL
-                  ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
-                  : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
-              </div>
-
-              <KanbanBoard
-                envios={visibleEnvios}
-                colunas={colunas}
-                isAdmin={isAdmin}
-                showLabName
-                getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
-                getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
-                precosByLab={precosByLab}
-                onMoveEnvio={moveEnvioAgg}
-                onOpenResumo={setResumoEnvio}
-                onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
-                onDeleteEnvio={deleteEnvioAgg}
-              />
-            </>
-          )}
+        <KanbanBoard
+          envios={visibleEnvios}
+          colunas={colunas}
+          isAdmin={isAdmin}
+          showLabName
+          getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
+          getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
+          precosByLab={precosByLab}
+          onMoveEnvio={moveEnvioAgg}
+          onOpenResumo={setResumoEnvio}
+          onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
+          onDeleteEnvio={deleteEnvioAgg}
+        />
+      )}
         </>
       )}
 
