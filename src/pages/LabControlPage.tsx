@@ -581,6 +581,71 @@ function Spinner() {
   )
 }
 
+type HeaderMenuItem = {
+  id: string
+  label: string
+  onClick: () => void
+}
+
+function HeaderActionsMenu({ items }: { items: HeaderMenuItem[] }) {
+  const [open, setOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!open) return
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
+  return (
+    <div className={styles.headerMenu} ref={menuRef}>
+      <button
+        type="button"
+        className={`${styles.btnSecondary} ${styles.headerMenuTrigger}`}
+        onClick={() => setOpen(prev => !prev)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        Menu <span aria-hidden="true">v</span>
+      </button>
+      {open && (
+        <div className={styles.headerMenuDropdown} role="menu">
+          {items.map(item => (
+            <button
+              key={item.id}
+              type="button"
+              className={styles.headerMenuItem}
+              onClick={() => {
+                setOpen(false)
+                item.onClick()
+              }}
+              role="menuitem"
+            >
+              <span>{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Modal Wrapper ──────────────────────────────────────────────────────────
 
 function Modal({ title, onClose, children, wide }: {
@@ -3662,6 +3727,43 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
 
   const todosEnvios = sortEnviosByCreatedAt(Object.values(enviosMap).flat())
   const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
+  const homeMenuItems: HeaderMenuItem[] = [
+    {
+      id: 'editar-lab',
+      label: 'Editar lab',
+      onClick: () => {
+        if (!isAdmin || labs.length === 0) return
+        setEditingLab(labs[0])
+        setShowLabModal(true)
+      },
+    },
+    {
+      id: 'lista-precos',
+      label: 'Lista de preços',
+      onClick: () => {
+        if (labs.length === 0) return
+        abrirVisaoLab(labs[0])
+      },
+    },
+    {
+      id: 'kanban',
+      label: 'Kanban',
+      onClick: () => setHomeMode('kanban'),
+    },
+    {
+      id: 'arquivados',
+      label: 'Arquivados',
+      onClick: () => abrirVisaoTodos(),
+    },
+    {
+      id: 'novo-envio',
+      label: 'Novo envio',
+      onClick: () => {
+        if (labs.length === 0) return
+        setShowHomeEnvioSteps(true)
+      },
+    },
+  ]
 
   if (loading) {
     return (
@@ -3719,27 +3821,25 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           </span>
         </div>
         <div className={styles.headerCenter}>
-          <div className={styles.viewModeCard}>
-            <span className={styles.viewModeLabel}>Modo de visualização</span>
-            <div
-              className={styles.viewModeSwitcher}
-              style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
-            >
-              <span className={styles.viewModeIndicator} aria-hidden="true" />
-              {HOME_MODE_OPTIONS.map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={`${styles.viewModeButton} ${homeMode === option.value ? styles.viewModeButtonActive : ''}`}
-                  onClick={() => setHomeMode(option.value)}
-                >
-                  {option.icon === 'calendar' && <IconCalendar />}
-                  {option.icon === 'list' && <IconList />}
-                  {option.label}
-                </button>
-              ))}
-            </div>
+          <div
+            className={styles.viewModeSwitcher}
+            style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
+          >
+            <span className={styles.viewModeIndicator} aria-hidden="true" />
+            {HOME_MODE_OPTIONS.map(option => (
+              <button
+                key={option.value}
+                type="button"
+                className={`${styles.viewModeButton} ${homeMode === option.value ? styles.viewModeButtonActive : ''}`}
+                onClick={() => setHomeMode(option.value)}
+              >
+                {option.icon === 'calendar' && <IconCalendar />}
+                {option.icon === 'list' && <IconList />}
+                {option.label}
+              </button>
+            ))}
           </div>
+          <HeaderActionsMenu items={homeMenuItems} />
         </div>
         <div className={styles.headerActions}>
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
