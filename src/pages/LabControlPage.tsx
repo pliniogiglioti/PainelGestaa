@@ -51,6 +51,11 @@ const CLASSIFICACAO_PROTESE_OPTIONS = ['Removível', 'Fixa', 'Sobre Implante', '
 
 const FORMA_ENVIO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Retirada pelo laboratório', 'Outro'] as const
 const FORMA_RECEBIMENTO_OPTIONS = ['Motoboy', 'WhatsApp', 'E-mail', 'Entrega pelo laboratório', 'Outro'] as const
+const HOME_MODE_OPTIONS = [
+  { value: 'kanban', label: 'Kanban', icon: null },
+  { value: 'calendar', label: 'Calendário', icon: 'calendar' },
+  { value: 'list', label: 'Lista', icon: 'list' },
+] as const
 function isString(value: unknown): value is string {
   return typeof value === 'string'
 }
@@ -3656,6 +3661,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   }
 
   const todosEnvios = sortEnviosByCreatedAt(Object.values(enviosMap).flat())
+  const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
 
   if (loading) {
     return (
@@ -3714,6 +3720,27 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           <button type="button" className={styles.btnSecondary} onClick={onTrocarEmpresa}>
             Trocar empresa
           </button>
+          <div className={styles.viewModeCard}>
+            <span className={styles.viewModeLabel}>Modo de visualização</span>
+            <div
+              className={styles.viewModeSwitcher}
+              style={{ ['--mode-index' as string]: String(selectedHomeModeIndex) }}
+            >
+              <span className={styles.viewModeIndicator} aria-hidden="true" />
+              {HOME_MODE_OPTIONS.map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`${styles.viewModeButton} ${homeMode === option.value ? styles.viewModeButtonActive : ''}`}
+                  onClick={() => setHomeMode(option.value)}
+                >
+                  {option.icon === 'calendar' && <IconCalendar />}
+                  {option.icon === 'list' && <IconList />}
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
           <button
             type="button"
             className={styles.btnPrimary}
@@ -3721,27 +3748,6 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
             onClick={() => setShowHomeEnvioSteps(true)}
           >
             <IconPlus /> Novo envio
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${homeMode === 'kanban' ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setHomeMode('kanban')}
-          >
-            Kanban
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${homeMode === 'calendar' ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setHomeMode('calendar')}
-          >
-            <IconCalendar /> Calendário
-          </button>
-          <button
-            type="button"
-            className={`${styles.btnSecondary} ${homeMode === 'list' ? styles.btnSecondaryActive : ''}`}
-            onClick={() => setHomeMode('list')}
-          >
-            <IconList /> Lista
           </button>
           {isAdmin && (
             <button

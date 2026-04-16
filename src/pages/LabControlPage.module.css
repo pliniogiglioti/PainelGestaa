@@ -50,6 +50,91 @@
   margin-left: auto;
 }
 
+.viewModeCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: min(100%, 360px);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.015)),
+    var(--bg-surface);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+
+.viewModeLabel {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.viewModeSwitcher {
+  --mode-index: 0;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,0.05);
+  background: var(--bg-elevated);
+  overflow: hidden;
+}
+
+.viewModeIndicator {
+  position: absolute;
+  top: 4px;
+  left: calc(4px + var(--mode-index) * ((100% - 8px) / 3));
+  width: calc((100% - 8px) / 3);
+  height: calc(100% - 8px);
+  border-radius: 9px;
+  background:
+    linear-gradient(135deg, rgba(201, 162, 42, 0.28), rgba(201, 162, 42, 0.14));
+  border: 1px solid rgba(201, 162, 42, 0.34);
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.08);
+  transition: left 0.28s ease, width 0.28s ease, background 0.28s ease;
+  pointer-events: none;
+}
+
+.viewModeButton {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.viewModeButton:hover {
+  color: var(--text);
+}
+
+.viewModeButtonActive {
+  color: var(--gold-light);
+}
+
+.viewModeButton:active {
+  transform: scale(0.985);
+}
+
 .labDetailTitle {
   display: flex;
   align-items: center;
@@ -1535,6 +1620,13 @@
   border-color: var(--border-gold);
   background: var(--gold-glow);
   color: var(--gold-light);
+}
+
+@media (max-width: 760px) {
+  .viewModeCard {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .calendarWrap {
