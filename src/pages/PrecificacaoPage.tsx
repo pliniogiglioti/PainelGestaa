@@ -991,7 +991,13 @@ function CalculadoraPrecificacaoModal({
                 <p className={styles.calcFormHint}>Valores que entram diretamente na execução do procedimento.</p>
               </div>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo insumos (R$)</span>
+                <span className={styles.modalLabel}>
+                  Custo insumos (R$)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Materiais consumíveis usados no procedimento: luvas, agulhas, anestésicos, resinas, etc. São gastos que ocorrem a cada atendimento.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.custoInsumos}
@@ -1001,7 +1007,13 @@ function CalculadoraPrecificacaoModal({
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo material aplicado (R$)</span>
+                <span className={styles.modalLabel}>
+                  Custo material aplicado (R$)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Materiais de maior valor incorporados ao tratamento: implantes, próteses, brackets, facetas, etc. Custo direto do material que fica no paciente.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.custoMaterialAplicado}
@@ -1011,7 +1023,13 @@ function CalculadoraPrecificacaoModal({
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo laboratório (R$)</span>
+                <span className={styles.modalLabel}>
+                  Custo laboratório (R$)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Valor cobrado pelo laboratório protético para confeccionar próteses, coroas, aparelhos, etc. Custo externo por procedimento.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.custoLaboratorio}
@@ -1030,7 +1048,13 @@ function CalculadoraPrecificacaoModal({
                 <p className={styles.calcFormHint}>Percentuais e remunerações que impactam a margem final.</p>
               </div>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Royalties e FNP (%)</span>
+                <span className={styles.modalLabel}>
+                  Royalties e FNP (%)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Percentual pago à franqueadora ou associação (Royalties + Fundo Nacional de Publicidade). Calculado sobre o valor de venda.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.royaltiesPercent}
@@ -1040,7 +1064,13 @@ function CalculadoraPrecificacaoModal({
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Custo profissionais</span>
+                <span className={styles.modalLabel}>
+                  Custo profissionais
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Remuneração do dentista ou profissional que executa o procedimento. Pode ser um percentual sobre o valor de venda (descontando os custos marcados) ou um valor fixo.</span>
+                  </span>
+                </span>
                 <div className={styles.switchRow}>
                   <button
                     type="button"
@@ -1077,7 +1107,13 @@ function CalculadoraPrecificacaoModal({
                 )}
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Impostos (%)</span>
+                <span className={styles.modalLabel}>
+                  Impostos (%)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Carga tributária sobre o faturamento: ISS, Simples Nacional, Lucro Presumido, etc. Calculado sobre o valor de venda.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.impostosPercent}
@@ -1087,7 +1123,13 @@ function CalculadoraPrecificacaoModal({
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Comissões vendas (%)</span>
+                <span className={styles.modalLabel}>
+                  Comissões vendas (%)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Percentual pago a consultores, recepcionistas ou equipe de vendas pela captação ou fechamento do procedimento.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.comissoesPercent}
@@ -1097,7 +1139,13 @@ function CalculadoraPrecificacaoModal({
                 />
               </label>
               <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Taxa máquina (%)</span>
+                <span className={styles.modalLabel}>
+                  Taxa máquina (%)
+                  <span className={styles.infoTooltipWrap}>
+                    <span className={styles.infoIcon}>ⓘ</span>
+                    <span className={styles.infoTooltip}>Taxa cobrada pela operadora de cartão de crédito/débito. Varia conforme a bandeira e número de parcelas. Use a média praticada na clínica.</span>
+                  </span>
+                </span>
                 <input
                   className={styles.modalInput}
                   value={form.taxaMaquinaPercent}
