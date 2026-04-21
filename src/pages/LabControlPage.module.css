@@ -2113,7 +2113,7 @@
   left: 0;
   bottom: calc(100% + 8px);
   top: auto;
-  width: min(280px, 80vw);
+  width: min(260px, 80vw);
   display: none;
   flex-direction: column;
   gap: 6px;
@@ -2122,9 +2122,6 @@
   border: 1px solid var(--border-gold);
   border-radius: 10px;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.4;
   pointer-events: none;
   z-index: 200;
 }

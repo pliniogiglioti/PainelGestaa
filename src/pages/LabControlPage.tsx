@@ -3222,23 +3222,35 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
                 {dayEvents.length > 0 && <span className={styles.calendarDayCount}>{dayEvents.length}</span>}
               </div>
               {dayEvents.map((ev, idx) => (
-                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent} title="">
+                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent}>
                   <span className={styles.calendarEventPatient}>{ev.urgente ? '⚡ ' : ''}{ev.pacienteNome}</span>
                   <span className={styles.calendarEventService}>{ev.servicoNome}</span>
                   <div className={styles.calendarEventTooltip}>
-                    {ev.urgente && <span className={styles.calendarTooltipUrgent}>⚡ Urgente</span>}
-                    <strong>{ev.pacienteNome}</strong>
-                    <span className={styles.calendarEventTooltipService}>{ev.servicoNome}</span>
+                    {ev.urgente && <div className={styles.kanbanCardUrgent}>⚡ Urgente</div>}
+                    {ev.labNome && <div className={styles.kanbanCardLab}>{ev.labNome}</div>}
+                    <div className={styles.kanbanCardPatient}>{ev.pacienteNome}</div>
+                    <div className={styles.kanbanCardService}>{ev.servicoNome}</div>
+                    {(ev.dentes || ev.cor) && (
+                      <div className={styles.kanbanCardDetails}>
+                        {ev.dentes && <span>Dentes: {ev.dentes}</span>}
+                        {ev.cor && <span>Cor: {ev.cor}</span>}
+                      </div>
+                    )}
+                    {ev.dataEntregaPrometida && (
+                      <div className={styles.kanbanCardDate}>
+                        <IconClock /> {formatDate(ev.dataEntregaPrometida)}
+                      </div>
+                    )}
+                    {ev.valor != null && (
+                      <div className={styles.kanbanCardPrice}>
+                        {ev.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </div>
+                    )}
+                    <div className={styles.calendarEventTooltipStatus}>{ev.status}</div>
                     <div className={styles.calendarEventTooltipDivider} />
-                    <span>🏥 {ev.labNome || 'Laboratório'}</span>
-                    {ev.dentes && <span>🦷 Dentes: {ev.dentes}</span>}
-                    {ev.cor && <span>🎨 Cor: {ev.cor}</span>}
-                    <div className={styles.calendarEventTooltipDivider} />
-                    <span>📅 Envio: {formatDate(ev.dataEnvio)}</span>
-                    <span>🎯 Previsto: {formatDate(ev.date)}</span>
-                    {ev.dataEntregaPrometida && <span>⏰ Prazo geral: {formatDate(ev.dataEntregaPrometida)}</span>}
-                    {ev.valor != null && <span>💰 {ev.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>}
-                    <span className={styles.calendarEventTooltipStatus}>{ev.status}</span>
+                    <div style={{ fontSize: 10, color: 'var(--text-dim)' }}>
+                      Previsto: {formatDate(ev.date)} · Envio: {formatDate(ev.dataEnvio)}
+                    </div>
                   </div>
                 </div>
               ))}
