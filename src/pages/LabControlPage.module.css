@@ -1245,28 +1245,29 @@
 }
 
 .precosGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow-y: auto;
 }
 .precoOption {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 12px;
+  border-radius: 6px;
+  padding: 7px 10px;
   cursor: pointer;
   text-align: left;
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  min-height: 66px;
-  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+  gap: 8px;
+  min-height: 36px;
+  transition: border-color 0.15s, background 0.15s;
 }
 .precoOption:hover {
   border-color: var(--border-gold);
   background: var(--bg-hover);
-  transform: translateY(-1px);
 }
 .precoOptionActive {
   border-color: var(--gold) !important;
@@ -1277,14 +1278,15 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--bg-elevated);
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 10px;
   font-weight: 800;
+  flex-shrink: 0;
 }
 
 .precoOptionActive .precoOptionCheck {
@@ -1301,8 +1303,8 @@
 }
 
 .precoOptionNome {
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 600;
   color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1310,12 +1312,12 @@
 }
 
 .precoOptionPrazo {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--text-dim);
 }
 
 .precoOptionValor {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--gold);
   font-weight: 700;
   white-space: nowrap;
@@ -1871,7 +1873,7 @@
   }
 
   .precoOption {
-    grid-template-columns: 24px minmax(0, 1fr);
+    grid-template-columns: 20px minmax(0, 1fr);
   }
 
   .precoOptionValor {
