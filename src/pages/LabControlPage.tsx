@@ -3222,26 +3222,23 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
                 {dayEvents.length > 0 && <span className={styles.calendarDayCount}>{dayEvents.length}</span>}
               </div>
               {dayEvents.map((ev, idx) => (
-                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent} title={`${ev.pacienteNome} — ${ev.servicoNome} (${ev.labNome})`}>
-                  <span className={styles.calendarEventPatient}>{ev.urgente ? 'Urgente | ' : ''}{ev.pacienteNome}</span>
+                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent} title="">
+                  <span className={styles.calendarEventPatient}>{ev.urgente ? '⚡ ' : ''}{ev.pacienteNome}</span>
                   <span className={styles.calendarEventService}>{ev.servicoNome}</span>
                   <div className={styles.calendarEventTooltip}>
+                    {ev.urgente && <span className={styles.calendarTooltipUrgent}>⚡ Urgente</span>}
                     <strong>{ev.pacienteNome}</strong>
-                    <span>Laboratório: {ev.labNome || 'Não informado'}</span>
-                    <span>Serviço: {ev.servicoNome}</span>
-                    <span>Status: {ev.status}</span>
-                    <span>Previsto: {formatDate(ev.date)}</span>
-                    <span>Envio: {formatDate(ev.dataEnvio)}</span>
-                    {ev.dataEntregaPrometida && <span>Prazo geral: {formatDate(ev.dataEntregaPrometida)}</span>}
-                    {(ev.dentes || ev.cor) && (
-                      <span>
-                        {ev.dentes ? `Dentes: ${ev.dentes}` : ''}
-                        {ev.dentes && ev.cor ? ' | ' : ''}
-                        {ev.cor ? `Cor: ${ev.cor}` : ''}
-                      </span>
-                    )}
-                    {ev.valor != null && <span>Valor: {ev.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>}
-                    {ev.urgente && <span className={styles.calendarTooltipUrgent}>Urgente</span>}
+                    <span className={styles.calendarEventTooltipService}>{ev.servicoNome}</span>
+                    <div className={styles.calendarEventTooltipDivider} />
+                    <span>🏥 {ev.labNome || 'Laboratório'}</span>
+                    {ev.dentes && <span>🦷 Dentes: {ev.dentes}</span>}
+                    {ev.cor && <span>🎨 Cor: {ev.cor}</span>}
+                    <div className={styles.calendarEventTooltipDivider} />
+                    <span>📅 Envio: {formatDate(ev.dataEnvio)}</span>
+                    <span>🎯 Previsto: {formatDate(ev.date)}</span>
+                    {ev.dataEntregaPrometida && <span>⏰ Prazo geral: {formatDate(ev.dataEntregaPrometida)}</span>}
+                    {ev.valor != null && <span>💰 {ev.valor.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</span>}
+                    <span className={styles.calendarEventTooltipStatus}>{ev.status}</span>
                   </div>
                 </div>
               ))}

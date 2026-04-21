@@ -1684,7 +1684,7 @@
   flex-direction: column;
   box-shadow: var(--shadow-modal);
 }
-.modalWide { max-width: 720px; }
+.modalWide { max-width: 960px; }
 .modalHeader {
   display: flex;
   align-items: center;
@@ -2112,24 +2112,61 @@
   position: absolute;
   left: 0;
   top: calc(100% + 8px);
-  width: min(270px, 72vw);
+  width: min(280px, 80vw);
   display: none;
   flex-direction: column;
-  gap: 5px;
-  padding: 10px;
+  gap: 6px;
+  padding: 12px;
   background: var(--bg-elevated);
   border: 1px solid var(--border-gold);
-  border-radius: 8px;
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.36);
+  border-radius: 10px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.45);
   color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.35;
+  font-size: 12px;
+  line-height: 1.4;
   pointer-events: none;
+  z-index: 100;
 }
 
 .calendarEventTooltip strong {
   color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.calendarEventTooltip span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-muted);
+  font-size: 11.5px;
+}
+
+.calendarEventTooltipService {
   font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.calendarEventTooltipDivider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
+}
+
+.calendarEventTooltipStatus {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  align-self: flex-start;
 }
 
 .calendarEvent:hover .calendarEventTooltip {
