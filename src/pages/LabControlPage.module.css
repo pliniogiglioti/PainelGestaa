@@ -2071,8 +2071,8 @@
 
 .calendarEvent {
   position: relative;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
+  background: rgba(201, 162, 42, 0.12);
+  border: 1px solid rgba(201, 162, 42, 0.22);
   border-radius: 8px;
   padding: 7px 9px;
   display: flex;
