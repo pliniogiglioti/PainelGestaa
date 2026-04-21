@@ -11,7 +11,7 @@ import { useSessionStorageState } from '../hooks/useSessionStorageState'
 const DEFAULT_COLUNAS = [
   { nome: 'Pré-envio',               ordem: 0, cor: '#f59e0b' },
   { nome: 'Envio / Em laboratório',  ordem: 1, cor: '#3b82f6' },
-  { nome: 'Retorno à clínica',       ordem: 2, cor: '#8b5cf6' },
+  { nome: 'Anexos',                  ordem: 2, cor: '#8b5cf6' },
   { nome: 'Agendamento do paciente', ordem: 3, cor: '#ec4899' },
   { nome: 'Instalado',               ordem: 4, cor: '#10b981' },
 ]
@@ -33,6 +33,7 @@ type LabEtapa = {
   id: string
   nome: string
   preco: number | null
+  quantidade: number
   origem: 'catalogo' | 'manual'
   prazo_entrega: string | null
   prazo_producao_dias: number | null
@@ -174,6 +175,7 @@ function getEnvioEtapas(envio: LabEnvio): LabEtapa[] {
         id: typeof etapa.id === 'string' ? etapa.id : `etapa-${envio.id}-${index}`,
         nome: typeof etapa.nome === 'string' ? etapa.nome : envio.tipo_trabalho,
         preco: typeof etapa.preco === 'number' ? etapa.preco : envio.preco_servico,
+        quantidade: typeof etapa.quantidade === 'number' ? etapa.quantidade : 1,
         origem: etapa.origem === 'manual' ? 'manual' : 'catalogo',
         prazo_entrega: typeof etapa.prazo_entrega === 'string' ? etapa.prazo_entrega : envio.data_entrega_prometida,
         prazo_producao_dias: typeof etapa.prazo_producao_dias === 'number' ? etapa.prazo_producao_dias : null,
@@ -187,6 +189,7 @@ function getEnvioEtapas(envio: LabEnvio): LabEtapa[] {
     id: `etapa-${envio.id}`,
     nome: envio.tipo_trabalho,
     preco: envio.preco_servico,
+    quantidade: 1,
     origem: 'manual',
     prazo_entrega: envio.data_entrega_prometida,
     prazo_producao_dias: null,
@@ -233,6 +236,7 @@ function serializeLabEtapas(etapas: LabEtapa[]) {
     id: etapa.id,
     nome: etapa.nome,
     preco: etapa.preco,
+    quantidade: etapa.quantidade,
     origem: etapa.origem,
     prazo_entrega: etapa.prazo_entrega,
     prazo_producao_dias: etapa.prazo_producao_dias,
@@ -1376,6 +1380,7 @@ interface ServicoSelecionado {
   key: string
   nome: string
   preco: number | null
+  quantidade: number
   origem: 'catalogo' | 'manual'
   prazo_entrega: string
   prazo_producao_dias: number | null
@@ -1410,6 +1415,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         key: precoCadastrado ? `preco:${precoCadastrado.id}` : `manual:${etapa.id}`,
         nome: etapa.nome,
         preco: etapa.preco,
+        quantidade: etapa.quantidade ?? 1,
         origem: precoCadastrado ? 'catalogo' : etapa.origem,
         prazo_entrega: etapa.prazo_entrega ?? envio.data_entrega_prometida ?? '',
         prazo_producao_dias: etapa.prazo_producao_dias ?? precoCadastrado?.prazo_producao_dias ?? null,
@@ -1454,7 +1460,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
       .join(' + ')
 
     const possuiPreco = servicosSelecionados.some(servico => servico.preco != null)
-    const valorTotal = servicosSelecionados.reduce((total, servico) => total + (servico.preco ?? 0), 0)
+    const valorTotal = servicosSelecionados.reduce((total, servico) => total + (servico.preco ?? 0) * servico.quantidade, 0)
     const precoServico = possuiPreco ? String(valorTotal) : ''
 
     setForm(prev => (
@@ -1489,6 +1495,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
           key,
           nome: p.nome_servico,
           preco: p.preco,
+          quantidade: 1,
           origem: 'catalogo',
           prazo_entrega: form.data_entrega_prometida,
           prazo_producao_dias: p.prazo_producao_dias ?? null,
@@ -1574,6 +1581,7 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
         id: servico.key,
         nome: servico.nome.trim(),
         preco: servico.preco,
+        quantidade: servico.quantidade,
         origem: servico.origem,
         prazo_entrega: servico.prazo_entrega || null,
         prazo_producao_dias: servico.prazo_producao_dias,
@@ -1709,9 +1717,14 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
                       <span className={styles.selectedServiceName}>{servico.nome}</span>
                       <span className={styles.selectedServicePrice}>
                         {servico.preco != null
-                          ? servico.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                          ? (servico.preco * servico.quantidade).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                           : 'Sem valor'}
                       </span>
+                    </div>
+                    <div className={styles.qtdControls}>
+                      <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', Math.max(1, servico.quantidade - 1))} disabled={servico.quantidade <= 1}>−</button>
+                      <span className={styles.qtdValue}>{servico.quantidade}</span>
+                      <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', servico.quantidade + 1)}>+</button>
                     </div>
                     <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => removeServico(servico.key)} title="Remover serviço">
                       <IconTrash />

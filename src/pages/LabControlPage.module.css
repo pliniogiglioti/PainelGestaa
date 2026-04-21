@@ -1369,6 +1369,48 @@
   color: var(--text-muted);
 }
 
+.qtdControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.qtdBtn {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+  line-height: 1;
+  padding: 0;
+  font-family: inherit;
+}
+.qtdBtn:hover:not(:disabled) {
+  border-color: var(--border-gold);
+  color: var(--gold);
+}
+.qtdBtn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.qtdValue {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 18px;
+  text-align: center;
+}
+
 .etapasBox {
   margin-top: 16px;
   padding: 14px;
