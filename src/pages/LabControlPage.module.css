@@ -487,6 +487,12 @@
   transform: translateY(-1px);
 }
 
+.labCardAggregate:hover {
+  border-color: var(--border);
+  box-shadow: none;
+  transform: none;
+}
+
 .labCardAggregate {
   background:
     radial-gradient(circle at top right, rgba(201, 162, 42, 0.14), transparent 38%),
