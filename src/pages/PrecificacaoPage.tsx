@@ -1224,9 +1224,9 @@ function CalculadoraPrecificacaoModal({
                 <strong>{formatPercent(calculo.margem)}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
-                <span>Preço sugerido</span>
+                <span>Preço mínimo viável</span>
                 <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                <span className={styles.calcHighlightHint}>Sugestão para atingir 50% de margem.</span>
+                <span className={styles.calcHighlightHint}>Preço mínimo para atingir 50% de margem.</span>
                 <span className={styles.calcHighlightHint}>
                   {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
                     ? 'O preço atual já está no ponto de equilíbrio da meta.'
