@@ -3,26 +3,16 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
-import { useSessionStorageState } from '../hooks/useSessionStorageState'
-import PrecificacaoVendaModal from '../components/precificacao/VendaModal'
 import type {
   Empresa,
   EmpresaPreco,
   EmpresaPrecificacaoConfig,
-  EmpresaVenda,
-  EmpresaVendaItem,
 } from '../lib/types'
 
 interface PrecificacaoPageProps {
   empresa: Empresa
   onTrocarEmpresa: () => void
   onVoltar: () => void
-}
-
-type ViewMode = 'vendas' | 'lista'
-
-function isViewMode(value: unknown): value is ViewMode {
-  return value === 'vendas' || value === 'lista'
 }
 
 type CustoProfissionaisBase =
@@ -58,28 +48,6 @@ type ConfiguracaoGeralForm = {
   impostosPercent: string
   comissoesPercent: string
   taxaMaquinaPercent: string
-}
-
-type ConfiguracaoVendasForm = {
-  maxCartao: string
-  maxBoleto: string
-  maxPix: string
-  maxCarne: string
-  tempoApresentacaoSegundos: string
-  ofertaValidaMinutos: string
-  exibirCampanhaPromocional: boolean
-}
-
-type VendaItemDraft = {
-  id: string
-  empresaPrecoId: string | null
-  descricao: string
-  precoUnitario: number
-  quantidade: number
-}
-
-type VendaCard = EmpresaVenda & {
-  itens: EmpresaVendaItem[]
 }
 
 type PrecoFormPayload = {
@@ -123,23 +91,6 @@ const IconUpload = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
     <polyline points="17 8 12 3 7 8" />
     <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-)
-
-const IconTag = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M20.59 13.41 13.41 20.6a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
-    <line x1="7" y1="7" x2="7.01" y2="7" />
-  </svg>
-)
-
-
-const IconReceipt = () => (
-  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 3h16v18l-3-2-3 2-3-2-3 2-3-2-3 2V3Z" />
-    <line x1="8" y1="7" x2="16" y2="7" />
-    <line x1="8" y1="11" x2="16" y2="11" />
-    <line x1="8" y1="15" x2="13" y2="15" />
   </svg>
 )
 
@@ -459,90 +410,6 @@ function configToForm(config: EmpresaPrecificacaoConfig | null): ConfiguracaoGer
     comissoesPercent: config ? String(config.comissoes_percent) : '',
     taxaMaquinaPercent: config ? String(config.taxa_maquina_percent) : '',
   }
-}
-
-function configToVendasForm(config: EmpresaPrecificacaoConfig | null): ConfiguracaoVendasForm {
-  return {
-    maxCartao: config ? String(config.vendas_max_cartao) : '12',
-    maxBoleto: config ? String(config.vendas_max_boleto) : '1',
-    maxPix: config ? String(config.vendas_max_pix) : '1',
-    maxCarne: config ? String(config.vendas_max_carne) : '1',
-    tempoApresentacaoSegundos: config ? String(config.vendas_tempo_apresentacao_segundos) : '0',
-    ofertaValidaMinutos: config ? String(config.vendas_oferta_valida_minutos) : '15',
-    exibirCampanhaPromocional: config ? config.vendas_exibir_campanha_promocional : false,
-  }
-}
-
-function calculateSubtotal(itens: Array<{ preco_unitario: number; quantidade: number }>) {
-  return itens.reduce((total, item) => total + item.preco_unitario * item.quantidade, 0)
-}
-
-function sanitizeEntrada(subtotal: number, entradaValor: number) {
-  return Math.min(Math.max(entradaValor, 0), subtotal)
-}
-
-function buildParcelas(
-  subtotal: number,
-  maxParcelas: number,
-  taxaMaquinaPercent: number,
-  entradaValor = 0,
-) {
-  const parcelas = Math.max(1, Math.floor(maxParcelas || 1))
-  const entradaAplicada = sanitizeEntrada(subtotal, entradaValor)
-  const saldoParcelado = Math.max(subtotal - entradaAplicada, 0)
-  const taxa = taxaMaquinaPercent > 0 && taxaMaquinaPercent < 100
-    ? taxaMaquinaPercent / 100
-    : 0
-
-  return Array.from({ length: parcelas }, (_, index) => {
-    const parcela = index + 1
-    const totalCobradoParcelado = taxa > 0 ? saldoParcelado / (1 - taxa) : saldoParcelado
-    return {
-      parcela,
-      entradaAplicada,
-      saldoParcelado,
-      totalCobradoParcelado,
-      valorParcela: totalCobradoParcelado / parcela,
-      totalProposta: entradaAplicada + totalCobradoParcelado,
-    }
-  })
-}
-
-function buildFormaPagamento(subtotal: number, parcelas: number, taxaPercent: number, entradaValor = 0) {
-  const qtdParcelas = Math.max(1, Math.floor(parcelas || 1))
-  const entradaAplicada = sanitizeEntrada(subtotal, entradaValor)
-  const saldoParcelado = Math.max(subtotal - entradaAplicada, 0)
-  const taxa = taxaPercent > 0 && taxaPercent < 100 ? taxaPercent / 100 : 0
-  const totalCobradoParcelado = taxa > 0 ? saldoParcelado / (1 - taxa) : saldoParcelado
-
-  return {
-    entradaAplicada,
-    saldoParcelado,
-    totalCobradoParcelado,
-    totalCobrado: entradaAplicada + totalCobradoParcelado,
-    valorParcela: totalCobradoParcelado / qtdParcelas,
-    parcelas: qtdParcelas,
-  }
-}
-
-
-function parsePositiveInteger(value: string, fallback: number, min = 0) {
-  const parsed = Math.floor(Number(value))
-  if (!Number.isFinite(parsed)) return fallback
-  return Math.max(min, parsed)
-}
-
-function formatCountdown(totalSeconds: number) {
-  const safeSeconds = Math.max(0, totalSeconds)
-  const hours = Math.floor(safeSeconds / 3600)
-  const minutes = Math.floor((safeSeconds % 3600) / 60)
-  const seconds = safeSeconds % 60
-
-  if (hours > 0) {
-    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
-  }
-
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
 }
 
 function PrecoModal({
@@ -1225,15 +1092,24 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
                 <span>Preço mínimo viável</span>
-                <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                <span className={styles.calcHighlightHint}>Preço mínimo para atingir 50% de margem.</span>
-                <span className={styles.calcHighlightHint}>
-                  {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
-                    ? 'O preço atual já está no ponto de equilíbrio da meta.'
-                    : calculo.diferencaParaMargemIdeal > 0
-                      ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
-                      : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
-                </span>
+                {calculo.precoSugerido === 0 ? (
+                  <>
+                    <strong>Inatingível</strong>
+                    <span className={styles.calcHighlightHint}>Os encargos variáveis somam 50% ou mais do preço de venda. Reduza os percentuais para viabilizar a meta de 50%.</span>
+                  </>
+                ) : (
+                  <>
+                    <strong>{formatCurrency(calculo.precoSugerido)}</strong>
+                    <span className={styles.calcHighlightHint}>Preço mínimo para atingir 50% de margem.</span>
+                    <span className={styles.calcHighlightHint}>
+                      {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
+                        ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                        : calculo.diferencaParaMargemIdeal > 0
+                          ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
+                          : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                    </span>
+                  </>
+                )}
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
                 <span>Preço de venda</span>
@@ -1417,460 +1293,9 @@ function ConfiguracaoGeralModal({
   )
 }
 
-function ConfiguracaoVendasModal({
-  form,
-  saving,
-  error,
-  onChange,
-  onToggleCampanha,
-  onClose,
-  onSubmit,
-}: {
-  form: ConfiguracaoVendasForm
-  saving: boolean
-  error: string
-  onChange: (field: keyof Omit<ConfiguracaoVendasForm, 'exibirCampanhaPromocional'>, value: string) => void
-  onToggleCampanha: (checked: boolean) => void
-  onClose: () => void
-  onSubmit: (e: React.FormEvent) => Promise<void>
-}) {
-  const backdropDismiss = useBackdropDismiss(onClose, saving)
-
-  return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Configuração de vendas</h2>
-          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
-        </div>
-
-        <form className={styles.modalForm} onSubmit={onSubmit}>
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Divisão máxima no cartão</span>
-            <input
-              className={styles.modalInput}
-              value={form.maxCartao}
-              onChange={e => onChange('maxCartao', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 12"
-              disabled={saving}
-            />
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Divisão máxima no boleto</span>
-            <input
-              className={styles.modalInput}
-              value={form.maxBoleto}
-              onChange={e => onChange('maxBoleto', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 6"
-              disabled={saving}
-            />
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Divisão máxima no PIX</span>
-            <input
-              className={styles.modalInput}
-              value={form.maxPix}
-              onChange={e => onChange('maxPix', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 1"
-              disabled={saving}
-            />
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Divisão máxima no carnê</span>
-            <input
-              className={styles.modalInput}
-              value={form.maxCarne}
-              onChange={e => onChange('maxCarne', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 12"
-              disabled={saving}
-            />
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Timer dos meios de pagamento (segundos)</span>
-            <input
-              className={styles.modalInput}
-              value={form.tempoApresentacaoSegundos}
-              onChange={e => onChange('tempoApresentacaoSegundos', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 5"
-              disabled={saving}
-            />
-            <span className={styles.modalFieldHint}>Controla em quantos segundos as formas de pagamento aparecem no modo apresentação.</span>
-          </label>
-
-          <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Oferta válida por quantos minutos</span>
-            <input
-              className={styles.modalInput}
-              value={form.ofertaValidaMinutos}
-              onChange={e => onChange('ofertaValidaMinutos', e.target.value)}
-              inputMode="numeric"
-              placeholder="Ex: 15"
-              disabled={saving}
-            />
-            <span className={styles.modalFieldHint}>Essa é a contagem regressiva mostrada para o cliente no modo apresentação.</span>
-          </label>
-
-          <label className={styles.switchField}>
-            <div className={styles.switchText}>
-              <span className={styles.modalLabel}>Exibir campanha promocional antes do preço final</span>
-              <span className={styles.modalFieldHint}>Mostra um bloco promocional antes das condições finais da proposta.</span>
-            </div>
-            <button
-              type="button"
-              className={`${styles.switchButton} ${form.exibirCampanhaPromocional ? styles.switchButtonActive : ''}`}
-              onClick={() => onToggleCampanha(!form.exibirCampanhaPromocional)}
-              disabled={saving}
-              aria-pressed={form.exibirCampanhaPromocional}
-            >
-              <span className={styles.switchThumb} />
-            </button>
-          </label>
-
-          {error && <p className={styles.formError}>{error}</p>}
-
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-              Cancelar
-            </button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar configuração'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
-function ApresentacaoVendaModal({
-  venda,
-  precos,
-  taxaMaquinaPercent,
-  configVendas,
-  onClose,
-}: {
-  venda: VendaCard
-  precos: EmpresaPreco[]
-  taxaMaquinaPercent: number
-  configVendas: EmpresaPrecificacaoConfig | null
-  onClose: () => void
-}) {
-  const backdropDismiss = useBackdropDismiss(onClose)
-  const [itensApresentacao, setItensApresentacao] = useState(venda.itens)
-  const subtotal = calculateSubtotal(itensApresentacao)
-
-  type FormaPagamento = 'cartao' | 'boleto' | 'pix' | 'carne'
-
-  const [precoAvista, setPrecoAvista] = useState(formatCurrencyInput(subtotal))
-  const [entradaApresentacao, setEntradaApresentacao] = useState(formatCurrencyInput(0))
-  const [meiosLiberadosEm, setMeiosLiberadosEm] = useState(configVendas?.vendas_tempo_apresentacao_segundos ?? 0)
-  const [ofertaExpiraEm, setOfertaExpiraEm] = useState((configVendas?.vendas_oferta_valida_minutos ?? 15) * 60)
-  const formasDisponiveis = [
-    {
-      id: 'cartao' as const,
-      label: 'Cartão',
-      maxParcelas: Math.max(0, configVendas?.vendas_max_cartao ?? 12),
-      taxaPercent: taxaMaquinaPercent,
-      resumoUnico: 'Parcelamento no cartão',
-    },
-    {
-      id: 'boleto' as const,
-      label: 'Boleto',
-      maxParcelas: Math.max(0, configVendas?.vendas_max_boleto ?? 1),
-      taxaPercent: 0,
-      resumoUnico: 'Boleto bancário',
-    },
-    {
-      id: 'pix' as const,
-      label: 'PIX',
-      maxParcelas: Math.max(0, configVendas?.vendas_max_pix ?? 1),
-      taxaPercent: 0,
-      resumoUnico: 'Pagamento via PIX',
-    },
-    {
-      id: 'carne' as const,
-      label: 'Carnê',
-      maxParcelas: Math.max(0, configVendas?.vendas_max_carne ?? 1),
-      taxaPercent: 0,
-      resumoUnico: 'Parcelamento no carnê',
-    },
-  ].filter(item => item.maxParcelas > 0)
-  const formaInicial = formasDisponiveis[0]?.id ?? 'cartao'
-  const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>(formaInicial)
-  const [parcelasSelecionadas, setParcelasSelecionadas] = useState('1')
-
-  useEffect(() => {
-    if (meiosLiberadosEm <= 0) return undefined
-
-    const timer = window.setInterval(() => {
-      setMeiosLiberadosEm(prev => (prev <= 1 ? 0 : prev - 1))
-    }, 1000)
-
-    return () => window.clearInterval(timer)
-  }, [meiosLiberadosEm])
-
-  useEffect(() => {
-    if (ofertaExpiraEm <= 0) return undefined
-
-    const timer = window.setInterval(() => {
-      setOfertaExpiraEm(prev => (prev <= 1 ? 0 : prev - 1))
-    }, 1000)
-
-    return () => window.clearInterval(timer)
-  }, [ofertaExpiraEm])
-
-  useEffect(() => {
-    if (!formasDisponiveis.some(item => item.id === formaPagamento)) {
-      setFormaPagamento(formasDisponiveis[0]?.id ?? 'cartao')
-    }
-  }, [formaPagamento, formasDisponiveis])
-
-  const precoAvistaCalculado = parsePreco(precoAvista)
-  const baseApresentacao = precoAvistaCalculado > 0 ? precoAvistaCalculado : subtotal
-  const entradaAplicada = sanitizeEntrada(baseApresentacao, parsePreco(entradaApresentacao))
-  const formaAtual = formasDisponiveis.find(item => item.id === formaPagamento) ?? {
-    id: 'cartao' as const,
-    label: 'Cartão',
-    maxParcelas: 1,
-    taxaPercent: taxaMaquinaPercent,
-    resumoUnico: 'Parcelamento no cartão',
-  }
-
-  useEffect(() => {
-    const parcelasClamped = Math.min(
-      parsePositiveInteger(parcelasSelecionadas, 1, 1),
-      Math.max(1, formaAtual.maxParcelas),
-    )
-
-    if (String(parcelasClamped) !== parcelasSelecionadas) {
-      setParcelasSelecionadas(String(parcelasClamped))
-    }
-  }, [formaAtual.maxParcelas, parcelasSelecionadas])
-
-  const qtdParcelas = Math.min(
-    parsePositiveInteger(parcelasSelecionadas, 1, 1),
-    Math.max(1, formaAtual.maxParcelas),
-  )
-  const resumo = buildFormaPagamento(baseApresentacao, qtdParcelas, formaAtual.taxaPercent, entradaAplicada)
-  const parcelasApresentacao = buildParcelas(baseApresentacao, formaAtual.maxParcelas, formaAtual.taxaPercent, entradaAplicada)
-  const meiosPagamentoLiberados = meiosLiberadosEm <= 0
-  const opcoesComplementares = precos
-    .filter(item => !itensApresentacao.some(vendaItem => vendaItem.empresa_preco_id === item.id))
-    .sort((a, b) => b.preco - a.preco)
-    .slice(0, 3)
-
-  const handleAdicionarComplementar = (item: EmpresaPreco) => {
-    setItensApresentacao(prev => ([
-      ...prev,
-      {
-        id: `apresentacao-${item.id}`,
-        venda_id: venda.id,
-        empresa_preco_id: item.id,
-        descricao: item.nome_produto,
-        preco_unitario: item.preco,
-        quantidade: 1,
-        created_at: new Date().toISOString(),
-      },
-    ]))
-
-    setPrecoAvista(prev => {
-      const valorAtual = parsePreco(prev)
-      const proximoValor = valorAtual > 0 ? valorAtual + item.preco : subtotal + item.preco
-      return formatCurrencyInput(proximoValor)
-    })
-  }
-
-  return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={`${styles.modal} ${styles.presentationModal}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.presentationHeader}>
-          <div>
-            <p className={styles.presentationEyebrow}>
-              {ofertaExpiraEm > 0 ? `Oferta válida por ${formatCountdown(ofertaExpiraEm)}` : 'Oferta expirada'}
-            </p>
-            <h2 className={styles.presentationTitle}>{venda.cliente_nome}</h2>
-          </div>
-          <button type="button" className={styles.modalClose} onClick={onClose}>✕</button>
-        </div>
-
-        <div className={styles.presentationBody}>
-          <div className={styles.presentationCountdownRow}>
-            <div className={styles.presentationCountdownCard}>
-              <span>Subtotal da proposta</span>
-              <strong>{formatCurrency(subtotal)}</strong>
-              <small>{itensApresentacao.length} item(ns) em apresentação</small>
-            </div>
-            <div className={styles.presentationCountdownCard}>
-              <span>Meios de pagamento</span>
-              <strong>{meiosPagamentoLiberados ? 'Liberados' : formatCountdown(meiosLiberadosEm)}</strong>
-              <small>{meiosPagamentoLiberados ? 'Prontos para apresentar ao cliente' : 'Aguardando timer configurado'}</small>
-            </div>
-          </div>
-
-          <div className={styles.presentationControls}>
-            <div className={styles.presentationSelectorBlock}>
-              <span className={styles.modalLabel}>Preço à vista</span>
-              <div className={styles.presentationPriceCard}>
-                <input
-                  className={styles.presentationPriceInput}
-                  value={precoAvista}
-                  onChange={e => setPrecoAvista(formatCurrencyTypingInput(e.target.value))}
-                  inputMode="decimal"
-                  placeholder="Ex: R$ 3.500,00"
-                />
-              </div>
-            </div>
-
-            <div className={styles.presentationSelectorBlock}>
-              <span className={styles.modalLabel}>Entrada</span>
-              <div className={styles.presentationPriceCard}>
-                <input
-                  className={styles.presentationPriceInput}
-                  value={entradaApresentacao}
-                  onChange={e => setEntradaApresentacao(formatCurrencyTypingInput(e.target.value))}
-                  inputMode="decimal"
-                  placeholder="Ex: R$ 1.000,00"
-                />
-              </div>
-            </div>
-
-            {!meiosPagamentoLiberados ? (
-              <div className={styles.presentationDelayBlock}>
-                <strong>Meios de pagamento ainda não liberados</strong>
-                <span>As opções serão exibidas em {formatCountdown(meiosLiberadosEm)}.</span>
-              </div>
-            ) : (
-              <>
-                <div className={styles.presentationSelectorBlock}>
-                  <span className={styles.modalLabel}>Forma de pagamento</span>
-                  <div className={styles.presentationSelectorGrid}>
-                    {formasDisponiveis.map(item => {
-                      const previewParcelas = Math.max(1, item.maxParcelas)
-                      const previewResumo = buildFormaPagamento(baseApresentacao, previewParcelas, item.taxaPercent, entradaAplicada)
-
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          className={`${styles.presentationSelectCard} ${item.id === formaPagamento ? styles.presentationSelectCardActive : ''}`}
-                          onClick={() => setFormaPagamento(item.id)}
-                        >
-                          <span>{item.label}</span>
-                          <strong>
-                            {previewParcelas > 1
-                              ? formatCurrency(previewResumo.valorParcela)
-                              : formatCurrency(previewResumo.totalCobrado)}
-                          </strong>
-                          <small>
-                            {previewParcelas > 1
-                              ? `Até ${previewParcelas}x disponível`
-                              : item.resumoUnico}
-                          </small>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-
-                {formaAtual.maxParcelas > 1 && (
-                  <div className={styles.presentationSelectorBlock}>
-                    <span className={styles.modalLabel}>Parcelas</span>
-                    <div className={styles.presentationParcelasGrid}>
-                      {parcelasApresentacao.map(opcao => (
-                        <button
-                          key={opcao.parcela}
-                          type="button"
-                          className={`${styles.presentationParcelaCard} ${opcao.parcela === resumo.parcelas ? styles.presentationParcelaCardActive : ''}`}
-                          onClick={() => setParcelasSelecionadas(String(opcao.parcela))}
-                        >
-                          <span>{opcao.parcela}x</span>
-                          <strong>{formatCurrency(opcao.valorParcela)}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {configVendas?.vendas_exibir_campanha_promocional && (
-                  <div className={styles.presentationCampaign}>
-                    <span>Campanha promocional ativa</span>
-                    <strong>Condição especial liberada para fechar a proposta agora.</strong>
-                    <small>Use esse momento para reforçar urgência, valor percebido e a validade da oferta.</small>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          {meiosPagamentoLiberados && (
-            <div className={styles.presentationTotals}>
-              {resumo.entradaAplicada > 0 && (
-                <div className={styles.presentationTotalCard}>
-                  <span>Entrada</span>
-                  <strong>{formatCurrency(resumo.entradaAplicada)}</strong>
-                </div>
-              )}
-              <div className={styles.presentationTotalCard}>
-                <span>Total final</span>
-                <strong>{formatCurrency(resumo.totalCobrado)}</strong>
-              </div>
-              <div className={styles.presentationTotalCard}>
-                <span>{formaAtual.maxParcelas > 1 ? `${resumo.parcelas}x em ${formaAtual.label}` : formaAtual.label}</span>
-                <strong>{formatCurrency(formaAtual.maxParcelas > 1 ? resumo.valorParcela : resumo.totalCobrado)}</strong>
-              </div>
-            </div>
-          )}
-
-          {opcoesComplementares.length > 0 && (
-            <div className={styles.presentationBlock}>
-              <h3 className={styles.sectionTitle}>Opções complementares</h3>
-              <div className={styles.anchorGrid}>
-                {opcoesComplementares.map(item => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={styles.anchorCard}
-                    onClick={() => handleAdicionarComplementar(item)}
-                  >
-                    <span>{item.nome_produto}</span>
-                    <strong>{formatCurrency(item.preco)}</strong>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }: PrecificacaoPageProps) {
   const [loading, setLoading] = useState(true)
   const [canManage, setCanManage] = useState(false)
-  const [view, setView] = useSessionStorageState<ViewMode>(
-    `precificacao:${empresa.id}:view`,
-    'vendas',
-    isViewMode,
-  )
   const [showCreatePrecoModal, setShowCreatePrecoModal] = useState(false)
   const [showPrecoModal, setShowPrecoModal] = useState(false)
   const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)
@@ -1880,19 +1305,14 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [importando, setImportando] = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
   const [showConfigModal, setShowConfigModal] = useState(false)
-  const [showVendasConfigModal, setShowVendasConfigModal] = useState(false)
-  const [showVendaModal, setShowVendaModal] = useState(false)
   const [precos, setPrecos] = useState<EmpresaPreco[]>([])
   const [savingPreco, setSavingPreco] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
-  const [savingVenda, setSavingVenda] = useState(false)
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [precoEditando, setPrecoEditando] = useState<EmpresaPreco | null>(null)
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
-  const [vendaEditando, setVendaEditando] = useState<VendaCard | null>(null)
-  const [vendaApresentacao, setVendaApresentacao] = useState<VendaCard | null>(null)
   const [configGeral, setConfigGeral] = useState<EmpresaPrecificacaoConfig | null>(null)
   const [configForm, setConfigForm] = useState<ConfiguracaoGeralForm>({
     royaltiesPercent: '',
@@ -1901,19 +1321,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     comissoesPercent: '',
     taxaMaquinaPercent: '',
   })
-  const [configVendasForm, setConfigVendasForm] = useState<ConfiguracaoVendasForm>({
-    maxCartao: '12',
-    maxBoleto: '1',
-    maxPix: '1',
-    maxCarne: '1',
-    tempoApresentacaoSegundos: '0',
-    ofertaValidaMinutos: '15',
-    exibirCampanhaPromocional: false,
-  })
   const configPadraoMemo = useMemo(() => configToForm(configGeral), [configGeral])
-  const configVendasPadraoMemo = useMemo(() => configToVendasForm(configGeral), [configGeral])
-  const taxaMaquinaPercent = configGeral?.taxa_maquina_percent ?? parsePreco(configForm.taxaMaquinaPercent)
-  const maxParcelasCartaoPadrao = configGeral?.vendas_max_cartao ?? parsePositiveInteger(configVendasForm.maxCartao, 12, 1)
 
   useEffect(() => {
     let active = true
@@ -1987,7 +1395,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         } else {
           setConfigGeral(configData)
           setConfigForm(configToForm(configData))
-          setConfigVendasForm(configToVendasForm(configData))
         }
 
         setLoadingWorkspace(false)
@@ -2068,7 +1475,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setShowCreatePrecoModal(false)
     setShowPrecoModal(false)
     setSavingPreco(false)
-    setView('lista')
   }
 
   const handleImportarLista = async () => {
@@ -2146,7 +1552,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setShowImportModal(false)
     setImportFile(null)
     setImportError('')
-    setView('lista')
   }
 
   const handleAddPrecoCalculado = async (item: PrecoFormPayload, calculo: CalculadoraPersistida) => {
@@ -2186,7 +1591,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setShowCreatePrecoModal(false)
     setShowPrecoCalculadoModal(false)
     setSavingPreco(false)
-    setView('lista')
   }
 
   const handleEditPreco = async (itemId: string, item: PrecoFormPayload) => {
@@ -2293,17 +1697,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setConfigForm(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleConfigVendasChange = (
-    field: keyof Omit<ConfiguracaoVendasForm, 'exibirCampanhaPromocional'>,
-    value: string,
-  ) => {
-    setConfigVendasForm(prev => ({ ...prev, [field]: value }))
-  }
-
-  const handleConfigVendasCampanha = (checked: boolean) => {
-    setConfigVendasForm(prev => ({ ...prev, exibirCampanhaPromocional: checked }))
-  }
-
   const handleSaveConfig = async (e: React.FormEvent) => {
     e.preventDefault()
     setSavingConfig(true)
@@ -2333,146 +1726,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
 
     setConfigGeral(data)
     setConfigForm(configToForm(data))
-    setConfigVendasForm(configToVendasForm(data))
     setFeedback('Configuração geral salva com sucesso.')
     setShowConfigModal(false)
     setSavingConfig(false)
   }
-
-  const handleSaveConfigVendas = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSavingConfig(true)
-    setError('')
-    setFeedback('')
-
-    const maxCartao = parsePositiveInteger(configVendasForm.maxCartao, 12, 0)
-    const maxBoleto = parsePositiveInteger(configVendasForm.maxBoleto, 1, 0)
-    const maxPix = parsePositiveInteger(configVendasForm.maxPix, 1, 0)
-    const maxCarne = parsePositiveInteger(configVendasForm.maxCarne, 1, 0)
-
-    if (maxCartao + maxBoleto + maxPix + maxCarne <= 0) {
-      setError('Ative ao menos um meio de pagamento na configuração de vendas.')
-      setSavingConfig(false)
-      return
-    }
-
-    const payload = {
-      empresa_id: empresa.id,
-      vendas_max_cartao: maxCartao,
-      vendas_max_boleto: maxBoleto,
-      vendas_max_pix: maxPix,
-      vendas_max_carne: maxCarne,
-      vendas_tempo_apresentacao_segundos: parsePositiveInteger(configVendasForm.tempoApresentacaoSegundos, 0, 0),
-      vendas_oferta_valida_minutos: parsePositiveInteger(configVendasForm.ofertaValidaMinutos, 15, 1),
-      vendas_exibir_campanha_promocional: configVendasForm.exibirCampanhaPromocional,
-    }
-
-    const { data, error: saveError } = await supabase
-      .from('empresa_precificacao_config')
-      .upsert(payload)
-      .select('*')
-      .single()
-
-    if (saveError) {
-      setError(saveError.message ?? 'Não foi possível salvar a configuração de vendas.')
-      setSavingConfig(false)
-      return
-    }
-
-    setConfigGeral(data)
-    setConfigForm(configToForm(data))
-    setConfigVendasForm(configToVendasForm(data))
-    setFeedback('Configuração de vendas salva com sucesso.')
-    setShowVendasConfigModal(false)
-    setSavingConfig(false)
-  }
-
-  const handleSaveVenda = async (payload: {
-    id?: string
-    clienteNome: string
-    observacoes: string
-    itens: VendaItemDraft[]
-  }) => {
-    setSavingVenda(true)
-    setError('')
-    setFeedback('')
-
-    let vendaId = payload.id
-
-    if (vendaId) {
-      const { error: updateError } = await supabase
-        .from('empresa_vendas')
-        .update({
-          cliente_nome: payload.clienteNome,
-          observacoes: payload.observacoes || null,
-          entrada_valor: 0,
-          max_parcelas: maxParcelasCartaoPadrao,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', vendaId)
-
-      if (updateError) {
-        setError(updateError.message ?? 'Não foi possível atualizar a apresentação.')
-        setSavingVenda(false)
-        return
-      }
-
-      const { error: deleteError } = await supabase
-        .from('empresa_venda_itens')
-        .delete()
-        .eq('venda_id', vendaId)
-
-      if (deleteError) {
-        setError(deleteError.message ?? 'Não foi possível atualizar os itens da venda.')
-        setSavingVenda(false)
-        return
-      }
-    } else {
-      const { data, error: insertError } = await supabase
-        .from('empresa_vendas')
-        .insert({
-          empresa_id: empresa.id,
-          cliente_nome: payload.clienteNome,
-          observacoes: payload.observacoes || null,
-          entrada_valor: 0,
-          max_parcelas: maxParcelasCartaoPadrao,
-        })
-        .select('*')
-        .single()
-
-      if (insertError || !data) {
-        setError(insertError?.message ?? 'Não foi possível criar a apresentação.')
-        setSavingVenda(false)
-        return
-      }
-
-      vendaId = data.id
-    }
-
-    const itensInsert = payload.itens.map(item => ({
-      venda_id: vendaId!,
-      empresa_preco_id: item.empresaPrecoId,
-      descricao: item.descricao,
-      preco_unitario: item.precoUnitario,
-      quantidade: item.quantidade,
-    }))
-
-    const { error: itensInsertError } = await supabase
-      .from('empresa_venda_itens')
-      .insert(itensInsert)
-
-    if (itensInsertError) {
-      setError(itensInsertError.message ?? 'Não foi possível salvar os itens da apresentação.')
-      setSavingVenda(false)
-      return
-    }
-
-    setFeedback(payload.id ? 'Venda atualizada com sucesso.' : 'Venda criada com sucesso.')
-    setShowVendaModal(false)
-    setVendaEditando(null)
-    setSavingVenda(false)
-  }
-
 
   if (loading) {
     return (
@@ -2511,31 +1768,9 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         <div className={styles.workspaceHeader}>
           <div>
             <p className={styles.workspaceEyebrow}>Precificação</p>
-            <h2 className={styles.workspaceTitle}>{view === 'vendas' ? 'Vendas' : 'Minha lista de preço'}</h2>
+            <h2 className={styles.workspaceTitle}>Minha lista de preço</h2>
           </div>
           <div className={styles.workspaceActions}>
-            <button
-              type="button"
-              className={view === 'vendas' ? styles.btnPrimary : styles.btnSecondary}
-              onClick={() => {
-                setError('')
-                setFeedback('')
-                setView('vendas')
-              }}
-            >
-              <IconReceipt /> Vendas
-            </button>
-            <button
-              type="button"
-              className={view === 'lista' ? styles.btnPrimary : styles.btnSecondary}
-              onClick={() => {
-                setError('')
-                setFeedback('')
-                setView('lista')
-              }}
-            >
-              <IconTag /> Minha lista de preço
-            </button>
             {canManage && (
               <button
                 type="button"
@@ -2566,20 +1801,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             {canManage && (
               <button
                 type="button"
-                className={styles.btnSecondary}
-                onClick={() => {
-                  setError('')
-                  setFeedback('')
-                  setConfigVendasForm(configVendasPadraoMemo)
-                  setShowVendasConfigModal(true)
-                }}
-              >
-                Configuração de vendas
-              </button>
-            )}
-            {canManage && view === 'lista' && (
-              <button
-                type="button"
                 className={styles.btnPrimary}
                 onClick={() => {
                   setError('')
@@ -2589,20 +1810,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 }}
               >
                 <IconPlus /> Criar preços
-              </button>
-            )}
-            {canManage && view === 'vendas' && (
-              <button
-                type="button"
-                className={styles.btnPrimary}
-                onClick={() => {
-                  setError('')
-                  setFeedback('')
-                  setVendaEditando(null)
-                  setShowVendaModal(true)
-                }}
-              >
-                <IconPlus /> Nova venda
               </button>
             )}
           </div>
@@ -2615,8 +1822,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           <div className={styles.blankCanvas}>
             <p className={styles.blankTitle}>Carregando dados...</p>
           </div>
-        ) : view === 'lista' ? (
-          precos.length === 0 ? (
+        ) : precos.length === 0 ? (
             <div className={styles.blankCanvas}>
               <p className={styles.blankTitle}>Nenhum preço cadastrado ainda.</p>
               <p className={styles.blankText}>
@@ -2696,15 +1902,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 })}
               </div>
             </div>
-          )
-        ) : (
-          <div className={styles.blankCanvas}>
-            <p className={styles.blankTitle}>Pronto para iniciar uma venda.</p>
-            <p className={styles.blankText}>
-              Clique em <strong>Nova venda</strong> para comecar.
-            </p>
-          </div>
-        )}
+          )}
       </div>
 
       {showPrecoModal && (
@@ -2809,44 +2007,6 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         />
       )}
 
-      {showVendasConfigModal && (
-        <ConfiguracaoVendasModal
-          form={configVendasForm}
-          saving={savingConfig}
-          error={error}
-          onChange={handleConfigVendasChange}
-          onToggleCampanha={handleConfigVendasCampanha}
-          onClose={() => setShowVendasConfigModal(false)}
-          onSubmit={handleSaveConfigVendas}
-        />
-      )}
-
-      {showVendaModal && (
-        <PrecificacaoVendaModal
-          precos={precos}
-          taxaMaquinaPercent={taxaMaquinaPercent}
-          configVendas={configGeral}
-          maxParcelasCartaoPadrao={maxParcelasCartaoPadrao}
-          initialVenda={vendaEditando}
-          saving={savingVenda}
-          error={error}
-          onClose={() => {
-            setShowVendaModal(false)
-            setVendaEditando(null)
-          }}
-          onSubmit={handleSaveVenda}
-        />
-      )}
-
-      {vendaApresentacao && (
-        <ApresentacaoVendaModal
-          venda={vendaApresentacao}
-          precos={precos}
-          taxaMaquinaPercent={taxaMaquinaPercent}
-          configVendas={configGeral}
-          onClose={() => setVendaApresentacao(null)}
-        />
-      )}
     </div>
   )
 }
