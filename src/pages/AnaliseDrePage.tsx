@@ -6,6 +6,7 @@ import { DreAssistentePanel } from '../components/dre-assistente/DreAssistentePa
 import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
+import ModalTransition from '../components/ModalTransition'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -907,6 +908,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     if (!deletingPeriodo) setShowDeletePeriodo(false)
   }, deletingPeriodo)
   const editClassBackdropDismiss = useBackdropDismiss(closeEditClassModal)
+  const assistenteBackdropDismiss = useBackdropDismiss(() => setShowAssistente(false))
+  const uploadBackdropDismiss = useBackdropDismiss(() => setShowUpload(false))
 
   const salvarClassificacao = async () => {
     if (!editClassItem) return
@@ -1349,24 +1352,37 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       )}
 
       {/* ── Modal Upload Extrato ── */}
-      {showUpload && (
-        <div className={styles.uploadOverlay} onClick={() => setShowUpload(false)}>
-          <div className={styles.uploadModal} onClick={e => e.stopPropagation()}>
-            <button className={styles.assistenteModalClose} onClick={() => setShowUpload(false)}>✕</button>
-            <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos()} />
+      <ModalTransition open={showUpload}>
+        {showUpload && (
+          <div
+            className={styles.uploadOverlay}
+            onPointerDown={uploadBackdropDismiss.handleBackdropPointerDown}
+            onClick={uploadBackdropDismiss.handleBackdropClick}
+          >
+            <div className={styles.uploadModal} onClick={e => e.stopPropagation()}>
+              <ExtratoUpload key={empresa.id} empresaId={empresa.id} onSaved={() => fetchLancamentos()} onClose={() => setShowUpload(false)} />
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModalTransition>
 
       {/* ── Modal Assistente IA ── */}
-      {showAssistente && (
-        <div className={styles.assistenteOverlay} onClick={() => setShowAssistente(false)}>
-          <div className={styles.assistenteModal} onClick={e => e.stopPropagation()}>
-            <button className={styles.assistenteModalClose} onClick={() => setShowAssistente(false)}>✕</button>
-            <DreAssistentePanel lancamentos={lancamentosFiltrados} />
+      <ModalTransition open={showAssistente}>
+        {showAssistente && (
+          <div
+            className={styles.assistenteOverlay}
+            onPointerDown={assistenteBackdropDismiss.handleBackdropPointerDown}
+            onClick={assistenteBackdropDismiss.handleBackdropClick}
+          >
+          <div
+            className={styles.assistenteModal}
+            onClick={e => e.stopPropagation()}
+          >
+            <DreAssistentePanel lancamentos={lancamentosFiltrados} onClose={() => setShowAssistente(false)} />
           </div>
-        </div>
-      )}
+          </div>
+        )}
+      </ModalTransition>
 
       {/* ── Lançamentos ── */}
       <section className={styles.panel}>
@@ -1692,7 +1708,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       </section>
 
       {/* ── Wizard modal ── */}
-      {showWizard && (
+      <ModalTransition open={showWizard}>
+        {showWizard && (
         <div
           className={styles.modalOverlay}
           onPointerDown={wizardBackdropDismiss.handleBackdropPointerDown}
@@ -1921,10 +1938,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
           </div>
         </div>
-      )}
+        )}
+      </ModalTransition>
 
       {/* ── Modal: excluir período ── */}
-      {showDeletePeriodo && (
+      <ModalTransition open={showDeletePeriodo}>
+        {showDeletePeriodo && (
         <div
           className={styles.modalOverlay}
           onPointerDown={deletePeriodoBackdropDismiss.handleBackdropPointerDown}
@@ -1976,10 +1995,12 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             </div>
           </div>
         </div>
-      )}
+        )}
+      </ModalTransition>
 
       {/* ── Modal: Editar Classificação ── */}
-      {showEditClassModal && editClassItem && (
+      <ModalTransition open={showEditClassModal && !!editClassItem}>
+        {showEditClassModal && editClassItem && (
         <div
           className={styles.modalOverlay}
           onPointerDown={editClassBackdropDismiss.handleBackdropPointerDown}
@@ -2065,7 +2086,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             </button>
           </div>
         </div>
-      )}
+        )}
+      </ModalTransition>
     </div>
   )
 }

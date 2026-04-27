@@ -921,9 +921,11 @@ interface ExtratoUploadProps {
   empresaId: string
   /** Chamado após lançamentos salvos com sucesso — use para recarregar a lista na página pai */
   onSaved?: () => void
+  /** Fechar o modal pai */
+  onClose?: () => void
 }
 
-export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
+export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProps) {
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Contexto salvo para execução manual da IA (Passo 2)
@@ -1706,6 +1708,9 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
 
   return (
     <section className={styles.section}>
+      {onClose && (
+        <button className={styles.sectionCloseBtn} onClick={onClose} title="Fechar">✕</button>
+      )}
       {/* ── Aviso de IA + cards de modelo (só no idle) ──────────────────────── */}
       {fase === 'idle' && (
         <>

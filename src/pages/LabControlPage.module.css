@@ -1662,6 +1662,23 @@
 
 /* ── Modal ────────────────────────────────────────────────────────────────── */
 
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes overlayOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes modalOut {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to   { opacity: 0; transform: translateY(8px) scale(0.97); }
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -1672,6 +1689,11 @@
   z-index: 100;
   padding: 20px;
   backdrop-filter: blur(2px);
+  animation: overlayIn 0.2s ease;
+}
+
+[data-modal-state="closing"] .overlay {
+  animation: overlayOut 0.2s ease forwards;
 }
 
 .modal {
@@ -1684,6 +1706,11 @@
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-modal);
+  animation: modalIn 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+[data-modal-state="closing"] .modal {
+  animation: modalOut 0.2s ease forwards;
 }
 .modalWide { max-width: 960px; }
 .modalHeader {

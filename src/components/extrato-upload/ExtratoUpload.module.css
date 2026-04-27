@@ -6,6 +6,31 @@
   border-radius: 18px;
   padding: 26px 28px;
   margin-bottom: 22px;
+  position: relative;
+}
+
+.sectionCloseBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  z-index: 2;
+}
+
+.sectionCloseBtn:hover {
+  background: rgba(255,255,255,0.12);
+  color: var(--text);
 }
 
 /* ── Upload warning banner (vermelho de atenção) ─────────────────────────────── */

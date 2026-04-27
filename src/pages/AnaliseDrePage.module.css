@@ -228,6 +228,13 @@
   max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
+}
+
+.uploadModalHeader {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 10;
   border-radius: 14px;
 }
 
@@ -253,11 +260,30 @@
   border-radius: 14px;
 }
 
+.assistenteModalHeader {
+  display: flex;
+  justify-content: flex-end;
+  padding: 10px 10px 0;
+}
+
 .assistenteModalClose {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  z-index: 10;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: var(--text-muted);
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  font-size: 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+
+.assistenteModalClose:hover {
+  background: rgba(255,255,255,0.12);
+  color: #eee;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
   border-radius: 6px;

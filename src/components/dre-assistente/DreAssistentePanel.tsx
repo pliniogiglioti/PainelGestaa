@@ -5,6 +5,7 @@ import styles from './DreAssistentePanel.module.css'
 
 type DreAssistentePanelProps = {
   lancamentos: DreLancamento[]
+  onClose?: () => void
 }
 
 // Validates that a URL is safe (http/https only)
@@ -116,7 +117,7 @@ function stripMarkdownForSpeech(text: string): string {
     .trim()
 }
 
-export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
+export function DreAssistentePanel({ lancamentos, onClose }: DreAssistentePanelProps) {
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
   const [analysis, setAnalysis] = useState('')
@@ -256,65 +257,70 @@ export function DreAssistentePanel({ lancamentos }: DreAssistentePanelProps) {
           </p>
         </div>
 
-        {hasData && (
-          <div className={styles.headerRight}>
-            <div className={styles.miniStats}>
-              <div className={styles.miniStat}>
-                <span className={styles.miniStatLabel}>Lançamentos</span>
-                <strong className={styles.miniStatValue}>{lancamentos.length}</strong>
-              </div>
-              <div className={`${styles.miniStat} ${resultado >= 0 ? styles.miniStatPositive : styles.miniStatNegative}`}>
-                <span className={styles.miniStatLabel}>Resultado</span>
-                <strong className={styles.miniStatValue}>
-                  {resultado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                </strong>
-              </div>
-            </div>
-
-            <button
-              className={styles.generateBtn}
-              onClick={analisarDre}
-              disabled={loading}
-            >
-              {loading ? '…' : '✦ Gerar Análise'}
-            </button>
-
-            {analysis && !loading && (
-              <div className={styles.audioControls}>
-                <button
-                  className={`${styles.audioBtn} ${audioState === 'playing' ? styles.audioBtnActive : ''}`}
-                  onClick={lerAnalise}
-                  title={audioState === 'playing' ? 'Pausar leitura' : audioState === 'paused' ? 'Retomar leitura' : 'Ler análise em voz alta'}
-                >
-                  {audioState === 'playing' ? (
-                    <><span className={styles.audioIcon}>⏸</span> Pausar</>
-                  ) : audioState === 'paused' ? (
-                    <><span className={styles.audioIcon}>▶</span> Retomar</>
-                  ) : (
-                    <><span className={styles.audioIcon}>🔊</span> Ouvir</>
-                  )}
-                </button>
-                {audioState !== 'idle' && (
-                  <button className={styles.audioStopBtn} onClick={pararLeitura} title="Parar leitura">
-                    ⏹
-                  </button>
-                )}
-                <div className={styles.speedControls}>
-                  {([0.75, 1, 1.25, 1.5, 2] as const).map(rate => (
-                    <button
-                      key={rate}
-                      className={`${styles.speedBtn} ${audioRate === rate ? styles.speedBtnActive : ''}`}
-                      onClick={() => mudarVelocidade(rate)}
-                      title={`Velocidade ${rate}×`}
-                    >
-                      {rate}×
-                    </button>
-                  ))}
+        <div className={styles.headerRight}>
+          {onClose && (
+            <button className={styles.panelCloseBtn} onClick={onClose} title="Fechar">✕</button>
+          )}
+          {hasData && (
+            <>
+              <div className={styles.miniStats}>
+                <div className={styles.miniStat}>
+                  <span className={styles.miniStatLabel}>Lançamentos</span>
+                  <strong className={styles.miniStatValue}>{lancamentos.length}</strong>
+                </div>
+                <div className={`${styles.miniStat} ${resultado >= 0 ? styles.miniStatPositive : styles.miniStatNegative}`}>
+                  <span className={styles.miniStatLabel}>Resultado</span>
+                  <strong className={styles.miniStatValue}>
+                    {resultado.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                  </strong>
                 </div>
               </div>
-            )}
-          </div>
-        )}
+
+              <button
+                className={styles.generateBtn}
+                onClick={analisarDre}
+                disabled={loading}
+              >
+                {loading ? '…' : '✦ Gerar Análise'}
+              </button>
+
+              {analysis && !loading && (
+                <div className={styles.audioControls}>
+                  <button
+                    className={`${styles.audioBtn} ${audioState === 'playing' ? styles.audioBtnActive : ''}`}
+                    onClick={lerAnalise}
+                    title={audioState === 'playing' ? 'Pausar leitura' : audioState === 'paused' ? 'Retomar leitura' : 'Ler análise em voz alta'}
+                  >
+                    {audioState === 'playing' ? (
+                      <><span className={styles.audioIcon}>⏸</span> Pausar</>
+                    ) : audioState === 'paused' ? (
+                      <><span className={styles.audioIcon}>▶</span> Retomar</>
+                    ) : (
+                      <><span className={styles.audioIcon}>🔊</span> Ouvir</>
+                    )}
+                  </button>
+                  {audioState !== 'idle' && (
+                    <button className={styles.audioStopBtn} onClick={pararLeitura} title="Parar leitura">
+                      ⏹
+                    </button>
+                  )}
+                  <div className={styles.speedControls}>
+                    {([0.75, 1, 1.25, 1.5, 2] as const).map(rate => (
+                      <button
+                        key={rate}
+                        className={`${styles.speedBtn} ${audioRate === rate ? styles.speedBtnActive : ''}`}
+                        onClick={() => mudarVelocidade(rate)}
+                        title={`Velocidade ${rate}×`}
+                      >
+                        {rate}×
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Loading state */}
