@@ -4,6 +4,7 @@ import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
 import { getFunctionErrorMessage } from '../lib/functionError'
 import type { App, DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
+import ModalTransition from '../components/ModalTransition'
 
 // ── Constantes ────────────────────────────────────────────────────────────
 
@@ -905,7 +906,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
             {addUserOk && <p className={styles.ok}>{addUserOk}</p>}
 
             {/* Modal de confirmação de delete */}
-            {confirmDelete && (
+            <ModalTransition open={!!confirmDelete}>
               <div className={styles.modalOverlay}>
                 <div className={styles.modalBox}>
                   <div className={styles.modalIcon}>
@@ -920,7 +921,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                   <h3 className={styles.modalTitle}>Deletar usuário</h3>
                   <p className={styles.modalDesc}>
                     Você está prestes a deletar permanentemente a conta de{' '}
-                    <strong>{confirmDelete.name ?? confirmDelete.email ?? 'este usuário'}</strong>.
+                    <strong>{confirmDelete?.name ?? confirmDelete?.email ?? 'este usuário'}</strong>.
                   </p>
                   <div className={styles.modalWarning}>
                     <p>⚠ Todos os dados do usuário serão perdidos permanentemente.</p>
@@ -945,15 +946,15 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                     </button>
                     <button
                       className={styles.btnDanger}
-                      onClick={() => deletarUsuario(confirmDelete)}
+                      onClick={() => confirmDelete && deletarUsuario(confirmDelete)}
                       disabled={!deleteCheck || !!deletingId}
                     >
-                      {deletingId === confirmDelete.id ? 'Deletando...' : 'Deletar permanentemente'}
+                      {confirmDelete && deletingId === confirmDelete.id ? 'Deletando...' : 'Deletar permanentemente'}
                     </button>
                   </div>
                 </div>
               </div>
-            )}
+            </ModalTransition>
 
             {/* Tabela de usuários */}
             {usuariosLoading && <p className={styles.hint}>Carregando usuários...</p>}

@@ -1,0 +1,18 @@
+{
+  "enabled": true,
+  "name": "Build Check antes de salvar",
+  "description": "Roda npm run build sempre que um arquivo .tsx ou .ts é editado, garantindo que o código compila antes de qualquer deploy",
+  "version": "1",
+  "when": {
+    "type": "fileEdited",
+    "patterns": [
+      "src/**/*.tsx",
+      "src/**/*.ts"
+    ]
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "npm run build",
+    "timeout": 120
+  }
+}

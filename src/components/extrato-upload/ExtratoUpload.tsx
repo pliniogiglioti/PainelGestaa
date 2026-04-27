@@ -3,6 +3,7 @@ import { read, utils } from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../../lib/supabase'
 import styles from './ExtratoUpload.module.css'
+import ModalTransition from '../ModalTransition'
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -2035,7 +2036,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
       )}
 
       {/* ── Modal: classificações sugeridas ────────────────────────────────── */}
-      {showSugeridaModal && (
+      <ModalTransition open={showSugeridaModal}>
         <div className={styles.modalOverlaySugerida} onClick={() => setShowSugeridaModal(false)}>
           <div className={styles.modalSugerida} onClick={e => e.stopPropagation()}>
             <div className={styles.modalSugeridaIcon}>⚠️</div>
@@ -2063,7 +2064,7 @@ export function ExtratoUpload({ empresaId, onSaved }: ExtratoUploadProps) {
             </div>
           </div>
         </div>
-      )}
+      </ModalTransition>
 
       {/* ── Sucesso ─────────────────────────────────────────────────────────── */}
       {fase === 'concluido' && (
