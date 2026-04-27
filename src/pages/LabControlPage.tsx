@@ -5,6 +5,7 @@ import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabHistorico, L
 import styles from './LabControlPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
+import ModalTransition from '../components/ModalTransition'
 
 // ── Constants ──────────────────────────────────────────────────────────────
 
@@ -2770,44 +2771,46 @@ function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLab
           onClose={() => setShowEnvioSteps(false)} onSaved={fetchEnvios}
         />
       )}
-      {showEditLab && (
+      <ModalTransition open={showEditLab}>
         <LabModal lab={lab} empresaId={empresaId}
           onClose={() => setShowEditLab(false)} onSaved={onLabUpdated} />
-      )}
-      {showPrecos && (
+      </ModalTransition>
+      <ModalTransition open={showPrecos}>
         <PrecosModal lab={lab}
           initialEditingId={editingPrecoId}
           onClose={() => { setShowPrecos(false); setEditingPrecoId(null) }}
           onSaved={fetchPrecos}
         />
-      )}
-      {showKanbanCfg && (
+      </ModalTransition>
+      <ModalTransition open={showKanbanCfg}>
         <KanbanConfigModal empresaId={empresaId} colunas={colunas}
           onClose={() => setShowKanbanCfg(false)} onSaved={onColunasUpdated} />
-      )}
-      {showArquivados && (
+      </ModalTransition>
+      <ModalTransition open={showArquivados}>
         <ArquivadosModal empresaId={empresaId} userId={userId} labId={lab.id} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
-      )}
-      {resumoEnvio && (
-        <EnvioResumoModal
-          envio={resumoEnvio}
-          labNome={lab.nome}
-          labTelefone={lab.telefone}
-          isAdmin={isAdmin}
-          empresaId={empresaId}
-          userId={userId}
-          feriados={getLabFeriados(lab)}
-          precosByLab={{ [lab.id]: precos }}
-          onClose={() => setResumoEnvio(null)}
-          onEdit={() => {
-            setEditingEnvio(resumoEnvio)
-            setResumoEnvio(null)
-            setShowEnvioSteps(true)
-          }}
-          onTogglePago={togglePagoEnvio}
-          onUpdateEtapa={updateEnvioEtapa}
-        />
-      )}
+      </ModalTransition>
+      <ModalTransition open={!!resumoEnvio}>
+        {resumoEnvio && (
+          <EnvioResumoModal
+            envio={resumoEnvio}
+            labNome={lab.nome}
+            labTelefone={lab.telefone}
+            isAdmin={isAdmin}
+            empresaId={empresaId}
+            userId={userId}
+            feriados={getLabFeriados(lab)}
+            precosByLab={{ [lab.id]: precos }}
+            onClose={() => setResumoEnvio(null)}
+            onEdit={() => {
+              setEditingEnvio(resumoEnvio)
+              setResumoEnvio(null)
+              setShowEnvioSteps(true)
+            }}
+            onTogglePago={togglePagoEnvio}
+            onUpdateEtapa={updateEnvioEtapa}
+          />
+        )}
+      </ModalTransition>
     </div>
   )
 }
@@ -3109,37 +3112,39 @@ function LabsAggregateDetailView({
           }}
         />
       )}
-      {showKanbanCfg && (
+      <ModalTransition open={showKanbanCfg}>
         <KanbanConfigModal
           empresaId={empresaId}
           colunas={colunas}
           onClose={() => setShowKanbanCfg(false)}
           onSaved={onColunasUpdated}
         />
-      )}
-      {showArquivados && (
+      </ModalTransition>
+      <ModalTransition open={showArquivados}>
         <ArquivadosModal empresaId={empresaId} userId={userId} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
-      )}
-      {resumoEnvio && (
-        <EnvioResumoModal
-          envio={resumoEnvio}
-          labNome={labsById[resumoEnvio.lab_id]?.nome}
-          labTelefone={labsById[resumoEnvio.lab_id]?.telefone}
-          feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
-          precosByLab={precosByLab}
-          isAdmin={isAdmin}
-          empresaId={empresaId}
-          userId={userId}
-          onClose={() => setResumoEnvio(null)}
-          onEdit={() => {
-            setEditingEnvio(resumoEnvio)
-            setResumoEnvio(null)
-            setShowEnvioSteps(true)
-          }}
-          onTogglePago={togglePagoEnvio}
-          onUpdateEtapa={updateEnvioEtapa}
-        />
-      )}
+      </ModalTransition>
+      <ModalTransition open={!!resumoEnvio}>
+        {resumoEnvio && (
+          <EnvioResumoModal
+            envio={resumoEnvio}
+            labNome={labsById[resumoEnvio.lab_id]?.nome}
+            labTelefone={labsById[resumoEnvio.lab_id]?.telefone}
+            feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
+            precosByLab={precosByLab}
+            isAdmin={isAdmin}
+            empresaId={empresaId}
+            userId={userId}
+            onClose={() => setResumoEnvio(null)}
+            onEdit={() => {
+              setEditingEnvio(resumoEnvio)
+              setResumoEnvio(null)
+              setShowEnvioSteps(true)
+            }}
+            onTogglePago={togglePagoEnvio}
+            onUpdateEtapa={updateEnvioEtapa}
+          />
+        )}
+      </ModalTransition>
     </div>
   )
 }
@@ -3540,35 +3545,41 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           onSaved={() => { void Promise.all([fetchLabs(), fetchColunas()]) }}
         />
       )}
-      {showEditLabPicker && labs.length > 0 && (
-        <LabPickerModal
-          title="Selecionar laboratório para editar"
-          labs={labs}
-          onClose={() => setShowEditLabPicker(false)}
-          onSelect={lab => {
-            setEditingLab(lab)
-            setShowLabModal(true)
-          }}
-        />
-      )}
-      {showPrecosPicker && labs.length > 0 && (
-        <LabPickerModal
-          title="Selecionar laboratório para lista de preços"
-          labs={labs}
-          onClose={() => setShowPrecosPicker(false)}
-          onSelect={lab => {
-            setEditingLab(lab)
-            setShowHomePrecos(true)
-          }}
-        />
-      )}
-      {showHomePrecos && editingLab && (
-        <PrecosModal
-          lab={editingLab}
-          onClose={() => setShowHomePrecos(false)}
-          onSaved={() => { void fetchLabs() }}
-        />
-      )}
+      <ModalTransition open={showEditLabPicker && labs.length > 0}>
+        {showEditLabPicker && labs.length > 0 && (
+          <LabPickerModal
+            title="Selecionar laboratório para editar"
+            labs={labs}
+            onClose={() => setShowEditLabPicker(false)}
+            onSelect={lab => {
+              setEditingLab(lab)
+              setShowLabModal(true)
+            }}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={showPrecosPicker && labs.length > 0}>
+        {showPrecosPicker && labs.length > 0 && (
+          <LabPickerModal
+            title="Selecionar laboratório para lista de preços"
+            labs={labs}
+            onClose={() => setShowPrecosPicker(false)}
+            onSelect={lab => {
+              setEditingLab(lab)
+              setShowHomePrecos(true)
+            }}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={showHomePrecos && !!editingLab}>
+        {showHomePrecos && editingLab && (
+          <PrecosModal
+            lab={editingLab}
+            onClose={() => setShowHomePrecos(false)}
+            onSaved={() => { void fetchLabs() }}
+          />
+        )}
+      </ModalTransition>
     </>
   )
 }

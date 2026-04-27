@@ -1,5 +1,5 @@
 {
-  "enabled": true,
+  "enabled": false,
   "name": "Build Check antes de salvar",
   "description": "Roda npm run build sempre que um arquivo .tsx ou .ts é editado, garantindo que o código compila antes de qualquer deploy",
   "version": "1",

@@ -1084,11 +1084,7 @@ th { color: var(--text-muted); font-weight: 500; }
   justify-content: center;
   z-index: 100;
   padding: 20px;
-  animation: modalBdIn 0.22s ease;
 }
-
-[data-modal-closing] .modalOverlay { animation: modalBdOut 0.2s ease forwards; pointer-events: none }
-[data-modal-closing] .modal        { animation: modalPanelOut 0.18s ease forwards }
 
 .modal {
   background: var(--bg-surface);
@@ -1098,7 +1094,6 @@ th { color: var(--text-muted); font-weight: 500; }
   width: 100%;
   max-width: 440px;
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.6);
-  animation: modalPanelIn 0.26s cubic-bezier(0.16,1,0.3,1);
 }
 
 .modalHeader {

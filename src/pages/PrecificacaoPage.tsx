@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
 import styles from './PrecificacaoPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import ModalTransition from '../components/ModalTransition'
 import type {
   Empresa,
   EmpresaPreco,
@@ -635,6 +636,14 @@ function EscolhaCriacaoPrecoModal({
             <strong>Calculada</strong>
             <span>Abre a calculadora de precificação e salva o novo produto ou serviço ao final.</span>
           </button>
+
+          <div className={`${styles.choiceCard} ${styles.choiceCardDisabled}`}>
+            <div className={styles.choiceCardHeader}>
+              <strong>Criada por IA</strong>
+              <div className={styles.choiceCardBadge}>Em breve</div>
+            </div>
+            <span>A inteligência artificial sugere nome, categoria e preço com base no seu perfil de clínica.</span>
+          </div>
         </div>
 
         <div className={styles.modalActions}>
@@ -1824,10 +1833,31 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           </div>
         ) : precos.length === 0 ? (
             <div className={styles.blankCanvas}>
-              <p className={styles.blankTitle}>Nenhum preço cadastrado ainda.</p>
-              <p className={styles.blankText}>
-                Clique em <strong>Criar preços</strong> para adicionar nome, categoria e preço na sua lista.
-              </p>
+              <div className={styles.blankSteps}>
+                <div className={styles.blankStep}>
+                  <span className={styles.blankStepNum}>1</span>
+                  <span className={styles.blankStepLabel}>Anote seus preços</span>
+                  <span className={styles.blankStepDesc}>Reúna os valores que você já pratica ou deseja cobrar por cada procedimento.</span>
+                </div>
+                <span className={styles.blankStepArrow}>→</span>
+                <div className={styles.blankStep}>
+                  <span className={styles.blankStepNum}>2</span>
+                  <span className={styles.blankStepLabel}>Cadastre na precificação</span>
+                  <span className={styles.blankStepDesc}>Adicione nome, categoria e preço para montar sua tabela de serviços.</span>
+                </div>
+                <span className={styles.blankStepArrow}>→</span>
+                <div className={styles.blankStep}>
+                  <span className={styles.blankStepNum}>3</span>
+                  <span className={styles.blankStepLabel}>Use nossa calculadora</span>
+                  <span className={styles.blankStepDesc}>Calcule custos, impostos e margem para saber se seu preço é saudável.</span>
+                </div>
+                <span className={styles.blankStepArrow}>→</span>
+                <div className={styles.blankStep}>
+                  <span className={styles.blankStepNum}>4</span>
+                  <span className={styles.blankStepLabel}>Venda com precisão</span>
+                  <span className={styles.blankStepDesc}>Apresente propostas com segurança e feche mais tratamentos.</span>
+                </div>
+              </div>
             </div>
           ) : (
             <div className={styles.priceTable}>
@@ -1905,107 +1935,119 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
           )}
       </div>
 
-      {showPrecoModal && (
-        <PrecoModal
-          initialItem={precoEditando}
-          configPadrao={configPadraoMemo}
-          onClose={() => {
-            setShowPrecoModal(false)
-            setPrecoEditando(null)
-          }}
-          onSubmit={precoEditando
-            ? (item => handleEditPreco(precoEditando.id, item))
-            : handleAddPreco}
-          saving={savingPreco}
-          error={error}
-        />
-      )}
+      <ModalTransition open={showPrecoModal}>
+        {showPrecoModal && (
+          <PrecoModal
+            initialItem={precoEditando}
+            configPadrao={configPadraoMemo}
+            onClose={() => {
+              setShowPrecoModal(false)
+              setPrecoEditando(null)
+            }}
+            onSubmit={precoEditando
+              ? (item => handleEditPreco(precoEditando.id, item))
+              : handleAddPreco}
+            saving={savingPreco}
+            error={error}
+          />
+        )}
+      </ModalTransition>
 
-      {showCreatePrecoModal && (
-        <EscolhaCriacaoPrecoModal
-          onClose={() => setShowCreatePrecoModal(false)}
-          onSelectSimple={() => {
-            setShowCreatePrecoModal(false)
-            setPrecoEditando(null)
-            setShowPrecoModal(true)
-          }}
-          onSelectCalculated={() => {
-            setShowCreatePrecoModal(false)
-            setShowPrecoCalculadoModal(true)
-          }}
-        />
-      )}
+      <ModalTransition open={showCreatePrecoModal}>
+        {showCreatePrecoModal && (
+          <EscolhaCriacaoPrecoModal
+            onClose={() => setShowCreatePrecoModal(false)}
+            onSelectSimple={() => {
+              setShowCreatePrecoModal(false)
+              setPrecoEditando(null)
+              setShowPrecoModal(true)
+            }}
+            onSelectCalculated={() => {
+              setShowCreatePrecoModal(false)
+              setShowPrecoCalculadoModal(true)
+            }}
+          />
+        )}
+      </ModalTransition>
 
-      {showPrecoCalculadoModal && (
-        <CalculadoraPrecificacaoModal
-          configPadrao={configPadraoMemo}
-          canManage={canManage}
-          savingPreco={savingPreco}
-          error={error}
-          onCreatePrecoCalculado={handleAddPrecoCalculado}
-          onClose={() => setShowPrecoCalculadoModal(false)}
-        />
-      )}
+      <ModalTransition open={showPrecoCalculadoModal}>
+        {showPrecoCalculadoModal && (
+          <CalculadoraPrecificacaoModal
+            configPadrao={configPadraoMemo}
+            canManage={canManage}
+            savingPreco={savingPreco}
+            error={error}
+            onCreatePrecoCalculado={handleAddPrecoCalculado}
+            onClose={() => setShowPrecoCalculadoModal(false)}
+          />
+        )}
+      </ModalTransition>
 
-      {itemCalculadora && (
-        <CalculadoraPrecificacaoModal
-          item={itemCalculadora}
-          configPadrao={configPadraoMemo}
-          canManage={canManage}
-          savingPreco={savingPreco}
-          error={error}
-          onPersistCalculo={handlePersistCalculo}
-          onClose={() => setItemCalculadora(null)}
-        />
-      )}
+      <ModalTransition open={!!itemCalculadora}>
+        {itemCalculadora && (
+          <CalculadoraPrecificacaoModal
+            item={itemCalculadora}
+            configPadrao={configPadraoMemo}
+            canManage={canManage}
+            savingPreco={savingPreco}
+            error={error}
+            onPersistCalculo={handlePersistCalculo}
+            onClose={() => setItemCalculadora(null)}
+          />
+        )}
+      </ModalTransition>
 
-      {showImportModal && (
-        <div className={styles.modalOverlay} onClick={() => !importando && setShowImportModal(false)}>
-          <div className={styles.modal} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Importar lista</h2>
-              <button className={styles.modalClose} onClick={() => setShowImportModal(false)} disabled={importando}>✕</button>
-            </div>
-            <div className={styles.modalBody}>
-              <p className={styles.modalFieldHint} style={{ marginBottom: 12 }}>
-                Selecione um arquivo <strong>.xlsx</strong>. A primeira linha (cabeçalho) será ignorada.<br />
-                As colunas devem estar na ordem: <strong>nome, margem, preco</strong>.
-              </p>
-              <input
-                ref={importFileRef}
-                type="file"
-                accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                className={styles.modalInput}
-                disabled={importando}
-                onChange={e => {
-                  setImportFile(e.target.files?.[0] ?? null)
-                  setImportError('')
-                }}
-              />
-              {importError && <p className={styles.formError}>{importError}</p>}
-            </div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.btnSecondary} onClick={() => setShowImportModal(false)} disabled={importando}>
-                Cancelar
-              </button>
-              <button type="button" className={styles.btnPrimary} onClick={handleImportarLista} disabled={importando || !importFile}>
-                {importando ? 'Importando...' : 'Importar'}
-              </button>
+      <ModalTransition open={showImportModal}>
+        {showImportModal && (
+          <div className={styles.modalOverlay} onClick={() => !importando && setShowImportModal(false)}>
+            <div className={styles.modal} onClick={e => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Importar lista</h2>
+                <button className={styles.modalClose} onClick={() => setShowImportModal(false)} disabled={importando}>✕</button>
+              </div>
+              <div className={styles.modalBody}>
+                <p className={styles.modalFieldHint} style={{ marginBottom: 12 }}>
+                  Selecione um arquivo <strong>.xlsx</strong>. A primeira linha (cabeçalho) será ignorada.<br />
+                  As colunas devem estar na ordem: <strong>nome, margem, preco</strong>.
+                </p>
+                <input
+                  ref={importFileRef}
+                  type="file"
+                  accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                  className={styles.modalInput}
+                  disabled={importando}
+                  onChange={e => {
+                    setImportFile(e.target.files?.[0] ?? null)
+                    setImportError('')
+                  }}
+                />
+                {importError && <p className={styles.formError}>{importError}</p>}
+              </div>
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.btnSecondary} onClick={() => setShowImportModal(false)} disabled={importando}>
+                  Cancelar
+                </button>
+                <button type="button" className={styles.btnPrimary} onClick={handleImportarLista} disabled={importando || !importFile}>
+                  {importando ? 'Importando...' : 'Importar'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModalTransition>
 
-      {showConfigModal && (
-        <ConfiguracaoGeralModal
-          form={configForm}
-          saving={savingConfig}
-          error={error}
-          onChange={handleConfigChange}
-          onClose={() => setShowConfigModal(false)}
-          onSubmit={handleSaveConfig}
-        />
-      )}
+      <ModalTransition open={showConfigModal}>
+        {showConfigModal && (
+          <ConfiguracaoGeralModal
+            form={configForm}
+            saving={savingConfig}
+            error={error}
+            onChange={handleConfigChange}
+            onClose={() => setShowConfigModal(false)}
+            onSubmit={handleSaveConfig}
+          />
+        )}
+      </ModalTransition>
 
     </div>
   )

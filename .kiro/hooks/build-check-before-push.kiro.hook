@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Build Check antes do push",
+  "description": "Roda npm run build antes de fazer git push, garantindo que o código compila",
+  "version": "1",
+  "when": {
+    "type": "userTriggered"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "npm run build",
+    "timeout": 120
+  }
+}

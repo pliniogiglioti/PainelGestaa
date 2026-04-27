@@ -13,6 +13,7 @@ import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
+import ModalTransition from '../components/ModalTransition'
 
 type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 
@@ -404,57 +405,59 @@ function TopNavigation({
         </div>
       </div>
 
-      {showEditNameModal && (
-        <div
-          className={styles.modalOverlay}
-          onPointerDown={backdropDismiss.handleBackdropPointerDown}
-          onClick={backdropDismiss.handleBackdropClick}
-        >
-          <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
-            <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Editar nome</h2>
-              <button className={styles.modalClose} onClick={() => setShowEditNameModal(false)} disabled={savingName}>×</button>
-            </div>
-            <form
-              className={styles.modalForm}
-              onSubmit={async e => {
-                e.preventDefault()
-                setSavingName(true)
-                setNameError('')
-                const error = await onUpdateUserName(nameDraft)
-                if (error) {
-                  setNameError(error)
+      <ModalTransition open={showEditNameModal}>
+        {showEditNameModal && (
+          <div
+            className={styles.modalOverlay}
+            onPointerDown={backdropDismiss.handleBackdropPointerDown}
+            onClick={backdropDismiss.handleBackdropClick}
+          >
+            <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2 className={styles.modalTitle}>Editar nome</h2>
+                <button className={styles.modalClose} onClick={() => setShowEditNameModal(false)} disabled={savingName}>×</button>
+              </div>
+              <form
+                className={styles.modalForm}
+                onSubmit={async e => {
+                  e.preventDefault()
+                  setSavingName(true)
+                  setNameError('')
+                  const error = await onUpdateUserName(nameDraft)
+                  if (error) {
+                    setNameError(error)
+                    setSavingName(false)
+                    return
+                  }
                   setSavingName(false)
-                  return
-                }
-                setSavingName(false)
-                setShowEditNameModal(false)
-              }}
-            >
-              <div className={styles.modalField}>
-                <label className={styles.modalLabel}>Seu nome</label>
-                <input
-                  className={styles.modalInput}
-                  value={nameDraft}
-                  onChange={e => setNameDraft(e.target.value)}
-                  placeholder="Digite seu nome completo"
-                  autoFocus
-                  disabled={savingName}
-                />
-              </div>
-              {nameError && <p className={styles.formError}>{nameError}</p>}
-              <div className={styles.modalActions}>
-                <button type="button" className={styles.modalCancel} onClick={() => setShowEditNameModal(false)} disabled={savingName}>
-                  Cancelar
-                </button>
-                <button type="submit" className={styles.modalSubmit} disabled={savingName}>
-                  {savingName ? 'Salvando...' : 'Salvar nome'}
-                </button>
-              </div>
-            </form>
+                  setShowEditNameModal(false)
+                }}
+              >
+                <div className={styles.modalField}>
+                  <label className={styles.modalLabel}>Seu nome</label>
+                  <input
+                    className={styles.modalInput}
+                    value={nameDraft}
+                    onChange={e => setNameDraft(e.target.value)}
+                    placeholder="Digite seu nome completo"
+                    autoFocus
+                    disabled={savingName}
+                  />
+                </div>
+                {nameError && <p className={styles.formError}>{nameError}</p>}
+                <div className={styles.modalActions}>
+                  <button type="button" className={styles.modalCancel} onClick={() => setShowEditNameModal(false)} disabled={savingName}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className={styles.modalSubmit} disabled={savingName}>
+                    {savingName ? 'Salvando...' : 'Salvar nome'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </ModalTransition>
     </header>
   )
 }
@@ -2271,95 +2274,109 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
 
       </main>
 
-      {showCreateApp  && <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)}  onCreated={fetchApps} />}
-      {editingApp && (
-        <EditAppModal
-          app={editingApp}
-          categories={categories}
-          onClose={() => setEditingApp(null)}
-          onUpdated={fetchApps}
-        />
-      )}
-      {showCreateCat  && <CreateCategoryModal onClose={() => setShowCreateCat(false)}  onCreated={fetchCategories} />}
-      {showCreateTopic && <CreateTopicModal   onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
-      {empresaConviteAppsModal && (
-        <InviteCollaboratorModal
-          empresaNome={empresaConviteAppsModal.nome}
-          email={inviteEmailByEmpresa[empresaConviteAppsModal.id] ?? ''}
-          apps={apps}
-          selectedAppIds={empresaConviteAppIds}
-          saving={!!savingEmpresaMembros[empresaConviteAppsModal.id]}
-          error={empresaMemberErrors[empresaConviteAppsModal.id] ?? ''}
-          onClose={() => {
-            if (savingEmpresaMembros[empresaConviteAppsModal.id]) return
-            setEmpresaConviteAppsModal(null)
-            setEmpresaConviteAppIds([])
-          }}
-          onChangeEmail={value => {
-            setInviteEmailByEmpresa(prev => ({ ...prev, [empresaConviteAppsModal.id]: value }))
-          }}
-          onToggleApp={appId => {
-            setEmpresaConviteAppIds(prev => (
-              prev.includes(appId)
-                ? prev.filter(id => id !== appId)
-                : [...prev, appId]
-            ))
-          }}
-          onSelectAll={() => setEmpresaConviteAppIds(apps.map(app => app.id))}
-          onClearAll={() => setEmpresaConviteAppIds([])}
-          onSubmit={() => void handleAdicionarColaborador(empresaConviteAppsModal.id, empresaConviteAppIds)}
-        />
-      )}
-      {colaboradorEditando && (
-        <EditCollaboratorAppsModal
-          empresaNome={colaboradorEditando.empresa.nome}
-          colaboradorNome={colaboradorEditando.membro.name?.trim() || colaboradorEditando.membro.email || 'Usuario'}
-          apps={apps}
-          selectedAppIds={colaboradorEditandoAppIds}
-          saving={!!savingEmpresaMembros[colaboradorEditando.empresa.id]}
-          error={empresaMemberErrors[colaboradorEditando.empresa.id] ?? ''}
-          onClose={() => {
-            if (savingEmpresaMembros[colaboradorEditando.empresa.id]) return
-            setColaboradorEditando(null)
-            setColaboradorEditandoAppIds([])
-          }}
-          onToggleApp={appId => {
-            setColaboradorEditandoAppIds(prev => (
-              prev.includes(appId)
-                ? prev.filter(id => id !== appId)
-                : [...prev, appId]
-            ))
-          }}
-          onSelectAll={() => setColaboradorEditandoAppIds(apps.map(app => app.id))}
-          onClearAll={() => setColaboradorEditandoAppIds([])}
-          onSubmit={() => void (async () => {
-            const ok = await handleSalvarAcessoColaborador(
-              colaboradorEditando.empresa.id,
-              colaboradorEditando.membro.user_id,
-              colaboradorEditandoAppIds,
-              colaboradorEditando.membro.ativo,
-            )
-            if (ok) {
+      <ModalTransition open={showCreateApp}>
+        {showCreateApp && <CreateAppModal categories={categories} onClose={() => setShowCreateApp(false)} onCreated={fetchApps} />}
+      </ModalTransition>
+      <ModalTransition open={!!editingApp}>
+        {editingApp && (
+          <EditAppModal
+            app={editingApp}
+            categories={categories}
+            onClose={() => setEditingApp(null)}
+            onUpdated={fetchApps}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={showCreateCat}>
+        {showCreateCat && <CreateCategoryModal onClose={() => setShowCreateCat(false)} onCreated={fetchCategories} />}
+      </ModalTransition>
+      <ModalTransition open={showCreateTopic}>
+        {showCreateTopic && <CreateTopicModal onClose={() => setShowCreateTopic(false)} onCreated={fetchTopics} />}
+      </ModalTransition>
+      <ModalTransition open={!!empresaConviteAppsModal}>
+        {empresaConviteAppsModal && (
+          <InviteCollaboratorModal
+            empresaNome={empresaConviteAppsModal.nome}
+            email={inviteEmailByEmpresa[empresaConviteAppsModal.id] ?? ''}
+            apps={apps}
+            selectedAppIds={empresaConviteAppIds}
+            saving={!!savingEmpresaMembros[empresaConviteAppsModal.id]}
+            error={empresaMemberErrors[empresaConviteAppsModal.id] ?? ''}
+            onClose={() => {
+              if (savingEmpresaMembros[empresaConviteAppsModal.id]) return
+              setEmpresaConviteAppsModal(null)
+              setEmpresaConviteAppIds([])
+            }}
+            onChangeEmail={value => {
+              setInviteEmailByEmpresa(prev => ({ ...prev, [empresaConviteAppsModal.id]: value }))
+            }}
+            onToggleApp={appId => {
+              setEmpresaConviteAppIds(prev => (
+                prev.includes(appId)
+                  ? prev.filter(id => id !== appId)
+                  : [...prev, appId]
+              ))
+            }}
+            onSelectAll={() => setEmpresaConviteAppIds(apps.map(app => app.id))}
+            onClearAll={() => setEmpresaConviteAppIds([])}
+            onSubmit={() => void handleAdicionarColaborador(empresaConviteAppsModal.id, empresaConviteAppIds)}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={!!colaboradorEditando}>
+        {colaboradorEditando && (
+          <EditCollaboratorAppsModal
+            empresaNome={colaboradorEditando.empresa.nome}
+            colaboradorNome={colaboradorEditando.membro.name?.trim() || colaboradorEditando.membro.email || 'Usuario'}
+            apps={apps}
+            selectedAppIds={colaboradorEditandoAppIds}
+            saving={!!savingEmpresaMembros[colaboradorEditando.empresa.id]}
+            error={empresaMemberErrors[colaboradorEditando.empresa.id] ?? ''}
+            onClose={() => {
+              if (savingEmpresaMembros[colaboradorEditando.empresa.id]) return
               setColaboradorEditando(null)
               setColaboradorEditandoAppIds([])
-            }
-          })()}
-        />
-      )}
-      {companyModalMode && (
-        <CompanyFormModal
-          mode={companyModalMode}
-          form={companyForm}
-          error={companyFormError}
-          saving={savingCompany}
-          cardBackgroundPreview={companyBackgroundPreview}
-          onClose={closeCompanyModal}
-          onSubmit={handleSubmitCompany}
-          onChange={handleCompanyFormChange}
-          onBackgroundChange={handleCompanyBackgroundChange}
-          onRemoveBackground={handleRemoveCompanyBackground}
-        />
-      )}
+            }}
+            onToggleApp={appId => {
+              setColaboradorEditandoAppIds(prev => (
+                prev.includes(appId)
+                  ? prev.filter(id => id !== appId)
+                  : [...prev, appId]
+              ))
+            }}
+            onSelectAll={() => setColaboradorEditandoAppIds(apps.map(app => app.id))}
+            onClearAll={() => setColaboradorEditandoAppIds([])}
+            onSubmit={() => void (async () => {
+              const ok = await handleSalvarAcessoColaborador(
+                colaboradorEditando.empresa.id,
+                colaboradorEditando.membro.user_id,
+                colaboradorEditandoAppIds,
+                colaboradorEditando.membro.ativo,
+              )
+              if (ok) {
+                setColaboradorEditando(null)
+                setColaboradorEditandoAppIds([])
+              }
+            })()}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={!!companyModalMode}>
+        {companyModalMode && (
+          <CompanyFormModal
+            mode={companyModalMode}
+            form={companyForm}
+            error={companyFormError}
+            saving={savingCompany}
+            cardBackgroundPreview={companyBackgroundPreview}
+            onClose={closeCompanyModal}
+            onSubmit={handleSubmitCompany}
+            onChange={handleCompanyFormChange}
+            onBackgroundChange={handleCompanyBackgroundChange}
+            onRemoveBackground={handleRemoveCompanyBackground}
+          />
+        )}
+      </ModalTransition>
     </div>
   )
 }

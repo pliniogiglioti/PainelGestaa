@@ -1554,11 +1554,7 @@
   justify-content: center;
   z-index: 1000;
   backdrop-filter: blur(6px);
-  animation: modalBdIn 0.22s ease;
 }
-
-[data-modal-closing] .modalOverlay { animation: modalBdOut 0.2s ease forwards; pointer-events: none }
-[data-modal-closing] .modal        { animation: modalPanelOut 0.18s ease forwards }
 
 .modal {
   width: 100%;
@@ -1570,7 +1566,6 @@
   display: flex;
   flex-direction: column;
   gap: 22px;
-  animation: modalPanelIn 0.26s cubic-bezier(0.16,1,0.3,1);
 }
 
 .modalSm {

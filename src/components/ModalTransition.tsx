@@ -33,7 +33,7 @@ export default function ModalTransition({
   if (!rendered) return null
 
   return (
-    <div data-modal-closing={closing || undefined} style={{ display: 'contents' }}>
+    <div data-modal-state={closing ? 'closing' : 'open'} style={{ display: 'contents' }}>
       {children}
     </div>
   )

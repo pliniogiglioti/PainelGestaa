@@ -898,11 +898,7 @@
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  animation: modalBdIn 0.22s ease;
 }
-
-[data-modal-closing] .modalOverlay { animation: modalBdOut 0.2s ease forwards; pointer-events: none }
-[data-modal-closing] .modalBox     { animation: modalPanelOut 0.18s ease forwards }
 
 .modalBox {
   background: var(--bg-elevated, #111);
@@ -914,7 +910,6 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
-  animation: modalPanelIn 0.26s cubic-bezier(0.16,1,0.3,1);
 }
 
 .modalIcon {
