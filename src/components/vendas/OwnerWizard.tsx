@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { OwnerV8Model } from './types';
 import {
   OWNER_V8_SECTIONS,
@@ -19,16 +19,8 @@ interface OwnerWizardProps {
 export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
   const [draft, setDraft] = useState<OwnerV8Model>(() => hydrateOwnerV8Model(model));
   const [section, setSection] = useState(model.currentSection ?? 0);
-  const sectionsRef = useRef<HTMLDivElement>(null);
 
   const totalSections = OWNER_V8_SECTIONS.length;
-
-  useEffect(() => {
-    const el = sectionsRef.current;
-    if (!el) return;
-    const child = el.children[section] as HTMLElement | undefined;
-    if (child) child.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'nearest', inline: 'start' });
-  }, []);
 
   const update = useCallback((fn: (m: OwnerV8Model) => void) => {
     setDraft(prev => {
@@ -38,17 +30,8 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
     });
   }, []);
 
-  function scrollToSection(index: number) {
-    const el = sectionsRef.current;
-    if (el) {
-      const child = el.children[index] as HTMLElement | undefined;
-      if (child) child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
-    }
-    setSection(index);
-  }
-
-  function goNext() { if (section < totalSections - 1) scrollToSection(section + 1); }
-  function goBack() { if (section > 0) scrollToSection(section - 1); }
+  function goNext() { if (section < totalSections - 1) setSection(s => s + 1); }
+  function goBack() { if (section > 0) setSection(s => s - 1); }
 
   function acceptSuggested() {
     const base = defaultOwnerV8Model();
@@ -96,7 +79,7 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
             <div
               key={s.key}
               className={`${styles.ownerProgressDot}${i === section ? ' ' + styles.ownerProgressDotActive : ''}`}
-              onClick={() => scrollToSection(i)}
+              onClick={() => setSection(i)}
               title={s.label}
             />
           ))}
@@ -111,7 +94,8 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
           disabled={section === 0}
         >‹</button>
 
-        <div className={styles.ownerSections} ref={sectionsRef}>
+        <div className={styles.ownerSections}>
+          <div className={styles.ownerSectionsTrack} style={{ transform: `translateX(-${section * 100}%)` }}>
 
           {/* 0 — Boas-vindas */}
           <div className={styles.ownerSection}>
@@ -439,6 +423,7 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
             </div>
           </div>
 
+          </div>
         </div>
 
         <button
