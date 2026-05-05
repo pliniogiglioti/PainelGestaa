@@ -12,9 +12,10 @@ import LabControlPage from './pages/LabControlPage'
 import LoginPage from './pages/LoginPage'
 import PrecificacaoPage from './pages/PrecificacaoPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
+import VendasPage from './pages/VendasPage'
 import TermosPage from './pages/TermosPage'
 
-const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao'] as const
+const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas'] as const
 const KNOWN_PATHS_SET = new Set<string>(KNOWN_PATHS)
 
 export interface User {
@@ -545,6 +546,14 @@ function App() {
                 />
               </ErrorBoundary>
             )}
+          </div>
+        )}
+
+        {(activePath === '/vendas' || mountedPaths.includes('/vendas')) && (
+          <div style={{ display: activePath === '/vendas' ? 'block' : 'none' }}>
+            <ErrorBoundary>
+              <VendasPage onVoltar={() => navigate('/')} />
+            </ErrorBoundary>
           </div>
         )}
       </>

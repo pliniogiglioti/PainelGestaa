@@ -17,7 +17,7 @@ interface Props {
   onVoltar: () => void
   /** Navegar para os termos de uso deste app */
   onVerTermos?: () => void
-  contexto?: 'dre' | 'labs' | 'precificacao'
+  contexto?: 'dre' | 'labs' | 'precificacao' | 'vendas'
 }
 
 type EmpresaRoleMap = Record<string, EmpresaMembro['role']>
