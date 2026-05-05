@@ -7,6 +7,7 @@ import styles from './Vendas.module.css';
 interface SellerWorldProps {
   ownerSettings: OwnerSettings;
   onOpenOwnerWizard: () => void;
+  initialPlanName?: string;
 }
 
 const BADGE_LABELS = ['A', 'B', 'C'];
@@ -14,10 +15,10 @@ const BADGE_CLASSES = [styles.badgeA, styles.badgeB, styles.badgeC];
 const PLAN_NAMES = ['Plano A', 'Plano B', 'Plano C'];
 const MAX_PLANS = 3;
 
-function makePlan(index: number): Plan {
+function makePlan(index: number, firstName?: string): Plan {
   return {
     id: uid(),
-    name: PLAN_NAMES[index] ?? `Plano ${index + 1}`,
+    name: (index === 0 && firstName) ? firstName : (PLAN_NAMES[index] ?? `Plano ${index + 1}`),
     items: [],
     totalRevealed: false,
     totalVisible: false,
@@ -58,11 +59,9 @@ interface ToastState {
   kind: 'info' | 'danger';
 }
 
-export function SellerWorld({ ownerSettings, onOpenOwnerWizard }: SellerWorldProps) {
-  const [plans, setPlans] = useState<Plan[]>(() => [makePlan(0)]);
+export function SellerWorld({ ownerSettings, onOpenOwnerWizard, initialPlanName }: SellerWorldProps) {
+  const [plans, setPlans] = useState<Plan[]>(() => [makePlan(0, initialPlanName)]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [patientName, setPatientName] = useState('');
-  const [proposalTitle, setProposalTitle] = useState('');
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -93,9 +92,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard }: SellerWorldPro
   }
 
   function clearAll() {
-    setPlans([makePlan(0)]);
-    setPatientName('');
-    setProposalTitle('');
+    setPlans([makePlan(0, initialPlanName)]);
   }
 
   return (
@@ -129,23 +126,10 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard }: SellerWorldPro
         </button>
         <div className={styles.sidebarContent}>
           <div className={styles.sbSection}>
-            <div className={styles.sbEyebrow}>Proposta</div>
-            <div className={styles.sbFieldLabel}>Nome do paciente</div>
-            <input
-              className={styles.sbInlineInput}
-              type="text"
-              placeholder="Nome do paciente"
-              value={patientName}
-              onChange={e => setPatientName(e.target.value)}
-            />
-            <div className={styles.sbFieldLabel}>Título (opcional)</div>
-            <input
-              className={styles.sbInlineInput}
-              type="text"
-              placeholder="ex: Tratamento completo"
-              value={proposalTitle}
-              onChange={e => setProposalTitle(e.target.value)}
-            />
+            <div className={styles.sbEyebrow}>Planos</div>
+            <button className={styles.sbBtn} onClick={addPlan} disabled={plans.length >= MAX_PLANS}>
+              + Adicionar plano
+            </button>
           </div>
 
           <div className={styles.sbDivider} />
