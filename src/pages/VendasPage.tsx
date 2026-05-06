@@ -19,6 +19,7 @@ export default function VendasPage({ onVoltar }: VendasPageProps) {
   const [ownerModel, setOwnerModel] = useState<OwnerV8Model>(() => loadOwnerV8Model());
   const [ownerSettings, setOwnerSettings] = useState<OwnerSettings>(() => applyOwnerV8Model(loadOwnerV8Model()));
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardFromSeller, setWizardFromSeller] = useState(false);
 
   const [screen, setScreen] = useState<Screen>('launchpad');
   const [patientName, setPatientName] = useState('');
@@ -34,14 +35,20 @@ export default function VendasPage({ onVoltar }: VendasPageProps) {
     setOwnerModel(model);
     setOwnerSettings(settings);
     setWizardOpen(false);
+    if (wizardFromSeller) {
+      setWizardFromSeller(false);
+      setScreen('entry');
+    }
   }
 
   function openOwnerWorld() {
+    setWizardFromSeller(false);
     setWizardOpen(true);
   }
 
   function openSellerWorld() {
     if (!ownerModel.completed) {
+      setWizardFromSeller(true);
       setWizardOpen(true);
       return;
     }
