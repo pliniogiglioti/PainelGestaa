@@ -701,6 +701,7 @@ function CalculadoraPrecificacaoModal({
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
   const [erroLocal, setErroLocal] = useState('')
   const temPrecoExplicito = parsePreco(precoVendaEditado) > 0
+  const travado = temPrecoExplicito
   const precoVendaAtual = temPrecoExplicito ? parsePreco(precoVendaEditado) : item?.preco ?? 0
   const modalStateKey = item?.id ?? '__new__'
 
@@ -763,6 +764,7 @@ function CalculadoraPrecificacaoModal({
             type="checkbox"
             checked={form.custoProfissionaisBases.includes(base)}
             onChange={() => handleToggleCustoProfissionaisBase(base)}
+            disabled={travado}
           />
         </label>
       )}
@@ -884,6 +886,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 40,00"
+                  disabled={travado}
                 />
               </label>
               <label className={styles.modalField}>
@@ -900,6 +903,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 700,00"
+                  disabled={travado}
                 />
               </label>
               <label className={styles.modalField}>
@@ -916,6 +920,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 120,00"
+                  disabled={travado}
                 />
               </label>
             </div>
@@ -941,6 +946,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('royaltiesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 9"
+                  disabled={travado}
                 />
               </label>
               <label className={styles.modalField}>
@@ -956,6 +962,7 @@ function CalculadoraPrecificacaoModal({
                     type="button"
                     className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
                     onClick={() => handleToggleCustoProfissionais('percentual')}
+                    disabled={travado}
                   >
                     Porcentagem
                   </button>
@@ -963,6 +970,7 @@ function CalculadoraPrecificacaoModal({
                     type="button"
                     className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
                     onClick={() => handleToggleCustoProfissionais('valor')}
+                    disabled={travado}
                   >
                     Valor
                   </button>
@@ -979,6 +987,7 @@ function CalculadoraPrecificacaoModal({
                   }}
                   inputMode="decimal"
                   placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
+                  disabled={travado}
                 />
                 {form.custoProfissionaisModo === 'percentual' && (
                   <span className={styles.modalFieldHint}>
@@ -1000,6 +1009,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('impostosPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 8"
+                  disabled={travado}
                 />
               </label>
               <label className={styles.modalField}>
@@ -1016,6 +1026,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('comissoesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 3"
+                  disabled={travado}
                 />
               </label>
               <label className={styles.modalField}>
@@ -1032,6 +1043,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 2"
+                  disabled={travado}
                 />
               </label>
             </div>
@@ -1141,11 +1153,13 @@ function CalculadoraPrecificacaoModal({
                     {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
                     {!erroLocal && !error && (
                       <p className={styles.modalFieldHint}>
-                        {isCreating
-                          ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
-                          : hasChanges
-                            ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
-                            : 'Alterações salvas neste produto.'}
+                        {travado
+                          ? 'Apague o preço de venda para editar os custos e encargos.'
+                          : isCreating
+                            ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
+                            : hasChanges
+                              ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
+                              : 'Alterações salvas neste produto.'}
                       </p>
                     )}
                   </>
