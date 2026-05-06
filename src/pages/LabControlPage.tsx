@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../lib/supabase'
-import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabHistorico, LabAnexo } from '../lib/types'
+import type { Empresa, Lab, LabPreco, LabKanbanColuna, LabEnvio, LabHistorico, LabAnexo, LabDentista } from '../lib/types'
 import styles from './LabControlPage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
@@ -45,7 +45,8 @@ type LabEtapa = {
 type LabViewSelection = { kind: 'lab'; lab: Lab } | { kind: 'all' }
 type LabHomeMode = 'kanban' | 'calendar' | 'list'
 
-const LAB_FILTER_ALL = '__all__'
+const LAB_FILTER_ALL      = '__all__'
+const DENTISTA_FILTER_ALL = '__dentista_all__'
 
 const CLASSIFICACAO_PROTESE_OPTIONS = ['Removível', 'Fixa', 'Sobre Implante', 'Ortodôntico', 'Clínico'] as const
 
@@ -533,6 +534,14 @@ function IconDownload() {
   )
 }
 
+function IconUser() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+    </svg>
+  )
+}
+
 // ── Spinner ────────────────────────────────────────────────────────────────
 
 function Spinner() {
@@ -600,6 +609,7 @@ function OverviewMenu({
   onOpenPrecosPicker,
   onOpenKanbanCfg,
   onOpenArquivados,
+  onOpenDentistas,
 }: {
   labs: Lab[]
   envios: LabEnvio[]
@@ -611,6 +621,7 @@ function OverviewMenu({
   onOpenPrecosPicker: () => void
   onOpenKanbanCfg: () => void
   onOpenArquivados: () => void
+  onOpenDentistas: () => void
 }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -652,6 +663,7 @@ function OverviewMenu({
       { id: 'precos', label: 'Lista de preços', icon: <IconList />, onClick: onOpenPrecosPicker },
       { id: 'kanbans', label: 'Editar Kanbans', icon: <IconSettings2 />, onClick: onOpenKanbanCfg },
     ] : []),
+    { id: 'dentistas',  label: 'Dentistas',  icon: <IconUser />,    onClick: onOpenDentistas },
     { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },
   ]
 
@@ -1363,6 +1375,85 @@ function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored }: {
   )
 }
 
+// ── DentistasModal ────────────────────────────────────────────────────────
+
+function DentistasModal({ empresaId, onClose }: { empresaId: string; onClose: () => void }) {
+  const [dentistas, setDentistas] = useState<LabDentista[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [addNome,   setAddNome]   = useState('')
+  const [addEsp,    setAddEsp]    = useState('')
+  const [saving,    setSaving]    = useState(false)
+
+  const fetch = useCallback(async () => {
+    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).order('nome')
+    setDentistas(data ?? [])
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const handleAdd = async () => {
+    if (!addNome.trim()) return
+    setSaving(true)
+    await supabase.from('lab_dentistas').insert({ empresa_id: empresaId, nome: addNome.trim(), especialidade: addEsp.trim() || null })
+    setAddNome('')
+    setAddEsp('')
+    setSaving(false)
+    void fetch()
+  }
+
+  const handleToggle = async (d: LabDentista) => {
+    await supabase.from('lab_dentistas').update({ ativo: !d.ativo }).eq('id', d.id)
+    void fetch()
+  }
+
+  return (
+    <Modal title="Dentistas" onClose={onClose}>
+      <div className={styles.form}>
+        {loading ? <Spinner /> : (
+          <>
+            {dentistas.length > 0 ? (
+              <div className={styles.dentistaList}>
+                {dentistas.map(d => (
+                  <div key={d.id} className={`${styles.dentistaRow} ${!d.ativo ? styles.dentistaInativo : ''}`}>
+                    <div className={styles.dentistaInfo}>
+                      <strong>{d.nome}</strong>
+                      {d.especialidade && <span className={styles.dentistaEsp}>{d.especialidade}</span>}
+                      {!d.ativo && <span className={styles.dentistaInativoBadge}>Inativo</span>}
+                    </div>
+                    <button type="button" className={styles.btnSecondary} onClick={() => void handleToggle(d)}>
+                      {d.ativo ? 'Desativar' : 'Ativar'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-muted)', marginBottom: 16 }}>Nenhum dentista cadastrado ainda.</p>
+            )}
+
+            <div className={styles.formGrid2} style={{ marginTop: 16 }}>
+              <div className={styles.formField}>
+                <label className={styles.label}>Nome *</label>
+                <input className={styles.input} value={addNome} onChange={e => setAddNome(e.target.value)} placeholder="Nome do dentista" />
+              </div>
+              <div className={styles.formField}>
+                <label className={styles.label}>Especialidade</label>
+                <input className={styles.input} value={addEsp} onChange={e => setAddEsp(e.target.value)} placeholder="Opcional" />
+              </div>
+            </div>
+            <div className={styles.formActions}>
+              <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+              <button type="button" className={styles.btnPrimary} disabled={saving || !addNome.trim()} onClick={() => void handleAdd()}>
+                {saving ? 'Salvando…' : 'Adicionar dentista'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
+}
+
 // ── EnvioSteps — wizard de 4 etapas ──────────────────────────────────────
 
 interface EnvioFormState {
@@ -1449,6 +1540,29 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
     observacao_financeira:       envio?.observacao_financeira ?? '',
     urgente:                     envio?.urgente ?? false,
   })
+
+  const [dentistas,       setDentistas]       = useState<LabDentista[]>([])
+  const [addingDentista,  setAddingDentista]  = useState(false)
+  const [novoDentistaName, setNovoDentistaName] = useState('')
+  const [savingDentista,  setSavingDentista]  = useState(false)
+
+  useEffect(() => {
+    void supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+      .then(({ data }) => setDentistas(data ?? []))
+  }, [empresaId])
+
+  const handleSaveDentista = async () => {
+    if (!novoDentistaName.trim()) return
+    setSavingDentista(true)
+    const { data } = await supabase.from('lab_dentistas').insert({ empresa_id: empresaId, nome: novoDentistaName.trim() }).select().single()
+    if (data) {
+      setDentistas(prev => [...prev, data as LabDentista].sort((a, b) => a.nome.localeCompare(b.nome)))
+      setForm(p => ({ ...p, dentista_nome: (data as LabDentista).nome }))
+    }
+    setAddingDentista(false)
+    setNovoDentistaName('')
+    setSavingDentista(false)
+  }
 
   const set = (f: keyof EnvioFormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -1766,7 +1880,37 @@ function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userI
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Dentista</label>
-              <input className={styles.input} value={form.dentista_nome} onChange={set('dentista_nome')} placeholder="Nome do dentista" />
+              {addingDentista ? (
+                <div className={styles.inlineAddRow}>
+                  <input
+                    className={styles.input}
+                    value={novoDentistaName}
+                    onChange={e => setNovoDentistaName(e.target.value)}
+                    placeholder="Nome do dentista"
+                    autoFocus
+                    onKeyDown={e => { if (e.key === 'Enter') void handleSaveDentista() }}
+                  />
+                  <button type="button" className={styles.btnPrimary} onClick={() => void handleSaveDentista()} disabled={savingDentista || !novoDentistaName.trim()}>
+                    {savingDentista ? '…' : 'Salvar'}
+                  </button>
+                  <button type="button" className={styles.btnSecondary} onClick={() => { setAddingDentista(false); setNovoDentistaName('') }}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <select
+                  className={styles.select}
+                  value={form.dentista_nome}
+                  onChange={e => {
+                    if (e.target.value === '__new__') { setAddingDentista(true) }
+                    else { setForm(p => ({ ...p, dentista_nome: e.target.value })) }
+                  }}
+                >
+                  <option value="">Selecione um dentista</option>
+                  {dentistas.map(d => <option key={d.id} value={d.nome}>{d.nome}</option>)}
+                  <option value="__new__">+ Cadastrar novo dentista</option>
+                </select>
+              )}
             </div>
             <div className={styles.formField}>
               <label className={styles.label}>Classificação da prótese</label>
@@ -2855,6 +2999,8 @@ function LabsAggregateDetailView({
   const [resumoEnvio,      setResumoEnvio]      = useState<LabEnvio | null>(null)
   const [showKanbanCfg,    setShowKanbanCfg]    = useState(false)
   const [showArquivados,   setShowArquivados]   = useState(false)
+  const [showDentistas,    setShowDentistas]    = useState(false)
+  const [dentistas,        setDentistas]        = useState<LabDentista[]>([])
   const [patientSearch, setPatientSearch] = useSessionStorageState(
     `${storagePrefix}:patient-search`,
     '',
@@ -2863,6 +3009,11 @@ function LabsAggregateDetailView({
   const [labFilterId, setLabFilterId] = useSessionStorageState(
     `${storagePrefix}:lab-filter`,
     LAB_FILTER_ALL,
+    isString,
+  )
+  const [dentistaFilter, setDentistaFilter] = useSessionStorageState(
+    `${storagePrefix}:dentista-filter`,
+    DENTISTA_FILTER_ALL,
     isString,
   )
 
@@ -2900,10 +3051,15 @@ function LabsAggregateDetailView({
     setPrecosByLab(nextMap)
   }, [labs])
 
+  const fetchDentistas = useCallback(async () => {
+    const { data } = await supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
+    setDentistas(data ?? [])
+  }, [empresaId])
+
   useEffect(() => {
     setLoading(true)
-    void Promise.all([fetchEnvios(), fetchPrecos()]).then(() => setLoading(false))
-  }, [fetchEnvios, fetchPrecos])
+    void Promise.all([fetchEnvios(), fetchPrecos(), fetchDentistas()]).then(() => setLoading(false))
+  }, [fetchEnvios, fetchPrecos, fetchDentistas])
 
   useEffect(() => {
     if (labFilterId === LAB_FILTER_ALL) return
@@ -2968,6 +3124,7 @@ function LabsAggregateDetailView({
   const visibleEnvios = envios.filter(envio => {
     if (!envio.paciente_nome.toLowerCase().includes(patientSearch.toLowerCase())) return false
     if (labFilterId !== LAB_FILTER_ALL && envio.lab_id !== labFilterId) return false
+    if (dentistaFilter !== DENTISTA_FILTER_ALL && envio.dentista_nome !== dentistaFilter) return false
     return true
   })
 
@@ -3030,6 +3187,7 @@ function LabsAggregateDetailView({
             onOpenPrecosPicker={onOpenPrecosPicker}
             onOpenKanbanCfg={() => setShowKanbanCfg(true)}
             onOpenArquivados={() => setShowArquivados(true)}
+            onOpenDentistas={() => setShowDentistas(true)}
           />
         </div>
       </div>
@@ -3055,12 +3213,23 @@ function LabsAggregateDetailView({
                 </option>
               ))}
             </select>
+            <select
+              className={`${styles.select} ${styles.searchSelect}`}
+              value={dentistaFilter}
+              onChange={e => setDentistaFilter(e.target.value)}
+            >
+              <option value={DENTISTA_FILTER_ALL}>Todos os dentistas</option>
+              {dentistas.map(d => (
+                <option key={d.id} value={d.nome}>{d.nome}</option>
+              ))}
+            </select>
           </div>
 
           <div className={styles.aggregateFilterHint}>
-            {labFilterId === LAB_FILTER_ALL
-              ? `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`
-              : `Filtrado para ${labsById[labFilterId]?.nome ?? 'laboratório selecionado'}.`}
+            {[
+              labFilterId !== LAB_FILTER_ALL && `Lab: ${labsById[labFilterId]?.nome ?? 'selecionado'}`,
+              dentistaFilter !== DENTISTA_FILTER_ALL && `Dentista: ${dentistaFilter}`,
+            ].filter(Boolean).join(' · ') || `Exibindo ${visibleEnvios.length} trabalhos distribuídos em ${aggregateLabCount} laboratório(s).`}
           </div>
 
           {homeMode === 'calendar' ? (
@@ -3124,6 +3293,14 @@ function LabsAggregateDetailView({
       </ModalTransition>
       <ModalTransition open={showArquivados}>
         <ArquivadosModal empresaId={empresaId} userId={userId} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+      </ModalTransition>
+      <ModalTransition open={showDentistas}>
+        {showDentistas && (
+          <DentistasModal
+            empresaId={empresaId}
+            onClose={() => { setShowDentistas(false); void fetchDentistas() }}
+          />
+        )}
       </ModalTransition>
       <ModalTransition open={!!resumoEnvio}>
         {resumoEnvio && (
