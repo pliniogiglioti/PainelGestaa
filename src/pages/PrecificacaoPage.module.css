@@ -2719,3 +2719,30 @@
 .infoTooltipWrap:hover .infoTooltip {
   display: block;
 }
+
+/* ParabensModal */
+.parabensModal {
+  max-width: 420px;
+  text-align: center;
+  padding: 48px 40px 40px;
+}
+
+.parabensIcon {
+  font-size: 56px;
+  line-height: 1;
+  margin-bottom: 20px;
+}
+
+.parabensTitle {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text, #fff);
+  margin: 0 0 16px;
+}
+
+.parabensText {
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--text-muted, #aaa);
+  margin: 0 0 32px;
+}

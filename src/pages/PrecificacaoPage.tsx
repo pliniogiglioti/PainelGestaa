@@ -1211,6 +1211,24 @@ function CalculadoraPrecificacaoModal({
   )
 }
 
+function ParabensModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={`${styles.modal} ${styles.parabensModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.parabensIcon}>🎉</div>
+        <h2 className={styles.parabensTitle}>Parabéns!</h2>
+        <p className={styles.parabensText}>
+          O preço deste produto ou serviço agora está alinhado com o cálculo de precificação da Gestaa.
+          Continue revisando os demais itens da sua lista para garantir que todos os seus serviços sejam rentáveis e sustentáveis.
+        </p>
+        <button type="button" className={styles.modalSubmit} onClick={onClose}>
+          Ótimo!
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ConfiguracaoGeralModal({
   form,
   saving,
@@ -1337,6 +1355,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [feedback, setFeedback] = useState('')
   const [precoEditando, setPrecoEditando] = useState<EmpresaPreco | null>(null)
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
+  const [showParabens, setShowParabens] = useState(false)
   const [configGeral, setConfigGeral] = useState<EmpresaPrecificacaoConfig | null>(null)
   const [configForm, setConfigForm] = useState<ConfiguracaoGeralForm>({
     royaltiesPercent: '',
@@ -1611,10 +1630,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setPrecos(prev =>
       [...prev, data].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
     )
-    setFeedback('Preço calculado salvo com sucesso.')
     setShowCreatePrecoModal(false)
     setShowPrecoCalculadoModal(false)
     setSavingPreco(false)
+    setShowParabens(true)
   }
 
   const handleEditPreco = async (itemId: string, item: PrecoFormPayload) => {
@@ -1715,6 +1734,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     )
     setItemCalculadora(data)
     setSavingPreco(false)
+    setShowParabens(true)
   }
 
   const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
@@ -2008,6 +2028,17 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             error={error}
             onPersistCalculo={handlePersistCalculo}
             onClose={() => setItemCalculadora(null)}
+          />
+        )}
+      </ModalTransition>
+
+      <ModalTransition open={showParabens}>
+        {showParabens && (
+          <ParabensModal
+            onClose={() => {
+              setShowParabens(false)
+              setItemCalculadora(null)
+            }}
           />
         )}
       </ModalTransition>
