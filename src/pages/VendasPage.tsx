@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import type { OwnerV8Model, OwnerSettings } from '../components/vendas/types';
 import {
   loadOwnerV8Model,
@@ -20,6 +20,14 @@ export default function VendasPage({ onVoltar }: VendasPageProps) {
   const [ownerSettings, setOwnerSettings] = useState<OwnerSettings>(() => applyOwnerV8Model(loadOwnerV8Model()));
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardFromSeller, setWizardFromSeller] = useState(false);
+  const [pageToast, setPageToast] = useState<string | null>(null);
+  const pageToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const notifyPage = useCallback((msg: string) => {
+    if (pageToastTimerRef.current) clearTimeout(pageToastTimerRef.current);
+    setPageToast(msg);
+    pageToastTimerRef.current = setTimeout(() => setPageToast(null), 3500);
+  }, []);
 
   const [screen, setScreen] = useState<Screen>('launchpad');
   const [patientName, setPatientName] = useState('');
@@ -50,6 +58,7 @@ export default function VendasPage({ onVoltar }: VendasPageProps) {
     if (!ownerModel.completed) {
       setWizardFromSeller(true);
       setWizardOpen(true);
+      notifyPage('Antes de abrir o vendedor, vamos deixar a clínica configurada.');
       return;
     }
     setScreen('entry');
@@ -134,6 +143,11 @@ export default function VendasPage({ onVoltar }: VendasPageProps) {
 
         {wizardOpen && (
           <OwnerWizard model={ownerModel} onSave={handleSaveWizard} onClose={() => setWizardOpen(false)} />
+        )}
+        {pageToast && (
+          <div className={styles.pageToast}>
+            <div className={styles.pageToastInner}>{pageToast}</div>
+          </div>
         )}
       </div>
     );

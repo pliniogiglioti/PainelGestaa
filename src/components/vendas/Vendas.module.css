@@ -956,6 +956,32 @@
 .sbVersion { font-size: 10px; color: var(--text-dim); }
 
 /* ============================================================
+   PAGE TOAST (top, page-level — used outside SellerWorld)
+   ============================================================ */
+.pageToast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 300;
+  pointer-events: none;
+  width: min(680px, calc(100vw - 32px));
+  text-align: center;
+}
+.pageToastInner {
+  display: inline-block;
+  padding: 14px 20px;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  border: 1px solid rgba(249,159,53,0.28);
+  background: rgba(44,30,13,0.94);
+  color: #ffe2b8;
+  backdrop-filter: blur(12px);
+}
+
+/* ============================================================
    POLICY TOAST
    ============================================================ */
 .policyToast {

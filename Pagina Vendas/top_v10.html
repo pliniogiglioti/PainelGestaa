@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>TOP V9</title>
+  <title>TOP V10</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
@@ -3210,12 +3210,12 @@
   @keydown.escape.window="discountPanel.open = false; ownerPanel.open && closeOwnerPanel(); ownerV8.open && closeOwnerV8()"
   @keydown.arrow-right.window="ownerV8.open && !$event.target.matches('input, textarea, select') && ownerV8Next()"
   @keydown.arrow-left.window="ownerV8.open && !$event.target.matches('input, textarea, select') && ownerV8Prev()"
-  x-init="document.documentElement.classList.toggle('light', colorMode==='light'); $watch('colorMode', v => { document.documentElement.classList.toggle('light', v==='light'); localStorage.setItem('top-v9-theme', v); })">
+  x-init="document.documentElement.classList.toggle('light', colorMode==='light'); $watch('colorMode', v => { document.documentElement.classList.toggle('light', v==='light'); localStorage.setItem('top-v10-theme', v); })">
 
   <div class="owner-v8-overlay" x-show="ownerV8.open" x-transition.opacity.duration.250ms>
     <div class="owner-v8-topbar">
       <div>
-        <div class="owner-v8-kicker">TOP V9 · Configuração da Clínica</div>
+        <div class="owner-v8-kicker">TOP V10 · Configuração da Clínica</div>
         <div class="owner-v8-title">Deixe sua clínica pronta para vender.</div>
         <div class="owner-v8-subtitle">Em poucos passos, você organiza preços, pagamentos e limites da equipe para vender com segurança e clareza.</div>
       </div>
@@ -3244,7 +3244,7 @@
           <div class="owner-v8-card">
             <div class="owner-v8-eyebrow">Boas-vindas</div>
             <div class="owner-v8-question">Quer começar com uma configuração pronta e depois só refinar?</div>
-            <div class="owner-v8-helper">A V9 pode montar uma base inicial para você revisar no final, ou você pode decidir tudo passo a passo.</div>
+            <div class="owner-v8-helper">A V10 pode montar uma base inicial para você revisar no final, ou você pode decidir tudo passo a passo.</div>
             <div class="owner-v8-grid">
               <div class="owner-v8-choice">
                 <div class="owner-v8-import-title">Configuração express</div>
@@ -3303,7 +3303,7 @@
                   <div class="owner-v8-note" style="margin-top:0;">Contrato: <code>clinicscale:external-minimum-prices:v1</code></div>
                 </div>
                 <div class="owner-v8-top-actions">
-                  <button class="owner-v8-btn" type="button" @click="window.open('minimo-demo.html', 'top-v9-minimo-demo')">Abrir stub</button>
+                  <button class="owner-v8-btn" type="button" @click="window.open('minimo-demo.html', 'top-v10-minimo-demo')">Abrir stub</button>
                   <button class="owner-v8-btn primary" type="button" @click="ownerV8ImportExternalSnapshot()" :disabled="!(ownerV8.externalPreview && ownerV8.externalPreview.items.length)">Importar</button>
                   <button class="owner-v8-btn" type="button" @click="ownerV8UseFallbackMinimums('manual-defaults')">Usar defaults</button>
                 </div>
@@ -3388,7 +3388,7 @@
               </div>
             </div>
             <div class="owner-v8-section-footer">
-              <div class="owner-v8-callout">A V9 usa essa condição como referência de narrativa. O motor da V7 continua protegendo o resto por baixo.</div>
+              <div class="owner-v8-callout">A V10 usa essa condição como referência de narrativa. O motor da V7 continua protegendo o resto por baixo.</div>
               <button class="owner-v8-btn primary" type="button" :disabled="!ownerV8SectionCanAdvance(3)" @click="ownerV8Next()">Continuar</button>
             </div>
           </div>
@@ -3398,7 +3398,7 @@
           <div class="owner-v8-card">
             <div class="owner-v8-eyebrow">Tabela e Preços</div>
             <div class="owner-v8-question">Como você quer montar a vitrine que o vendedor vai apresentar?</div>
-            <div class="owner-v8-helper">Você pode usar o sugerido pela V9, aplicar um percentual global, ajustar por procedimento ou assumir tudo no modo 100% manual.</div>
+            <div class="owner-v8-helper">Você pode usar o sugerido pela V10, aplicar um percentual global, ajustar por procedimento ou assumir tudo no modo 100% manual.</div>
 
             <div class="owner-v8-pill-row" style="margin-bottom:16px;">
               <button class="owner-v8-pill" type="button" :class="{ active: ownerV8.model.tableStrategy.mode === 'suggested' }" @click="ownerV8.model.tableStrategy.mode = 'suggested'">Usar sugerido</button>
@@ -3526,7 +3526,7 @@
             </div>
 
             <div class="owner-v8-section-footer">
-              <div class="owner-v8-callout" x-text="ownerV8ValidateTableStrategy().valid ? 'A V9 vai transformar essa decisão no preço de vitrine que o vendedor enxerga.' : ownerV8ValidateTableStrategy().message"></div>
+              <div class="owner-v8-callout" x-text="ownerV8ValidateTableStrategy().valid ? 'A V10 vai transformar essa decisão no preço de vitrine que o vendedor enxerga.' : ownerV8ValidateTableStrategy().message"></div>
               <button class="owner-v8-btn primary" type="button" :disabled="!ownerV8SectionCanAdvance(4)" @click="ownerV8Next()">Continuar</button>
             </div>
           </div>
@@ -3724,7 +3724,7 @@
               <div class="owner-v8-field">
                 <label>Taxa do cartão</label>
                 <select class="owner-v8-select" x-model="ownerV8.model.cardTerms.useDefaultRateTable" @change="ownerV8.model.cardTerms.useDefaultRateTable = ($event.target.value === 'true')">
-                  <option :value="true">Usar tabela padrão da V9</option>
+                  <option :value="true">Usar tabela padrão da V10</option>
                   <option :value="false">Usar taxa fixa</option>
                 </select>
                 <div class="owner-v8-note">A tabela padrão varia por número de parcelas. A taxa fixa usa o mesmo percentual em toda faixa com juros.</div>
@@ -3862,7 +3862,7 @@
               <div class="owner-v8-summary">
                 <div class="owner-v8-summary-label">Cartão</div>
                 <strong x-text="ownerV8.model.cardTerms.noInterestEnabled ? 'Sem juros até ' + ownerV8.model.cardTerms.noInterestUpToInstallments + 'x' : 'Sem juros desligado'"></strong>
-                <span x-text="ownerV8.model.cardTerms.useDefaultRateTable ? 'Usando tabela padrão da V9' : 'Taxa fixa de ' + ownerV8.model.cardTerms.flatRatePct + '%'"></span>
+                <span x-text="ownerV8.model.cardTerms.useDefaultRateTable ? 'Usando tabela padrão da V10' : 'Taxa fixa de ' + ownerV8.model.cardTerms.flatRatePct + '%'"></span>
               </div>
               <div class="owner-v8-summary">
                 <div class="owner-v8-summary-label">Boleto</div>
@@ -3892,7 +3892,7 @@
               <div class="owner-v8-field">
                 <label>Juros mensal (%)</label>
                 <input class="owner-v8-input" type="number" min="0" max="10" step="0.1" x-model.number="ownerV8.model.lastChanceCondition.monthlyInterestPct">
-                <div class="owner-v8-note">Base da narrativa de preço usada pela V9.</div>
+                <div class="owner-v8-note">Base da narrativa de preço usada pela V10.</div>
               </div>
               <div class="owner-v8-field">
                 <label>Parcelas máximas</label>
@@ -4212,7 +4212,7 @@
             </div>
 
             <div class="owner-v8-section-footer">
-              <div class="owner-v8-callout">Ao ativar, a V9 grava o modelo em <code>top-v9-owner-model</code>, atualiza <code>top-v7-owner-settings</code> e sincroniza o vendedor com o que estiver definido aqui.</div>
+              <div class="owner-v8-callout">Ao ativar, a V10 grava o modelo em <code>top-v10-owner-model</code>, atualiza <code>top-v7-owner-settings</code> e sincroniza o vendedor com o que estiver definido aqui.</div>
               <div class="owner-v8-top-actions">
                 <button class="owner-v8-btn" type="button" @click="ownerV8GoTo(0)">Revisar tudo</button>
                 <button class="owner-v8-btn primary" type="button" @click="ownerV8Apply()">Ativar no vendedor</button>
@@ -4411,7 +4411,7 @@
 
   <div class="entry-overlay" x-show="launchpadOpen && !started && !naming && !ownerV8.open" x-transition.opacity.duration.300ms>
     <div class="launchpad-card">
-      <div class="launchpad-kicker">TOP V9</div>
+      <div class="launchpad-kicker">TOP V10</div>
       <div class="launchpad-title">Para onde você quer ir agora?</div>
       <div class="launchpad-subtitle">Escolha o ambiente que faz mais sentido neste momento. Se a clínica ainda não estiver configurada, a TOP te leva direto para o lugar certo.</div>
 
@@ -5035,7 +5035,7 @@
           <button class="sb-theme-option" :class="{'active': colorMode === 'dark'}" @click="setColorMode('dark')">Preto</button>
           <button class="sb-theme-option" :class="{'active': colorMode === 'light'}" @click="setColorMode('light')">Claro</button>
         </div>
-      <span class="sb-version">v9</span>
+      <span class="sb-version">v10</span>
       </div>
 
     </div><!-- /sidebar-content -->
@@ -6140,8 +6140,8 @@ function v7ComputeNarrativePrice(minPrice, settings) {
   return roundMoney(base * Math.pow(1 + r, n) * (1 + risk) * (1 + acquirer));
 }
 
-const OWNER_V8_STORAGE_KEY = 'top-v9-owner-model';
-const OWNER_V8_MINIMUM_DRAFT_KEY = 'top-v9-minimo-demo-draft';
+const OWNER_V8_STORAGE_KEY = 'top-v10-owner-model';
+const OWNER_V8_MINIMUM_DRAFT_KEY = 'top-v10-minimo-demo-draft';
 const EXTERNAL_MINIMUM_STORAGE_KEY = 'clinicscale:external-minimum-prices:v1';
 const OWNER_V8_SECTIONS = [
   { key: 'welcome', label: 'Boas-vindas' },
@@ -6867,7 +6867,7 @@ function app() {
         this.syncOwnerSettingsToPlans('Alterações manuais aplicadas no vendedor.');
       }
       this.ownerV8QueueSave();
-      this.notifyPolicy('Alterações manuais salvas na vitrine da V9.', 'info');
+      this.notifyPolicy('Alterações manuais salvas na vitrine da V10.', 'info');
     },
     ownerV8SectionCanAdvance(sectionIndex = this.ownerV8.currentSection) {
       if (sectionIndex === 0) return true;
@@ -6908,7 +6908,7 @@ function app() {
         if (!raw) return;
         const parsed = JSON.parse(raw);
         if (parsed?.version !== 1) {
-          this.ownerV8.externalWarning = 'Versão do contrato incompatível. Atualize o TOP V9.';
+          this.ownerV8.externalWarning = 'Versão do contrato incompatível. Atualize o TOP V10.';
           return;
         }
         const unknownNames = [];
@@ -6960,7 +6960,7 @@ function app() {
       this.ownerV8.manualDraft.rows = {};
       this.ownerV8.manualDraft.editing = null;
       if (this.ownerV8.externalPreview.unknownNames.length) {
-        this.notifyPolicy(`${this.ownerV8.externalPreview.unknownNames.length} procedimento(s) do export foram ignorados porque não existem no catálogo da V9.`, 'info');
+        this.notifyPolicy(`${this.ownerV8.externalPreview.unknownNames.length} procedimento(s) do export foram ignorados porque não existem no catálogo da V10.`, 'info');
       }
       this.ownerV8QueueSave();
     },
@@ -7059,7 +7059,7 @@ function app() {
       });
     },
     closeOwnerV8() {
-      if (!this.ownerV8.model.completed && !window.confirm('Fechar sem reaplicar a configuração do Mundo do Dono da V9?')) return;
+      if (!this.ownerV8.model.completed && !window.confirm('Fechar sem reaplicar a configuração do Mundo do Dono da V10?')) return;
       this.ownerV8.open = false;
       if (!this.started && !this.naming) {
         this.launchpadOpen = true;
@@ -7100,7 +7100,7 @@ function app() {
       const validation = this.ownerV8ValidateTableStrategy();
       const cardValidation = this.ownerV8ValidateCardTerms();
       if (!this.ownerV8HasMinimums()) {
-        this.notifyPolicy('Importe ou preencha os preços mínimos antes de ativar a V9.', 'danger');
+        this.notifyPolicy('Importe ou preencha os preços mínimos antes de ativar a V10.', 'danger');
         this.ownerV8GoTo(2);
         return;
       }
@@ -7847,7 +7847,7 @@ function app() {
       return {
         conservative: {
           label: 'Conservador',
-          description: 'A V9 chama de flexível e limite mais cedo. Bom para operação mais protegida.',
+          description: 'A V10 chama de flexível e limite mais cedo. Bom para operação mais protegida.',
           rules: {
             cash: { limitMaxPct: 15, warnMaxPct: 40, goodMaxPct: 78 },
             entry: { premiumAboveSuggestedPct: 20 },
@@ -7857,7 +7857,7 @@ function app() {
         },
         balanced: {
           label: 'Equilibrado',
-          description: 'Faixa padrão da V9. Boa leitura para a maioria das clínicas.',
+          description: 'Faixa padrão da V10. Boa leitura para a maioria das clínicas.',
           rules: defaultIndicatorRules(),
         },
         aggressive: {
@@ -7882,7 +7882,7 @@ function app() {
     indicatorPresetDescription() {
       const key = this.indicatorPresetKey();
       if (key === 'custom') {
-        return 'Personalizado. Você ajustou o semáforo do seu jeito e a V9 vai respeitar essas faixas em todo o vendedor.';
+        return 'Personalizado. Você ajustou o semáforo do seu jeito e a V10 vai respeitar essas faixas em todo o vendedor.';
       }
       return this.indicatorPresetDefinitions()[key]?.description || '';
     },
@@ -8166,7 +8166,7 @@ function app() {
         : 'Sem juros desligado';
       const charge = `taxa a partir de ${card.chargeInterestFromInstallments}x`;
       const rate = card.useDefaultRateTable
-        ? 'tabela padrão da V9'
+        ? 'tabela padrão da V10'
         : `${roundMoney(card.flatRatePct)}% fixo por parcela com juros`;
       const anticipation = card.anticipationEnabled
         ? `antecipação ${roundMoney(card.anticipationPct)}% a partir de ${card.anticipationFromInstallments}x`
@@ -8253,7 +8253,7 @@ function app() {
       const rounded = Math.round(Math.min(1.35, Math.max(0.72, nextScale)) * 100) / 100;
       this.contentScale = rounded;
       if (rounded >= 1) this.lastManualScale = rounded;
-      localStorage.setItem('top-v9-zoom', String(rounded));
+      localStorage.setItem('top-v10-zoom', String(rounded));
       this.$nextTick(() => this.equalizedPlans ? this.centerAllPlans('smooth') : this.centerActivePlan('smooth'));
     },
     fitZoom() {
@@ -8511,7 +8511,7 @@ function app() {
 
     init() {
       try {
-        const savedTheme = localStorage.getItem('top-v9-theme');
+        const savedTheme = localStorage.getItem('top-v10-theme');
         if (savedTheme === 'light' || savedTheme === 'dark') {
           this.colorMode = savedTheme;
         }
@@ -8536,7 +8536,7 @@ function app() {
         this.launchpadOpen = true;
         this.persistOwnerSettings();
         this.ownerV8RefreshExternalPreview();
-        const savedZoom = parseFloat(localStorage.getItem('top-v9-zoom') || '1');
+        const savedZoom = parseFloat(localStorage.getItem('top-v10-zoom') || '1');
         if (!Number.isNaN(savedZoom)) {
           const mobileLike = window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
           this.contentScale = mobileLike ? 1 : Math.min(1.35, Math.max(1, savedZoom));
