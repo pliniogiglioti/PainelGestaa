@@ -701,9 +701,10 @@ function CalculadoraPrecificacaoModal({
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() =>
     initialPersisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : '')
   )
+  const [precoConfirmado, setPrecoConfirmado] = useState(() => Boolean(initialPersisted.precoVenda))
   const [erroLocal, setErroLocal] = useState('')
-  const temPrecoExplicito = parsePreco(precoVendaEditado) > 0
-  const precoVendaAtual = temPrecoExplicito ? parsePreco(precoVendaEditado) : item?.preco ?? 0
+  const temPrecoExplicito = precoConfirmado && parsePreco(precoVendaEditado) > 0
+  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
   const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
@@ -726,6 +727,7 @@ function CalculadoraPrecificacaoModal({
       taxaMaquinaPercent: persisted.taxaMaquinaPercent,
     })
     setPrecoVendaEditado(persisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : ''))
+    setPrecoConfirmado(Boolean(persisted.precoVenda))
     setErroLocal('')
   }, [modalStateKey])
 
@@ -1135,7 +1137,7 @@ function CalculadoraPrecificacaoModal({
                     <input
                       className={`${styles.modalInput} ${styles.calcHighlightInput}`}
                       value={precoVendaEditado}
-                      onChange={e => { setPrecoVendaEditado(formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
+                      onChange={e => { const v = formatCurrencyTypingInput(e.target.value); setPrecoVendaEditado(v); setPrecoConfirmado(parsePreco(v) > 0); setErroLocal('') }}
                       inputMode="decimal"
                       placeholder="Ex: R$ 1.250,00"
                       disabled={savingPreco}
