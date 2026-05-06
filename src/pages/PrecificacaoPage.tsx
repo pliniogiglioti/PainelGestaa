@@ -132,6 +132,8 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
 const MARGEM_IDEAL_PERCENT = 50
+const MARKUP_EQUIVALENTE_PERCENT = 100
+const MARKUP_EQUIVALENTE_FATOR = 1 + (MARKUP_EQUIVALENTE_PERCENT / 100)
 const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = {
   custoInsumos: 'Custo insumos',
   custoMaterialAplicado: 'Custo material aplicado',
@@ -258,9 +260,53 @@ function isMargemSaudavel(margem: number | null) {
   return margem != null && margem >= MARGEM_IDEAL_PERCENT
 }
 
-function calcularPrecoSugerido(custoTotal: number) {
-  if (custoTotal <= 0) return null
-  return roundCurrencyValue(custoTotal * 2)
+function calcularPrecoSugeridoMarkup(
+  custosFixos: number,
+  percentualVariavelTotal: number,
+) {
+  const denominador = 1 - (percentualVariavelTotal * MARKUP_EQUIVALENTE_FATOR)
+
+  if (denominador <= 0) {
+    return {
+      precoSugerido: null,
+      denominador,
+      custoVariavel: null,
+      custoTotal: null,
+      lucro: null,
+      margemRealSobreVenda: null,
+      markupRealSobreCusto: null,
+      inviavel: percentualVariavelTotal > 0,
+    }
+  }
+
+  if (custosFixos <= 0) {
+    return {
+      precoSugerido: null,
+      denominador,
+      custoVariavel: null,
+      custoTotal: null,
+      lucro: null,
+      margemRealSobreVenda: null,
+      markupRealSobreCusto: null,
+      inviavel: false,
+    }
+  }
+
+  const precoSugerido = roundCurrencyValue((custosFixos * MARKUP_EQUIVALENTE_FATOR) / denominador)
+  const custoVariavel = roundCurrencyValue(precoSugerido * percentualVariavelTotal)
+  const custoTotal = roundCurrencyValue(custosFixos + custoVariavel)
+  const lucro = roundCurrencyValue(precoSugerido - custoTotal)
+
+  return {
+    precoSugerido,
+    denominador,
+    custoVariavel,
+    custoTotal,
+    lucro,
+    margemRealSobreVenda: precoSugerido > 0 ? (lucro / precoSugerido) * 100 : null,
+    markupRealSobreCusto: custoTotal > 0 ? (lucro / custoTotal) * 100 : null,
+    inviavel: false,
+  }
 }
 
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
@@ -315,7 +361,24 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
-  const precoSugerido = calcularPrecoSugerido(custoTotal)
+  const custosFixosPrecoSugerido =
+    custoInsumos +
+    custoMaterialAplicado +
+    custoLaboratorio +
+    (form.custoProfissionaisModo === 'valor' ? custoProfissionaisValor : 0)
+  const percentualVariavelTotalPrecoSugerido =
+    (
+      royaltiesPercent +
+      impostosPercent +
+      comissoesPercent +
+      taxaMaquinaPercent +
+      (form.custoProfissionaisModo === 'percentual' ? custoProfissionaisPercent : 0)
+    ) / 100
+  const precoSugeridoMarkup = calcularPrecoSugeridoMarkup(
+    custosFixosPrecoSugerido,
+    percentualVariavelTotalPrecoSugerido,
+  )
+  const precoSugerido = precoSugeridoMarkup.precoSugerido
   const diferencaParaMargemIdeal = precoSugerido == null ? null : roundCurrencyValue(precoSugerido - precoVenda)
 
   return {
@@ -338,11 +401,22 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     comissoes,
     taxaMaquina,
     custoTotal,
+    custosFixosPrecoSugerido,
+    percentualVariavelTotalPrecoSugerido,
     precoSugerido,
+    precoSugeridoInviavel: precoSugeridoMarkup.inviavel,
+    precoSugeridoDenominador: precoSugeridoMarkup.denominador,
+    precoSugeridoCustoVariavel: precoSugeridoMarkup.custoVariavel,
+    precoSugeridoCustoTotal: precoSugeridoMarkup.custoTotal,
+    precoSugeridoLucro: precoSugeridoMarkup.lucro,
+    precoSugeridoMargemRealSobreVenda: precoSugeridoMarkup.margemRealSobreVenda,
+    precoSugeridoMarkupRealSobreCusto: precoSugeridoMarkup.markupRealSobreCusto,
     diferencaParaMargemIdeal,
     margem,
-    resultadoMargem: precoSugerido == null
-      ? 'Preço abaixo da margem ideal'
+    resultadoMargem: precoSugeridoMarkup.inviavel
+      ? 'Preço sugerido inviável'
+      : precoSugerido == null
+        ? 'Preço abaixo da margem ideal'
       : diferencaParaMargemIdeal != null && diferencaParaMargemIdeal <= 0
         ? 'Preço de venda acima do mínimo'
         : 'Preço abaixo do mínimo',
@@ -1111,8 +1185,18 @@ function CalculadoraPrecificacaoModal({
                 <strong>{temPrecoExplicito ? formatPercent(calculo.margem) : '—'}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
-                <span>Preço mínimo viável</span>
-                {calculo.precoSugerido == null ? (
+                <span>Preço sugerido com markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)} sobre custo</span>
+                {calculo.precoSugeridoInviavel ? (
+                  <>
+                    <strong>Não viável</strong>
+                    <span className={styles.calcHighlightHint}>
+                      Com os percentuais atuais, não é possível atingir margem de {formatPercent(MARGEM_IDEAL_PERCENT)} sobre venda usando markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)}, pois os custos percentuais sobre venda estão muito altos.
+                    </span>
+                    <span className={styles.calcHighlightHint}>
+                      Percentual variável total: {formatPercent(calculo.percentualVariavelTotalPrecoSugerido * 100)}.
+                    </span>
+                  </>
+                ) : calculo.precoSugerido == null ? (
                   <>
                     <strong>{formatCurrency(precoVendaParaCalculo)}</strong>
                     <span className={styles.calcHighlightHint}>
@@ -1122,7 +1206,13 @@ function CalculadoraPrecificacaoModal({
                 ) : (
                   <>
                     <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                    <span className={styles.calcHighlightHint}>Preço mínimo para atingir {formatPercent(MARGEM_IDEAL_PERCENT)} de margem.</span>
+                    <span className={styles.calcHighlightHint}>Preço sugerido para buscar margem de {formatPercent(MARGEM_IDEAL_PERCENT)} sobre venda.</span>
+                    <span className={styles.calcHighlightHint}>
+                      Custo variável: {formatCurrency(calculo.precoSugeridoCustoVariavel ?? 0)} · Custo total: {formatCurrency(calculo.precoSugeridoCustoTotal ?? 0)} · Lucro: {formatCurrency(calculo.precoSugeridoLucro ?? 0)}
+                    </span>
+                    <span className={styles.calcHighlightHint}>
+                      Margem real sobre venda: {formatPercent(calculo.precoSugeridoMargemRealSobreVenda ?? 0)} · Markup real sobre custo: {formatPercent(calculo.precoSugeridoMarkupRealSobreCusto ?? 0)}
+                    </span>
                     {temPrecoExplicito && (
                       <span className={styles.calcHighlightHint}>
                         {Math.abs(calculo.diferencaParaMargemIdeal ?? 0) < 0.005
@@ -1150,7 +1240,7 @@ function CalculadoraPrecificacaoModal({
                     />
                     {mostrarPrecoMinimoCriacao && (
                       <p className={styles.calcMinimumNotice}>
-                        Preço de venda mínimo deve ser {formatCurrency(calculo.precoSugerido ?? 0)}.
+                        Preço sugerido deve ser {formatCurrency(calculo.precoSugerido ?? 0)}.
                       </p>
                     )}
                     {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
