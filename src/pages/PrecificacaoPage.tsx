@@ -375,8 +375,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     subtotalAntesProfissionais +
     custoProfissionais
 
-  const margemBruta = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
-  const margem = Math.round((margemBruta + Number.EPSILON) * 100) / 100
+  const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
   const precoSugerido = calcularPrecoSugerido(form)
   const diferencaParaMargemIdeal = roundCurrencyValue(precoSugerido - precoVenda)
 
@@ -403,7 +402,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     precoSugerido,
     diferencaParaMargemIdeal,
     margem,
-    resultadoMargem: margem < 50 ? 'Abaixo da meta de 50%' : 'Meta de 50% atingida',
+    resultadoMargem: (precoSugerido > 0 && diferencaParaMargemIdeal <= 0) ? 'Atingida' : 'Não atingida',
   }
 }
 
@@ -701,7 +700,8 @@ function CalculadoraPrecificacaoModal({
   }))
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
   const [erroLocal, setErroLocal] = useState('')
-  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
+  const temPrecoExplicito = parsePreco(precoVendaEditado) > 0
+  const precoVendaAtual = temPrecoExplicito ? parsePreco(precoVendaEditado) : item?.preco ?? 0
   const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
@@ -1101,7 +1101,7 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcHighlight}>
                 <span>Margem</span>
-                <strong>{formatPercent(calculo.margem)}</strong>
+                <strong>{temPrecoExplicito ? formatPercent(calculo.margem) : '—'}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
                 <span>Preço mínimo viável</span>
@@ -1114,13 +1114,15 @@ function CalculadoraPrecificacaoModal({
                   <>
                     <strong>{formatCurrency(calculo.precoSugerido)}</strong>
                     <span className={styles.calcHighlightHint}>Preço mínimo para atingir 50% de margem.</span>
-                    <span className={styles.calcHighlightHint}>
-                      {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
-                        ? 'O preço atual já está no ponto de equilíbrio da meta.'
-                        : calculo.diferencaParaMargemIdeal > 0
-                          ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
-                          : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
-                    </span>
+                    {temPrecoExplicito && (
+                      <span className={styles.calcHighlightHint}>
+                        {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
+                          ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                          : calculo.diferencaParaMargemIdeal > 0
+                            ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
+                            : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -1151,9 +1153,9 @@ function CalculadoraPrecificacaoModal({
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+              <div className={`${styles.calcHighlight} ${!temPrecoExplicito || calculo.resultadoMargem !== 'Atingida' ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
                 <span>Resultado da margem</span>
-                <strong>{calculo.resultadoMargem}</strong>
+                <strong>{temPrecoExplicito ? calculo.resultadoMargem : '—'}</strong>
               </div>
             </div>
             {canManage && (
