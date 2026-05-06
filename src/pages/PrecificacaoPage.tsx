@@ -1110,10 +1110,7 @@ function CalculadoraPrecificacaoModal({
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
                 <span>Preço mínimo viável</span>
                 {calculo.precoSugerido === 0 ? (
-                  <>
-                    <strong>Inatingível</strong>
-                    <span className={styles.calcHighlightHint}>Os encargos variáveis somam 50% ou mais do preço de venda. Reduza os percentuais para viabilizar a meta de 50%.</span>
-                  </>
+                  <strong>—</strong>
                 ) : (
                   <>
                     <strong>{formatCurrency(calculo.precoSugerido)}</strong>
