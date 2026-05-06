@@ -8,12 +8,61 @@ import {
   createOwnerV8FallbackSnapshot,
   EXTERNAL_MINIMUM_STORAGE_KEY,
 } from './ownerModel';
-import { safeNumber, clamp, roundMoney, defaultCatalogMinPrice } from './calcEngine';
+import {
+  safeNumber,
+  clamp,
+  roundMoney,
+  defaultCatalogMinPrice,
+  sanitizeIndicatorTags,
+  sanitizeIndicatorRules,
+  sanitizeIndicatorRoleLabels,
+  defaultIndicatorRules,
+} from './calcEngine';
 import { FLAT_CATALOG } from './catalog';
 import styles from './Vendas.module.css';
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+const INDICATOR_ROLE_KEYS = ['premium', 'good', 'warn', 'limit', 'neutral', 'legend'] as const;
+type IndicatorRoleKey = (typeof INDICATOR_ROLE_KEYS)[number];
+type IndicatorPresetKey = 'conservative' | 'balanced' | 'aggressive';
+
+const INDICATOR_PRESETS: Record<IndicatorPresetKey, {
+  label: string;
+  description: string;
+  rules: OwnerV8Model['indicatorRules'];
+}> = {
+  conservative: {
+    label: 'Conservador',
+    description: 'A V10 chama de flexível e limite mais cedo. Bom para operação mais protegida.',
+    rules: {
+      cash: { limitMaxPct: 15, warnMaxPct: 40, goodMaxPct: 78 },
+      entry: { premiumAboveSuggestedPct: 20 },
+      card: { premiumUpToIdealPct: 45, goodUpToIdealPct: 95 },
+      boleto: { premiumUpToIdealPct: 0, goodUpToIdealPct: 85 },
+    },
+  },
+  balanced: {
+    label: 'Equilibrado',
+    description: 'Faixa padrão da V10. Boa leitura para a maioria das clínicas.',
+    rules: defaultIndicatorRules(),
+  },
+  aggressive: {
+    label: 'Agressivo',
+    description: 'Segura o premium por mais tempo e aceita leituras comerciais mais abertas.',
+    rules: {
+      cash: { limitMaxPct: 5, warnMaxPct: 25, goodMaxPct: 55 },
+      entry: { premiumAboveSuggestedPct: 8 },
+      card: { premiumUpToIdealPct: 75, goodUpToIdealPct: 120 },
+      boleto: { premiumUpToIdealPct: 20, goodUpToIdealPct: 110 },
+    },
+  },
+};
+
+function createIndicatorTagId() {
+  return `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
 
 interface OwnerWizardProps {
   model: OwnerV8Model;
@@ -26,6 +75,7 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
   const [section, setSection] = useState(model.currentSection ?? 0);
   const [importedBadge, setImportedBadge] = useState('');
   const [externalWarning, setExternalWarning] = useState('');
+  const [semaforoAdvancedOpen, setSemaforoAdvancedOpen] = useState(false);
 
   const totalSections = OWNER_V8_SECTIONS.length;
 
@@ -132,6 +182,102 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
 
   const exampleMinPrice = procedureRows[0]?.minPrice ?? 0;
   const exampleSuggested = procedureRows.length > 0 ? suggestedTableValue(procedureRows[0].name) : 0;
+  const indicatorRoleLabels = useMemo(
+    () => sanitizeIndicatorRoleLabels(draft.indicatorRoleLabels),
+    [draft.indicatorRoleLabels],
+  );
+  const indicatorRules = useMemo(
+    () => sanitizeIndicatorRules(draft.indicatorRules),
+    [draft.indicatorRules],
+  );
+  const indicatorRoleOptions = useMemo(
+    () => INDICATOR_ROLE_KEYS.map(role => ({ value: role, label: indicatorRoleLabels[role] })),
+    [indicatorRoleLabels],
+  );
+  const indicatorPresetKey = useMemo(() => {
+    const current = JSON.stringify(indicatorRules);
+    for (const presetKey of Object.keys(INDICATOR_PRESETS) as IndicatorPresetKey[]) {
+      if (JSON.stringify(sanitizeIndicatorRules(INDICATOR_PRESETS[presetKey].rules)) === current) {
+        return presetKey;
+      }
+    }
+    return 'custom';
+  }, [indicatorRules]);
+  const indicatorPresetDescription = indicatorPresetKey === 'custom'
+    ? 'Personalizado. Você ajustou o semáforo do seu jeito e a V10 vai respeitar essas faixas em todo o vendedor.'
+    : INDICATOR_PRESETS[indicatorPresetKey].description;
+
+  function normalizeIndicatorConfig(m: OwnerV8Model) {
+    m.indicatorTags = sanitizeIndicatorTags(m.indicatorTags);
+    m.indicatorRoleLabels = sanitizeIndicatorRoleLabels(m.indicatorRoleLabels);
+    m.indicatorRules = sanitizeIndicatorRules(m.indicatorRules);
+  }
+
+  function commitIndicatorConfig() {
+    update(m => {
+      normalizeIndicatorConfig(m);
+    });
+  }
+
+  function indicatorRoleSemanticLabel(role: IndicatorRoleKey) {
+    return String(indicatorRoleLabels[role] || role)
+      .trim()
+      .replace(/^Usa no\s+/i, '')
+      .replace(/^Usa na\s+/i, '')
+      .replace(/^Usa em\s+/i, '')
+      .replace(/^Só\s+/i, 'somente ')
+      .trim();
+  }
+
+  function semaforoCashSummary() {
+    return `Até ${Math.round(indicatorRules.cash.limitMaxPct)}% da margem: ${indicatorRoleSemanticLabel('limit')}. Até ${Math.round(indicatorRules.cash.warnMaxPct)}%: ${indicatorRoleSemanticLabel('warn')}. Até ${Math.round(indicatorRules.cash.goodMaxPct)}%: ${indicatorRoleSemanticLabel('good')}. Acima disso: ${indicatorRoleSemanticLabel('premium')}.`;
+  }
+
+  function semaforoEntrySummary() {
+    return `Sem entrada definida: ${indicatorRoleSemanticLabel('neutral')}. Abaixo da entrada sugerida: ${indicatorRoleSemanticLabel('warn')}. Da sugerida até +${Math.round(indicatorRules.entry.premiumAboveSuggestedPct)} pontos: ${indicatorRoleSemanticLabel('good')}. Acima disso: ${indicatorRoleSemanticLabel('premium')}.`;
+  }
+
+  function semaforoCardSummary(kind: 'card' | 'boleto') {
+    const current = kind === 'boleto' ? indicatorRules.boleto : indicatorRules.card;
+    return `Até ${Math.round(current.premiumUpToIdealPct)}% da faixa ideal: ${indicatorRoleSemanticLabel('premium')}. Até ${Math.round(current.goodUpToIdealPct)}% da faixa ideal: ${indicatorRoleSemanticLabel('good')}. Acima disso e antes do máximo: ${indicatorRoleSemanticLabel('warn')}. No máximo: ${indicatorRoleSemanticLabel('limit')}.`;
+  }
+
+  function applyIndicatorPreset(presetKey: IndicatorPresetKey) {
+    update(m => {
+      m.indicatorRules = sanitizeIndicatorRules(INDICATOR_PRESETS[presetKey].rules);
+      normalizeIndicatorConfig(m);
+    });
+    setSemaforoAdvancedOpen(false);
+  }
+
+  function addIndicatorTag() {
+    update(m => {
+      m.indicatorTags.push({
+        id: createIndicatorTagId(),
+        label: `Nova tag ${m.indicatorTags.length + 1}`,
+        color: '#8f8f8f',
+        mapsTo: 'legend',
+      });
+      normalizeIndicatorConfig(m);
+    });
+  }
+
+  function removeIndicatorTag(index: number) {
+    update(m => {
+      m.indicatorTags.splice(index, 1);
+      normalizeIndicatorConfig(m);
+    });
+  }
+
+  function moveIndicatorTag(index: number, direction: number) {
+    update(m => {
+      const nextIndex = index + direction;
+      if (nextIndex < 0 || nextIndex >= m.indicatorTags.length) return;
+      const [tag] = m.indicatorTags.splice(index, 1);
+      m.indicatorTags.splice(nextIndex, 0, tag);
+      normalizeIndicatorConfig(m);
+    });
+  }
 
   return (
     <div className={styles.ownerOverlay}>
@@ -441,6 +587,348 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
                     );
                   })}
                 </div>
+
+                <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
+                  <div className={styles.ownerImportTitle}>Indicadores da equipe</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                    Edite os nomes, cores, ordem e quais indicadores o sistema usa. Você também pode criar tags extras só para treinamento.
+                  </div>
+                  <div className={styles.ownerIndicatorEditor}>
+                    {draft.indicatorTags.map((tag, index) => (
+                      <div key={tag.id} className={styles.ownerIndicatorEditorRow}>
+                        <button
+                          className={styles.ownerIndicatorEditorMove}
+                          type="button"
+                          title="Mover para cima"
+                          onClick={() => moveIndicatorTag(index, -1)}
+                          disabled={index === 0}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          className={styles.ownerIndicatorEditorMove}
+                          type="button"
+                          title="Mover para baixo"
+                          onClick={() => moveIndicatorTag(index, 1)}
+                          disabled={index === draft.indicatorTags.length - 1}
+                        >
+                          ↓
+                        </button>
+                        <input
+                          className={styles.ownerInlineInput}
+                          type="text"
+                          value={tag.label}
+                          placeholder="Nome da tag"
+                          onChange={e => update(m => { m.indicatorTags[index].label = e.target.value; })}
+                          onBlur={commitIndicatorConfig}
+                        />
+                        <input
+                          className={styles.ownerIndicatorEditorColor}
+                          type="color"
+                          value={tag.color}
+                          onChange={e => update(m => {
+                            m.indicatorTags[index].color = e.target.value;
+                            normalizeIndicatorConfig(m);
+                          })}
+                        />
+                        <select
+                          className={styles.ownerInlineSelect}
+                          value={tag.mapsTo}
+                          onChange={e => update(m => {
+                            m.indicatorTags[index].mapsTo = e.target.value as IndicatorRoleKey;
+                            normalizeIndicatorConfig(m);
+                          })}
+                        >
+                          {indicatorRoleOptions.map(option => (
+                            <option key={option.value} value={option.value}>{option.label}</option>
+                          ))}
+                        </select>
+                        <button
+                          className={styles.ownerIndicatorEditorRemove}
+                          type="button"
+                          title="Remover tag"
+                          onClick={() => removeIndicatorTag(index)}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                    <button className={styles.ownerV8Btn} type="button" onClick={addIndicatorTag}>
+                      + Adicionar tag
+                    </button>
+                  </div>
+
+                  <div className={styles.ownerImportTitle} style={{ marginTop: 22 }}>Textos das condicionais</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                    Esses nomes aparecem no seletor de condição e também na leitura interna da equipe.
+                  </div>
+                  <div className={styles.ownerGrid} style={{ marginTop: 14 }}>
+                    <div className={styles.ownerField}>
+                      <label>Premium</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.premium}
+                        onChange={e => update(m => { m.indicatorRoleLabels.premium = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Equilibrado</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.good}
+                        onChange={e => update(m => { m.indicatorRoleLabels.good = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Flexível</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.warn}
+                        onChange={e => update(m => { m.indicatorRoleLabels.warn = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Limite</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.limit}
+                        onChange={e => update(m => { m.indicatorRoleLabels.limit = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Neutro</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.neutral}
+                        onChange={e => update(m => { m.indicatorRoleLabels.neutral = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Só legenda</label>
+                      <input
+                        className={styles.ownerInput}
+                        type="text"
+                        value={draft.indicatorRoleLabels.legend}
+                        onChange={e => update(m => { m.indicatorRoleLabels.legend = e.target.value; })}
+                        onBlur={commitIndicatorConfig}
+                      />
+                    </div>
+                  </div>
+
+                  <div className={styles.ownerImportTitle} style={{ marginTop: 22 }}>Semáforo comercial</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                    Essa régua decide quando a equipe enxerga uma condição como premium, equilibrada, flexível ou no limite. Você pode escolher um perfil pronto e só ajustar se quiser.
+                  </div>
+
+                  <div className={styles.ownerPillRow} style={{ marginTop: 14 }}>
+                    {(Object.keys(INDICATOR_PRESETS) as IndicatorPresetKey[]).map(presetKey => (
+                      <button
+                        key={presetKey}
+                        type="button"
+                        className={`${styles.ownerPill}${indicatorPresetKey === presetKey ? ` ${styles.ownerPillActive}` : ''}`}
+                        onClick={() => applyIndicatorPreset(presetKey)}
+                      >
+                        {INDICATOR_PRESETS[presetKey].label}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={`${styles.ownerPill}${indicatorPresetKey === 'custom' ? ` ${styles.ownerPillActive}` : ''}`}
+                      disabled
+                    >
+                      Personalizado
+                    </button>
+                  </div>
+
+                  <div className={styles.ownerCallout} style={{ marginTop: 14 }}>{indicatorPresetDescription}</div>
+
+                  <div className={styles.ownerImportTitle} style={{ marginTop: 22 }}>Leitura rápida do semáforo</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                    Aqui está a regra já traduzida em português simples, sem precisar interpretar número por número.
+                  </div>
+                  <div className={styles.ownerSummaryGrid} style={{ marginTop: 14 }}>
+                    <div className={styles.ownerSummaryCard}>
+                      <div className={styles.ownerSummaryLabel}>À vista e débito</div>
+                      <strong>Distância até o mínimo</strong>
+                      <span>{semaforoCashSummary()}</span>
+                    </div>
+                    <div className={styles.ownerSummaryCard}>
+                      <div className={styles.ownerSummaryLabel}>Entrada</div>
+                      <strong>Comparada ao sugerido</strong>
+                      <span>{semaforoEntrySummary()}</span>
+                    </div>
+                    <div className={styles.ownerSummaryCard}>
+                      <div className={styles.ownerSummaryLabel}>Cartão</div>
+                      <strong>Comparado à faixa ideal</strong>
+                      <span>{semaforoCardSummary('card')}</span>
+                    </div>
+                    <div className={styles.ownerSummaryCard}>
+                      <div className={styles.ownerSummaryLabel}>Boleto</div>
+                      <strong>Comparado à faixa ideal</strong>
+                      <span>{semaforoCardSummary('boleto')}</span>
+                    </div>
+                  </div>
+
+                  <div className={styles.ownerTopActions} style={{ marginTop: 18 }}>
+                    <button className={styles.ownerV8Btn} type="button" onClick={() => setSemaforoAdvancedOpen(open => !open)}>
+                      {semaforoAdvancedOpen ? 'Fechar ajuste fino' : 'Abrir ajuste fino'}
+                    </button>
+                  </div>
+
+                  {semaforoAdvancedOpen && (
+                    <>
+                      <div className={styles.ownerImportTitle} style={{ marginTop: 22 }}>Ajuste fino do semáforo</div>
+                      <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                        Use essa parte só se você quiser refinar exatamente onde cada faixa começa.
+                      </div>
+
+                      <div className={styles.ownerGrid} style={{ marginTop: 14 }}>
+                        <div className={styles.ownerField}>
+                          <label>À vista / débito · limite até (%)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={draft.indicatorRules.cash.limitMaxPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.cash.limitMaxPct = safeNumber(e.target.value, indicatorRules.cash.limitMaxPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Muito perto do piso já entra no limite.</div>
+                        </div>
+                        <div className={styles.ownerField}>
+                          <label>À vista / débito · flexível até (%)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={draft.indicatorRules.cash.warnMaxPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.cash.warnMaxPct = safeNumber(e.target.value, indicatorRules.cash.warnMaxPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Até aqui a leitura entra como mais flexível.</div>
+                        </div>
+                        <div className={styles.ownerField}>
+                          <label>À vista / débito · equilibrado até (%)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={draft.indicatorRules.cash.goodMaxPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.cash.goodMaxPct = safeNumber(e.target.value, indicatorRules.cash.goodMaxPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Acima disso a condição vira premium.</div>
+                        </div>
+
+                        <div className={styles.ownerField}>
+                          <label>Entrada · premium acima do sugerido (+pts)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={draft.indicatorRules.entry.premiumAboveSuggestedPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.entry.premiumAboveSuggestedPct = safeNumber(e.target.value, indicatorRules.entry.premiumAboveSuggestedPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Quantos pontos acima da entrada mínima fazem a entrada virar premium.</div>
+                        </div>
+
+                        <div className={styles.ownerField}>
+                          <label>Cartão · premium até (% da faixa ideal)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="1"
+                            value={draft.indicatorRules.card.premiumUpToIdealPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.card.premiumUpToIdealPct = safeNumber(e.target.value, indicatorRules.card.premiumUpToIdealPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Quanto do prazo ideal ainda conta como premium.</div>
+                        </div>
+                        <div className={styles.ownerField}>
+                          <label>Cartão · equilibrado até (% da faixa ideal)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="1"
+                            value={draft.indicatorRules.card.goodUpToIdealPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.card.goodUpToIdealPct = safeNumber(e.target.value, indicatorRules.card.goodUpToIdealPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Acima disso, antes do máximo, vira flexível.</div>
+                        </div>
+
+                        <div className={styles.ownerField}>
+                          <label>Boleto · premium até (% da faixa ideal)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="1"
+                            value={draft.indicatorRules.boleto.premiumUpToIdealPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.boleto.premiumUpToIdealPct = safeNumber(e.target.value, indicatorRules.boleto.premiumUpToIdealPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Se ficar em zero, o boleto não usa premium.</div>
+                        </div>
+                        <div className={styles.ownerField}>
+                          <label>Boleto · equilibrado até (% da faixa ideal)</label>
+                          <input
+                            className={styles.ownerInput}
+                            type="number"
+                            min="0"
+                            max="300"
+                            step="1"
+                            value={draft.indicatorRules.boleto.goodUpToIdealPct}
+                            onChange={e => update(m => {
+                              m.indicatorRules.boleto.goodUpToIdealPct = safeNumber(e.target.value, indicatorRules.boleto.goodUpToIdealPct);
+                              normalizeIndicatorConfig(m);
+                            })}
+                          />
+                          <div className={styles.ownerNote}>Acima disso, antes do máximo, vira flexível.</div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
                 <div className={styles.ownerSectionFooter}>
                   <div className={styles.ownerCallout}>Se quiser manter o boleto como carta na manga, deixe ligado só quando realmente fizer sentido para a operação.</div>
                   <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>

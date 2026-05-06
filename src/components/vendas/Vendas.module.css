@@ -1473,3 +1473,58 @@
   min-width: 40px;
   text-align: center;
 }
+
+/* ---- Indicator Editor (§5 Pagamentos) ---- */
+.ownerIndicatorEditor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.ownerIndicatorEditorRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ownerIndicatorEditorMove {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ownerIndicatorEditorMove:disabled { opacity: 0.28; cursor: default; }
+.ownerIndicatorEditorMove:not(:disabled):hover { color: var(--text); border-color: rgba(255,255,255,0.20); }
+.ownerIndicatorEditorColor {
+  width: 32px;
+  height: 28px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+.ownerIndicatorEditorRemove {
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(220,94,94,0.22);
+  border-radius: 6px;
+  background: transparent;
+  color: #dc5e5e;
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+.ownerIndicatorEditorRemove:hover { opacity: 1; }
