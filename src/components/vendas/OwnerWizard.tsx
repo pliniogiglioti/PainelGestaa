@@ -35,8 +35,9 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
 
   function acceptSuggested() {
     const base = defaultOwnerV8Model();
-    const final = hydrateOwnerV8Model({ ...base, currentSection: totalSections - 1, completed: true });
-    onSave(final);
+    base.externalMinimumSnapshot = createOwnerV8FallbackSnapshot('accepted-suggested');
+    setDraft(hydrateOwnerV8Model(base));
+    setSection(totalSections - 1);
   }
 
   function save() {
