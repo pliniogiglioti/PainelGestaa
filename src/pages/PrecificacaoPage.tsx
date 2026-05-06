@@ -655,7 +655,7 @@ function CalculadoraPrecificacaoModal({
 
   const calculo = calcularPrecificacao(precoVendaParaCalculo, form)
   const custosBloqueados = savingPreco || (isCreating && precoVendaNumerico <= 0)
-  const precoVendaBloqueado = savingPreco || (isCreating && precoVendaTravado)
+  const precoVendaBloqueado = savingPreco
   const todosCustosPreenchidos = [
     form.custoInsumos,
     form.custoMaterialAplicado,
@@ -1135,7 +1135,7 @@ function CalculadoraPrecificacaoModal({
                     <input
                       className={`${styles.modalInput} ${styles.calcHighlightInput}`}
                       value={precoVendaEditado}
-                      onChange={e => { const v = formatCurrencyTypingInput(e.target.value); setPrecoVendaEditado(v); setPrecoConfirmado(parsePreco(v) > 0); setPrecoVendaTravado(false); setErroLocal('') }}
+                      onChange={e => { const v = formatCurrencyTypingInput(e.target.value); setPrecoVendaEditado(v); setPrecoConfirmado(parsePreco(v) > 0); setErroLocal('') }}
                       inputMode="decimal"
                       placeholder="Ex: R$ 1.250,00"
                       autoFocus={isCreating}
@@ -1153,7 +1153,7 @@ function CalculadoraPrecificacaoModal({
                           ? (precoVendaNumerico <= 0
                             ? 'Comece pelo preço de venda para liberar a digitação dos custos.'
                             : precoVendaTravado
-                              ? 'Preço bloqueado durante o preenchimento dos custos.'
+                              ? 'Preço liberado para ajuste durante o preenchimento dos custos.'
                               : 'Depois de preencher o primeiro custo, este preço será bloqueado para manter o cálculo consistente.')
                           : hasChanges
                             ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
