@@ -305,7 +305,6 @@ function calcularPrecoSugerido(form: CalculadoraForm) {
   }, 0)
 
   const totalRateComProfissionais = encargosSobreVendaRate + (custoProfissionaisRate * (1 - abatimentosRate))
-  if (1 - 2 * totalRateComProfissionais <= 0) return 0
 
   const precoComProfissionais = solveSuggestedPrice(
     custoFixoBase - (custoProfissionaisRate * abatimentosFixos),
