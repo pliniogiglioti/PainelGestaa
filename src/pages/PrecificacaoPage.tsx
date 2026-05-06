@@ -735,7 +735,13 @@ function CalculadoraPrecificacaoModal({
     ...form,
     precoVenda: precoVendaEditado,
   }), [form, precoVendaEditado])
-  const savedPayload = useMemo(() => getCalculadoraPersistida(item ?? null, configPadrao), [configPadrao, item])
+  const savedPayload = useMemo(() => {
+    const p = getCalculadoraPersistida(item ?? null, configPadrao)
+    return {
+      ...p,
+      precoVenda: p.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : ''),
+    }
+  }, [configPadrao, item])
   const hasChanges = useMemo(() => {
     const baseChanged = JSON.stringify(calculadoraPersistida) !== JSON.stringify(savedPayload)
     if (isCreating) return baseChanged || nome.trim() !== '' || categoria !== ''
@@ -744,10 +750,12 @@ function CalculadoraPrecificacaoModal({
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
+    if (parsePreco(precoVendaEditado) > 0) setPrecoConfirmado(true)
   }
 
   const handleToggleCustoProfissionais = (modo: CalculadoraForm['custoProfissionaisModo']) => {
     setForm(prev => ({ ...prev, custoProfissionaisModo: modo }))
+    if (parsePreco(precoVendaEditado) > 0) setPrecoConfirmado(true)
   }
 
   const handleToggleCustoProfissionaisBase = (base: CustoProfissionaisBase) => {
@@ -757,6 +765,7 @@ function CalculadoraPrecificacaoModal({
         ? prev.custoProfissionaisBases.filter(item => item !== base)
         : [...prev.custoProfissionaisBases, base],
     }))
+    if (parsePreco(precoVendaEditado) > 0) setPrecoConfirmado(true)
   }
 
   const renderProcedimentoComSelecao = (base: CustoProfissionaisBase, label: string) => (
@@ -1154,7 +1163,7 @@ function CalculadoraPrecificacaoModal({
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${!temPrecoExplicito || calculo.resultadoMargem !== 'Preço de venda acima do mínimo' ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+              <div className={`${styles.calcHighlight} ${!temPrecoExplicito ? '' : calculo.resultadoMargem === 'Preço de venda acima do mínimo' ? styles.calcHighlightGood : styles.calcHighlightBad}`}>
                 <span>Resultado da margem</span>
                 <strong>{temPrecoExplicito ? calculo.resultadoMargem : '—'}</strong>
               </div>
