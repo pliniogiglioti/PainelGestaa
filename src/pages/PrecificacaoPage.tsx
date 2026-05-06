@@ -402,7 +402,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     precoSugerido,
     diferencaParaMargemIdeal,
     margem,
-    resultadoMargem: (precoSugerido > 0 && diferencaParaMargemIdeal <= 0) ? 'Atingida' : 'Não atingida',
+    resultadoMargem: (precoSugerido > 0 && diferencaParaMargemIdeal <= 0) ? 'Preço de venda acima do mínimo' : 'Preço abaixo do mínimo',
   }
 }
 
@@ -698,7 +698,9 @@ function CalculadoraPrecificacaoModal({
     comissoesPercent: initialPersisted.comissoesPercent,
     taxaMaquinaPercent: initialPersisted.taxaMaquinaPercent,
   }))
-  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
+  const [precoVendaEditado, setPrecoVendaEditado] = useState(() =>
+    initialPersisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : '')
+  )
   const [erroLocal, setErroLocal] = useState('')
   const temPrecoExplicito = parsePreco(precoVendaEditado) > 0
   const precoVendaAtual = temPrecoExplicito ? parsePreco(precoVendaEditado) : item?.preco ?? 0
@@ -723,7 +725,7 @@ function CalculadoraPrecificacaoModal({
       comissoesPercent: persisted.comissoesPercent,
       taxaMaquinaPercent: persisted.taxaMaquinaPercent,
     })
-    setPrecoVendaEditado(persisted.precoVenda)
+    setPrecoVendaEditado(persisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : ''))
     setErroLocal('')
   }, [modalStateKey])
 
@@ -1153,7 +1155,7 @@ function CalculadoraPrecificacaoModal({
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${!temPrecoExplicito || calculo.resultadoMargem !== 'Atingida' ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+              <div className={`${styles.calcHighlight} ${!temPrecoExplicito || calculo.resultadoMargem !== 'Preço de venda acima do mínimo' ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
                 <span>Resultado da margem</span>
                 <strong>{temPrecoExplicito ? calculo.resultadoMargem : '—'}</strong>
               </div>
