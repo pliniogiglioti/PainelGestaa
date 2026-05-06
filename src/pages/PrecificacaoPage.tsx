@@ -619,7 +619,13 @@ function CalculadoraPrecificacaoModal({
   savingPreco: boolean
   error: string
   onSavePrice?: (result: { preco: number; margem: number }) => Promise<boolean> | boolean
-  onPersistCalculo?: (itemId: string, payload: CalculadoraPersistida, preco: number) => Promise<void>
+  onPersistCalculo?: (
+    itemId: string,
+    payload: CalculadoraPersistida,
+    preco: number,
+    nomeProduto: string,
+    categoriaProduto: string,
+  ) => Promise<void>
   onCreatePrecoCalculado?: (item: PrecoFormPayload, calculo: CalculadoraPersistida) => Promise<void>
   onClose: () => void
 }) {
@@ -704,9 +710,12 @@ function CalculadoraPrecificacaoModal({
   }, [configPadrao, item])
   const hasChanges = useMemo(() => {
     const baseChanged = JSON.stringify(calculadoraPersistida) !== JSON.stringify(savedPayload)
+    const nomeOriginal = item?.nome_produto ?? ''
+    const categoriaOriginal = item?.categoria ?? ''
+
     if (isCreating) return baseChanged || nome.trim() !== '' || categoria !== ''
-    return baseChanged
-  }, [calculadoraPersistida, categoria, isCreating, nome, savedPayload])
+    return baseChanged || nome.trim() !== nomeOriginal.trim() || categoria !== categoriaOriginal
+  }, [calculadoraPersistida, categoria, isCreating, item, nome, savedPayload])
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -787,7 +796,7 @@ function CalculadoraPrecificacaoModal({
     }
 
     if (!item) return
-    await onPersistCalculo?.(item.id, calculadoraParaSalvar, precoNumerico)
+    await onPersistCalculo?.(item.id, calculadoraParaSalvar, precoNumerico, nome.trim(), categoria)
   }
 
   return (
@@ -803,7 +812,7 @@ function CalculadoraPrecificacaoModal({
             <p className={styles.calcItemName}>
               {isCreating
                 ? 'Para iniciar, coloque o preço de venda. Depois preencha os custos para ver o mínimo recomendado.'
-                : `${item.nome_produto} - ${getCategoriaLabel(item.categoria)}`}
+                : 'Ajuste o preço de venda e os custos para verificar a margem e o mínimo recomendado.'}
             </p>
           </div>
           <div className={styles.modalHeaderActions}>
@@ -813,39 +822,37 @@ function CalculadoraPrecificacaoModal({
 
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
-            {isCreating && (
-              <div className={styles.calcFormCard}>
-                <div className={styles.calcFormHeader}>
-                  <h3 className={styles.calcFormTitle}>Dados do item</h3>
-                  <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
-                </div>
-                <label className={styles.modalField}>
-                  <span className={styles.modalLabel}>Nome do produto ou servico</span>
-                  <input
-                    className={styles.modalInput}
-                    value={nome}
-                    onChange={e => { setNome(e.target.value); setErroLocal('') }}
-                    placeholder="Ex: Consulta de avaliação"
-                    autoFocus={!isCreating}
-                    disabled={savingPreco}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  <span className={styles.modalLabel}>Categoria odontologica</span>
-                  <select
-                    className={styles.modalInput}
-                    value={categoria}
-                    onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
-                    disabled={savingPreco}
-                  >
-                    <option value="">Selecione uma categoria</option>
-                    {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
-                      <option key={itemCategoria} value={itemCategoria}>{itemCategoria}</option>
-                    ))}
-                  </select>
-                </label>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Dados do item</h3>
+                <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
               </div>
-            )}
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Nome do produto ou servico</span>
+                <input
+                  className={styles.modalInput}
+                  value={nome}
+                  onChange={e => { setNome(e.target.value); setErroLocal('') }}
+                  placeholder="Ex: Consulta de avaliação"
+                  autoFocus={!isCreating}
+                  disabled={savingPreco}
+                />
+              </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Categoria odontologica</span>
+                <select
+                  className={styles.modalInput}
+                  value={categoria}
+                  onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
+                  disabled={savingPreco}
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
+                    <option key={itemCategoria} value={itemCategoria}>{itemCategoria}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             <div className={styles.calcFormCard}>
               <div className={styles.calcFormHeader}>
@@ -1197,6 +1204,8 @@ function CalculadoraPrecificacaoModal({
                       comissoesPercent: savedPayload.comissoesPercent,
                       taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
                     })
+                    setNome(item?.nome_produto ?? '')
+                    setCategoria(item?.categoria ?? '')
                     setPrecoVendaEditado(savedPayload.precoVenda)
                     setPrecoVendaTravado(false)
                     setErroLocal('')
@@ -1708,7 +1717,13 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setFeedback('Preço excluído com sucesso.')
   }
 
-  const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
+  const handlePersistCalculo = async (
+    itemId: string,
+    payload: CalculadoraPersistida,
+    preco: number,
+    nomeProduto: string,
+    categoriaProduto: string,
+  ) => {
     setSavingPreco(true)
     setError('')
 
@@ -1723,6 +1738,8 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
       .update({
+        nome_produto: nomeProduto,
+        categoria: categoriaProduto,
         preco,
         margem_percent: margem,
         precificacao_calculo: payload,
