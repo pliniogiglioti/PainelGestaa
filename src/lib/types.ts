@@ -833,6 +833,27 @@ export interface Database {
         }
         Relationships: []
       }
+      lab_formas_envio: {
+        Row: {
+          id:         string
+          empresa_id: string
+          nome:       string
+          ativo:      boolean
+          created_at: string
+        }
+        Insert: {
+          id?:         string
+          empresa_id:  string
+          nome:        string
+          ativo?:      boolean
+          created_at?: string
+        }
+        Update: {
+          nome?:  string
+          ativo?: boolean
+        }
+        Relationships: []
+      }
       lab_etiquetas: {
         Row: {
           id:         string
@@ -1057,6 +1078,7 @@ export type LabPreco         = Database['public']['Tables']['lab_precos']['Row']
 export type LabKanbanColuna  = Database['public']['Tables']['lab_kanban_colunas']['Row']
 export type LabEnvio         = Database['public']['Tables']['lab_envios']['Row']
 export type LabDentista      = Database['public']['Tables']['lab_dentistas']['Row']
+export type LabFormaEnvio    = Database['public']['Tables']['lab_formas_envio']['Row']
 export type LabEtiqueta      = Database['public']['Tables']['lab_etiquetas']['Row']
 export type LabTipoServico   = Database['public']['Tables']['lab_tipos_servico']['Row']
 export type LabHistorico     = Database['public']['Tables']['lab_historico']['Row']
