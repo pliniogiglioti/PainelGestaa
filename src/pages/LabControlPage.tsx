@@ -3075,6 +3075,8 @@ function LabsAggregateDetailView({
           envios={visibleEnvios}
           precosByLab={precosByLab}
           labs={labs}
+          colunas={colunas}
+          onMoveEnvio={moveEnvioAgg}
         />
       ) : (
         <KanbanBoard
@@ -3267,12 +3269,15 @@ function CalendarView({ envios, precosByLab, labs, onClose }: {
   )
 }
 
-function ServicesListView({ envios, precosByLab, labs }: {
+function ServicesListView({ envios, precosByLab, labs, colunas, onMoveEnvio }: {
   envios: LabEnvio[]
   precosByLab: Record<string, LabPreco[]>
   labs: Lab[]
+  colunas: LabKanbanColuna[]
+  onMoveEnvio: (envioId: string, status: string) => void
 }) {
   const labsById = useMemo(() => Object.fromEntries(labs.map(lab => [lab.id, lab])), [labs])
+  const colunasOrdenadas = useMemo(() => [...colunas].sort((a, b) => a.ordem - b.ordem), [colunas])
   const rows = useMemo(() => envios.flatMap(envio => {
     const lab = labsById[envio.lab_id]
     const feriados = lab ? getLabFeriados(lab) : []
@@ -3282,6 +3287,7 @@ function ServicesListView({ envios, precosByLab, labs }: {
 
       return {
         id: `${envio.id}-${etapa.id}`,
+        envioId: envio.id,
         pacienteNome: envio.paciente_nome,
         servicoNome: etapa.nome,
         dentes: envio.dentes,
@@ -3289,6 +3295,7 @@ function ServicesListView({ envios, precosByLab, labs }: {
         dataEnvio: envio.data_envio,
         dataPrevista,
         status: etapa.concluido ? 'Pronto' : envio.status,
+        etapaConcluida: etapa.concluido,
         urgente: envio.urgente,
         atrasado: !etapa.concluido && dataPrevista != null && dataPrevista < today(),
         labNome: lab?.nome ?? 'Laboratório removido',
@@ -3364,9 +3371,21 @@ function ServicesListView({ envios, precosByLab, labs }: {
                   <td>{formatDate(row.dataEnvio)}</td>
                   <td>{formatDate(row.dataPrevista)}</td>
                   <td>
-                    <span className={row.atrasado ? styles.serviceStatusOverdue : styles.serviceStatus}>
-                      {row.atrasado ? 'Atrasado' : row.status}
-                    </span>
+                    {row.etapaConcluida || isFinalEnvioStatus(row.status) ? (
+                      <span className={row.atrasado ? styles.serviceStatusOverdue : styles.serviceStatus}>
+                        {row.atrasado ? 'Atrasado' : row.status}
+                      </span>
+                    ) : (
+                      <select
+                        className={styles.serviceStatusSelect}
+                        value={row.status}
+                        onChange={e => onMoveEnvio(row.envioId, e.target.value)}
+                      >
+                        {colunasOrdenadas.map(col => (
+                          <option key={col.id} value={col.nome}>{col.nome}</option>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td>{row.labNome}</td>
                 </tr>
