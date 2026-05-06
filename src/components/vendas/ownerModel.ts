@@ -245,7 +245,7 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
     policy.idealCashPrice = roundMoney(Math.max(minPrice, safeNumber(proc.tablePrice, minPrice)));
 
     const procStrategy = normalized.tableStrategy.perProcedure[proc.name] || { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
-    let override = roundMoney(Math.max(minPrice, safeNumber(proc.tablePrice, minPrice)));
+    let override: number | null = null;
     if (normalized.tableStrategy.mode === 'globalPct') {
       override = roundMoney(minPrice * (1 + (safeNumber(normalized.tableStrategy.globalGorduraPct, 0) / 100)));
     } else if (normalized.tableStrategy.mode === 'perProcedure' || normalized.tableStrategy.mode === 'manual') {
@@ -253,11 +253,11 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
         override = roundMoney(minPrice * (1 + (safeNumber(procStrategy.gorduraPct, 0) / 100)));
       } else if (procStrategy.inputMode === 'absolute') {
         override = roundMoney(safeNumber(procStrategy.tableAbsolute, 0));
-      } else {
-        override = roundMoney(Math.max(minPrice, safeNumber(proc.tablePrice, minPrice)));
       }
+      // inputMode 'auto' → override stays null (engine calculates via annualizedNarrativeValue)
     }
-    policy.narrativePriceOverride = override != null && override >= minPrice ? override : null;
+    // 'suggested' mode → override stays null (engine calculates via annualizedNarrativeValue)
+    policy.narrativePriceOverride = (override !== null && override >= minPrice) ? override : null;
   });
 
   Object.keys(settings.paymentPolicy.cardRates).forEach(key => {

@@ -371,7 +371,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       )}
 
       {/* Payment reveal */}
-      {plan.paymentRevealed && plan.paymentVisible && (
+      {plan.paymentRevealed && !plan.paymentVisible && (
         <button className={`${styles.narrativeBtn} ${styles.revealPaymentBtn}`}
           onClick={handleRevealPayment}>
           Revelar Pagamento
