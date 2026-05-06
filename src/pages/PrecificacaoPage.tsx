@@ -304,9 +304,12 @@ function calcularPrecoSugerido(form: CalculadoraForm) {
     return total
   }, 0)
 
+  const totalRateComProfissionais = encargosSobreVendaRate + (custoProfissionaisRate * (1 - abatimentosRate))
+  if (1 - 2 * totalRateComProfissionais <= 0) return 0
+
   const precoComProfissionais = solveSuggestedPrice(
     custoFixoBase - (custoProfissionaisRate * abatimentosFixos),
-    encargosSobreVendaRate + (custoProfissionaisRate * (1 - abatimentosRate)),
+    totalRateComProfissionais,
   )
 
   if (precoComProfissionais > 0) {
@@ -372,7 +375,8 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     subtotalAntesProfissionais +
     custoProfissionais
 
-  const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
+  const margemBruta = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
+  const margem = Math.round((margemBruta + Number.EPSILON) * 100) / 100
   const precoSugerido = calcularPrecoSugerido(form)
   const diferencaParaMargemIdeal = roundCurrencyValue(precoSugerido - precoVenda)
 
