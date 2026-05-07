@@ -131,7 +131,9 @@ const PRECIFICACAO_CATEGORIAS_ODONTO = [
 ] as const
 
 const CATEGORIA_SEM_CADASTRO = 'Sem categoria'
-
+const MARGEM_IDEAL_PERCENT = 50
+const MARKUP_EQUIVALENTE_PERCENT = 100
+const MARKUP_EQUIVALENTE_FATOR = 1 + (MARKUP_EQUIVALENTE_PERCENT / 100)
 const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = {
   custoInsumos: 'Custo insumos',
   custoMaterialAplicado: 'Custo material aplicado',
@@ -255,70 +257,56 @@ function getItemMargemPercent(item: EmpresaPreco, configPadrao: ConfiguracaoGera
 }
 
 function isMargemSaudavel(margem: number | null) {
-  return margem != null && margem >= 50
+  return margem != null && margem >= MARGEM_IDEAL_PERCENT
 }
 
-function calcularPrecoSugerido(form: CalculadoraForm) {
-  const custoInsumos = parsePreco(form.custoInsumos)
-  const custoMaterialAplicado = parsePreco(form.custoMaterialAplicado)
-  const custoLaboratorio = parsePreco(form.custoLaboratorio)
-  const royaltiesRate = parsePreco(form.royaltiesPercent) / 100
-  const impostosRate = parsePreco(form.impostosPercent) / 100
-  const comissoesRate = parsePreco(form.comissoesPercent) / 100
-  const taxaMaquinaRate = parsePreco(form.taxaMaquinaPercent) / 100
-  const custoProfissionaisRate = parsePreco(form.custoProfissionaisPercent) / 100
-  const custoProfissionaisValor = parsePreco(form.custoProfissionaisValor)
+function calcularPrecoSugeridoMarkup(
+  custosFixos: number,
+  percentualVariavelTotal: number,
+) {
+  const denominador = 1 - (percentualVariavelTotal * MARKUP_EQUIVALENTE_FATOR)
 
-  const custoFixoBase =
-    custoInsumos +
-    custoMaterialAplicado +
-    custoLaboratorio
-  const encargosSobreVendaRate =
-    royaltiesRate +
-    impostosRate +
-    comissoesRate +
-    taxaMaquinaRate
-
-  const solveSuggestedPrice = (fixedCost: number, variableRate: number) => {
-    const denominator = 1 - (2 * variableRate)
-    if (denominator <= 0) return 0
-    return roundCurrencyValue((2 * fixedCost) / denominator)
+  if (denominador <= 0) {
+    return {
+      precoSugerido: null,
+      denominador,
+      custoVariavel: null,
+      custoTotal: null,
+      lucro: null,
+      margemRealSobreVenda: null,
+      markupRealSobreCusto: null,
+      inviavel: percentualVariavelTotal > 0,
+    }
   }
 
-  if (form.custoProfissionaisModo === 'valor') {
-    return solveSuggestedPrice(custoFixoBase + custoProfissionaisValor, encargosSobreVendaRate)
+  if (custosFixos <= 0) {
+    return {
+      precoSugerido: null,
+      denominador,
+      custoVariavel: null,
+      custoTotal: null,
+      lucro: null,
+      margemRealSobreVenda: null,
+      markupRealSobreCusto: null,
+      inviavel: false,
+    }
   }
 
-  const abatimentosFixos = form.custoProfissionaisBases.reduce((total, base) => {
-    if (base === 'custoInsumos') return total + custoInsumos
-    if (base === 'custoMaterialAplicado') return total + custoMaterialAplicado
-    if (base === 'custoLaboratorio') return total + custoLaboratorio
-    return total
-  }, 0)
+  const precoSugerido = roundCurrencyValue((custosFixos * MARKUP_EQUIVALENTE_FATOR) / denominador)
+  const custoVariavel = roundCurrencyValue(precoSugerido * percentualVariavelTotal)
+  const custoTotal = roundCurrencyValue(custosFixos + custoVariavel)
+  const lucro = roundCurrencyValue(precoSugerido - custoTotal)
 
-  const abatimentosRate = form.custoProfissionaisBases.reduce((total, base) => {
-    if (base === 'royalties') return total + royaltiesRate
-    if (base === 'impostos') return total + impostosRate
-    if (base === 'comissoes') return total + comissoesRate
-    if (base === 'taxaMaquina') return total + taxaMaquinaRate
-    return total
-  }, 0)
-
-  const precoComProfissionais = solveSuggestedPrice(
-    custoFixoBase - (custoProfissionaisRate * abatimentosFixos),
-    encargosSobreVendaRate + (custoProfissionaisRate * (1 - abatimentosRate)),
-  )
-
-  if (precoComProfissionais > 0) {
-    const baseLiquidaProfissionais =
-      precoComProfissionais -
-      abatimentosFixos -
-      (precoComProfissionais * abatimentosRate)
-
-    if (baseLiquidaProfissionais > 0) return precoComProfissionais
+  return {
+    precoSugerido,
+    denominador,
+    custoVariavel,
+    custoTotal,
+    lucro,
+    margemRealSobreVenda: precoSugerido > 0 ? (lucro / precoSugerido) * 100 : null,
+    markupRealSobreCusto: custoTotal > 0 ? (lucro / custoTotal) * 100 : null,
+    inviavel: false,
   }
-
-  return solveSuggestedPrice(custoFixoBase, encargosSobreVendaRate)
 }
 
 function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
@@ -373,8 +361,25 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
-  const precoSugerido = calcularPrecoSugerido(form)
-  const diferencaParaMargemIdeal = roundCurrencyValue(precoSugerido - precoVenda)
+  const custosFixosPrecoSugerido =
+    custoInsumos +
+    custoMaterialAplicado +
+    custoLaboratorio +
+    (form.custoProfissionaisModo === 'valor' ? custoProfissionaisValor : 0)
+  const percentualVariavelTotalPrecoSugerido =
+    (
+      royaltiesPercent +
+      impostosPercent +
+      comissoesPercent +
+      taxaMaquinaPercent +
+      (form.custoProfissionaisModo === 'percentual' ? custoProfissionaisPercent : 0)
+    ) / 100
+  const precoSugeridoMarkup = calcularPrecoSugeridoMarkup(
+    custosFixosPrecoSugerido,
+    percentualVariavelTotalPrecoSugerido,
+  )
+  const precoSugerido = precoSugeridoMarkup.precoSugerido
+  const diferencaParaMargemIdeal = precoSugerido == null ? null : roundCurrencyValue(precoSugerido - precoVenda)
 
   return {
     custoInsumos,
@@ -396,10 +401,25 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     comissoes,
     taxaMaquina,
     custoTotal,
+    custosFixosPrecoSugerido,
+    percentualVariavelTotalPrecoSugerido,
     precoSugerido,
+    precoSugeridoInviavel: precoSugeridoMarkup.inviavel,
+    precoSugeridoDenominador: precoSugeridoMarkup.denominador,
+    precoSugeridoCustoVariavel: precoSugeridoMarkup.custoVariavel,
+    precoSugeridoCustoTotal: precoSugeridoMarkup.custoTotal,
+    precoSugeridoLucro: precoSugeridoMarkup.lucro,
+    precoSugeridoMargemRealSobreVenda: precoSugeridoMarkup.margemRealSobreVenda,
+    precoSugeridoMarkupRealSobreCusto: precoSugeridoMarkup.markupRealSobreCusto,
     diferencaParaMargemIdeal,
     margem,
-    resultadoMargem: margem < 50 ? 'Abaixo da meta de 50%' : 'Meta de 50% atingida',
+    resultadoMargem: precoSugeridoMarkup.inviavel
+      ? 'Preço sugerido inviável'
+      : precoSugerido == null
+        ? 'Preço abaixo da margem ideal'
+      : diferencaParaMargemIdeal != null && diferencaParaMargemIdeal <= 0
+        ? 'Preço de venda acima do mínimo'
+        : 'Preço abaixo do mínimo',
   }
 }
 
@@ -673,7 +693,13 @@ function CalculadoraPrecificacaoModal({
   savingPreco: boolean
   error: string
   onSavePrice?: (result: { preco: number; margem: number }) => Promise<boolean> | boolean
-  onPersistCalculo?: (itemId: string, payload: CalculadoraPersistida, preco: number) => Promise<void>
+  onPersistCalculo?: (
+    itemId: string,
+    payload: CalculadoraPersistida,
+    preco: number,
+    nomeProduto: string,
+    categoriaProduto: string,
+  ) => Promise<void>
   onCreatePrecoCalculado?: (item: PrecoFormPayload, calculo: CalculadoraPersistida) => Promise<void>
   onClose: () => void
 }) {
@@ -695,12 +721,17 @@ function CalculadoraPrecificacaoModal({
     comissoesPercent: initialPersisted.comissoesPercent,
     taxaMaquinaPercent: initialPersisted.taxaMaquinaPercent,
   }))
-  const [precoVendaEditado, setPrecoVendaEditado] = useState(() => initialPersisted.precoVenda)
+  const [precoVendaEditado, setPrecoVendaEditado] = useState(() =>
+    initialPersisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : '')
+  )
   const [erroLocal, setErroLocal] = useState('')
-  const precoVendaAtual = parsePreco(precoVendaEditado) > 0 ? parsePreco(precoVendaEditado) : item?.preco ?? 0
+  const precoVendaNumerico = parsePreco(precoVendaEditado)
+  const temPrecoExplicito = precoVendaNumerico > 0
+  const precoVendaAtual = precoVendaNumerico > 0 ? precoVendaNumerico : item?.preco ?? 0
   const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
+  const custosBloqueados = savingPreco
 
   useEffect(() => {
     const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
@@ -719,7 +750,7 @@ function CalculadoraPrecificacaoModal({
       comissoesPercent: persisted.comissoesPercent,
       taxaMaquinaPercent: persisted.taxaMaquinaPercent,
     })
-    setPrecoVendaEditado(persisted.precoVenda)
+    setPrecoVendaEditado(persisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : ''))
     setErroLocal('')
   }, [modalStateKey])
 
@@ -727,12 +758,21 @@ function CalculadoraPrecificacaoModal({
     ...form,
     precoVenda: precoVendaEditado,
   }), [form, precoVendaEditado])
-  const savedPayload = useMemo(() => getCalculadoraPersistida(item ?? null, configPadrao), [configPadrao, item])
+  const savedPayload = useMemo(() => {
+    const p = getCalculadoraPersistida(item ?? null, configPadrao)
+    return {
+      ...p,
+      precoVenda: p.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : ''),
+    }
+  }, [configPadrao, item])
   const hasChanges = useMemo(() => {
     const baseChanged = JSON.stringify(calculadoraPersistida) !== JSON.stringify(savedPayload)
+    const nomeOriginal = item?.nome_produto ?? ''
+    const categoriaOriginal = item?.categoria ?? ''
+
     if (isCreating) return baseChanged || nome.trim() !== '' || categoria !== ''
-    return baseChanged
-  }, [calculadoraPersistida, categoria, isCreating, nome, savedPayload])
+    return baseChanged || nome.trim() !== nomeOriginal.trim() || categoria !== categoriaOriginal
+  }, [calculadoraPersistida, categoria, isCreating, item, nome, savedPayload])
 
   const handleChange = (field: Exclude<keyof CalculadoraForm, 'custoProfissionaisBases'>, value: string) => {
     setForm(prev => ({ ...prev, [field]: value }))
@@ -759,6 +799,7 @@ function CalculadoraPrecificacaoModal({
             type="checkbox"
             checked={form.custoProfissionaisBases.includes(base)}
             onChange={() => handleToggleCustoProfissionaisBase(base)}
+            disabled={custosBloqueados}
           />
         </label>
       )}
@@ -784,9 +825,14 @@ function CalculadoraPrecificacaoModal({
     }
 
     setErroLocal('')
+    const calculoParaSalvar = calcularPrecificacao(precoNumerico, form)
+    const calculadoraParaSalvar: CalculadoraPersistida = {
+      ...form,
+      precoVenda: formatCurrencyInput(precoNumerico),
+    }
 
     if (onSavePrice) {
-      await onSavePrice({ preco: precoNumerico, margem: calculo.margem })
+      await onSavePrice({ preco: precoNumerico, margem: calculoParaSalvar.margem })
       return
     }
 
@@ -795,13 +841,13 @@ function CalculadoraPrecificacaoModal({
         nome: nome.trim(),
         categoria,
         preco: precoNumerico,
-        margem: calculo.margem,
-      }, calculadoraPersistida)
+        margem: calculoParaSalvar.margem,
+      }, calculadoraParaSalvar)
       return
     }
 
     if (!item) return
-    await onPersistCalculo?.(item.id, calculadoraPersistida, precoNumerico)
+    await onPersistCalculo?.(item.id, calculadoraParaSalvar, precoNumerico, nome.trim(), categoria)
   }
 
   return (
@@ -817,7 +863,7 @@ function CalculadoraPrecificacaoModal({
             <p className={styles.calcItemName}>
               {isCreating
                 ? 'Preencha os dados do produto ou servico e salve tudo em uma etapa.'
-                : `${item.nome_produto} - ${getCategoriaLabel(item.categoria)}`}
+                : 'Ajuste o preço de venda e os custos para verificar a margem e o mínimo recomendado.'}
             </p>
           </div>
           <div className={styles.modalHeaderActions}>
@@ -827,39 +873,37 @@ function CalculadoraPrecificacaoModal({
 
         <div className={styles.calcLayout}>
           <div className={styles.calcForm}>
-            {isCreating && (
-              <div className={styles.calcFormCard}>
-                <div className={styles.calcFormHeader}>
-                  <h3 className={styles.calcFormTitle}>Dados do item</h3>
-                  <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
-                </div>
-                <label className={styles.modalField}>
-                  <span className={styles.modalLabel}>Nome do produto ou servico</span>
-                  <input
-                    className={styles.modalInput}
-                    value={nome}
-                    onChange={e => { setNome(e.target.value); setErroLocal('') }}
-                    placeholder="Ex: Consulta de avaliação"
-                    autoFocus
-                    disabled={savingPreco}
-                  />
-                </label>
-                <label className={styles.modalField}>
-                  <span className={styles.modalLabel}>Categoria odontologica</span>
-                  <select
-                    className={styles.modalInput}
-                    value={categoria}
-                    onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
-                    disabled={savingPreco}
-                  >
-                    <option value="">Selecione uma categoria</option>
-                    {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
-                      <option key={itemCategoria} value={itemCategoria}>{itemCategoria}</option>
-                    ))}
-                  </select>
-                </label>
+            <div className={styles.calcFormCard}>
+              <div className={styles.calcFormHeader}>
+                <h3 className={styles.calcFormTitle}>Dados do item</h3>
+                <p className={styles.calcFormHint}>Essas informações serão salvas junto com a precificação.</p>
               </div>
-            )}
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Nome do produto ou servico</span>
+                <input
+                  className={styles.modalInput}
+                  value={nome}
+                  onChange={e => { setNome(e.target.value); setErroLocal('') }}
+                  placeholder="Ex: Consulta de avaliação"
+                  autoFocus={!isCreating}
+                  disabled={savingPreco}
+                />
+              </label>
+              <label className={styles.modalField}>
+                <span className={styles.modalLabel}>Categoria odontologica</span>
+                <select
+                  className={styles.modalInput}
+                  value={categoria}
+                  onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
+                  disabled={savingPreco}
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
+                    <option key={itemCategoria} value={itemCategoria}>{itemCategoria}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             <div className={styles.calcFormCard}>
               <div className={styles.calcFormHeader}>
@@ -880,6 +924,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoInsumos', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 40,00"
+                  disabled={custosBloqueados}
                 />
               </label>
               <label className={styles.modalField}>
@@ -896,6 +941,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoMaterialAplicado', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 700,00"
+                  disabled={custosBloqueados}
                 />
               </label>
               <label className={styles.modalField}>
@@ -912,6 +958,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('custoLaboratorio', formatCurrencyTypingInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: R$ 120,00"
+                  disabled={custosBloqueados}
                 />
               </label>
             </div>
@@ -937,6 +984,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('royaltiesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 9"
+                  disabled={custosBloqueados}
                 />
               </label>
               <label className={styles.modalField}>
@@ -952,6 +1000,7 @@ function CalculadoraPrecificacaoModal({
                     type="button"
                     className={`${styles.switchOption} ${form.custoProfissionaisModo === 'percentual' ? styles.switchOptionActive : ''}`}
                     onClick={() => handleToggleCustoProfissionais('percentual')}
+                    disabled={custosBloqueados}
                   >
                     Porcentagem
                   </button>
@@ -959,6 +1008,7 @@ function CalculadoraPrecificacaoModal({
                     type="button"
                     className={`${styles.switchOption} ${form.custoProfissionaisModo === 'valor' ? styles.switchOptionActive : ''}`}
                     onClick={() => handleToggleCustoProfissionais('valor')}
+                    disabled={custosBloqueados}
                   >
                     Valor
                   </button>
@@ -975,6 +1025,7 @@ function CalculadoraPrecificacaoModal({
                   }}
                   inputMode="decimal"
                   placeholder={form.custoProfissionaisModo === 'percentual' ? 'Ex: 30' : 'Ex: R$ 450,00'}
+                  disabled={custosBloqueados}
                 />
                 {form.custoProfissionaisModo === 'percentual' && (
                   <span className={styles.modalFieldHint}>
@@ -996,6 +1047,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('impostosPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 8"
+                  disabled={custosBloqueados}
                 />
               </label>
               <label className={styles.modalField}>
@@ -1012,6 +1064,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('comissoesPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 3"
+                  disabled={custosBloqueados}
                 />
               </label>
               <label className={styles.modalField}>
@@ -1028,6 +1081,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { handleChange('taxaMaquinaPercent', sanitizePercentInput(e.target.value)); setErroLocal('') }}
                   inputMode="decimal"
                   placeholder="Ex: 2"
+                  disabled={custosBloqueados}
                 />
               </label>
             </div>
@@ -1097,26 +1151,46 @@ function CalculadoraPrecificacaoModal({
               </div>
               <div className={styles.calcHighlight}>
                 <span>Margem</span>
-                <strong>{formatPercent(calculo.margem)}</strong>
+                <strong>{temPrecoExplicito ? formatPercent(calculo.margem) : '—'}</strong>
               </div>
               <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
-                <span>Preço mínimo viável</span>
-                {calculo.precoSugerido === 0 ? (
+                <span>Preço sugerido com markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)} sobre custo</span>
+                {calculo.precoSugeridoInviavel ? (
                   <>
-                    <strong>Inatingível</strong>
-                    <span className={styles.calcHighlightHint}>Os encargos variáveis somam 50% ou mais do preço de venda. Reduza os percentuais para viabilizar a meta de 50%.</span>
+                    <strong>Não viável</strong>
+                    <span className={styles.calcHighlightHint}>
+                      Com os percentuais atuais, não é possível atingir margem de {formatPercent(MARGEM_IDEAL_PERCENT)} sobre venda usando markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)}, pois os custos percentuais sobre venda estão muito altos.
+                    </span>
+                    <span className={styles.calcHighlightHint}>
+                      Percentual variável total: {formatPercent(calculo.percentualVariavelTotalPrecoSugerido * 100)}.
+                    </span>
+                  </>
+                ) : calculo.precoSugerido == null ? (
+                  <>
+                    <strong>{formatCurrency(precoVendaAtual)}</strong>
+                    <span className={styles.calcHighlightHint}>
+                      Este é o preço de venda atual. Com os percentuais informados, ele gera {formatPercent(calculo.margem)} de margem.
+                    </span>
                   </>
                 ) : (
                   <>
                     <strong>{formatCurrency(calculo.precoSugerido)}</strong>
-                    <span className={styles.calcHighlightHint}>Preço mínimo para atingir 50% de margem.</span>
+                    <span className={styles.calcHighlightHint}>Preço sugerido para buscar margem de {formatPercent(MARGEM_IDEAL_PERCENT)} sobre venda.</span>
                     <span className={styles.calcHighlightHint}>
-                      {Math.abs(calculo.diferencaParaMargemIdeal) < 0.005
-                        ? 'O preço atual já está no ponto de equilíbrio da meta.'
-                        : calculo.diferencaParaMargemIdeal > 0
-                          ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal)} no preço de venda para chegar a 50%.`
-                          : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal))} acima da meta de 50%.`}
+                      Custo variável: {formatCurrency(calculo.precoSugeridoCustoVariavel ?? 0)} · Custo total: {formatCurrency(calculo.precoSugeridoCustoTotal ?? 0)} · Lucro: {formatCurrency(calculo.precoSugeridoLucro ?? 0)}
                     </span>
+                    <span className={styles.calcHighlightHint}>
+                      Margem real sobre venda: {formatPercent(calculo.precoSugeridoMargemRealSobreVenda ?? 0)} · Markup real sobre custo: {formatPercent(calculo.precoSugeridoMarkupRealSobreCusto ?? 0)}
+                    </span>
+                    {temPrecoExplicito && (
+                      <span className={styles.calcHighlightHint}>
+                        {Math.abs(calculo.diferencaParaMargemIdeal ?? 0) < 0.005
+                          ? 'O preço atual já está no ponto de equilíbrio da meta.'
+                          : (calculo.diferencaParaMargemIdeal ?? 0) > 0
+                            ? `Faltam ${formatCurrency(calculo.diferencaParaMargemIdeal ?? 0)} no preço de venda para chegar a ${formatPercent(MARGEM_IDEAL_PERCENT)}.`
+                            : `O preço atual está ${formatCurrency(Math.abs(calculo.diferencaParaMargemIdeal ?? 0))} acima da meta de ${formatPercent(MARGEM_IDEAL_PERCENT)}.`}
+                      </span>
+                    )}
                   </>
                 )}
               </div>
@@ -1147,9 +1221,9 @@ function CalculadoraPrecificacaoModal({
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${calculo.margem < 50 ? styles.calcHighlightBad : styles.calcHighlightGood}`}>
+              <div className={`${styles.calcHighlight} ${!temPrecoExplicito ? '' : calculo.resultadoMargem === 'Preço de venda acima do mínimo' ? styles.calcHighlightGood : styles.calcHighlightBad}`}>
                 <span>Resultado da margem</span>
-                <strong>{calculo.resultadoMargem}</strong>
+                <strong>{temPrecoExplicito ? calculo.resultadoMargem : '—'}</strong>
               </div>
             </div>
             {canManage && (
@@ -1172,6 +1246,8 @@ function CalculadoraPrecificacaoModal({
                       comissoesPercent: savedPayload.comissoesPercent,
                       taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
                     })
+                    setNome(item?.nome_produto ?? '')
+                    setCategoria(item?.categoria ?? '')
                     setPrecoVendaEditado(savedPayload.precoVenda)
                     setErroLocal('')
                   }}
@@ -1191,6 +1267,24 @@ function CalculadoraPrecificacaoModal({
             )}
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function ParabensModal({ onClose }: { onClose: () => void }) {
+  return (
+    <div className={styles.modalOverlay} onClick={onClose}>
+      <div className={`${styles.modal} ${styles.parabensModal}`} onClick={e => e.stopPropagation()}>
+        <div className={styles.parabensIcon}>🎉</div>
+        <h2 className={styles.parabensTitle}>Parabéns!</h2>
+        <p className={styles.parabensText}>
+          O preço deste produto ou serviço agora está alinhado com o cálculo de precificação da Gestaa.
+          Continue revisando os demais itens da sua lista para garantir que todos os seus serviços sejam rentáveis e sustentáveis.
+        </p>
+        <button type="button" className={styles.modalSubmit} onClick={onClose}>
+          Ótimo!
+        </button>
       </div>
     </div>
   )
@@ -1322,6 +1416,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [feedback, setFeedback] = useState('')
   const [precoEditando, setPrecoEditando] = useState<EmpresaPreco | null>(null)
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)
+  const [showParabens, setShowParabens] = useState(false)
   const [configGeral, setConfigGeral] = useState<EmpresaPrecificacaoConfig | null>(null)
   const [configForm, setConfigForm] = useState<ConfiguracaoGeralForm>({
     royaltiesPercent: '',
@@ -1596,10 +1691,10 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setPrecos(prev =>
       [...prev, data].sort((a, b) => a.nome_produto.localeCompare(b.nome_produto, 'pt-BR'))
     )
-    setFeedback('Preço calculado salvo com sucesso.')
     setShowCreatePrecoModal(false)
     setShowPrecoCalculadoModal(false)
     setSavingPreco(false)
+    setShowParabens(true)
   }
 
   const handleEditPreco = async (itemId: string, item: PrecoFormPayload) => {
@@ -1663,7 +1758,13 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setFeedback('Preço excluído com sucesso.')
   }
 
-  const handlePersistCalculo = async (itemId: string, payload: CalculadoraPersistida, preco: number) => {
+  const handlePersistCalculo = async (
+    itemId: string,
+    payload: CalculadoraPersistida,
+    preco: number,
+    nomeProduto: string,
+    categoriaProduto: string,
+  ) => {
     setSavingPreco(true)
     setError('')
 
@@ -1678,6 +1779,8 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     const { data, error: updateError } = await supabase
       .from('empresa_precos')
       .update({
+        nome_produto: nomeProduto,
+        categoria: categoriaProduto,
         preco,
         margem_percent: margem,
         precificacao_calculo: payload,
@@ -1700,6 +1803,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     )
     setItemCalculadora(data)
     setSavingPreco(false)
+    setShowParabens(true)
   }
 
   const handleConfigChange = (field: keyof ConfiguracaoGeralForm, value: string) => {
@@ -1993,6 +2097,17 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
             error={error}
             onPersistCalculo={handlePersistCalculo}
             onClose={() => setItemCalculadora(null)}
+          />
+        )}
+      </ModalTransition>
+
+      <ModalTransition open={showParabens}>
+        {showParabens && (
+          <ParabensModal
+            onClose={() => {
+              setShowParabens(false)
+              setItemCalculadora(null)
+            }}
           />
         )}
       </ModalTransition>
