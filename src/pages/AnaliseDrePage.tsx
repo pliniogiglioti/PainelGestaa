@@ -432,6 +432,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [showUpload,       setShowUpload]       = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
+  const [canExcluirPeriodo, setCanExcluirPeriodo] = useState(false)
   const [buscaLancamento, setBuscaLancamento] = useSessionStorageState(
     `${storagePrefix}:busca-lancamento`,
     '',
@@ -523,18 +524,19 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           const admin = profile?.role === 'admin'
           setIsAdmin(admin)
 
+          const { data: membro } = await supabase
+            .from('empresa_membros')
+            .select('user_id, role')
+            .eq('empresa_id', empresa.id)
+            .eq('user_id', myId)
+            .maybeSingle()
+
+          setCanExcluirPeriodo(admin || empresa.created_by === myId || membro?.role === 'admin')
+
           // Validate that user still has access to this empresa (sessionStorage may be stale)
-          if (!admin) {
-            const { data: membro } = await supabase
-              .from('empresa_membros')
-              .select('user_id')
-              .eq('empresa_id', empresa.id)
-              .eq('user_id', myId)
-              .maybeSingle()
-            if (!membro) {
-              onTrocarEmpresa()
-              return
-            }
+          if (!admin && !membro) {
+            onTrocarEmpresa()
+            return
           }
 
           // Pass admin explicitly to avoid stale closure (React state not yet committed)
@@ -990,6 +992,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   }, [lancamentos, anoFiltro, mesesFiltro])
 
   const excluirLancamentosPeriodo = async () => {
+    if (!canExcluirPeriodo) return
     if (idsPeriodoSelecionado.length === 0) return
     setDeletingPeriodo(true)
     try {
@@ -1491,7 +1494,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
               </select>
             </label>
 
-            {anoFiltro !== 'todos' && (
+            {canExcluirPeriodo && anoFiltro !== 'todos' && (
               <button
                 className={styles.deletePeriodoBtn}
                 onClick={() => setShowDeletePeriodo(true)}
