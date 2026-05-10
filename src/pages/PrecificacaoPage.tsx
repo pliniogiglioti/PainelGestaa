@@ -51,6 +51,13 @@ type ConfiguracaoGeralForm = {
   taxaMaquinaPercent: string
 }
 
+type CampoPercentualVariavel =
+  | 'royaltiesPercent'
+  | 'custoProfissionaisPercent'
+  | 'impostosPercent'
+  | 'comissoesPercent'
+  | 'taxaMaquinaPercent'
+
 type PrecoFormPayload = {
   nome: string
   categoria: string
@@ -142,6 +149,14 @@ const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = 
   impostos: 'Impostos',
   comissoes: 'Comissões vendas',
   taxaMaquina: 'Taxa máquina',
+}
+
+const CAMPO_PERCENTUAL_LABELS: Record<CampoPercentualVariavel, string> = {
+  royaltiesPercent: 'Royalties e FNP',
+  custoProfissionaisPercent: 'custo dos profissionais',
+  impostosPercent: 'Impostos',
+  comissoesPercent: 'ComissÃµes de vendas',
+  taxaMaquinaPercent: 'Taxa mÃ¡quina',
 }
 
 function Spinner() {
@@ -731,11 +746,31 @@ function CalculadoraPrecificacaoModal({
   const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
-  const custoProfissionaisNaoViavel =
-    calculo.precoSugeridoInviavel &&
-    calculo.custoProfissionaisModo === 'percentual' &&
-    calculo.custoProfissionaisPercent > 0
+  const camposPercentuaisNaoViaveis = useMemo(() => {
+    if (!calculo.precoSugeridoInviavel) return new Set<CampoPercentualVariavel>()
+
+    const percentuais = new Map<CampoPercentualVariavel, number>([
+      ['royaltiesPercent', calculo.royaltiesPercent],
+      ['impostosPercent', calculo.impostosPercent],
+      ['comissoesPercent', calculo.comissoesPercent],
+      ['taxaMaquinaPercent', calculo.taxaMaquinaPercent],
+      ['custoProfissionaisPercent', calculo.custoProfissionaisModo === 'percentual' ? calculo.custoProfissionaisPercent : 0],
+    ])
+
+    const totalPercentual = [...percentuais.values()].reduce((acc, value) => acc + value, 0)
+    const limiteViavel = 50
+
+    return new Set(
+      [...percentuais.entries()]
+        .filter(([, value]) => value > 0)
+        .filter(([, value]) => totalPercentual - value <= limiteViavel)
+        .map(([field]) => field),
+    )
+  }, [calculo])
   const custosBloqueados = savingPreco
+
+  const getMensagemCampoNaoViavel = (field: CampoPercentualVariavel) =>
+    `Aconselhamos que você revise ${CAMPO_PERCENTUAL_LABELS[field]}. No formato atual, esse percentual está alto demais para a venda e está deixando o preço sugerido sem viabilidade dentro da margem ideal da Gestaa.`
 
   useEffect(() => {
     const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
@@ -990,6 +1025,11 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 9"
                   disabled={custosBloqueados}
                 />
+                {camposPercentuaisNaoViaveis.has('royaltiesPercent') && (
+                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
+                    {getMensagemCampoNaoViavel('royaltiesPercent')}
+                  </span>
+                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1018,7 +1058,7 @@ function CalculadoraPrecificacaoModal({
                   </button>
                 </div>
                 <input
-                  className={`${styles.modalInput} ${custoProfissionaisNaoViavel ? styles.modalInputDanger : ''}`}
+                  className={`${styles.modalInput} ${camposPercentuaisNaoViaveis.has('custoProfissionaisPercent') ? styles.modalInputDanger : ''}`}
                   value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
                   onChange={e => {
                     handleChange(
@@ -1036,9 +1076,9 @@ function CalculadoraPrecificacaoModal({
                     A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? Marque ao lado quais devem ser abatidos.
                   </span>
                 )}
-                {custoProfissionaisNaoViavel && (
+                {camposPercentuaisNaoViaveis.has('custoProfissionaisPercent') && (
                   <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    Aconselhamos que você reduza o percentual de custo dos profissionais ou reveja os abatimentos usados nessa base de cálculo. No formato atual, esse repasse está alto demais para a venda e acaba impedindo um preço sugerido viável com a margem ideal da Gestaa.
+                    {getMensagemCampoNaoViavel('custoProfissionaisPercent')}
                   </span>
                 )}
               </label>
@@ -1058,6 +1098,11 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 8"
                   disabled={custosBloqueados}
                 />
+                {camposPercentuaisNaoViaveis.has('impostosPercent') && (
+                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
+                    {getMensagemCampoNaoViavel('impostosPercent')}
+                  </span>
+                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1075,6 +1120,11 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 3"
                   disabled={custosBloqueados}
                 />
+                {camposPercentuaisNaoViaveis.has('comissoesPercent') && (
+                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
+                    {getMensagemCampoNaoViavel('comissoesPercent')}
+                  </span>
+                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1092,6 +1142,11 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 2"
                   disabled={custosBloqueados}
                 />
+                {camposPercentuaisNaoViaveis.has('taxaMaquinaPercent') && (
+                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
+                    {getMensagemCampoNaoViavel('taxaMaquinaPercent')}
+                  </span>
+                )}
               </label>
             </div>
           </div>
