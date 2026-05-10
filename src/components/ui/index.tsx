@@ -180,12 +180,14 @@ export function Modal({
   children,
   wide = false,
   className,
+  bodyClassName,
 }: {
   title: ReactNode
   onClose: () => void
   children: ReactNode
   wide?: boolean
   className?: string
+  bodyClassName?: string
 }) {
   const backdropDismiss = useBackdropDismiss(onClose)
 
@@ -194,16 +196,16 @@ export function Modal({
       className={styles.overlay}
       onPointerDown={backdropDismiss.handleBackdropPointerDown}
       onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={cx(styles.modal, wide && styles.modalWide, className)} onClick={event => event.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>{title}</h2>
-          <IconButton label="Fechar" variant="ghost" size="sm" onClick={onClose}>
-            x
-          </IconButton>
+      >
+        <div className={cx(styles.modal, wide && styles.modalWide, className)} onClick={event => event.stopPropagation()}>
+          <div className={styles.modalHeader}>
+            <h2 className={styles.modalTitle}>{title}</h2>
+            <IconButton label="Fechar" variant="ghost" size="sm" onClick={onClose}>
+              x
+            </IconButton>
+          </div>
+          <div className={cx(styles.modalBody, bodyClassName)}>{children}</div>
         </div>
-        <div className={styles.modalBody}>{children}</div>
       </div>
-    </div>
   )
 }

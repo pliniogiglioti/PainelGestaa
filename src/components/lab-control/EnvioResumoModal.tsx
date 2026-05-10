@@ -106,6 +106,8 @@ export function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precos
 
   return (
       <Modal title={`Resumo do trabalho — ${envio.paciente_nome}`} onClose={onClose} wide>
+      <div className={styles.summaryModalLayout}>
+        <div className={styles.summaryModalScroll}>
       {/* Tabs */}
       <div className={styles.tabs} style={{ marginBottom: 16 }}>
         {(['detalhes', 'historico', 'anexos'] as const).map(tab => (
@@ -245,7 +247,9 @@ export function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precos
         </div>
       )}
 
-      <div className={styles.formActions}>
+        </div>
+
+      <div className={`${styles.formActions} ${styles.modalFooterActions}`}>
         <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
         <span style={{ flex: 1 }} />
         {briefingUrl && (
@@ -259,6 +263,7 @@ export function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precos
           </button>
         )}
         <button type="button" className={styles.btnPrimary} onClick={onEdit}>Editar</button>
+      </div>
       </div>
     </Modal>
   )

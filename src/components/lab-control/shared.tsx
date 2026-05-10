@@ -262,13 +262,15 @@ export function OverviewMenu({
 
 // ── Modal Wrapper ──────────────────────────────────────────────────────────
 
-export function Modal({ title, onClose, children, wide }: {
+export function Modal({ title, onClose, children, wide, className, bodyClassName }: {
   title: string
   onClose: () => void
   children: React.ReactNode
   wide?: boolean
+  className?: string
+  bodyClassName?: string
 }) {
-  return <UiModal title={title} onClose={onClose} wide={wide}>{children}</UiModal>
+  return <UiModal title={title} onClose={onClose} wide={wide} className={className} bodyClassName={bodyClassName}>{children}</UiModal>
 }
 
 // ── LabModal (Create/Edit Lab — Admin) ────────────────────────────────────

@@ -1127,6 +1127,27 @@
   padding-right: 16px;
   position: relative;
 }
+.stepItemButton {
+  appearance: none;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  padding-left: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.stepItemInteractive {
+  cursor: pointer;
+}
+.stepItemInteractive:hover .stepDot {
+  border-color: var(--gold);
+  color: var(--gold-light);
+}
+.stepItemInteractive:hover .stepLabel {
+  color: var(--text);
+}
 .stepItem:not(:last-child)::after {
   content: '';
   position: absolute;
@@ -1189,6 +1210,27 @@
 .stepContent {
   min-height: 120px;
   margin-bottom: 16px;
+}
+.wizardModalLayout,
+.summaryModalLayout {
+  margin: -20px;
+  min-height: min(70vh, 760px);
+  max-height: min(70vh, 760px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.wizardModalScroll,
+.summaryModalScroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+}
+.summaryModalScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 .stepHint {
   font-size: 12.5px;
@@ -1870,6 +1912,11 @@
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+.modalFooterActions {
+  margin-top: 0;
+  padding: 16px 24px 24px;
+  flex-shrink: 0;
 }
 
 .errorMsg {

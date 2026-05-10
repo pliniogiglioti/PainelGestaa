@@ -321,20 +321,42 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
   ]
   const TOTAL_STEPS = steps.length
   const displayTrabalho = form.tipo_trabalho
+  const canJumpBetweenSteps = Boolean(envio)
+
+  const handleStepSelect = (targetStep: number) => {
+    if (!canJumpBetweenSteps || targetStep === step) return
+    setError('')
+    setStep(targetStep)
+  }
 
   return (
     <Modal title={envio ? 'Editar Envio' : `Novo Envio${currentLab ? ` — ${currentLab.nome}` : ''}`} onClose={onClose} wide>
+      <div className={styles.wizardModalLayout}>
+        <div className={styles.wizardModalScroll}>
       {/* Step indicator */}
       <div className={styles.stepIndicator}>
-        {steps.map((stepInfo, i) => (
-          <div key={stepInfo.title} className={`${styles.stepItem} ${i + 1 === step ? styles.stepActive : ''} ${i + 1 < step ? styles.stepDone : ''}`}>
+        {steps.map((stepInfo, i) => {
+          const stepNumber = i + 1
+          const isCurrent = stepNumber === step
+          const isDone = stepNumber < step
+
+          return (
+            <button
+            type="button"
+            key={stepInfo.title}
+            className={`${styles.stepItem} ${styles.stepItemButton} ${isCurrent ? styles.stepActive : ''} ${isDone ? styles.stepDone : ''} ${canJumpBetweenSteps ? styles.stepItemInteractive : ''}`}
+            onClick={() => handleStepSelect(stepNumber)}
+            aria-current={isCurrent ? 'step' : undefined}
+            title={canJumpBetweenSteps ? `Ir para ${stepInfo.title}` : undefined}
+          >
             <div className={styles.stepDot}>{i + 1 < step ? '✓' : i + 1}</div>
             <span className={styles.stepText}>
               <span className={styles.stepLabel}>{stepInfo.title}</span>
               <span className={styles.stepDescription}>{stepInfo.description}</span>
             </span>
-          </div>
-        ))}
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Step 1: Tipo de trabalho ── */}
@@ -756,8 +778,9 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
       )}
 
       {error && <p className={styles.errorMsg}>{error}</p>}
+        </div>
 
-      <div className={styles.formActions}>
+      <div className={`${styles.formActions} ${styles.modalFooterActions}`}>
         {step > 1 && (
           <button type="button" className={styles.btnSecondary} onClick={() => { setError(''); setStep(s => s - 1) }}>Voltar</button>
         )}
@@ -770,6 +793,7 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
             {saving ? 'Salvando...' : envio ? 'Salvar alterações' : 'Confirmar envio'}
           </button>
         )}
+      </div>
       </div>
     </Modal>
   )
