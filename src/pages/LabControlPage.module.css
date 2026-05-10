@@ -1227,6 +1227,9 @@
   overflow-y: auto;
   padding-right: 4px;
 }
+.wizardModalScroll {
+  padding: 20px 18px 0;
+}
 .summaryModalScroll {
   display: flex;
   flex-direction: column;
