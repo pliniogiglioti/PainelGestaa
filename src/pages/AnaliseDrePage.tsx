@@ -671,7 +671,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       classificacoes: Map<string, { total: number; items: DreLancamento[] }>
     }>()
     for (const l of lancamentosFiltrados) {
-      const gKey = CLASSIFICACAO_TO_GRUPO[l.classificacao] ?? l.grupo ?? 'Sem grupo'
+      const gKey = l.grupo?.trim() || CLASSIFICACAO_TO_GRUPO[l.classificacao] || 'Sem grupo'
       const cKey = l.classificacao || 'Sem classificação'
       const tipo = (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') as 'receita' | 'despesa'
       if (!grupoMap.has(gKey)) grupoMap.set(gKey, { total: 0, tipo, classificacoes: new Map() })
@@ -925,13 +925,16 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     const classificacaoNome = editClassForm.classificacaoNome.trim()
     const grupoNome         = editClassForm.grupo.trim()
     const tipo              = editClassForm.tipo as 'receita' | 'despesa'
+    const payload           = { tipo, classificacao: classificacaoNome, grupo: grupoNome }
 
     const { error: errUpdate } = await supabase
       .from('dre_lancamentos')
-      .update({ tipo, classificacao: classificacaoNome, grupo: grupoNome })
+      .update(payload)
       .eq('id', editClassItem.id)
 
     if (errUpdate) { setEditClassError(errUpdate.message); setEditClassSaving(false); return }
+
+    const idsAtualizados = new Set<string>([editClassItem.id])
 
     // Busca outros lançamentos da mesma empresa com descrição normalizada idêntica
     const descNorm = normalizeKey(editClassItem.descricao ?? '')
@@ -944,10 +947,13 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           `Encontramos ${outros.length} outro${outros.length > 1 ? 's' : ''} lançamento${outros.length > 1 ? 's' : ''} com a mesma descrição "${editClassItem.descricao?.slice(0, 60)}". Deseja atualizar a classificação deles também?`,
         )
         if (confirmar) {
-          await supabase
+          const otherIds = outros.map(l => l.id)
+          const { error: errOutros } = await supabase
             .from('dre_lancamentos')
-            .update({ tipo, classificacao: classificacaoNome, grupo: grupoNome })
-            .in('id', outros.map(l => l.id))
+            .update(payload)
+            .in('id', otherIds)
+          if (errOutros) { setEditClassError(errOutros.message); setEditClassSaving(false); return }
+          otherIds.forEach(id => idsAtualizados.add(id))
         }
       }
 
@@ -962,10 +968,14 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       }, { onConflict: 'empresa_id,descricao_normalizada' })
     }
 
+    setLancamentos(prev => prev.map(item =>
+      idsAtualizados.has(item.id) ? { ...item, ...payload } : item,
+    ))
+
     setEditClassSaving(false)
     closeEditClassModal()
-    fetchLancamentos()
-    fetchGrupos()
+    await fetchLancamentos()
+    await fetchGrupos()
   }
 
   const deleteLancamento = async (item: DreLancamento) => {
@@ -2051,8 +2061,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
                       key={c.id}
                       className={`${styles.listboxItem} ${editClassForm.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
                       onClick={() => {
-                        const grupoSugerido = CLASSIFICACAO_TO_GRUPO[c.nome] ?? ''
-                        setEditClassForm(p => ({ ...p, classificacaoNome: c.nome, grupo: grupoSugerido }))
+                        setEditClassForm(p => ({
+                          ...p,
+                          classificacaoNome: c.nome,
+                          grupo: CLASSIFICACAO_TO_GRUPO[c.nome] ?? p.grupo,
+                        }))
                       }}
                     >
                       <span className={styles.listboxRadio}>{editClassForm.classificacaoNome === c.nome ? '●' : '○'}</span>
