@@ -731,6 +731,10 @@ function CalculadoraPrecificacaoModal({
   const modalStateKey = item?.id ?? '__new__'
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
+  const custoProfissionaisNaoViavel =
+    calculo.precoSugeridoInviavel &&
+    calculo.custoProfissionaisModo === 'percentual' &&
+    calculo.custoProfissionaisPercent > 0
   const custosBloqueados = savingPreco
 
   useEffect(() => {
@@ -1014,7 +1018,7 @@ function CalculadoraPrecificacaoModal({
                   </button>
                 </div>
                 <input
-                  className={styles.modalInput}
+                  className={`${styles.modalInput} ${custoProfissionaisNaoViavel ? styles.modalInputDanger : ''}`}
                   value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
                   onChange={e => {
                     handleChange(
@@ -1030,6 +1034,11 @@ function CalculadoraPrecificacaoModal({
                 {form.custoProfissionaisModo === 'percentual' && (
                   <span className={styles.modalFieldHint}>
                     A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? Marque ao lado quais devem ser abatidos.
+                  </span>
+                )}
+                {custoProfissionaisNaoViavel && (
+                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
+                    Aconselhamos que você reduza o percentual de custo dos profissionais ou reveja os abatimentos usados nessa base de cálculo. No formato atual, esse repasse está alto demais para a venda e acaba impedindo um preço sugerido viável com a margem ideal da Gestaa.
                   </span>
                 )}
               </label>

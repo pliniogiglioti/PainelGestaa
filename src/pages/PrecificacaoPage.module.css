@@ -825,6 +825,14 @@
   color: var(--text-muted);
 }
 
+.modalFieldHintDanger {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(201, 73, 73, 0.34);
+  background: rgba(201, 73, 73, 0.1);
+  color: #ffb1b1;
+}
+
 .switchField {
   display: flex;
   align-items: center;
@@ -885,6 +893,11 @@
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
   font-family: inherit;
+}
+
+.modalInputDanger {
+  border-color: rgba(201, 73, 73, 0.7);
+  box-shadow: 0 0 0 3px rgba(201, 73, 73, 0.12);
 }
 
 .calcShortcutButton {
