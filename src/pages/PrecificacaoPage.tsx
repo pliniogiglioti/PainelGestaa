@@ -744,6 +744,7 @@ function CalculadoraPrecificacaoModal({
   const temPrecoExplicito = precoVendaNumerico > 0
   const precoVendaAtual = precoVendaNumerico > 0 ? precoVendaNumerico : item?.preco ?? 0
   const modalStateKey = item?.id ?? '__new__'
+  const aguardandoPrecoInicial = isCreating && !temPrecoExplicito
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
   const camposPercentuaisNaoViaveis = useMemo(() => {
@@ -757,17 +758,14 @@ function CalculadoraPrecificacaoModal({
       ['custoProfissionaisPercent', calculo.custoProfissionaisModo === 'percentual' ? calculo.custoProfissionaisPercent : 0],
     ])
 
-    const totalPercentual = [...percentuais.values()].reduce((acc, value) => acc + value, 0)
-    const limiteViavel = 50
+    const maiorPercentual = [...percentuais.entries()]
+      .filter(([, value]) => value > 0)
+      .sort(([, a], [, b]) => b - a)[0]?.[0]
 
-    return new Set(
-      [...percentuais.entries()]
-        .filter(([, value]) => value > 0)
-        .filter(([, value]) => totalPercentual - value <= limiteViavel)
-        .map(([field]) => field),
-    )
+    return maiorPercentual ? new Set<CampoPercentualVariavel>([maiorPercentual]) : new Set<CampoPercentualVariavel>()
   }, [calculo])
-  const custosBloqueados = savingPreco
+  const camposBloqueadosAtePreco = aguardandoPrecoInicial || savingPreco
+  const custosBloqueados = camposBloqueadosAtePreco
 
   const getMensagemCampoNaoViavel = (field: CampoPercentualVariavel) =>
     `Aconselhamos que você revise ${CAMPO_PERCENTUAL_LABELS[field]}. No formato atual, esse percentual está alto demais para a venda e está deixando o preço sugerido sem viabilidade dentro da margem ideal da Gestaa.`
@@ -925,7 +923,7 @@ function CalculadoraPrecificacaoModal({
                   onChange={e => { setNome(e.target.value); setErroLocal('') }}
                   placeholder="Ex: Consulta de avaliação"
                   autoFocus={!isCreating}
-                  disabled={savingPreco}
+                  disabled={camposBloqueadosAtePreco}
                 />
               </label>
               <label className={styles.modalField}>
@@ -934,7 +932,7 @@ function CalculadoraPrecificacaoModal({
                   className={styles.modalInput}
                   value={categoria}
                   onChange={e => { setCategoria(e.target.value); setErroLocal('') }}
-                  disabled={savingPreco}
+                  disabled={camposBloqueadosAtePreco}
                 >
                   <option value="">Selecione uma categoria</option>
                   {PRECIFICACAO_CATEGORIAS_ODONTO.map(itemCategoria => (
@@ -1258,7 +1256,7 @@ function CalculadoraPrecificacaoModal({
                   </>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable}`}>
+              <div className={`${styles.calcHighlight} ${styles.calcHighlightEditable} ${aguardandoPrecoInicial ? styles.calcHighlightAttention : ''}`}>
                 <span>Preço de venda</span>
                 {canManage ? (
                   <>
@@ -1269,11 +1267,14 @@ function CalculadoraPrecificacaoModal({
                       inputMode="decimal"
                       placeholder="Ex: R$ 1.250,00"
                       disabled={savingPreco}
+                      autoFocus={isCreating}
                     />
                     {(erroLocal || error) && <p className={styles.formError}>{erroLocal || error}</p>}
                     {!erroLocal && !error && (
                       <p className={styles.modalFieldHint}>
-                        {isCreating
+                        {aguardandoPrecoInicial
+                          ? 'Digite primeiro o preço de venda para liberar os dados e custos deste preço calculado.'
+                          : isCreating
                           ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
                           : hasChanges
                             ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
