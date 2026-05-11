@@ -752,11 +752,7 @@ function CalculadoraPrecificacaoModal({
     calculo.precoSugerido != null &&
     calculo.precoSugerido > precoVendaAtual * 2
   const camposPercentuaisNaoViaveis = useMemo(() => {
-    if (!calculo.precoSugeridoInviavel) {
-      return precoSugeridoMuitoAcima
-        ? new Set<CampoPercentualVariavel>(['custoProfissionaisPercent'])
-        : new Set<CampoPercentualVariavel>()
-    }
+    if (!calculo.precoSugeridoInviavel) return new Set<CampoPercentualVariavel>()
 
     const percentuais = new Map<CampoPercentualVariavel, number>([
       ['royaltiesPercent', calculo.royaltiesPercent],
@@ -771,7 +767,7 @@ function CalculadoraPrecificacaoModal({
       .sort(([, a], [, b]) => b - a)[0]?.[0]
 
     return maiorPercentual ? new Set<CampoPercentualVariavel>([maiorPercentual]) : new Set<CampoPercentualVariavel>()
-  }, [calculo, precoSugeridoMuitoAcima])
+  }, [calculo])
   const camposBloqueadosAtePreco = aguardandoPrecoInicial || savingPreco
   const custosBloqueados = camposBloqueadosAtePreco
 
@@ -1246,6 +1242,11 @@ function CalculadoraPrecificacaoModal({
                   <>
                     <strong>{formatCurrency(calculo.precoSugerido)}</strong>
                     <span className={styles.calcHighlightHint}>Preço sugerido para buscar margem de {formatPercent(MARGEM_IDEAL_PERCENT)} sobre venda.</span>
+                    {precoSugeridoMuitoAcima && (
+                      <span className={`${styles.calcHighlightHint} ${styles.modalFieldHintDanger}`}>
+                        Preço sugerido com variação acima do padrão. Revise as políticas de custo, profissional e encargos para evitar uma precificação fora da realidade da clínica.
+                      </span>
+                    )}
                     <span className={styles.calcHighlightHint}>
                       Custo variável: {formatCurrency(calculo.precoSugeridoCustoVariavel ?? 0)} · Custo total: {formatCurrency(calculo.precoSugeridoCustoTotal ?? 0)} · Lucro: {formatCurrency(calculo.precoSugeridoLucro ?? 0)}
                     </span>
