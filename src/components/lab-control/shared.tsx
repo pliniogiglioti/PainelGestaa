@@ -3,7 +3,7 @@ import type React from 'react'
 import type { Lab, LabEnvio, LabKanbanColuna } from '../../lib/types'
 import { Modal as UiModal } from '../ui'
 import styles from '../../pages/LabControlPage.module.css'
-import { IconArchive, IconEdit, IconList, IconPlus, IconSettings2, IconUser } from './icons'
+import { IconArchive, IconEdit, IconList, IconMoney, IconPlus, IconSettings2, IconUser } from './icons'
 import { formatDate, isFinalEnvioStatus, isOverdue } from './utils'
 
 export function Spinner() {
@@ -73,6 +73,7 @@ export function OverviewMenu({
   onOpenArquivados,
   onOpenDentistas,
   onOpenFormasEnvio,
+  onOpenFinanceiro,
 }: {
   labs: Lab[]
   envios: LabEnvio[]
@@ -86,6 +87,7 @@ export function OverviewMenu({
   onOpenArquivados: () => void
   onOpenDentistas: () => void
   onOpenFormasEnvio: () => void
+  onOpenFinanceiro: () => void
 }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -127,6 +129,7 @@ export function OverviewMenu({
       { id: 'precos', label: 'Lista de preços', icon: <IconList />, onClick: onOpenPrecosPicker },
       { id: 'kanbans', label: 'Editar Kanbans', icon: <IconSettings2 />, onClick: onOpenKanbanCfg },
     ] : []),
+    { id: 'financeiro', label: 'Financeiro', icon: <IconMoney />, onClick: onOpenFinanceiro },
     { id: 'dentistas',  label: 'Dentistas',  icon: <IconUser />,    onClick: onOpenDentistas },
     { id: 'formas-envio', label: 'Tipos de envio', icon: <IconArchive />, onClick: onOpenFormasEnvio },
     { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },

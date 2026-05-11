@@ -12,7 +12,8 @@ import { EnvioResumoModal } from './EnvioResumoModal'
 import { EnvioSteps } from './EnvioSteps'
 import { KanbanBoard } from './KanbanBoard'
 import { ServicesListView } from './ServicesListView'
-import { InfoRow, OverviewMenu, Spinner } from './shared'
+import { FinancialListView } from './FinancialListView'
+import { InfoRow, Modal, OverviewMenu, Spinner } from './shared'
 import type { LabEtapa } from './utils'
 import { applyEtapaChanges, formatDate, formatWhatsAppNumber, getEnvioDataEntregaRealFromEtapas, getEnvioEtapas, getLabFeriados, isOverdue, registrarHistorico, serializeLabEtapas, sortEnviosByCreatedAt, today } from './utils'
 
@@ -431,6 +432,7 @@ export function LabsAggregateDetailView({
   const [resumoEnvio,      setResumoEnvio]      = useState<LabEnvio | null>(null)
   const [showKanbanCfg,    setShowKanbanCfg]    = useState(false)
   const [showArquivados,   setShowArquivados]   = useState(false)
+  const [showFinanceiro,   setShowFinanceiro]   = useState(false)
   const [showDentistas,    setShowDentistas]    = useState(false)
   const [showFormasEnvio,  setShowFormasEnvio]  = useState(false)
   const [dentistas,        setDentistas]        = useState<LabDentista[]>([])
@@ -622,6 +624,7 @@ export function LabsAggregateDetailView({
             onOpenArquivados={() => setShowArquivados(true)}
             onOpenDentistas={() => setShowDentistas(true)}
             onOpenFormasEnvio={() => setShowFormasEnvio(true)}
+            onOpenFinanceiro={() => setShowFinanceiro(true)}
           />
         </div>
       </div>
@@ -727,6 +730,13 @@ export function LabsAggregateDetailView({
       </ModalTransition>
       <ModalTransition open={showArquivados}>
         <ArquivadosModal empresaId={empresaId} userId={userId} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+      </ModalTransition>
+      <ModalTransition open={showFinanceiro}>
+        {showFinanceiro && (
+          <Modal title="Pagamentos dos trabalhos" onClose={() => setShowFinanceiro(false)} wide>
+            <FinancialListView envios={envios} labs={labs} />
+          </Modal>
+        )}
       </ModalTransition>
       <ModalTransition open={showDentistas}>
         {showDentistas && (

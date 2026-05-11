@@ -1592,8 +1592,19 @@
 
 .financialSummary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px;
+}
+
+.financialFilters {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.25fr) repeat(3, minmax(150px, 1fr)) minmax(130px, auto);
+  gap: 10px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-elevated);
 }
 
 .financialCard {
@@ -2085,6 +2096,10 @@
 }
 
 @media (max-width: 760px) {
+  .financialFilters {
+    grid-template-columns: 1fr;
+  }
+
   .headerCenter {
     order: 3;
     flex-basis: 100%;
@@ -2387,6 +2402,10 @@
   min-width: 940px;
   border-collapse: collapse;
   background: var(--bg-elevated);
+}
+
+.financialTable {
+  min-width: 1200px;
 }
 
 .serviceTable th,
