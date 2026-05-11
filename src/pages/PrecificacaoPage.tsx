@@ -1159,7 +1159,7 @@ function CalculadoraPrecificacaoModal({
                 <span>Margem</span>
                 <strong>{temPrecoExplicito ? formatPercent(calculo.margem) : '—'}</strong>
               </div>
-              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested} ${calculo.precoSugeridoInviavel ? styles.calcHighlightSuggestedBad : ''}`}>
+              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested} ${calculo.precoSugeridoInviavel || precoSugeridoMuitoAcima ? styles.calcHighlightSuggestedBad : ''}`}>
                 <span>Preço sugerido com markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)} sobre custo</span>
                 {calculo.precoSugeridoInviavel ? (
                   <>
@@ -1176,6 +1176,16 @@ function CalculadoraPrecificacaoModal({
                     <strong>{formatCurrency(precoVendaAtual)}</strong>
                     <span className={styles.calcHighlightHint}>
                       Este é o preço de venda atual. Com os percentuais informados, ele gera {formatPercent(calculo.margem)} de margem.
+                    </span>
+                  </>
+                ) : precoSugeridoMuitoAcima ? (
+                  <>
+                    <strong>Variação acima do padrão</strong>
+                    <span className={styles.calcHighlightHint}>
+                      Preço sugerido com variação acima do padrão.
+                    </span>
+                    <span className={styles.calcHighlightHint}>
+                      Revise as políticas de custo, profissional e encargos para evitar uma precificação fora da realidade da clínica.
                     </span>
                   </>
                 ) : (
@@ -1238,48 +1248,42 @@ function CalculadoraPrecificacaoModal({
           </div>
         </div>
         {canManage && (
-          <div className={styles.calcFooterActions}>
-            <p className={`${styles.calcFooterWarning} ${styles.modalFieldHintDanger} ${precoSugeridoMuitoAcima ? styles.calcFooterWarningVisible : styles.calcFooterWarningHidden}`}>
-              <span className={styles.calcFooterWarningIcon} aria-hidden="true">!</span>
-              <span>Preço sugerido com variação acima do padrão. Revise as políticas de custo, profissional e encargos para evitar uma precificação fora da realidade da clínica.</span>
-            </p>
-            <div className={styles.inlineActions}>
-              <button
-                type="button"
-                className={styles.modalCancel}
-                onClick={() => {
-                  if (isCreating) { onClose(); return }
-                  setForm({
-                    custoInsumos: savedPayload.custoInsumos,
-                    custoMaterialAplicado: savedPayload.custoMaterialAplicado,
-                    custoLaboratorio: savedPayload.custoLaboratorio,
-                    royaltiesPercent: savedPayload.royaltiesPercent,
-                    custoProfissionaisModo: savedPayload.custoProfissionaisModo,
-                    custoProfissionaisBases: savedPayload.custoProfissionaisBases,
-                    custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
-                    custoProfissionaisValor: savedPayload.custoProfissionaisValor,
-                    impostosPercent: savedPayload.impostosPercent,
-                    comissoesPercent: savedPayload.comissoesPercent,
-                    taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
-                  })
-                  setNome(item?.nome_produto ?? '')
-                  setCategoria(item?.categoria ?? '')
-                  setPrecoVendaEditado(savedPayload.precoVenda)
-                  setErroLocal('')
-                }}
-                disabled={savingPreco}
-              >
-                {isCreating ? 'Cancelar' : 'Reverter'}
-              </button>
-              <button
-                type="button"
-                className={styles.modalSubmit}
-                onClick={() => void handleSalvarCalculo()}
-                disabled={savingPreco || (!isCreating && !hasChanges && !erroLocal)}
-              >
-                {savingPreco ? 'Salvando...' : isCreating ? 'Criar e salvar preço' : 'Salvar preço'}
-              </button>
-            </div>
+          <div className={styles.inlineActions}>
+            <button
+              type="button"
+              className={styles.modalCancel}
+              onClick={() => {
+                if (isCreating) { onClose(); return }
+                setForm({
+                  custoInsumos: savedPayload.custoInsumos,
+                  custoMaterialAplicado: savedPayload.custoMaterialAplicado,
+                  custoLaboratorio: savedPayload.custoLaboratorio,
+                  royaltiesPercent: savedPayload.royaltiesPercent,
+                  custoProfissionaisModo: savedPayload.custoProfissionaisModo,
+                  custoProfissionaisBases: savedPayload.custoProfissionaisBases,
+                  custoProfissionaisPercent: savedPayload.custoProfissionaisPercent,
+                  custoProfissionaisValor: savedPayload.custoProfissionaisValor,
+                  impostosPercent: savedPayload.impostosPercent,
+                  comissoesPercent: savedPayload.comissoesPercent,
+                  taxaMaquinaPercent: savedPayload.taxaMaquinaPercent,
+                })
+                setNome(item?.nome_produto ?? '')
+                setCategoria(item?.categoria ?? '')
+                setPrecoVendaEditado(savedPayload.precoVenda)
+                setErroLocal('')
+              }}
+              disabled={savingPreco}
+            >
+              {isCreating ? 'Cancelar' : 'Reverter'}
+            </button>
+            <button
+              type="button"
+              className={styles.modalSubmit}
+              onClick={() => void handleSalvarCalculo()}
+              disabled={savingPreco || (!isCreating && !hasChanges && !erroLocal)}
+            >
+              {savingPreco ? 'Salvando...' : isCreating ? 'Criar e salvar preço' : 'Salvar preço'}
+            </button>
           </div>
         )}
       </div>

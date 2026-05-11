@@ -1545,62 +1545,6 @@
 
 /* ── Modals ──────────────────────────────────────────────────────────────── */
 
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.72);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(6px);
-}
-
-.modal {
-  width: 100%;
-  max-width: 520px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-}
-
-.modalSm {
-  max-width: 360px;
-}
-
-.modalHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modalTitle {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.modalClose {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  font-size: 16px;
-  cursor: pointer;
-  padding: 6px 8px;
-  border-radius: 7px;
-  transition: color 0.15s, background 0.15s;
-  line-height: 1;
-}
-
-.modalClose:hover {
-  color: var(--text);
-  background: var(--bg-hover);
-}
-
 .modalForm {
   display: flex;
   flex-direction: column;
@@ -1624,27 +1568,6 @@
   font-weight: 500;
   color: var(--text-muted);
 }
-
-.modalInput {
-  padding: 10px 13px;
-  background: var(--bg-elevated);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 14px;
-  outline: none;
-  width: 100%;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  font-family: inherit;
-  resize: none;
-}
-
-.modalInput:focus {
-  border-color: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-glow);
-}
-
-.modalInput option { background: var(--bg-elevated); }
 
 .modalHint {
   margin: 0;
@@ -1728,64 +1651,11 @@
   background-repeat: no-repeat;
 }
 
-.modalRemoveButton {
-  align-self: flex-start;
-  padding: 8px 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(224, 85, 85, 0.24);
-  background: rgba(224, 85, 85, 0.08);
-  color: #ff8b8b;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.modalTextarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
 .modalActions {
   display: flex;
   gap: 10px;
   justify-content: flex-end;
   margin-top: 4px;
-}
-
-.modalCancel {
-  padding: 9px 18px;
-  border-radius: 8px;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-
-.modalCancel:hover {
-  background: var(--bg-hover);
-  color: var(--text);
-}
-
-.modalSubmit {
-  padding: 9px 22px;
-  border-radius: 8px;
-  border: none;
-  background: linear-gradient(135deg, var(--gold-light), var(--gold-dark));
-  color: var(--bg);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: opacity 0.15s, box-shadow 0.15s, transform 0.15s;
-  box-shadow: 0 2px 12px var(--gold-glow);
-}
-
-.modalSubmit:hover {
-  opacity: 0.88;
-  box-shadow: 0 4px 20px rgba(201, 162, 42, 0.35);
-  transform: translateY(-1px);
 }
 
 /* ── Link Type Toggle ────────────────────────────────────────────────────── */
@@ -2200,8 +2070,6 @@
   display: flex;
   gap: 10px;
 }
-
-.classAddRow .modalInput { flex: 1; }
 
 /* ── Exemplos de Upload ───────────────────────────────────────────────────── */
 

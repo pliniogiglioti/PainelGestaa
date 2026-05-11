@@ -11,9 +11,9 @@ import {
 } from '../lib/companyCardBackground'
 import ForumTopicPage from './ForumTopicPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
-import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
 import ModalTransition from '../components/ModalTransition'
+import { Button, Field, Input, Modal, Select, Textarea } from '../components/ui'
 
 type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
 
@@ -239,12 +239,12 @@ function TopNavigation({
   const menuRef = useRef<HTMLDivElement | null>(null)
   const userInitial = user.name.trim().charAt(0).toUpperCase() || user.email.trim().charAt(0).toUpperCase() || 'U'
   const roleLabel = isAdmin ? 'Admin' : 'Usuario'
-  const backdropDismiss = useBackdropDismiss(() => {
+  const closeEditNameModal = () => {
     if (savingName) return
     setShowEditNameModal(false)
     setNameError('')
     setNameDraft(user.name)
-  }, savingName)
+  }
 
   useEffect(() => {
     setNameDraft(user.name)
@@ -407,16 +407,7 @@ function TopNavigation({
 
       <ModalTransition open={showEditNameModal}>
         {showEditNameModal && (
-          <div
-            className={styles.modalOverlay}
-            onPointerDown={backdropDismiss.handleBackdropPointerDown}
-            onClick={backdropDismiss.handleBackdropClick}
-          >
-            <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Editar nome</h2>
-                <button className={styles.modalClose} onClick={() => setShowEditNameModal(false)} disabled={savingName}>×</button>
-              </div>
+          <Modal title="Editar nome" onClose={closeEditNameModal}>
               <form
                 className={styles.modalForm}
                 onSubmit={async e => {
@@ -433,29 +424,26 @@ function TopNavigation({
                   setShowEditNameModal(false)
                 }}
               >
-                <div className={styles.modalField}>
-                  <label className={styles.modalLabel}>Seu nome</label>
-                  <input
-                    className={styles.modalInput}
+                <Field label="Seu nome">
+                  <Input
                     value={nameDraft}
                     onChange={e => setNameDraft(e.target.value)}
                     placeholder="Digite seu nome completo"
                     autoFocus
                     disabled={savingName}
                   />
-                </div>
+                </Field>
                 {nameError && <p className={styles.formError}>{nameError}</p>}
                 <div className={styles.modalActions}>
-                  <button type="button" className={styles.modalCancel} onClick={() => setShowEditNameModal(false)} disabled={savingName}>
+                  <Button type="button" onClick={closeEditNameModal} disabled={savingName}>
                     Cancelar
-                  </button>
-                  <button type="submit" className={styles.modalSubmit} disabled={savingName}>
+                  </Button>
+                  <Button type="submit" variant="primary" disabled={savingName}>
                     {savingName ? 'Salvando...' : 'Salvar nome'}
-                  </button>
+                  </Button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
       </ModalTransition>
     </header>
@@ -494,7 +482,6 @@ function CreateAppModal({ categories, onClose, onCreated }: {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError]   = useState('')
-  const backdropDismiss = useBackdropDismiss(onClose)
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -520,79 +507,64 @@ function CreateAppModal({ categories, onClose, onCreated }: {
   }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Novo Aplicativo</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
+    <Modal title="Novo Aplicativo" onClose={onClose}>
+      <form className={styles.modalForm} onSubmit={handleSubmit}>
+        <div className={styles.modalRow}>
+          <Field label="Nome">
+            <Input placeholder="Ex: GestCaixa" value={form.name} onChange={set('name')} required />
+          </Field>
+          <Field label="Categoria">
+            <Select value={form.category} onChange={set('category')} required>
+              <option value="">Selecione...</option>
+              {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+            </Select>
+          </Field>
         </div>
-        <form className={styles.modalForm} onSubmit={handleSubmit}>
-          <div className={styles.modalRow}>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Nome</label>
-              <input className={styles.modalInput} placeholder="Ex: GestCaixa" value={form.name} onChange={set('name')} required />
-            </div>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Categoria</label>
-              <select className={styles.modalInput} value={form.category} onChange={set('category')} required>
-                <option value="">Selecione...</option>
-                {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Descrição</label>
-            <textarea className={`${styles.modalInput} ${styles.modalTextarea}`}
-              placeholder="Descreva o que este app faz..."
-              value={form.description} onChange={set('description')} rows={3} />
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Tipo de Link</label>
-            <div className={styles.linkTypeToggle}>
-              <button
-                type="button"
-                className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
-                onClick={() => setForm(p => ({ ...p, linkType: 'externo', link: '' }))}
-              >
-                Externo
-              </button>
-              <button
-                type="button"
-                className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
-                onClick={() => setForm(p => ({ ...p, linkType: 'interno', link: '' }))}
-              >
-                Interno
-              </button>
-            </div>
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>
-              {form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}
-            </label>
-            {form.linkType === 'externo' ? (
-              <input className={styles.modalInput} type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
-            ) : (
-              <input className={styles.modalInput} placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
-            )}
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>URL da Imagem de Fundo</label>
-            <input className={styles.modalInput} type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
-          </div>
-          {error && <p className={styles.formError}>{error}</p>}
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Criar App'}
+        <Field label="Descrição">
+          <Textarea
+            placeholder="Descreva o que este app faz..."
+            value={form.description}
+            onChange={set('description')}
+            rows={3}
+          />
+        </Field>
+        <Field label="Tipo de Link">
+          <div className={styles.linkTypeToggle}>
+            <button
+              type="button"
+              className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
+              onClick={() => setForm(p => ({ ...p, linkType: 'externo', link: '' }))}
+            >
+              Externo
+            </button>
+            <button
+              type="button"
+              className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
+              onClick={() => setForm(p => ({ ...p, linkType: 'interno', link: '' }))}
+            >
+              Interno
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </Field>
+        <Field label={form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}>
+          {form.linkType === 'externo' ? (
+            <Input type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
+          ) : (
+            <Input placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
+          )}
+        </Field>
+        <Field label="URL da Imagem de Fundo">
+          <Input type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
+        </Field>
+        {error && <p className={styles.formError}>{error}</p>}
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? 'Salvando...' : 'Criar App'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -624,7 +596,6 @@ function EditAppModal({
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
-  const backdropDismiss = useBackdropDismiss(onClose)
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -661,90 +632,70 @@ function EditAppModal({
   }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Editar Aplicativo</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
+    <Modal title="Editar Aplicativo" onClose={onClose}>
+      <form className={styles.modalForm} onSubmit={handleSubmit}>
+        <div className={styles.modalRow}>
+          <Field label="Nome">
+            <Input placeholder="Ex: GestCaixa" value={form.name} onChange={set('name')} required />
+          </Field>
+          <Field label="Categoria">
+            <Select value={form.category} onChange={set('category')} required>
+              <option value="">Selecione...</option>
+              {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
+            </Select>
+          </Field>
         </div>
-        <form className={styles.modalForm} onSubmit={handleSubmit}>
-          <div className={styles.modalRow}>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Nome</label>
-              <input className={styles.modalInput} placeholder="Ex: GestCaixa" value={form.name} onChange={set('name')} required />
-            </div>
-            <div className={styles.modalField}>
-              <label className={styles.modalLabel}>Categoria</label>
-              <select className={styles.modalInput} value={form.category} onChange={set('category')} required>
-                <option value="">Selecione...</option>
-                {categories.map(c => <option key={c.id} value={c.slug}>{c.name}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Descrição</label>
-            <textarea
-              className={`${styles.modalInput} ${styles.modalTextarea}`}
-              placeholder="Descreva o que este app faz..."
-              value={form.description}
-              onChange={set('description')}
-              rows={3}
-            />
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Tipo de Link</label>
-            <div className={styles.linkTypeToggle}>
-              <button
-                type="button"
-                className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
-                onClick={() => setForm(prev => ({ ...prev, linkType: 'externo', link: '' }))}
-              >
-                Externo
-              </button>
-              <button
-                type="button"
-                className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
-                onClick={() => setForm(prev => ({ ...prev, linkType: 'interno', link: '' }))}
-              >
-                Interno
-              </button>
-            </div>
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>
-              {form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}
-            </label>
-            {form.linkType === 'externo' ? (
-              <input className={styles.modalInput} type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
-            ) : (
-              <input className={styles.modalInput} placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
-            )}
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>URL da Imagem de Fundo</label>
-            <input className={styles.modalInput} type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
-          </div>
-          {error && <p className={styles.formError}>{error}</p>}
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar alterações'}
+        <Field label="Descrição">
+          <Textarea
+            placeholder="Descreva o que este app faz..."
+            value={form.description}
+            onChange={set('description')}
+            rows={3}
+          />
+        </Field>
+        <Field label="Tipo de Link">
+          <div className={styles.linkTypeToggle}>
+            <button
+              type="button"
+              className={`${styles.linkTypeBtn} ${form.linkType === 'externo' ? styles.linkTypeBtnActive : ''}`}
+              onClick={() => setForm(prev => ({ ...prev, linkType: 'externo', link: '' }))}
+            >
+              Externo
+            </button>
+            <button
+              type="button"
+              className={`${styles.linkTypeBtn} ${form.linkType === 'interno' ? styles.linkTypeBtnActive : ''}`}
+              onClick={() => setForm(prev => ({ ...prev, linkType: 'interno', link: '' }))}
+            >
+              Interno
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </Field>
+        <Field label={form.linkType === 'externo' ? 'URL Externa' : 'Rota Interna'}>
+          {form.linkType === 'externo' ? (
+            <Input type="url" placeholder="https://app.exemplo.com" value={form.link} onChange={set('link')} required />
+          ) : (
+            <Input placeholder="/apps/gestcaixa" value={form.link} onChange={set('link')} required />
+          )}
+        </Field>
+        <Field label="URL da Imagem de Fundo">
+          <Input type="url" placeholder="https://exemplo.com/imagem.jpg" value={form.backgroundImage} onChange={set('backgroundImage')} />
+        </Field>
+        {error && <p className={styles.formError}>{error}</p>}
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar alterações'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
 
 function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const [name, setName] = useState('')
   const [saving, setSaving] = useState(false)
-  const backdropDismiss = useBackdropDismiss(onClose)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -755,28 +706,17 @@ function CreateCategoryModal({ onClose, onCreated }: { onClose: () => void; onCr
   }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Nova Categoria</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
+    <Modal title="Nova Categoria" onClose={onClose}>
+      <form className={styles.modalForm} onSubmit={handleSubmit}>
+        <Field label="Nome">
+          <Input placeholder="Ex: Marketing" value={name} onChange={e => setName(e.target.value)} required autoFocus />
+        </Field>
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={saving}>{saving ? '...' : 'Criar'}</Button>
         </div>
-        <form className={styles.modalForm} onSubmit={handleSubmit}>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Nome</label>
-            <input className={styles.modalInput} placeholder="Ex: Marketing" value={name} onChange={e => setName(e.target.value)} required autoFocus />
-          </div>
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>{saving ? '...' : 'Criar'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -784,7 +724,6 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
   const [title,   setTitle]   = useState('')
   const [content, setContent] = useState('')
   const [saving,  setSaving]  = useState(false)
-  const backdropDismiss = useBackdropDismiss(onClose)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -801,34 +740,26 @@ function CreateTopicModal({ onClose, onCreated }: { onClose: () => void; onCreat
   }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Novo Tópico</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
+    <Modal title="Novo Tópico" onClose={onClose}>
+      <form className={styles.modalForm} onSubmit={handleSubmit}>
+        <Field label="Título">
+          <Input placeholder="Qual é a sua dúvida ou tema?" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
+        </Field>
+        <Field label="Conteúdo">
+          <Textarea
+            placeholder="Descreva em detalhes..."
+            rows={5}
+            value={content}
+            onChange={e => setContent(e.target.value)}
+            required
+          />
+        </Field>
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={onClose}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={saving}>{saving ? 'Publicando...' : 'Publicar'}</Button>
         </div>
-        <form className={styles.modalForm} onSubmit={handleSubmit}>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Título</label>
-            <input className={styles.modalInput} placeholder="Qual é a sua dúvida ou tema?" value={title} onChange={e => setTitle(e.target.value)} required autoFocus />
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Conteúdo</label>
-            <textarea className={`${styles.modalInput} ${styles.modalTextarea}`}
-              placeholder="Descreva em detalhes..." rows={5}
-              value={content} onChange={e => setContent(e.target.value)} required />
-          </div>
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>{saving ? 'Publicando...' : 'Publicar'}</button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -857,76 +788,62 @@ function CompanyFormModal({
   onBackgroundChange: (file: File | null) => void
   onRemoveBackground: () => void
 }) {
-  const backdropDismiss = useBackdropDismiss(onClose, saving)
+  const handleClose = () => {
+    if (!saving) onClose()
+  }
+
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>{mode === 'create' ? 'Nova empresa' : 'Editar empresa'}</h2>
-          <button className={styles.modalClose} onClick={onClose}>✕</button>
+    <Modal title={mode === 'create' ? 'Nova empresa' : 'Editar empresa'} onClose={handleClose}>
+      <form className={styles.modalForm} onSubmit={onSubmit}>
+        <Field label="Nome da empresa *">
+          <Input
+            placeholder="Ex: Clinica Sorriso Ltda"
+            value={form.nome}
+            onChange={e => onChange('nome', e.target.value)}
+            required
+            autoFocus
+          />
+        </Field>
+        <Field label="CNPJ *">
+          <Input
+            placeholder="00.000.000/0000-00"
+            value={form.cnpj}
+            onChange={e => onChange('cnpj', formatarCnpj(e.target.value))}
+            inputMode="numeric"
+            maxLength={18}
+            pattern="\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"
+            title="Informe um CNPJ válido no formato 00.000.000/0000-00"
+            required
+          />
+        </Field>
+        <Field label="Imagem de fundo do card" hint="Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.">
+          <Input
+            type="file"
+            accept={COMPANY_CARD_BACKGROUND_ACCEPT}
+            onChange={e => onBackgroundChange(e.target.files?.[0] ?? null)}
+            disabled={saving}
+          />
+        </Field>
+        {cardBackgroundPreview && (
+          <>
+            <div
+              className={styles.companyBackgroundPreview}
+              style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
+            />
+            <Button type="button" variant="danger" onClick={onRemoveBackground} disabled={saving}>
+              Excluir imagem atual
+            </Button>
+          </>
+        )}
+        {error && <p className={styles.formError}>{error}</p>}
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={handleClose} disabled={saving}>Cancelar</Button>
+          <Button type="submit" variant="primary" disabled={saving}>
+            {saving ? 'Salvando...' : mode === 'create' ? 'Criar empresa' : 'Salvar alterações'}
+          </Button>
         </div>
-        <form className={styles.modalForm} onSubmit={onSubmit}>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Nome da empresa *</label>
-            <input
-              className={styles.modalInput}
-              placeholder="Ex: Clinica Sorriso Ltda"
-              value={form.nome}
-              onChange={e => onChange('nome', e.target.value)}
-              required
-              autoFocus
-            />
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>CNPJ *</label>
-            <input
-              className={styles.modalInput}
-              placeholder="00.000.000/0000-00"
-              value={form.cnpj}
-              onChange={e => onChange('cnpj', formatarCnpj(e.target.value))}
-              inputMode="numeric"
-              maxLength={18}
-              pattern="\d{2}\.\d{3}\.\d{3}/\d{4}-\d{2}"
-              title="Informe um CNPJ válido no formato 00.000.000/0000-00"
-              required
-            />
-          </div>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Imagem de fundo do card</label>
-            <input
-              className={styles.modalInput}
-              type="file"
-              accept={COMPANY_CARD_BACKGROUND_ACCEPT}
-              onChange={e => onBackgroundChange(e.target.files?.[0] ?? null)}
-              disabled={saving}
-            />
-            <p className={styles.modalHint}>Opcional. Aceita JPG, PNG ou WEBP com ate 5MB e converte para WEBP no envio.</p>
-            {cardBackgroundPreview && (
-              <>
-                <div
-                  className={styles.companyBackgroundPreview}
-                  style={{ backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0.08), rgba(0,0,0,0.62)), url(${cardBackgroundPreview})` }}
-                />
-                <button type="button" className={styles.modalRemoveButton} onClick={onRemoveBackground} disabled={saving}>
-                  Excluir imagem atual
-                </button>
-              </>
-            )}
-          </div>
-          {error && <p className={styles.formError}>{error}</p>}
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>Cancelar</button>
-            <button type="submit" className={styles.modalSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : mode === 'create' ? 'Criar empresa' : 'Salvar alterações'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </form>
+    </Modal>
   )
 }
 
@@ -957,94 +874,82 @@ function InviteCollaboratorModal({
   onClearAll: () => void
   onSubmit: () => void
 }) {
-  const backdropDismiss = useBackdropDismiss(onClose, saving)
+  const handleClose = () => {
+    if (!saving) onClose()
+  }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={`${styles.modal} ${styles.modalLg}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Adicionar colaborador</h2>
-          <button className={styles.modalClose} onClick={onClose} disabled={saving}>×</button>
-        </div>
+    <Modal title="Adicionar colaborador" onClose={handleClose} wide>
+      <div className={styles.modalForm}>
+        <Field label="Empresa">
+          <Input value={empresaNome} readOnly />
+        </Field>
 
-        <div className={styles.modalForm}>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Empresa</label>
-            <input className={styles.modalInput} value={empresaNome} readOnly />
-          </div>
+        <Field label="E-mail do colaborador">
+          <Input
+            value={email}
+            onChange={e => onChangeEmail(e.target.value)}
+            placeholder="email@colaborador.com"
+            autoFocus
+            disabled={saving}
+          />
+        </Field>
 
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>E-mail do colaborador</label>
-            <input
-              className={styles.modalInput}
-              value={email}
-              onChange={e => onChangeEmail(e.target.value)}
-              placeholder="email@colaborador.com"
-              autoFocus
-              disabled={saving}
-            />
-          </div>
-
-          <div className={styles.modalField}>
-            <div className={styles.collaboratorAppsHeader}>
-              <div>
-                <label className={styles.modalLabel}>Apps com acesso liberado</label>
-                <p className={styles.modalHint}>
-                  Escolha quais apps esse colaborador podera acessar depois que entrar na plataforma.
-                </p>
-              </div>
-              <div className={styles.collaboratorAppsActions}>
-                <button type="button" className={styles.modalCancel} onClick={onSelectAll} disabled={saving || apps.length === 0}>
-                  Marcar todos
-                </button>
-                <button type="button" className={styles.modalCancel} onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
-                  Limpar
-                </button>
-              </div>
+        <div className={styles.modalField}>
+          <div className={styles.collaboratorAppsHeader}>
+            <div>
+              <label className={styles.modalLabel}>Apps com acesso liberado</label>
+              <p className={styles.modalHint}>
+                Escolha quais apps esse colaborador podera acessar depois que entrar na plataforma.
+              </p>
             </div>
-
-            {apps.length === 0 ? (
-              <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
-            ) : (
-              <div className={styles.collaboratorAppsGrid}>
-                {apps.map(app => (
-                  <label
-                    key={app.id}
-                    className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedAppIds.includes(app.id)}
-                      onChange={() => onToggleApp(app.id)}
-                      disabled={saving}
-                    />
-                    <div>
-                      <strong>{app.name}</strong>
-                      <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <div className={styles.collaboratorAppsActions}>
+              <Button type="button" onClick={onSelectAll} disabled={saving || apps.length === 0}>
+                Marcar todos
+              </Button>
+              <Button type="button" onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
+                Limpar
+              </Button>
+            </div>
           </div>
 
-          {error && <p className={styles.formError}>{error}</p>}
+          {apps.length === 0 ? (
+            <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
+          ) : (
+            <div className={styles.collaboratorAppsGrid}>
+              {apps.map(app => (
+                <label
+                  key={app.id}
+                  className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAppIds.includes(app.id)}
+                    onChange={() => onToggleApp(app.id)}
+                    disabled={saving}
+                  />
+                  <div>
+                    <strong>{app.name}</strong>
+                    <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
 
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-              Cancelar
-            </button>
-            <button type="button" className={styles.modalSubmit} onClick={onSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Enviar convite'}
-            </button>
+        {error && <p className={styles.formError}>{error}</p>}
+
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={handleClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="primary" onClick={onSubmit} disabled={saving}>
+            {saving ? 'Salvando...' : 'Enviar convite'}
+          </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 
@@ -1073,85 +978,74 @@ function EditCollaboratorAppsModal({
   onClearAll: () => void
   onSubmit: () => void
 }) {
-  const backdropDismiss = useBackdropDismiss(onClose, saving)
+  const handleClose = () => {
+    if (!saving) onClose()
+  }
 
   return (
-    <div
-      className={styles.modalOverlay}
-      onPointerDown={backdropDismiss.handleBackdropPointerDown}
-      onClick={backdropDismiss.handleBackdropClick}
-    >
-      <div className={`${styles.modal} ${styles.modalLg}`} onClick={e => e.stopPropagation()}>
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalTitle}>Editar acessos do colaborador</h2>
-          <button className={styles.modalClose} onClick={onClose} disabled={saving}>×</button>
-        </div>
+    <Modal title="Editar acessos do colaborador" onClose={handleClose} wide>
+      <div className={styles.modalForm}>
+        <Field label="Empresa">
+          <Input value={empresaNome} readOnly />
+        </Field>
 
-        <div className={styles.modalForm}>
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Empresa</label>
-            <input className={styles.modalInput} value={empresaNome} readOnly />
-          </div>
+        <Field label="Colaborador">
+          <Input value={colaboradorNome} readOnly />
+        </Field>
 
-          <div className={styles.modalField}>
-            <label className={styles.modalLabel}>Colaborador</label>
-            <input className={styles.modalInput} value={colaboradorNome} readOnly />
-          </div>
-
-          <div className={styles.modalField}>
-            <div className={styles.collaboratorAppsHeader}>
-              <div>
-                <label className={styles.modalLabel}>Apps liberados</label>
-                <p className={styles.modalHint}>A selecao abaixo atualiza os apps que esse colaborador pode acessar.</p>
-              </div>
-              <div className={styles.collaboratorAppsActions}>
-                <button type="button" className={styles.modalCancel} onClick={onSelectAll} disabled={saving || apps.length === 0}>
-                  Marcar todos
-                </button>
-                <button type="button" className={styles.modalCancel} onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
-                  Limpar
-                </button>
-              </div>
+        <div className={styles.modalField}>
+          <div className={styles.collaboratorAppsHeader}>
+            <div>
+              <label className={styles.modalLabel}>Apps liberados</label>
+              <p className={styles.modalHint}>A selecao abaixo atualiza os apps que esse colaborador pode acessar.</p>
             </div>
-
-            {apps.length === 0 ? (
-              <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
-            ) : (
-              <div className={styles.collaboratorAppsGrid}>
-                {apps.map(app => (
-                  <label
-                    key={app.id}
-                    className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedAppIds.includes(app.id)}
-                      onChange={() => onToggleApp(app.id)}
-                      disabled={saving}
-                    />
-                    <div>
-                      <strong>{app.name}</strong>
-                      <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            )}
+            <div className={styles.collaboratorAppsActions}>
+              <Button type="button" onClick={onSelectAll} disabled={saving || apps.length === 0}>
+                Marcar todos
+              </Button>
+              <Button type="button" onClick={onClearAll} disabled={saving || selectedAppIds.length === 0}>
+                Limpar
+              </Button>
+            </div>
           </div>
 
-          {error && <p className={styles.formError}>{error}</p>}
+          {apps.length === 0 ? (
+            <p className={styles.companyMembersHint}>Nenhum app cadastrado para liberar.</p>
+          ) : (
+            <div className={styles.collaboratorAppsGrid}>
+              {apps.map(app => (
+                <label
+                  key={app.id}
+                  className={`${styles.collaboratorAppOption} ${selectedAppIds.includes(app.id) ? styles.collaboratorAppOptionActive : ''}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedAppIds.includes(app.id)}
+                    onChange={() => onToggleApp(app.id)}
+                    disabled={saving}
+                  />
+                  <div>
+                    <strong>{app.name}</strong>
+                    <span>{app.internal_link || app.external_link || 'Sem link configurado'}</span>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
 
-          <div className={styles.modalActions}>
-            <button type="button" className={styles.modalCancel} onClick={onClose} disabled={saving}>
-              Cancelar
-            </button>
-            <button type="button" className={styles.modalSubmit} onClick={onSubmit} disabled={saving}>
-              {saving ? 'Salvando...' : 'Salvar acessos'}
-            </button>
+        {error && <p className={styles.formError}>{error}</p>}
+
+        <div className={styles.modalActions}>
+          <Button type="button" onClick={handleClose} disabled={saving}>
+            Cancelar
+          </Button>
+          <Button type="button" variant="primary" onClick={onSubmit} disabled={saving}>
+            {saving ? 'Salvando...' : 'Salvar acessos'}
+          </Button>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   )
 }
 

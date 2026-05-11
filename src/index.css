@@ -17,6 +17,25 @@
   --text-muted:  #888;
   --text-dim:    #555;
 
+  --danger:      #f87171;
+  --danger-bg:   rgba(239, 68, 68, 0.08);
+  --danger-border: rgba(239, 68, 68, 0.28);
+  --success:     #34d399;
+  --success-bg:  rgba(16, 185, 129, 0.10);
+  --success-border: rgba(16, 185, 129, 0.28);
+  --warning:     #fbbf24;
+  --warning-bg:  rgba(245, 158, 11, 0.10);
+  --warning-border: rgba(245, 158, 11, 0.28);
+
+  --space-1:     4px;
+  --space-2:     8px;
+  --space-3:     12px;
+  --space-4:     16px;
+  --space-5:     20px;
+  --space-6:     24px;
+  --space-8:     32px;
+  --space-10:    40px;
+
   --shadow-card-hover: 0 20px 48px rgba(0,0,0,0.65), 0 0 24px rgba(201,162,42,0.10);
   --shadow-dropdown:   0 8px 24px rgba(0,0,0,0.50);
   --shadow-modal:      0 24px 64px rgba(0,0,0,0.60);
@@ -41,6 +60,13 @@ html[data-theme="light"] {
   --text:        #18181b;
   --text-muted:  #71717a;
   --text-dim:    #a1a1aa;
+
+  --danger-bg:   rgba(239, 68, 68, 0.08);
+  --danger-border: rgba(239, 68, 68, 0.24);
+  --success-bg:  rgba(16, 185, 129, 0.10);
+  --success-border: rgba(16, 185, 129, 0.24);
+  --warning-bg:  rgba(245, 158, 11, 0.10);
+  --warning-border: rgba(245, 158, 11, 0.24);
 
   --shadow-card-hover: 0 8px 32px rgba(0,0,0,0.12), 0 0 16px rgba(201,162,42,0.18);
   --shadow-dropdown:   0 8px 24px rgba(0,0,0,0.10);
