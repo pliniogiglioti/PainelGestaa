@@ -51,13 +51,6 @@ type ConfiguracaoGeralForm = {
   taxaMaquinaPercent: string
 }
 
-type CampoPercentualVariavel =
-  | 'royaltiesPercent'
-  | 'custoProfissionaisPercent'
-  | 'impostosPercent'
-  | 'comissoesPercent'
-  | 'taxaMaquinaPercent'
-
 type PrecoFormPayload = {
   nome: string
   categoria: string
@@ -149,14 +142,6 @@ const CUSTO_PROFISSIONAIS_BASE_LABELS: Record<CustoProfissionaisBase, string> = 
   impostos: 'Impostos',
   comissoes: 'Comissões vendas',
   taxaMaquina: 'Taxa máquina',
-}
-
-const CAMPO_PERCENTUAL_LABELS: Record<CampoPercentualVariavel, string> = {
-  royaltiesPercent: 'Royalties e FNP',
-  custoProfissionaisPercent: 'custo dos profissionais',
-  impostosPercent: 'Impostos',
-  comissoesPercent: 'ComissÃµes de vendas',
-  taxaMaquinaPercent: 'Taxa mÃ¡quina',
 }
 
 function Spinner() {
@@ -751,28 +736,8 @@ function CalculadoraPrecificacaoModal({
     temPrecoExplicito &&
     calculo.precoSugerido != null &&
     calculo.precoSugerido > precoVendaAtual * 2
-  const camposPercentuaisNaoViaveis = useMemo(() => {
-    if (!calculo.precoSugeridoInviavel) return new Set<CampoPercentualVariavel>()
-
-    const percentuais = new Map<CampoPercentualVariavel, number>([
-      ['royaltiesPercent', calculo.royaltiesPercent],
-      ['impostosPercent', calculo.impostosPercent],
-      ['comissoesPercent', calculo.comissoesPercent],
-      ['taxaMaquinaPercent', calculo.taxaMaquinaPercent],
-      ['custoProfissionaisPercent', calculo.custoProfissionaisModo === 'percentual' ? calculo.custoProfissionaisPercent : 0],
-    ])
-
-    const maiorPercentual = [...percentuais.entries()]
-      .filter(([, value]) => value > 0)
-      .sort(([, a], [, b]) => b - a)[0]?.[0]
-
-    return maiorPercentual ? new Set<CampoPercentualVariavel>([maiorPercentual]) : new Set<CampoPercentualVariavel>()
-  }, [calculo])
   const camposBloqueadosAtePreco = aguardandoPrecoInicial || savingPreco
   const custosBloqueados = camposBloqueadosAtePreco
-
-  const getMensagemCampoNaoViavel = (field: CampoPercentualVariavel) =>
-    `Aconselhamos que você revise ${CAMPO_PERCENTUAL_LABELS[field]}. No formato atual, esse percentual está alto demais para a venda e está deixando o preço sugerido sem viabilidade dentro da margem ideal da Gestaa.`
 
   useEffect(() => {
     const persisted = getCalculadoraPersistida(item ?? null, configPadrao)
@@ -1027,11 +992,6 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 9"
                   disabled={custosBloqueados}
                 />
-                {camposPercentuaisNaoViaveis.has('royaltiesPercent') && (
-                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    {getMensagemCampoNaoViavel('royaltiesPercent')}
-                  </span>
-                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1060,7 +1020,7 @@ function CalculadoraPrecificacaoModal({
                   </button>
                 </div>
                 <input
-                  className={`${styles.modalInput} ${camposPercentuaisNaoViaveis.has('custoProfissionaisPercent') ? styles.modalInputDanger : ''}`}
+                  className={styles.modalInput}
                   value={form.custoProfissionaisModo === 'percentual' ? form.custoProfissionaisPercent : form.custoProfissionaisValor}
                   onChange={e => {
                     handleChange(
@@ -1076,11 +1036,6 @@ function CalculadoraPrecificacaoModal({
                 {form.custoProfissionaisModo === 'percentual' && (
                   <span className={styles.modalFieldHint}>
                     A porcentagem será aplicada sobre o valor da venda. Deseja remover algum custo do procedimento da base de cálculo do profissional? Marque ao lado quais devem ser abatidos.
-                  </span>
-                )}
-                {camposPercentuaisNaoViaveis.has('custoProfissionaisPercent') && (
-                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    {getMensagemCampoNaoViavel('custoProfissionaisPercent')}
                   </span>
                 )}
               </label>
@@ -1100,11 +1055,6 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 8"
                   disabled={custosBloqueados}
                 />
-                {camposPercentuaisNaoViaveis.has('impostosPercent') && (
-                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    {getMensagemCampoNaoViavel('impostosPercent')}
-                  </span>
-                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1122,11 +1072,6 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 3"
                   disabled={custosBloqueados}
                 />
-                {camposPercentuaisNaoViaveis.has('comissoesPercent') && (
-                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    {getMensagemCampoNaoViavel('comissoesPercent')}
-                  </span>
-                )}
               </label>
               <label className={styles.modalField}>
                 <span className={styles.modalLabel}>
@@ -1144,11 +1089,6 @@ function CalculadoraPrecificacaoModal({
                   placeholder="Ex: 2"
                   disabled={custosBloqueados}
                 />
-                {camposPercentuaisNaoViaveis.has('taxaMaquinaPercent') && (
-                  <span className={`${styles.modalFieldHint} ${styles.modalFieldHintDanger}`}>
-                    {getMensagemCampoNaoViavel('taxaMaquinaPercent')}
-                  </span>
-                )}
               </label>
             </div>
           </div>
@@ -1219,7 +1159,7 @@ function CalculadoraPrecificacaoModal({
                 <span>Margem</span>
                 <strong>{temPrecoExplicito ? formatPercent(calculo.margem) : '—'}</strong>
               </div>
-              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested}`}>
+              <div className={`${styles.calcHighlight} ${styles.calcHighlightSuggested} ${calculo.precoSugeridoInviavel ? styles.calcHighlightSuggestedBad : ''}`}>
                 <span>Preço sugerido com markup de {formatPercent(MARKUP_EQUIVALENTE_PERCENT)} sobre custo</span>
                 {calculo.precoSugeridoInviavel ? (
                   <>
