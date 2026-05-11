@@ -747,8 +747,16 @@ function CalculadoraPrecificacaoModal({
   const aguardandoPrecoInicial = isCreating && !temPrecoExplicito
 
   const calculo = calcularPrecificacao(precoVendaAtual, form)
+  const precoSugeridoMuitoAcima =
+    temPrecoExplicito &&
+    calculo.precoSugerido != null &&
+    calculo.precoSugerido > precoVendaAtual * 2
   const camposPercentuaisNaoViaveis = useMemo(() => {
-    if (!calculo.precoSugeridoInviavel) return new Set<CampoPercentualVariavel>()
+    if (!calculo.precoSugeridoInviavel) {
+      return precoSugeridoMuitoAcima
+        ? new Set<CampoPercentualVariavel>(['custoProfissionaisPercent'])
+        : new Set<CampoPercentualVariavel>()
+    }
 
     const percentuais = new Map<CampoPercentualVariavel, number>([
       ['royaltiesPercent', calculo.royaltiesPercent],
@@ -763,7 +771,7 @@ function CalculadoraPrecificacaoModal({
       .sort(([, a], [, b]) => b - a)[0]?.[0]
 
     return maiorPercentual ? new Set<CampoPercentualVariavel>([maiorPercentual]) : new Set<CampoPercentualVariavel>()
-  }, [calculo])
+  }, [calculo, precoSugeridoMuitoAcima])
   const camposBloqueadosAtePreco = aguardandoPrecoInicial || savingPreco
   const custosBloqueados = camposBloqueadosAtePreco
 
