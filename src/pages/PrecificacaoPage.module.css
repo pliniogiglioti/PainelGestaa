@@ -779,6 +779,79 @@
   margin-top: 12px;
 }
 
+.calcFooterActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  column-gap: 10px;
+}
+
+.calcFooterActions .inlineActions {
+  margin-top: 0;
+}
+
+.calcFooterWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  justify-self: start;
+  width: min(620px, 100%);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  text-wrap: pretty;
+  transform-origin: bottom left;
+}
+
+.calcFooterWarningIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 177, 177, 0.55);
+  color: #ffb1b1;
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.calcFooterWarningVisible {
+  animation: calcFooterWarningIn 0.22s ease-out both;
+}
+
+.calcFooterWarningHidden {
+  pointer-events: none;
+  animation: calcFooterWarningOut 0.18s ease-in both;
+}
+
+@keyframes calcFooterWarningIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes calcFooterWarningOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+    visibility: visible;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+    visibility: hidden;
+  }
+}
+
 .switchRow {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
