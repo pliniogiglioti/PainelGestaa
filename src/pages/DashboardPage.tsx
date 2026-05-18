@@ -39,6 +39,12 @@ type TipoUsuario = 'titular' | 'colaborador'
 
 const DASHBOARD_PAGES: Page[] = ['aplicativos', 'minhas-empresas', 'comunidade']
 
+function normalizeInternalAppLink(link?: string | null) {
+  const trimmed = link?.trim() ?? ''
+  if (!trimmed || trimmed.startsWith('http')) return trimmed
+  return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
+}
+
 function isDashboardPage(value: unknown): value is Page {
   return typeof value === 'string' && DASHBOARD_PAGES.includes(value as Page)
 }
@@ -1068,7 +1074,7 @@ function AppCard({
 
   // Resolve link based on link_type (with backwards-compat fallback)
   const isExternal = app.link_type === 'externo' || (!app.link_type && !!app.external_link)
-  const href = isExternal ? (app.external_link ?? '#') : (app.internal_link ?? '#')
+  const href = isExternal ? (app.external_link ?? '#') : (normalizeInternalAppLink(app.internal_link) || '#')
 
   return (
     <div

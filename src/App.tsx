@@ -80,8 +80,12 @@ async function carregarAcessoUsuario(session: Session) {
   const allowedInternalPaths = Array.from(
     new Set(
       (apps ?? [])
-        .map(app => app.internal_link?.trim() ?? '')
-        .filter(link => link.startsWith('/')),
+        .map(app => {
+          const link = app.internal_link?.trim() ?? ''
+          if (!link || link.startsWith('http')) return ''
+          return link.startsWith('/') ? link : '/' + link
+        })
+        .filter(Boolean),
     ),
   )
 
