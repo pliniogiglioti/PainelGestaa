@@ -1779,7 +1779,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
 
   const navItems = [
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
-    { id: 'minhas-empresas' as Page, label: 'Minhas empresas', icon: <IconBuilding /> },
+    ...(tipoUsuario === 'titular' || isAdmin ? [{ id: 'minhas-empresas' as Page, label: 'Minhas empresas', icon: <IconBuilding /> }] : []),
     { id: 'comunidade'  as Page, label: 'Comunidade',  icon: <IconCommunity /> },
   ]
 
