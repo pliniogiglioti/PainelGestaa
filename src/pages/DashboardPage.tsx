@@ -275,6 +275,7 @@ function TopNavigation({
   }, [menuOpen])
 
   return (
+    <>
     <header className={styles.topNavWrap}>
       <div className={styles.topNavBrand}>
         <img src="/logo.png" height="24" alt="PainelGestaa" />
@@ -404,49 +405,50 @@ function TopNavigation({
           )}
         </div>
       </div>
-
-      <ModalTransition open={showEditNameModal}>
-        {showEditNameModal && (
-          <Modal title="Editar nome" onClose={closeEditNameModal}>
-              <form
-                className={styles.modalForm}
-                onSubmit={async e => {
-                  e.preventDefault()
-                  setSavingName(true)
-                  setNameError('')
-                  const error = await onUpdateUserName(nameDraft)
-                  if (error) {
-                    setNameError(error)
-                    setSavingName(false)
-                    return
-                  }
-                  setSavingName(false)
-                  setShowEditNameModal(false)
-                }}
-              >
-                <Field label="Seu nome">
-                  <Input
-                    value={nameDraft}
-                    onChange={e => setNameDraft(e.target.value)}
-                    placeholder="Digite seu nome completo"
-                    autoFocus
-                    disabled={savingName}
-                  />
-                </Field>
-                {nameError && <p className={styles.formError}>{nameError}</p>}
-                <div className={styles.modalActions}>
-                  <Button type="button" onClick={closeEditNameModal} disabled={savingName}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" variant="primary" disabled={savingName}>
-                    {savingName ? 'Salvando...' : 'Salvar nome'}
-                  </Button>
-                </div>
-              </form>
-          </Modal>
-        )}
-      </ModalTransition>
     </header>
+
+    <ModalTransition open={showEditNameModal}>
+      {showEditNameModal && (
+        <Modal title="Editar nome" onClose={closeEditNameModal}>
+            <form
+              className={styles.modalForm}
+              onSubmit={async e => {
+                e.preventDefault()
+                setSavingName(true)
+                setNameError('')
+                const error = await onUpdateUserName(nameDraft)
+                if (error) {
+                  setNameError(error)
+                  setSavingName(false)
+                  return
+                }
+                setSavingName(false)
+                setShowEditNameModal(false)
+              }}
+            >
+              <Field label="Seu nome">
+                <Input
+                  value={nameDraft}
+                  onChange={e => setNameDraft(e.target.value)}
+                  placeholder="Digite seu nome completo"
+                  autoFocus
+                  disabled={savingName}
+                />
+              </Field>
+              {nameError && <p className={styles.formError}>{nameError}</p>}
+              <div className={styles.modalActions}>
+                <Button type="button" onClick={closeEditNameModal} disabled={savingName}>
+                  Cancelar
+                </Button>
+                <Button type="submit" variant="primary" disabled={savingName}>
+                  {savingName ? 'Salvando...' : 'Salvar nome'}
+                </Button>
+              </div>
+            </form>
+        </Modal>
+      )}
+    </ModalTransition>
+    </>
   )
 }
 
