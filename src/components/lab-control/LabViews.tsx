@@ -4,7 +4,7 @@ import type { Lab, LabEnvio, LabKanbanColuna, LabPreco, LabDentista } from '../.
 import ModalTransition from '../ModalTransition'
 import { useSessionStorageState } from '../../hooks/useSessionStorageState'
 import styles from '../../pages/LabControlPage.module.css'
-import { DENTISTA_FILTER_ALL, HOME_MODE_OPTIONS, LAB_FILTER_ALL, isLabDetailTab, isString, type LabHomeMode } from './constants'
+import { DENTISTA_FILTER_ALL, HOME_MODE_OPTIONS, LAB_FILTER_ALL, isLabDetailTab, isString, type LabControlPermissions, type LabHomeMode } from './constants'
 import { IconAlert, IconArchive, IconBack, IconCalendar, IconClock, IconEdit, IconList, IconMail, IconPhone, IconPlus, IconSettings2, IconTrash } from './icons'
 import { ArquivadosModal, DentistasModal, FormasEnvioModal, KanbanConfigModal, LabModal, PrecosModal } from './LabModals'
 import { CalendarView } from './CalendarView'
@@ -17,8 +17,9 @@ import { InfoRow, Modal, OverviewMenu, Spinner } from './shared'
 import type { LabEtapa } from './utils'
 import { applyEtapaChanges, formatDate, formatWhatsAppNumber, getEnvioDataEntregaRealFromEtapas, getEnvioEtapas, getLabFeriados, isOverdue, registrarHistorico, serializeLabEtapas, sortEnviosByCreatedAt, today } from './utils'
 
-export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack, onLabUpdated, onColunasUpdated }: {
+export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, colunas, onBack, onLabUpdated, onColunasUpdated }: {
   lab: Lab; empresaId: string; userId: string; isAdmin: boolean
+  permissions: LabControlPermissions
   colunas: LabKanbanColuna[]
   onBack: () => void; onLabUpdated: () => void; onColunasUpdated: () => void
 }) {
@@ -45,6 +46,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
     isString,
   )
   const [novoFeriado,     setNovoFeriado]     = useState('')
+  const can = (permission: keyof LabControlPermissions) => isAdmin || !!permissions[permission]
 
   const fetchEnvios = useCallback(async () => {
     const { data } = await supabase
@@ -166,20 +168,28 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
           )}
         </div>
         <div className={styles.headerActions}>
-          {isAdmin && (
+          {(can('editar_laboratorios') || can('lista_precos') || isAdmin || can('arquivados')) && (
             <>
+              {can('editar_laboratorios') && (
               <button type="button" className={styles.btnSecondary} onClick={() => setShowEditLab(true)}>
                 <IconEdit /> Editar lab
               </button>
+              )}
+              {can('lista_precos') && (
               <button type="button" className={styles.btnSecondary} onClick={() => setShowPrecos(true)}>
                 Lista de preços
               </button>
+              )}
+              {isAdmin && (
               <button type="button" className={styles.btnSecondary} onClick={() => setShowKanbanCfg(true)}>
                 <IconSettings2 /> Kanban
               </button>
+              )}
+              {can('arquivados') && (
               <button type="button" className={styles.btnSecondary} onClick={() => setShowArquivados(true)}>
                 <IconArchive /> Arquivados
               </button>
+              )}
             </>
           )}
           <button type="button" className={styles.btnPrimary} onClick={() => { setEditingEnvio(null); setShowEnvioSteps(true) }}>
@@ -213,7 +223,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
             <KanbanBoard
               envios={filteredEnvios}
               colunas={colunas}
-              isAdmin={isAdmin}
+              isAdmin={can('excluir_envio')}
               getLabFeriados={() => getLabFeriados(lab)}
               precosByLab={{ [lab.id]: precos }}
               onMoveEnvio={moveEnvio}
@@ -242,7 +252,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
             <div className={styles.labInfoCardHeader}>
               <h3 className={styles.infoSectionTitle}>Feriados do laboratório</h3>
             </div>
-            {isAdmin && (
+            {can('feriados') && (
               <div className={styles.formGrid2}>
                 <div className={styles.formField}>
                   <label className={styles.label}>Cadastrar feriado</label>
@@ -272,7 +282,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
                     <strong>{formatDate(feriado)}</strong>
                     <span>Dia não contabilizado no prazo útil</span>
                   </div>
-                  {isAdmin && (
+                  {can('feriados') && (
                     <div className={styles.financialActions}>
                       <button
                         type="button"
@@ -293,7 +303,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
           <div className={styles.labInfoCard}>
             <div className={styles.labInfoCardHeader}>
               <h3 className={styles.infoSectionTitle}>Lista de preços</h3>
-              {isAdmin && (
+              {can('gerenciar_precos') && (
                 <button
                   type="button"
                   className={styles.btnSecondary}
@@ -309,7 +319,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
             {precos.length === 0 ? (
               <p className={styles.emptyMsg}>
                 Nenhum serviço cadastrado.
-                {isAdmin && ' Clique em "Gerenciar" para adicionar.'}
+                {can('gerenciar_precos') && ' Clique em "Gerenciar" para adicionar.'}
               </p>
             ) : (
               <div className={styles.precosList}>
@@ -319,7 +329,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
                     <span className={styles.precosValor}>
                       {p.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                     </span>
-                    {isAdmin && (
+                    {can('gerenciar_precos') && (
                       <button
                         type="button"
                         className={styles.btnIcon}
@@ -364,7 +374,14 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
           onClose={() => setShowKanbanCfg(false)} onSaved={onColunasUpdated} />
       </ModalTransition>
       <ModalTransition open={showArquivados}>
-        <ArquivadosModal empresaId={empresaId} userId={userId} labId={lab.id} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+        <ArquivadosModal
+          empresaId={empresaId}
+          userId={userId}
+          labId={lab.id}
+          allowPermanentDelete={isAdmin}
+          onClose={() => setShowArquivados(false)}
+          onRestored={() => void fetchEnvios()}
+        />
       </ModalTransition>
       <ModalTransition open={!!resumoEnvio}>
         {resumoEnvio && (
@@ -372,7 +389,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, colunas, onBack
             envio={resumoEnvio}
             labNome={lab.nome}
             labTelefone={lab.telefone}
-            isAdmin={isAdmin}
+            isAdmin={can('marcar_pago')}
             empresaId={empresaId}
             userId={userId}
             feriados={getLabFeriados(lab)}
@@ -398,6 +415,7 @@ export function LabsAggregateDetailView({
   empresaNome,
   userId,
   isAdmin,
+  permissions,
   colunas,
   onBack,
   onTrocarEmpresa,
@@ -407,12 +425,14 @@ export function LabsAggregateDetailView({
   onCreateLab,
   onOpenEditLabPicker,
   onOpenPrecosPicker,
+  onOpenAccessManagement,
 }: {
   labs: Lab[]
   empresaId: string
   empresaNome: string
   userId: string
   isAdmin: boolean
+  permissions: LabControlPermissions
   colunas: LabKanbanColuna[]
   onBack: () => void
   onTrocarEmpresa: () => void
@@ -422,6 +442,7 @@ export function LabsAggregateDetailView({
   onCreateLab: () => void
   onOpenEditLabPicker: () => void
   onOpenPrecosPicker: () => void
+  onOpenAccessManagement: () => void
 }) {
   const storagePrefix = `lab-control:${empresaId}:aggregate`
   const [envios,           setEnvios]           = useState<LabEnvio[]>([])
@@ -565,6 +586,7 @@ export function LabsAggregateDetailView({
 
   const aggregateLabCount = new Set(visibleEnvios.map(envio => envio.lab_id)).size
   const selectedHomeModeIndex = HOME_MODE_OPTIONS.findIndex(option => option.value === homeMode)
+  const can = (permission: keyof LabControlPermissions) => isAdmin || !!permissions[permission]
 
   return (
     <div className={styles.page}>
@@ -616,11 +638,13 @@ export function LabsAggregateDetailView({
             envios={envios}
             colunas={colunas}
             isAdmin={isAdmin}
+            permissions={permissions}
             getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
             onCreateLab={onCreateLab}
             onOpenEditLabPicker={onOpenEditLabPicker}
             onOpenPrecosPicker={onOpenPrecosPicker}
             onOpenKanbanCfg={() => setShowKanbanCfg(true)}
+            onOpenAccessManagement={onOpenAccessManagement}
             onOpenArquivados={() => setShowArquivados(true)}
             onOpenDentistas={() => setShowDentistas(true)}
             onOpenFormasEnvio={() => setShowFormasEnvio(true)}
@@ -688,7 +712,7 @@ export function LabsAggregateDetailView({
         <KanbanBoard
           envios={visibleEnvios}
           colunas={colunas}
-          isAdmin={isAdmin}
+          isAdmin={can('excluir_envio')}
           showLabName
           getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
           getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
@@ -729,7 +753,13 @@ export function LabsAggregateDetailView({
         />
       </ModalTransition>
       <ModalTransition open={showArquivados}>
-        <ArquivadosModal empresaId={empresaId} userId={userId} onClose={() => setShowArquivados(false)} onRestored={() => void fetchEnvios()} />
+        <ArquivadosModal
+          empresaId={empresaId}
+          userId={userId}
+          allowPermanentDelete={isAdmin}
+          onClose={() => setShowArquivados(false)}
+          onRestored={() => void fetchEnvios()}
+        />
       </ModalTransition>
       <ModalTransition open={showFinanceiro}>
         {showFinanceiro && (
@@ -762,7 +792,7 @@ export function LabsAggregateDetailView({
             labTelefone={labsById[resumoEnvio.lab_id]?.telefone}
             feriados={labsById[resumoEnvio.lab_id] ? getLabFeriados(labsById[resumoEnvio.lab_id]) : []}
             precosByLab={precosByLab}
-            isAdmin={isAdmin}
+            isAdmin={can('marcar_pago')}
             empresaId={empresaId}
             userId={userId}
             onClose={() => setResumoEnvio(null)}

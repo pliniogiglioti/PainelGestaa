@@ -703,6 +703,27 @@ export interface Database {
         }
         Relationships: []
       }
+      lab_colaborador_permissoes: {
+        Row: {
+          empresa_id: string
+          user_id: string
+          permissoes: string[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          empresa_id: string
+          user_id: string
+          permissoes?: string[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          permissoes?: string[]
+          updated_at?: string
+        }
+        Relationships: []
+      }
       lab_envios: {
         Row: {
           id:                       string

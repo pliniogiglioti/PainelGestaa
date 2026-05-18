@@ -48,6 +48,34 @@ export const HOME_MODE_OPTIONS = [
   { value: 'calendar', label: 'Calendário', icon: 'calendar' },
   { value: 'list', label: 'Lista', icon: 'list' },
 ] as const
+
+export const LAB_CONTROL_PERMISSION_OPTIONS = [
+  { key: 'novo_laboratorio', label: 'Novo laboratório' },
+  { key: 'editar_laboratorios', label: 'Editar Laboratórios' },
+  { key: 'lista_precos', label: 'Lista de Preços' },
+  { key: 'arquivados', label: 'Arquivados' },
+  { key: 'feriados', label: 'Adicionar/remover feriado' },
+  { key: 'gerenciar_precos', label: 'Gerenciar lista de preços' },
+  { key: 'excluir_envio', label: 'Botão de excluir envio no card' },
+  { key: 'marcar_pago', label: 'Marcar como pago / remover pagamento' },
+] as const
+
+export type LabControlPermissionKey = typeof LAB_CONTROL_PERMISSION_OPTIONS[number]['key']
+export type LabControlPermissions = Partial<Record<LabControlPermissionKey, boolean>>
+
+export function buildLabControlPermissions(keys?: string[] | null): LabControlPermissions {
+  const allowed = new Set(keys ?? [])
+  return Object.fromEntries(
+    LAB_CONTROL_PERMISSION_OPTIONS.map(option => [option.key, allowed.has(option.key)]),
+  ) as LabControlPermissions
+}
+
+export function getAllLabControlPermissions(): LabControlPermissions {
+  return Object.fromEntries(
+    LAB_CONTROL_PERMISSION_OPTIONS.map(option => [option.key, true]),
+  ) as LabControlPermissions
+}
+
 export function isString(value: unknown): value is string {
   return typeof value === 'string'
 }

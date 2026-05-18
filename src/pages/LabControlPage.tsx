@@ -6,6 +6,7 @@ import styles from './LabControlPage.module.css'
 import {
   DEFAULT_COLUNAS,
   IconBack,
+  LabAccessModal,
   LabDetailView,
   LabModal,
   LabPickerModal,
@@ -15,11 +16,13 @@ import {
   type LabHomeMode,
   type LabViewSelection,
 } from '../components/lab-control/LabControlComponents'
+import { buildLabControlPermissions, getAllLabControlPermissions, type LabControlPermissions } from '../components/lab-control/constants'
 
 export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVoltar }: {
   userId: string; empresa: Empresa; onTrocarEmpresa: () => void; onVoltar: () => void
 }) {
   const [isAdmin,      setIsAdmin]      = useState(false)
+  const [labPermissions, setLabPermissions] = useState<LabControlPermissions>({})
   const [labs,         setLabs]         = useState<Lab[]>([])
   const [colunas,      setColunas]      = useState<LabKanbanColuna[]>([])
   const [selectedView, setSelectedView] = useState<LabViewSelection | null>(null)
@@ -29,10 +32,14 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
   const [showHomePrecos, setShowHomePrecos] = useState(false)
   const [showEditLabPicker, setShowEditLabPicker] = useState(false)
   const [showPrecosPicker, setShowPrecosPicker] = useState(false)
+  const [showAccessModal, setShowAccessModal] = useState(false)
   const [homeMode, setHomeMode] = useState<LabHomeMode>('kanban')
 
   useEffect(() => {
     const validarAcesso = async () => {
+      setIsAdmin(false)
+      setLabPermissions({})
+
       // Verifica se a empresa ainda existe
       const { data: empresaExiste } = await supabase
         .from('empresas')
@@ -67,11 +74,25 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
           return
         }
 
-        setIsAdmin(membro.role === 'admin')
+        const empresaAdmin = membro.role === 'admin'
+        setIsAdmin(empresaAdmin)
+        if (empresaAdmin) {
+          setLabPermissions(getAllLabControlPermissions())
+        } else {
+          const { data: permissions } = await supabase
+            .from('lab_colaborador_permissoes')
+            .select('permissoes')
+            .eq('empresa_id', empresa.id)
+            .eq('user_id', userId)
+            .maybeSingle()
+
+          setLabPermissions(buildLabControlPermissions(permissions?.permissoes ?? []))
+        }
         return
       }
 
       setIsAdmin(true)
+      setLabPermissions(getAllLabControlPermissions())
     }
 
     void validarAcesso()
@@ -134,6 +155,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         empresaId={empresa.id}
         userId={userId}
         isAdmin={isAdmin}
+        permissions={labPermissions}
         colunas={colunas}
         onBack={() => setSelectedView(null)}
         onLabUpdated={() => { fetchLabs() }}
@@ -151,6 +173,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         empresaNome={empresa.nome}
         userId={userId}
         isAdmin={isAdmin}
+        permissions={labPermissions}
         colunas={colunas}
         onBack={onVoltar}
         onTrocarEmpresa={onTrocarEmpresa}
@@ -160,6 +183,7 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
         onCreateLab={() => { setEditingLab(null); setShowLabModal(true) }}
         onOpenEditLabPicker={() => setShowEditLabPicker(true)}
         onOpenPrecosPicker={() => setShowPrecosPicker(true)}
+        onOpenAccessManagement={() => setShowAccessModal(true)}
       />
 
       {showLabModal && (
@@ -202,6 +226,14 @@ export default function LabControlPage({ userId, empresa, onTrocarEmpresa, onVol
             lab={editingLab}
             onClose={() => setShowHomePrecos(false)}
             onSaved={() => { void fetchLabs() }}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={showAccessModal}>
+        {showAccessModal && (
+          <LabAccessModal
+            empresaId={empresa.id}
+            onClose={() => setShowAccessModal(false)}
           />
         )}
       </ModalTransition>

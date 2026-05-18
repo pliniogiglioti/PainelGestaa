@@ -3,6 +3,7 @@ import type React from 'react'
 import type { Lab, LabEnvio, LabKanbanColuna } from '../../lib/types'
 import { Modal as UiModal } from '../ui'
 import styles from '../../pages/LabControlPage.module.css'
+import type { LabControlPermissions } from './constants'
 import { IconArchive, IconEdit, IconList, IconMoney, IconPlus, IconSettings2, IconUser } from './icons'
 import { formatDate, isFinalEnvioStatus, isOverdue } from './utils'
 
@@ -65,11 +66,13 @@ export function OverviewMenu({
   envios,
   colunas,
   isAdmin,
+  permissions,
   getLabName,
   onCreateLab,
   onOpenEditLabPicker,
   onOpenPrecosPicker,
   onOpenKanbanCfg,
+  onOpenAccessManagement,
   onOpenArquivados,
   onOpenDentistas,
   onOpenFormasEnvio,
@@ -79,11 +82,13 @@ export function OverviewMenu({
   envios: LabEnvio[]
   colunas: LabKanbanColuna[]
   isAdmin: boolean
+  permissions: LabControlPermissions
   getLabName: (labId: string) => string
   onCreateLab: () => void
   onOpenEditLabPicker: () => void
   onOpenPrecosPicker: () => void
   onOpenKanbanCfg: () => void
+  onOpenAccessManagement: () => void
   onOpenArquivados: () => void
   onOpenDentistas: () => void
   onOpenFormasEnvio: () => void
@@ -121,18 +126,28 @@ export function OverviewMenu({
   const totalValor = envios.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
   const valorEmAndamento = emAndamento.reduce((total, envio) => total + (envio.preco_servico ?? 0), 0)
   const ticketMedio = envios.length > 0 ? totalValor / envios.length : 0
+  const can = (permission: keyof LabControlPermissions) => isAdmin || !!permissions[permission]
 
   const actions = [
-    ...(isAdmin ? [
+    ...(can('novo_laboratorio') ? [
       { id: 'novo-lab', label: 'Novo laboratório', icon: <IconPlus />, onClick: onCreateLab },
+    ] : []),
+    ...(can('editar_laboratorios') ? [
       { id: 'editar-labs', label: 'Editar laboratórios', icon: <IconEdit />, onClick: onOpenEditLabPicker },
+    ] : []),
+    ...(can('lista_precos') ? [
       { id: 'precos', label: 'Lista de preços', icon: <IconList />, onClick: onOpenPrecosPicker },
+    ] : []),
+    ...(isAdmin ? [
       { id: 'kanbans', label: 'Editar Kanbans', icon: <IconSettings2 />, onClick: onOpenKanbanCfg },
+      { id: 'acessos', label: 'Gerenciar acesso', icon: <IconSettings2 />, onClick: onOpenAccessManagement },
     ] : []),
     { id: 'financeiro', label: 'Financeiro', icon: <IconMoney />, onClick: onOpenFinanceiro },
     { id: 'dentistas',  label: 'Dentistas',  icon: <IconUser />,    onClick: onOpenDentistas },
     { id: 'formas-envio', label: 'Tipos de envio', icon: <IconArchive />, onClick: onOpenFormasEnvio },
-    { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },
+    ...(can('arquivados') ? [
+      { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },
+    ] : []),
   ]
 
   return (

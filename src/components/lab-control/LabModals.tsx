@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
 import type { Lab, LabDentista, LabEnvio, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { FORMA_ENVIO_OPTIONS } from './constants'
+import { FORMA_ENVIO_OPTIONS, LAB_CONTROL_PERMISSION_OPTIONS, type LabControlPermissionKey } from './constants'
 import { IconEdit, IconPlus, IconTrash, IconUpload } from './icons'
 import { Modal, Spinner } from './shared'
 import { formatCurrencyMask, formatDate, formatWhatsAppInput, normalizeWhatsAppNumber, parseMaskedCurrency, registrarHistorico } from './utils'
@@ -466,8 +466,8 @@ export function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
 
 // ── ArquivadosModal ───────────────────────────────────────────────────────
 
-export function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored }: {
-  empresaId: string; userId: string; labId?: string; onClose: () => void; onRestored: () => void
+export function ArquivadosModal({ empresaId, userId, labId, allowPermanentDelete = true, onClose, onRestored }: {
+  empresaId: string; userId: string; labId?: string; allowPermanentDelete?: boolean; onClose: () => void; onRestored: () => void
 }) {
   const [envios,   setEnvios]   = useState<LabEnvio[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -519,7 +519,7 @@ export function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored 
                   <strong>{e.paciente_nome}</strong>
                   <span>{e.tipo_trabalho}</span>
                   <small>Arquivado em {formatDate(e.arquivado_em)}</small>
-                  {confirmDeleteId === e.id && (
+                  {allowPermanentDelete && confirmDeleteId === e.id && (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
                       <input
                         className={styles.input}
@@ -542,7 +542,7 @@ export function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored 
                 </div>
                 <div className={styles.financialActions}>
                   <button type="button" className={styles.btnSecondary} onClick={() => void restaurar(e)}>Restaurar</button>
-                  {confirmDeleteId !== e.id && (
+                  {allowPermanentDelete && confirmDeleteId !== e.id && (
                     <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => { setConfirmDeleteId(e.id); setConfirmText('') }} title="Excluir permanentemente">
                       <IconTrash />
                     </button>
@@ -556,6 +556,210 @@ export function ArquivadosModal({ empresaId, userId, labId, onClose, onRestored 
       <div className={styles.formActions} style={{ marginTop: 12 }}>
         <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
       </div>
+    </Modal>
+  )
+}
+
+type LabAccessMember = {
+  user_id: string
+  name: string | null
+  email: string | null
+  empresa_role: 'admin' | 'membro'
+  ativo: boolean
+  app_access_ids: string[] | null
+}
+
+export function LabAccessModal({ empresaId, onClose }: {
+  empresaId: string
+  onClose: () => void
+}) {
+  const [members, setMembers] = useState<LabAccessMember[]>([])
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [draft, setDraft] = useState<LabControlPermissionKey[]>([])
+  const [labControlAppId, setLabControlAppId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+
+  const selectedMember = members.find(member => member.user_id === selectedUserId)
+
+  const fetchData = useCallback(async () => {
+    setLoading(true)
+    setError('')
+
+    const [{ data: apps }, { data: membros, error: membrosError }] = await Promise.all([
+      supabase
+        .from('apps')
+        .select('id, name, internal_link')
+        .or('internal_link.eq./lab-control,internal_link.eq.lab-control,name.ilike.%Lab%Control%')
+        .limit(1),
+      supabase.rpc('listar_membros_empresa', { p_empresa_id: empresaId }),
+    ])
+
+    if (membrosError) {
+      setError(membrosError.message)
+      setLoading(false)
+      return
+    }
+
+    const appId = apps?.[0]?.id ?? null
+    setLabControlAppId(appId)
+
+    const labMembers = ((membros ?? []) as LabAccessMember[])
+      .filter(member => {
+        if (member.empresa_role !== 'membro' || member.ativo === false) return false
+        if (!appId) return true
+        return member.app_access_ids == null || member.app_access_ids.includes(appId)
+      })
+
+    setMembers(labMembers)
+
+    const firstUserId = labMembers[0]?.user_id ?? ''
+    setSelectedUserId(firstUserId)
+
+    if (firstUserId) {
+      const { data: permissions } = await supabase
+        .from('lab_colaborador_permissoes')
+        .select('permissoes')
+        .eq('empresa_id', empresaId)
+        .eq('user_id', firstUserId)
+        .maybeSingle()
+
+      setDraft((permissions?.permissoes ?? []) as LabControlPermissionKey[])
+    } else {
+      setDraft([])
+    }
+
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetchData() }, [fetchData])
+
+  const loadMemberPermissions = async (userId: string) => {
+    setSelectedUserId(userId)
+    setSuccess('')
+    setError('')
+
+    if (!userId) {
+      setDraft([])
+      return
+    }
+
+    const { data, error: permissionsError } = await supabase
+      .from('lab_colaborador_permissoes')
+      .select('permissoes')
+      .eq('empresa_id', empresaId)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    if (permissionsError) {
+      setError(permissionsError.message)
+      setDraft([])
+      return
+    }
+
+    setDraft((data?.permissoes ?? []) as LabControlPermissionKey[])
+  }
+
+  const togglePermission = (permission: LabControlPermissionKey) => {
+    setSuccess('')
+    setError('')
+    setDraft(prev => (
+      prev.includes(permission)
+        ? prev.filter(item => item !== permission)
+        : [...prev, permission]
+    ))
+  }
+
+  const handleSave = async () => {
+    if (!selectedUserId) return
+    setSaving(true)
+    setError('')
+    setSuccess('')
+
+    const permissoes = LAB_CONTROL_PERMISSION_OPTIONS
+      .map(option => option.key)
+      .filter(key => draft.includes(key))
+
+    const { error: saveError } = await supabase
+      .from('lab_colaborador_permissoes')
+      .upsert({
+        empresa_id: empresaId,
+        user_id: selectedUserId,
+        permissoes,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'empresa_id,user_id' })
+
+    if (saveError) {
+      setError(saveError.message)
+      setSaving(false)
+      return
+    }
+
+    setSuccess('Acesso do colaborador atualizado.')
+    setSaving(false)
+  }
+
+  return (
+    <Modal title="Gerenciar acesso Lab Control" onClose={onClose} wide>
+      {loading ? <Spinner /> : (
+        <div className={styles.accessManager}>
+          {labControlAppId == null && (
+            <p className={styles.errorMsg}>Nao foi possivel localizar o app Lab Control cadastrado.</p>
+          )}
+          {members.length === 0 ? (
+            <p className={styles.emptyMsg}>Nenhum colaborador com acesso ao Lab Control nesta empresa.</p>
+          ) : (
+            <>
+              <div className={styles.formField}>
+                <label className={styles.label}>Colaborador</label>
+                <select
+                  className={styles.select}
+                  value={selectedUserId}
+                  onChange={event => void loadMemberPermissions(event.target.value)}
+                >
+                  {members.map(member => (
+                    <option key={member.user_id} value={member.user_id}>
+                      {member.name?.trim() || member.email || 'Colaborador'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {selectedMember && (
+                <div className={styles.accessMemberSummary}>
+                  <strong>{selectedMember.name?.trim() || 'Colaborador'}</strong>
+                  <span>{selectedMember.email}</span>
+                </div>
+              )}
+
+              <div className={styles.accessPermissionGrid}>
+                {LAB_CONTROL_PERMISSION_OPTIONS.map(option => (
+                  <label key={option.key} className={styles.accessPermissionItem}>
+                    <input
+                      type="checkbox"
+                      checked={draft.includes(option.key)}
+                      onChange={() => togglePermission(option.key)}
+                    />
+                    <span>{option.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {error && <p className={styles.errorMsg}>{error}</p>}
+              {success && <p className={styles.successMsg}>{success}</p>}
+
+              <div className={styles.formActions}>
+                <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+                <button type="button" className={styles.btnPrimary} disabled={saving} onClick={() => void handleSave()}>
+                  {saving ? 'Salvando...' : 'Salvar acessos'}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </Modal>
   )
 }
