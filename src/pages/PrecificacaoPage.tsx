@@ -361,19 +361,36 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     custoProfissionais
 
   const margem = precoVenda > 0 ? ((precoVenda - custoTotal) / precoVenda) * 100 : 0
+  const percentageBaseFracoes: Record<CustoProfissionaisBase, number> = {
+    custoInsumos: 0,
+    custoMaterialAplicado: 0,
+    custoLaboratorio: 0,
+    royalties: royaltiesPercent / 100,
+    impostos: impostosPercent / 100,
+    comissoes: comissoesPercent / 100,
+    taxaMaquina: taxaMaquinaPercent / 100,
+  }
+  const fixedBaseAmounts: Record<CustoProfissionaisBase, number> = {
+    custoInsumos,
+    custoMaterialAplicado,
+    custoLaboratorio,
+    royalties: 0,
+    impostos: 0,
+    comissoes: 0,
+    taxaMaquina: 0,
+  }
+  const pvBasesTotal = form.custoProfissionaisBases.reduce((s, b) => s + percentageBaseFracoes[b], 0)
+  const fiBasesTotal = form.custoProfissionaisBases.reduce((s, b) => s + fixedBaseAmounts[b], 0)
+  const profPercent = custoProfissionaisPercent / 100
   const custosFixosPrecoSugerido =
     custoInsumos +
     custoMaterialAplicado +
-    custoLaboratorio +
+    custoLaboratorio -
+    (form.custoProfissionaisModo === 'percentual' ? fiBasesTotal * profPercent : 0) +
     (form.custoProfissionaisModo === 'valor' ? custoProfissionaisValor : 0)
-  const percentualVariavelTotalPrecoSugerido =
-    (
-      royaltiesPercent +
-      impostosPercent +
-      comissoesPercent +
-      taxaMaquinaPercent +
-      (form.custoProfissionaisModo === 'percentual' ? custoProfissionaisPercent : 0)
-    ) / 100
+  const percentualVariavelTotalPrecoSugerido = form.custoProfissionaisModo === 'percentual'
+    ? (royaltiesPercent + impostosPercent + comissoesPercent + taxaMaquinaPercent) / 100 + (1 - pvBasesTotal) * profPercent
+    : (royaltiesPercent + impostosPercent + comissoesPercent + taxaMaquinaPercent) / 100
   const precoSugeridoMarkup = calcularPrecoSugeridoMarkup(
     custosFixosPrecoSugerido,
     percentualVariavelTotalPrecoSugerido,
