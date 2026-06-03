@@ -7,7 +7,10 @@ import styles from './Vendas.module.css';
 interface SellerWorldProps {
   ownerSettings: OwnerSettings;
   onOpenOwnerWizard: () => void;
+  onBack?: () => void;
   initialPlanName?: string;
+  patientName?: string;
+  proposalTitle?: string;
 }
 
 const BADGE_LABELS = ['A', 'B', 'C'];
@@ -59,9 +62,12 @@ interface ToastState {
   kind: 'info' | 'danger';
 }
 
-export function SellerWorld({ ownerSettings, onOpenOwnerWizard, initialPlanName }: SellerWorldProps) {
+export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialPlanName, patientName, proposalTitle }: SellerWorldProps) {
   const [plans, setPlans] = useState<Plan[]>(() => [makePlan(0, initialPlanName)]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [equalizedPlans, setEqualizedPlans] = useState(false);
+  const [editPatientName, setEditPatientName] = useState(patientName ?? '');
+  const [editProposalTitle, setEditProposalTitle] = useState(proposalTitle ?? '');
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -98,6 +104,12 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, initialPlanName 
   return (
     <div className={styles.workspaceShell}>
       <div className={styles.workspaceStage}>
+        {(patientName || proposalTitle) && (
+          <div className={styles.workspaceHeader}>
+            {patientName && <div className={styles.workspaceTitle}>{patientName}</div>}
+            {proposalTitle && <div className={styles.workspaceSubtitle}>{proposalTitle}</div>}
+          </div>
+        )}
         <div className={styles.plansArea}>
           {plans.map((plan, idx) => (
             <PlanCard
@@ -121,38 +133,78 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, initialPlanName 
 
       {/* Sidebar */}
       <div className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : styles.sidebarClosed}`}>
-        <button className={styles.sidebarToggle} onClick={() => setSidebarOpen(o => !o)} title={sidebarOpen ? 'Fechar' : 'Abrir painel'}>
+
+        {/* Toggle strip — sempre visível */}
+        <button className={styles.sidebarToggle} onClick={() => setSidebarOpen(o => !o)}
+          title={sidebarOpen ? 'Ocultar painel' : 'Mostrar painel'}>
           {sidebarOpen ? '›' : '‹'}
         </button>
-        <div className={styles.sidebarContent}>
-          <div className={styles.sbSection}>
-            <div className={styles.sbEyebrow}>Planos</div>
-            <button className={styles.sbBtn} onClick={addPlan} disabled={plans.length >= MAX_PLANS}>
-              + Adicionar plano
-            </button>
-          </div>
 
-          <div className={styles.sbDivider} />
+        {/* Conteúdo — só visível quando aberto */}
+        {sidebarOpen && (
+          <div className={styles.sidebarContent}>
 
-          <div className={styles.sbSection}>
-            <div className={styles.sbEyebrow}>Configurações</div>
-            <button className={styles.sbBtn} onClick={onOpenOwnerWizard}>
-              Configurar preços e pagamentos
-            </button>
-          </div>
+            {/* Editar atendimento */}
+            <div className={styles.sbSection}>
+              <div className={styles.sbEyebrow}>Editar atendimento</div>
+              <div className={styles.sbFieldLabel}>Paciente</div>
+              <input className={styles.sbInlineInput} type="text"
+                value={editPatientName}
+                onChange={e => setEditPatientName(e.target.value)}
+                placeholder="Nome do paciente" />
+              <div className={styles.sbFieldLabel}>Planejamento</div>
+              <input className={styles.sbInlineInput} type="text"
+                value={editProposalTitle}
+                onChange={e => setEditProposalTitle(e.target.value)}
+                placeholder="Opcional" />
+            </div>
 
-          <div className={styles.sbDivider} />
+            <div className={styles.sbDivider} />
 
-          <div className={styles.sbSection}>
+            {/* Ações secundárias */}
+            <div className={styles.sbSection}>
+              <button className={styles.sbBtn} onClick={onOpenOwnerWizard}>Voltar ao Dono</button>
+              {plans.length < MAX_PLANS && (
+                <button className={styles.sbBtn} onClick={addPlan}>+ Comparação</button>
+              )}
+              {plans.length > 1 && (
+                <button className={`${styles.sbBtn} ${equalizedPlans ? styles.sbBtnActive : ''}`}
+                  onClick={() => setEqualizedPlans(e => !e)}>
+                  ⊟ Equalizar
+                </button>
+              )}
+              {onBack && (
+                <button className={styles.sbBtn} onClick={onBack}>‹ Voltar</button>
+              )}
+            </div>
+
+            <div className={styles.sbDivider} />
+
+            {/* Escopo ativo */}
+            <div className={styles.sbSection}>
+              <div className={styles.sbEyebrow}>Escopo ativo</div>
+              <div style={{ fontSize: 12, color: 'var(--text)' }}>
+                {ownerSettings.scopeName || '—'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-dim)' }}>O vendedor segue automaticamente essas regras.</div>
+            </div>
+
+            <div className={styles.sbDivider} />
+
             <button className={`${styles.sbBtn} ${styles.sbBtnDanger}`} onClick={clearAll}>
-              Limpar proposta
+              Novo atendimento
             </button>
-          </div>
-        </div>
 
-        <div className={styles.sbFooter}>
-          <span className={styles.sbVersion}>TOP v9</span>
-        </div>
+            <div className={styles.sbFooter}>
+              <div className={styles.sbThemeSwitch}>
+                <button className={styles.sbThemeOption}>Preto</button>
+                <button className={styles.sbThemeOption}>Claro</button>
+              </div>
+              <span className={styles.sbVersion}>v10</span>
+            </div>
+
+          </div>
+        )}
       </div>
 
       {/* Policy toast */}

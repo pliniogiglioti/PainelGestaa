@@ -92,7 +92,7 @@ function VendasSetup({ empresa, onConcluir }: SimpleSetupProps) {
             Cadastre os serviços da clínica
           </div>
           <div className={styles.launchpadSubtitle} style={{ fontSize: 14, marginBottom: 24 }}>
-            Esses preços serão usados como mínimos à vista no Mundo do Dono. Adicione pelo menos um serviço para continuar.
+            Esses preços serão usados como mínimos à vista nas Configurações. Adicione pelo menos um serviço para continuar.
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
@@ -218,7 +218,9 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   const [screen, setScreen] = useState<Screen>('launchpad');
   const [patientName, setPatientName] = useState('');
   const [proposalTitle, setProposalTitle] = useState('');
-  const [planNameInput, setPlanNameInput] = useState('Plano A');
+  const [planNameInput, setPlanNameInput] = useState('');
+
+  const PLAN_NAME_SUGGESTIONS = ['Diamante', 'Ouro', 'Prata', 'Premium', 'Essencial'];
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const planNameInputRef = useRef<HTMLInputElement>(null);
@@ -252,12 +254,13 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   function startSession() {
     if (!patientName.trim()) return;
-    setPlanNameInput('Plano A');
+    setPlanNameInput('');
     setScreen('naming');
-    setTimeout(() => planNameInputRef.current?.select(), 50);
+    setTimeout(() => planNameInputRef.current?.focus(), 50);
   }
 
   function confirmPlanName() {
+    if (!planNameInput.trim()) setPlanNameInput('Diamante');
     setScreen('workspace');
   }
 
@@ -296,8 +299,8 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
               {/* Mundo do Dono */}
               <div className={`${styles.launchpadChoice} ${styles.launchpadChoicePrimary}`}>
                 <div>
-                  <div className={styles.launchpadChoiceKicker}>Estratégia da clínica</div>
-                  <div className={styles.launchpadChoiceTitle}>Mundo do Dono</div>
+                  <div className={styles.launchpadChoiceKicker}>Estratégia</div>
+                  <div className={styles.launchpadChoiceTitle}>Configurações</div>
                   <div className={styles.launchpadChoiceText}>
                     Defina preços, pagamentos e proteções da equipe antes de colocar a operação para vender.
                   </div>
@@ -309,7 +312,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                       : 'Se preferir, a TOP monta uma base inicial e você só ajusta o que quiser.'}
                   </div>
                   <button className={styles.launchpadBtn} onClick={openOwnerWorld}>
-                    Abrir Mundo do Dono
+                    Abrir Configurações
                   </button>
                 </div>
               </div>
@@ -317,8 +320,8 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
               {/* Mundo do Vendedor */}
               <div className={styles.launchpadChoice}>
                 <div>
-                  <div className={styles.launchpadChoiceKicker}>Atendimento e proposta</div>
-                  <div className={styles.launchpadChoiceTitle}>Mundo do Vendedor</div>
+                  <div className={styles.launchpadChoiceKicker}>Proposta</div>
+                  <div className={styles.launchpadChoiceTitle}>Vender</div>
                   <div className={styles.launchpadChoiceText}>
                     Monte a proposta e conduza a negociação com a clínica já configurada do jeito certo.
                   </div>
@@ -331,10 +334,10 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                         ? { background: '#58d7b5', boxShadow: '0 0 0 1px rgba(88,215,181,0.22), 0 0 14px rgba(88,215,181,0.18)' }
                         : { background: '#f99f35', boxShadow: '0 0 0 1px rgba(249,159,53,0.24), 0 0 14px rgba(249,159,53,0.18)' }}
                     />
-                    {ownerModel.completed ? 'Clínica pronta para vender' : 'Primeiro vamos ajustar a clínica'}
+                    {ownerModel.completed ? 'Configurações prontas' : 'Configure antes de vender'}
                   </div>
                   <button className={styles.launchpadBtnGhost} onClick={openSellerWorld}>
-                    Abrir Mundo do Vendedor
+                    Começar a Vender
                   </button>
                 </div>
               </div>
@@ -355,6 +358,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
             onSave={handleSaveWizard}
             onClose={() => setWizardOpen(false)}
             empresaPrecos={empresaPrecos ?? []}
+            empresaId={empresa.id}
           />
         )}
         {pageToast && (
@@ -409,7 +413,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                 onClick={openOwnerWorld}
                 style={{ display: 'block', marginTop: 8, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
               >
-                Revisar Mundo do Dono
+                Revisar Configurações
               </button>
             )}
           </div>
@@ -421,6 +425,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
             onSave={handleSaveWizard}
             onClose={() => setWizardOpen(false)}
             empresaPrecos={empresaPrecos ?? []}
+            empresaId={empresa.id}
           />
         )}
       </div>
@@ -433,27 +438,47 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
       <div className={styles.vendasRoot}>
         <div className={styles.entryOverlay}>
           <div className={styles.namingCard}>
-            <div className={styles.entryEyebrow}>Criar proposta para {patientName}</div>
-            <label className={styles.entryFieldLabel}>Nome do plano inicial</label>
+            <div className={styles.namingStep}>Passo 2 de 3</div>
+            <div className={styles.namingPatient}>
+              {patientName}{proposalTitle ? ` · ${proposalTitle}` : ''}
+            </div>
+
+            <div className={styles.namingLabel}>Como vamos chamar o plano principal?</div>
+            <div className={styles.namingPrefix}>Plano</div>
             <input
               ref={planNameInputRef}
-              className={styles.entryInput}
+              className={styles.namingInput}
               type="text"
-              placeholder="ex: Plano A"
+              placeholder="Diamante"
               value={planNameInput}
               onChange={e => setPlanNameInput(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') confirmPlanName(); }}
               autoFocus
             />
-            <button className={styles.entryBtn} onClick={confirmPlanName} disabled={!planNameInput.trim()}>
-              Começar
-            </button>
-            <button
-              onClick={() => setScreen('entry')}
-              style={{ display: 'block', marginTop: 12, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
-            >
-              Voltar
-            </button>
+
+            <div className={styles.namingSuggestions}>
+              {PLAN_NAME_SUGGESTIONS.map(s => (
+                <button
+                  key={s}
+                  className={`${styles.namingChip}${planNameInput === s ? ' ' + styles.namingChipActive : ''}`}
+                  onClick={() => setPlanNameInput(s)}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <button className={styles.entryBtn} onClick={confirmPlanName}>
+                Começar →
+              </button>
+              <button
+                onClick={() => setScreen('entry')}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: 13, fontFamily: 'inherit', cursor: 'pointer', padding: 0 }}
+              >
+                ‹ Voltar
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -463,25 +488,13 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   // ---- Workspace ----
   return (
     <div className={`${styles.vendasRoot} ${styles.appWrapper}`}>
-      <div className={styles.appHeader}>
-        <button onClick={() => setScreen('launchpad')} style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer' }}>
-          ←
-        </button>
-        {patientName && <span className={styles.patientNameDisplay}>{patientName}</span>}
-        {proposalTitle && <span className={styles.proposalTitleDisplay}>{proposalTitle}</span>}
-        <span style={{ flex: 1 }} />
-        <button
-          onClick={openOwnerWorld}
-          style={{ background: 'transparent', border: '1px solid var(--border)', borderRadius: 8, padding: '5px 12px', fontSize: 12, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer' }}
-        >
-          Configurações
-        </button>
-      </div>
-
       <SellerWorld
         ownerSettings={ownerSettings}
-        initialPlanName={planNameInput.trim() || 'Plano A'}
+        initialPlanName={planNameInput.trim() || 'Diamante'}
+        patientName={patientName}
+        proposalTitle={proposalTitle}
         onOpenOwnerWizard={openOwnerWorld}
+        onBack={() => setScreen('launchpad')}
       />
 
       {wizardOpen && (

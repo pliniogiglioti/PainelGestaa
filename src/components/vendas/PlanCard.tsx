@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import type { Plan, PlanItem, OwnerSettings } from './types';
 import {
   fmt, planTableTotal, planEffectiveTotal, planHasCampaign,
@@ -51,10 +52,18 @@ function sortItems(items: PlanItem[]): PlanItem[] {
 export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass }: PlanCardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
   const [totalEditing, setTotalEditing] = useState(false);
   const [totalEditInput, setTotalEditInput] = useState(0);
   const totalInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const itemSearchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (dropdownOpen && itemSearchRef.current) {
+      setDropdownRect(itemSearchRef.current.getBoundingClientRect());
+    }
+  }, [dropdownOpen]);
 
   function update(fn: (p: Plan) => void) {
     const next = JSON.parse(JSON.stringify(plan)) as Plan;
@@ -246,79 +255,90 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
           return (
             <div key={item.id} className={`${styles.itemRow} ${hasDiscount ? styles.hasDiscount : ''}`}>
               <div className={styles.itemBody}>
-                <div className={styles.itemName}>{item.name}</div>
-                <div className={styles.itemControls}>
+                <span className={styles.itemName}>{item.name}</span>
+                <div className={`${styles.itemControls} ${(item.qty > 1) ? styles.qtyActive : ''}`}>
                   <button className={styles.qtyBtn} onClick={() => changeQty(idx, -1)}>−</button>
                   <span className={styles.qtyVal}>{item.qty}</span>
                   <button className={styles.qtyBtn} onClick={() => changeQty(idx, 1)}>+</button>
-                  <button className={`${styles.campaignBtn} ${hasDiscount ? styles.active : ''}`}
-                    onClick={() => {
-                      if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); }
-                      else if (!item.campaignEditing) {
-                        update(p => { p.items[idx].campaignEditing = true; p.items[idx].campaignInput = item.campaignPct !== null ? String(item.campaignPct) : ''; });
-                      } else {
-                        update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; });
-                      }
-                    }}>
-                    {hasDiscount ? `${item.campaignPct ?? 0}%` : '›'}
-                  </button>
                 </div>
-                {item.campaignEditing && (
-                  <div className={styles.campaignEditor}>
-                    <input className={styles.campaignInput} type="number" min="0" max="80"
-                      id={`cinp-${item.id}`}
-                      value={item.campaignInput}
-                      onChange={e => update(p => { p.items[idx].campaignInput = e.target.value; })}
-                      onKeyDown={e => { if (e.key === 'Enter') applyCampaignInput(idx); if (e.key === 'Escape') update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; }); }}
-                      placeholder="%" autoFocus />
-                    <button onClick={() => applyCampaignInput(idx)}>✓</button>
-                    <button onClick={() => applyMaxCampaign(idx)} title={`Ir ao mínimo: ${fmt(itemMinPrice(item, ownerSettings) * (item.qty || 1))}`}>min</button>
-                    {hasDiscount && <button onClick={() => update(p => { p.items[idx].overridePrice = null; p.items[idx].campaignPct = null; p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; p.totalOverride = null; })}>×</button>}
-                  </div>
-                )}
-              </div>
-              <div className={styles.itemPriceArea}>
-                {hasDiscount && item.priceVisible && <span className={styles.itemPriceOrig}>{fmt(item.tablePrice * (item.qty || 1))}</span>}
-                {item.priceEditing ? (
-                  <span className={styles.priceEditWrap}>
-                    <input className={styles.priceEditInput} type="number" min="0"
-                      id={`pedit-${item.id}`}
-                      value={item.priceEditInput}
-                      onChange={e => update(p => { p.items[idx].priceEditInput = e.target.value; })}
-                      onKeyDown={e => { if (e.key === 'Enter') applyPriceEdit(idx); if (e.key === 'Escape') update(p => { p.items[idx].priceEditing = false; p.items[idx].priceEditInput = ''; }); }} />
-                    <button className={styles.priceEditOk} onClick={() => applyPriceEdit(idx)}>✓</button>
-                  </span>
-                ) : (
-                  <span className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
-                    onClick={() => {
-                      if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); return; }
-                      update(p => { p.items[idx].priceEditInput = String(Math.round(totalForItem)); p.items[idx].priceEditing = true; });
-                    }}>
-                    {fmt(totalForItem)}
-                  </span>
-                )}
+                <div className={styles.itemPriceArea}>
+                  {hasDiscount && item.priceVisible && <span className={styles.itemPriceOrig}>{fmt(item.tablePrice * (item.qty || 1))}</span>}
+                  {item.priceEditing ? (
+                    <span className={styles.priceEditWrap}>
+                      <input className={styles.priceEditInput} type="number" min="0"
+                        id={`pedit-${item.id}`}
+                        value={item.priceEditInput}
+                        onChange={e => update(p => { p.items[idx].priceEditInput = e.target.value; })}
+                        onKeyDown={e => { if (e.key === 'Enter') applyPriceEdit(idx); if (e.key === 'Escape') update(p => { p.items[idx].priceEditing = false; p.items[idx].priceEditInput = ''; }); }} />
+                      <button className={styles.priceEditOk} onClick={() => applyPriceEdit(idx)}>✓</button>
+                    </span>
+                  ) : (
+                    <span className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
+                      onClick={() => {
+                        if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); return; }
+                        update(p => { p.items[idx].priceEditInput = String(Math.round(totalForItem)); p.items[idx].priceEditing = true; });
+                      }}>
+                      {fmt(totalForItem)}
+                    </span>
+                  )}
+                </div>
+                <button
+                  className={`${styles.itemChevron} ${hasDiscount ? styles.hasDiscount : ''}`}
+                  onClick={() => {
+                    if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); }
+                    else if (!item.campaignEditing) {
+                      update(p => { p.items[idx].campaignEditing = true; p.items[idx].campaignInput = item.campaignPct !== null ? String(item.campaignPct) : ''; });
+                    } else {
+                      update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; });
+                    }
+                  }}>›</button>
                 <button className={styles.removeItemBtn} onClick={() => removeItem(idx)}>×</button>
               </div>
+              {item.campaignEditing && (
+                <div className={styles.campaignEditor}>
+                  <input className={styles.campaignInput} type="number" min="0" max="80"
+                    id={`cinp-${item.id}`}
+                    value={item.campaignInput}
+                    onChange={e => update(p => { p.items[idx].campaignInput = e.target.value; })}
+                    onKeyDown={e => { if (e.key === 'Enter') applyCampaignInput(idx); if (e.key === 'Escape') update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; }); }}
+                    placeholder="%" autoFocus />
+                  <button onClick={() => applyCampaignInput(idx)}>✓</button>
+                  <button onClick={() => applyMaxCampaign(idx)} title={`Ir ao mínimo: ${fmt(itemMinPrice(item, ownerSettings) * (item.qty || 1))}`}>min</button>
+                  {hasDiscount && <button onClick={() => update(p => { p.items[idx].overridePrice = null; p.items[idx].campaignPct = null; p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; p.totalOverride = null; })}>×</button>}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
       {/* Item search / add */}
-      <div className={styles.itemSearch}>
+      <div className={styles.itemSearch} ref={itemSearchRef}>
         <input className={styles.searchInput} ref={searchInputRef}
-          placeholder="Adicionar tratamento..."
+          placeholder="+ Adicionar tratamento"
           value={searchQuery}
           onFocus={() => setDropdownOpen(true)}
           onChange={e => { setSearchQuery(e.target.value); setDropdownOpen(true); }} />
-        {dropdownOpen && (
-          <div className={styles.catalogDropdown}>
+      </div>
+
+      {dropdownOpen && createPortal(
+        <>
+          <div className={styles.dropdownBackdrop} onClick={() => { setDropdownOpen(false); setSearchQuery(''); }} />
+          <div
+            className={styles.catalogDropdown}
+            style={dropdownRect ? {
+              position: 'fixed',
+              top: dropdownRect.bottom + 6,
+              left: dropdownRect.left,
+              width: dropdownRect.width,
+            } : undefined}
+          >
             {filteredCatalog().map(cat => (
               <div key={cat.name}>
                 <div className={styles.catalogCategory}>{cat.name}</div>
                 {cat.items.map(item => (
                   <button key={item.name} className={`${styles.catalogItem} ${plan.items.some(i => i.name === item.name) ? styles.catalogItemAdded : ''}`}
-                    onClick={() => { if (!plan.items.some(i => i.name === item.name)) addItem(item); }}>
+                    onClick={() => { if (!plan.items.some(i => i.name === item.name)) { addItem(item); setDropdownOpen(false); setSearchQuery(''); } }}>
                     <span>{item.name}</span>
                     <span className={styles.catalogItemPrice}>{fmt(item.tablePrice)}</span>
                   </button>
@@ -327,29 +347,35 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
             ))}
             {filteredCatalog().length === 0 && <div className={styles.catalogEmpty}>Nenhum resultado</div>}
           </div>
-        )}
-      </div>
-      {dropdownOpen && <div className={styles.dropdownBackdrop} onClick={() => setDropdownOpen(false)} />}
+        </>,
+        document.body
+      )}
 
       {/* Total area */}
-      {plan.items.length > 0 && (
+      {plan.totalRevealed && plan.items.length > 0 && (
         <div className={styles.totalArea}>
-          {hasCampaign && <span className={styles.totalOrig}>{fmt(tableTotal)}</span>}
-          {totalEditing ? (
-            <span className={styles.priceEditWrap}>
-              <input ref={totalInputRef} className={styles.priceEditInput} type="number" min="0"
-                id={`total-edit-${plan.id}`}
-                value={totalEditInput}
-                onChange={e => setTotalEditInput(parseFloat(e.target.value) || 0)}
-                onKeyDown={e => { if (e.key === 'Enter') applyTotalEdit(); if (e.key === 'Escape') setTotalEditing(false); }} />
-              <button className={styles.priceEditOk} onClick={applyTotalEdit}>✓</button>
-            </span>
-          ) : (
-            <span className={`${styles.totalValue} ${plan.totalVisible ? '' : styles.hidden}`}
-              onClick={() => { if (!plan.totalVisible) handleRevealTotal(); else startTotalEdit(); }}>
-              {plan.totalVisible ? fmt(eff) : '● ● ●'}
-            </span>
-          )}
+          <hr className={styles.sectionDivider} />
+          <div className={styles.totalRow}>
+            <span className={styles.totalLabel}>Total</span>
+            <div className={`${styles.totalValueWrap} ${plan.totalVisible ? styles.valRevealed : styles.valHidden}`}>
+              {hasCampaign && <span className={styles.totalOrig}>{fmt(tableTotal)}</span>}
+              {totalEditing ? (
+                <span className={styles.priceEditWrap}>
+                  <input ref={totalInputRef} className={styles.priceEditInput} type="number" min="0"
+                    id={`total-edit-${plan.id}`}
+                    value={totalEditInput}
+                    onChange={e => setTotalEditInput(parseFloat(e.target.value) || 0)}
+                    onKeyDown={e => { if (e.key === 'Enter') applyTotalEdit(); if (e.key === 'Escape') setTotalEditing(false); }} />
+                  <button className={styles.priceEditOk} onClick={applyTotalEdit}>✓</button>
+                </span>
+              ) : (
+                <span className={styles.totalValue}
+                  onClick={() => { if (plan.totalVisible) startTotalEdit(); }}>
+                  {fmt(eff)}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

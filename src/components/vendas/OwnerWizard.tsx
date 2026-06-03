@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { supabase } from '../../lib/supabase';
 import type { OwnerV8Model } from './types';
 import {
   OWNER_V8_SECTIONS,
@@ -6,7 +7,6 @@ import {
   defaultOwnerV8Model,
   ownerV8SuggestedGorduraPct,
   createOwnerV8FallbackSnapshot,
-  EXTERNAL_MINIMUM_STORAGE_KEY,
 } from './ownerModel';
 import {
   safeNumber,
@@ -17,7 +17,10 @@ import {
   sanitizeIndicatorRules,
   sanitizeIndicatorRoleLabels,
   defaultIndicatorRules,
+  cardFeePct,
+  boletoTotalWithInterest,
 } from './calcEngine';
+import { applyOwnerV8Model } from './ownerModel';
 import { FLAT_CATALOG } from './catalog';
 import styles from './Vendas.module.css';
 
@@ -65,6 +68,7 @@ function createIndicatorTagId() {
 }
 
 interface EmpresaPrecoMinimal {
+  id: string;
   nome_produto: string;
   categoria: string | null;
   preco: number;
@@ -75,13 +79,12 @@ interface OwnerWizardProps {
   onSave: (model: OwnerV8Model) => void;
   onClose: () => void;
   empresaPrecos?: EmpresaPrecoMinimal[];
+  empresaId?: string;
 }
 
-export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWizardProps) {
+export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }: OwnerWizardProps) {
   const [draft, setDraft] = useState<OwnerV8Model>(() => hydrateOwnerV8Model(model));
   const [section, setSection] = useState(model.currentSection ?? 0);
-  const [importedBadge, setImportedBadge] = useState('');
-  const [externalWarning, setExternalWarning] = useState('');
   const [semaforoAdvancedOpen, setSemaforoAdvancedOpen] = useState(false);
 
   const totalSections = OWNER_V8_SECTIONS.length;
@@ -93,6 +96,128 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
       return next;
     });
   }, []);
+
+  // ---- Modo 100% manual ----
+  const [manualDraft, setManualDraft] = useState<Record<string, { name: string; minPrice: number; tablePrice: number }>>({});
+  const [manualNotice, setManualNotice] = useState('');
+
+  function ensureManualDraft(force = false) {
+    if (!force && Object.keys(manualDraft).length > 0) return;
+    const rows: Record<string, { name: string; minPrice: number; tablePrice: number }> = {};
+    procedureRows.forEach(proc => {
+      rows[proc.name] = {
+        name: proc.name,
+        minPrice: roundMoney(proc.minPrice),
+        tablePrice: roundMoney(suggestedTableValue(proc.name)),
+      };
+    });
+    setManualDraft(rows);
+  }
+
+  function startManualMode() {
+    ensureManualDraft(draft.tableStrategy.mode !== 'manual');
+    update(m => { m.tableStrategy.mode = 'manual'; });
+  }
+
+  function isManualDirty(): boolean {
+    return Object.keys(manualDraft).some(name => {
+      const row = manualDraft[name];
+      const state = procedureRowState(name);
+      return roundMoney(row.minPrice) !== roundMoney(state.minPrice)
+        || roundMoney(row.tablePrice) !== roundMoney(state.preview);
+    });
+  }
+
+  function applyManualDraft() {
+    const rows = Object.values(manualDraft);
+    for (const row of rows) {
+      if (row.minPrice <= 0) {
+        setManualNotice(`"${row.name}" precisa ter um mínimo maior que zero.`);
+        return;
+      }
+      if (row.tablePrice < row.minPrice) {
+        setManualNotice(`"${row.name}" tem a vitrine abaixo do mínimo protegido.`);
+        return;
+      }
+    }
+    const now = new Date().toISOString();
+    update(m => {
+      m.externalMinimumSnapshot = {
+        importedAt: now,
+        source: 'manual-v8',
+        items: rows.map(row => ({
+          name: row.name,
+          category: procedureRows.find(p => p.name === row.name)?.category || '',
+          minPrice: roundMoney(row.minPrice),
+          updatedAt: now,
+        })),
+      };
+      rows.forEach(row => {
+        m.tableStrategy.perProcedure[row.name] = {
+          inputMode: 'absolute',
+          gorduraPct: null,
+          tableAbsolute: roundMoney(row.tablePrice),
+        };
+      });
+      m.tableStrategy.mode = 'manual';
+    });
+
+    // Salva no banco: empresa_preco_vitrine
+    if (empresaId && empresaPrecos && empresaPrecos.length > 0) {
+      const upsertRows = rows
+        .map(row => {
+          const ep = empresaPrecos.find(p => p.nome_produto === row.name);
+          if (!ep) return null;
+          return {
+            empresa_id: empresaId,
+            empresa_preco_id: ep.id,
+            preco_minimo: roundMoney(row.minPrice),
+            preco_vitrine: roundMoney(row.tablePrice),
+            updated_at: now,
+          };
+        })
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+
+      if (upsertRows.length > 0) {
+        supabase
+          .from('empresa_preco_vitrine')
+          .upsert(upsertRows, { onConflict: 'empresa_id,empresa_preco_id' })
+          .then(() => {});
+      }
+    }
+
+    setManualNotice('Modo manual aplicado. O vendedor vai enxergar exatamente essa vitrine.');
+    setTimeout(() => setManualNotice(''), 4000);
+  }
+
+  const savingLastChanceRef = useRef(false);
+
+  async function saveLastChanceToDB(juros: number, parcelas: number) {
+    if (!empresaId || savingLastChanceRef.current) return;
+    savingLastChanceRef.current = true;
+    await supabase.from('empresa_precificacao_config').upsert(
+      { empresa_id: empresaId, vendas_juros_mensal_pct: juros, vendas_max_parcelas: parcelas, updated_at: new Date().toISOString() },
+      { onConflict: 'empresa_id' }
+    );
+    savingLastChanceRef.current = false;
+  }
+
+  const savingCardTermsRef = useRef(false);
+
+  async function saveCardBoletoTermsToDB() {
+    if (!empresaId || savingCardTermsRef.current) return;
+    savingCardTermsRef.current = true;
+    await supabase.from('empresa_precificacao_config').upsert(
+      {
+        empresa_id: empresaId,
+        vendas_max_cartao: draft.cardTerms.noInterestEnabled ? draft.cardTerms.noInterestUpToInstallments : 0,
+        taxa_maquina_percent: draft.cardTerms.useDefaultRateTable ? 0 : draft.cardTerms.flatRatePct,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'empresa_id' }
+    );
+    savingCardTermsRef.current = false;
+  }
 
   function goNext() { if (section < totalSections - 1) setSection(s => s + 1); }
   function goBack() { if (section > 0) setSection(s => s - 1); }
@@ -188,37 +313,6 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
     });
   }
 
-  function useFallbackMinimums() {
-    update(m => { m.externalMinimumSnapshot = createOwnerV8FallbackSnapshot('manual-defaults'); });
-    setImportedBadge('Mínimos padrão do catálogo carregados.');
-    setTimeout(() => setImportedBadge(''), 3500);
-  }
-
-  function importExternalSnapshot() {
-    setExternalWarning('');
-    try {
-      const raw = localStorage.getItem(EXTERNAL_MINIMUM_STORAGE_KEY);
-      if (!raw) { setExternalWarning('Nenhum dado externo encontrado no localStorage.'); return; }
-      const parsed = JSON.parse(raw);
-      if (parsed.version !== 1) { setExternalWarning('Versão do contrato incompatível. Atualize o TOP V10.'); return; }
-      const items = (parsed.items || [])
-        .filter((i: any) => FLAT_CATALOG.some(p => p.name === i.name))
-        .map((i: any) => ({
-          name: i.name,
-          category: i.category || '',
-          minPrice: roundMoney(Math.max(0, safeNumber(i.minPrice, 0))),
-          updatedAt: i.updatedAt || parsed.exportedAt,
-        }));
-      const unknown = (parsed.items || []).filter((i: any) => !FLAT_CATALOG.some(p => p.name === i.name));
-      update(m => {
-        m.externalMinimumSnapshot = { importedAt: parsed.exportedAt, source: parsed.source, items };
-      });
-      setImportedBadge(unknown.length
-        ? `${unknown.length} procedimento(s) ignorados (não reconhecidos no catálogo).`
-        : `${items.length} procedimentos importados com sucesso.`);
-      setTimeout(() => setImportedBadge(''), 4000);
-    } catch { setExternalWarning('Erro ao ler dados externos.'); }
-  }
 
   const exampleMinPrice = procedureRows[0]?.minPrice ?? 0;
   const exampleSuggested = procedureRows.length > 0 ? suggestedTableValue(procedureRows[0].name) : 0;
@@ -332,8 +426,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
           </div>
         </div>
         <div className={styles.ownerTopActions}>
-          <button className={styles.ownerV8Btn} onClick={useFallbackMinimums}>Atualizar importação</button>
-          {model.completed && (
+{model.completed && (
             <button className={styles.ownerV8BtnPrimary} onClick={onClose}>Ir para o vendedor</button>
           )}
           <button className={styles.ownerV8Btn} onClick={onClose}>Fechar</button>
@@ -419,27 +512,9 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
               <div className={styles.ownerCard}>
                 <div className={styles.ownerEyebrow}>Preços Mínimos</div>
                 <div className={styles.ownerQuestion}>Quais são os seus mínimos à vista?</div>
-                <div className={styles.ownerHelper}>Você pode importar do sistema externo ou usar a tabela base como ponto de partida. Depois, se quiser, ajusta tudo manualmente.</div>
-
-                <div className={styles.ownerTableCard}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, flexWrap: 'wrap' }}>
-                    <div>
-                      <div className={styles.ownerImportTitle}>Sistema externo de mínimos</div>
-                      <div className={styles.ownerNote} style={{ marginTop: 0 }}>Contrato: <code>clinicscale:external-minimum-prices:v1</code></div>
-                    </div>
-                    <div className={styles.ownerTopActions}>
-                      <button className={styles.ownerV8Btn} onClick={() => window.open('minimo-demo.html', 'top-v10-minimo-demo')}>Abrir stub</button>
-                      <button className={styles.ownerV8BtnPrimary} onClick={importExternalSnapshot}>Importar</button>
-                      <button className={styles.ownerV8Btn} onClick={useFallbackMinimums}>Usar defaults</button>
-                    </div>
-                  </div>
-                  {externalWarning && <div className={styles.ownerNote} style={{ marginTop: 8 }}>{externalWarning}</div>}
-                  {importedBadge && <div className={styles.ownerNote} style={{ marginTop: 8 }}>{importedBadge}</div>}
-                </div>
+                <div className={styles.ownerHelper}>Esses são os preços mínimos à vista dos serviços da clínica. Ajuste qualquer valor antes de continuar.</div>
 
                 <div className={styles.ownerTableCard} style={{ marginTop: 12 }}>
-                  <div className={styles.ownerImportTitle}>Tabela manual de conferência</div>
-                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>Mesmo depois de importar, você pode corrigir qualquer mínimo antes de ativar.</div>
                   {hasMinimums ? (
                     <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
                       <table className={styles.ownerTable}>
@@ -460,7 +535,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                       </table>
                     </div>
                   ) : (
-                    <div className={styles.ownerNote} style={{ marginTop: 12 }}>Escolha importar do sistema externo ou usar os defaults para começar a preencher.</div>
+                    <div className={styles.ownerNote} style={{ marginTop: 12 }}>Nenhum serviço encontrado. Cadastre os serviços da clínica na tela anterior.</div>
                   )}
                 </div>
 
@@ -499,8 +574,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   <div><span>Tabela sugerida</span><strong>{fmt(exampleSuggested)}</strong></div>
                 </div>
                 <div className={styles.ownerSectionFooter}>
-                  <div className={styles.ownerCallout}>A V10 usa essa condição como referência de narrativa. O motor da V7 continua protegendo o resto por baixo.</div>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  <button className={styles.ownerV8BtnPrimary} onClick={() => {
+                    saveLastChanceToDB(draft.lastChanceCondition.monthlyInterestPct, draft.lastChanceCondition.maxInstallments);
+                    goNext();
+                  }}>Continuar</button>
                 </div>
               </div>
             </div>
@@ -510,7 +587,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
               <div className={styles.ownerCard}>
                 <div className={styles.ownerEyebrow}>Tabela e Preços</div>
                 <div className={styles.ownerQuestion}>Como você quer montar a vitrine que o vendedor vai apresentar?</div>
-                <div className={styles.ownerHelper}>Você pode usar o sugerido pela V10, aplicar um percentual global ou ajustar por procedimento.</div>
+                <div className={styles.ownerHelper}>Você pode usar o sugerido, aplicar um percentual global, ajustar por procedimento ou definir tudo no modo 100% manual.</div>
                 <div className={styles.ownerPillRow} style={{ marginBottom: 16 }}>
                   {(['suggested', 'globalPct', 'perProcedure'] as const).map(mode => (
                     <button key={mode}
@@ -519,6 +596,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                       {mode === 'suggested' ? 'Usar sugerido' : mode === 'globalPct' ? 'Percentual global' : 'Ajuste por procedimento'}
                     </button>
                   ))}
+                  <button
+                    className={`${styles.ownerPill}${draft.tableStrategy.mode === 'manual' ? ' ' + styles.ownerPillActive : ''}`}
+                    onClick={startManualMode}>
+                    100% manual
+                  </button>
                 </div>
 
                 {draft.tableStrategy.mode === 'globalPct' && (
@@ -533,7 +615,8 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   </div>
                 )}
 
-                {hasMinimums && (
+                {/* Tabela padrão (suggested / globalPct / perProcedure) */}
+                {draft.tableStrategy.mode !== 'manual' && hasMinimums && (
                   <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
                     <table className={styles.ownerTable}>
                       <thead>
@@ -593,14 +676,98 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   </div>
                 )}
 
-                {!hasMinimums && (
+                {draft.tableStrategy.mode !== 'manual' && !hasMinimums && (
                   <div className={styles.ownerCallout} style={{ marginTop: 14 }}>
                     Carregue os mínimos na etapa anterior para ver a prévia dos preços de vitrine.
                   </div>
                 )}
 
+                {/* Tabela modo 100% manual */}
+                {draft.tableStrategy.mode === 'manual' && (
+                  <div className={styles.ownerTableCard} style={{ marginTop: 14 }}>
+                    <div className={styles.ownerImportTitle}>Modo 100% manual</div>
+                    <div className={styles.ownerNote} style={{ marginTop: 0 }}>
+                      Defina o mínimo e o preço de vitrine de cada serviço. A vitrine não pode ficar abaixo do mínimo. Clique em "Aplicar" para confirmar.
+                    </div>
+                    <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
+                      <table className={styles.ownerTable}>
+                        <thead>
+                          <tr>
+                            <th>Serviço</th>
+                            <th>Mínimo à vista</th>
+                            <th>Vitrine</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {procedureRows.map(proc => {
+                            const row = manualDraft[proc.name] ?? { minPrice: proc.minPrice, tablePrice: suggestedTableValue(proc.name) };
+                            return (
+                              <tr key={proc.name}>
+                                <td><strong>{proc.name}</strong></td>
+                                <td>
+                                  <input
+                                    className={styles.ownerInlineInput}
+                                    type="number" min="0" step="10"
+                                    value={row.minPrice}
+                                    onChange={e => {
+                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                      setManualDraft(prev => ({
+                                        ...prev,
+                                        [proc.name]: {
+                                          ...prev[proc.name] ?? row,
+                                          minPrice: val,
+                                          tablePrice: Math.max(prev[proc.name]?.tablePrice ?? row.tablePrice, val),
+                                        },
+                                      }));
+                                    }}
+                                  />
+                                </td>
+                                <td>
+                                  <input
+                                    className={styles.ownerInlineInput}
+                                    type="number" min="0" step="10"
+                                    value={row.tablePrice}
+                                    onChange={e => {
+                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                      setManualDraft(prev => ({
+                                        ...prev,
+                                        [proc.name]: { ...prev[proc.name] ?? row, tablePrice: val },
+                                      }));
+                                    }}
+                                    onBlur={e => {
+                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                      const min = manualDraft[proc.name]?.minPrice ?? row.minPrice;
+                                      if (val < min) {
+                                        setManualDraft(prev => ({
+                                          ...prev,
+                                          [proc.name]: { ...prev[proc.name] ?? row, tablePrice: min },
+                                        }));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+                      <div className={styles.ownerCallout} style={{ flex: 1, margin: 0 }}>
+                        {manualNotice || (isManualDirty() ? 'Há alterações pendentes. Aplique para confirmar.' : 'Modo manual aplicado.')}
+                      </div>
+                      <button
+                        className={styles.ownerV8BtnPrimary}
+                        onClick={applyManualDraft}
+                        disabled={!isManualDirty()}
+                      >
+                        Aplicar alterações
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className={styles.ownerSectionFooter}>
-                  <div className={styles.ownerCallout}>A V10 vai transformar essa decisão no preço de vitrine que o vendedor enxerga.</div>
                   <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
                 </div>
               </div>
@@ -1063,6 +1230,21 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   </>)}
                 </div>
 
+                {/* Preview taxas cartão */}
+                {(() => {
+                  const settings = applyOwnerV8Model(draft);
+                  return (
+                    <div className={styles.ownerPreviewKpi} style={{ marginTop: 18 }}>
+                      {[1, 2, 6, 12].map(n => (
+                        <div key={n}>
+                          <span>{n}x</span>
+                          <strong>{cardFeePct(n, settings).toFixed(2)}%</strong>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
                   <div className={styles.ownerImportTitle}>Boleto</div>
                   <div className={styles.ownerNote} style={{ marginTop: 0 }}>Use a mesma lógica: você pode ter uma faixa sem juros e depois começar a cobrar juros ao mês.</div>
@@ -1103,9 +1285,27 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   </div>
                 </div>
 
+                {/* Preview boleto */}
+                {(() => {
+                  const settings = applyOwnerV8Model(draft);
+                  const BASE = 1000;
+                  return (
+                    <div className={styles.ownerPreviewKpi} style={{ marginTop: 18 }}>
+                      {[1, 3, 6, 12].map(n => {
+                        const total = boletoTotalWithInterest(BASE, n, settings);
+                        return (
+                          <div key={n}>
+                            <span>Boleto {n}x</span>
+                            <strong>{fmt(total / n)}/mês</strong>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+
                 <div className={styles.ownerSectionFooter}>
-                  <div className={styles.ownerCallout}>Configure as taxas conforme sua maquininha. O motor usa isso para calcular o total que o cliente paga.</div>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Ir para revisão</button>
+                  <button className={styles.ownerV8BtnPrimary} onClick={() => { saveCardBoletoTermsToDB(); goNext(); }}>Ir para revisão</button>
                 </div>
               </div>
             </div>
@@ -1137,8 +1337,19 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                   </div>
                   <div className={styles.ownerSummaryCard}>
                     <div className={styles.ownerSummaryLabel}>Tabela</div>
-                    <strong>{draft.tableStrategy.mode === 'suggested' ? 'Sugerida' : draft.tableStrategy.mode === 'globalPct' ? 'Percentual global' : 'Por procedimento'}</strong>
-                    <span>{draft.tableStrategy.mode === 'globalPct' ? `${draft.tableStrategy.globalGorduraPct}% aplicado em todos` : 'Narrativa pronta para o vendedor'}</span>
+                    <strong>
+                      {draft.tableStrategy.mode === 'suggested' ? 'Sugerida'
+                        : draft.tableStrategy.mode === 'globalPct' ? 'Percentual global'
+                        : draft.tableStrategy.mode === 'manual' ? '100% manual'
+                        : 'Por procedimento'}
+                    </strong>
+                    <span>
+                      {draft.tableStrategy.mode === 'globalPct'
+                        ? `${draft.tableStrategy.globalGorduraPct}% aplicado em todos`
+                        : draft.tableStrategy.mode === 'manual'
+                        ? 'Mínimos e vitrines definidos manualmente'
+                        : 'Narrativa pronta para o vendedor'}
+                    </span>
                   </div>
                   <div className={styles.ownerSummaryCard}>
                     <div className={styles.ownerSummaryLabel}>Pagamentos</div>
@@ -1156,7 +1367,224 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWiza
                     <span>{draft.boletoTerms.monthlyInterestPct}% ao mês a partir de {draft.boletoTerms.chargeInterestFromInstallments}x</span>
                   </div>
                 </div>
+                {/* Ajustes finais */}
+                <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
+                  <div className={styles.ownerImportTitle}>Ajustes finais</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>Edite qualquer campo antes de ativar.</div>
+                  <div className={styles.ownerGrid} style={{ marginTop: 14 }}>
+                    <div className={styles.ownerField}>
+                      <label>Tipo de escopo</label>
+                      <select className={styles.ownerSelect}
+                        value={draft.identity.scopeType}
+                        onChange={e => update(m => { m.identity.scopeType = e.target.value as 'clinica' | 'unidade'; })}>
+                        <option value="unidade">Unidade</option>
+                        <option value="clinica">Clínica</option>
+                      </select>
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Nome da clínica ou unidade</label>
+                      <input className={styles.ownerInput} type="text"
+                        value={draft.identity.scopeName}
+                        placeholder="Ex: Clínica Centro"
+                        onChange={e => update(m => { m.identity.scopeName = e.target.value; })} />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Juros mensal (%)</label>
+                      <input className={styles.ownerInput} type="number" min="0" max="10" step="0.1"
+                        value={draft.lastChanceCondition.monthlyInterestPct}
+                        onChange={e => update(m => { m.lastChanceCondition.monthlyInterestPct = clamp(safeNumber(e.target.value, 1.5), 0, 10); })} />
+                    </div>
+                    <div className={styles.ownerField}>
+                      <label>Parcelas máximas</label>
+                      <input className={styles.ownerInput} type="number" min="1" max="60" step="1"
+                        value={draft.lastChanceCondition.maxInstallments}
+                        onChange={e => update(m => { m.lastChanceCondition.maxInstallments = clamp(Math.round(safeNumber(e.target.value, 24)), 1, 60); })} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Mínimos protegidos */}
+                {hasMinimums && (
+                  <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
+                    <div className={styles.ownerImportTitle}>Mínimos protegidos</div>
+                    <div className={styles.ownerNote} style={{ marginTop: 0 }}>Corrija qualquer mínimo antes de ativar.</div>
+                    <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
+                      <table className={styles.ownerTable}>
+                        <thead><tr><th>Serviço</th><th>Categoria</th><th>Mínimo à vista</th></tr></thead>
+                        <tbody>
+                          {procedureRows.map(proc => (
+                            <tr key={proc.name}>
+                              <td><strong>{proc.name}</strong></td>
+                              <td>{proc.category}</td>
+                              <td>
+                                <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                  defaultValue={proc.minPrice}
+                                  onBlur={e => updateMinimum(proc.name, e.target.value)} />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tabela e vitrine */}
+                <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
+                  <div className={styles.ownerImportTitle}>Tabela e vitrine</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>Revise o preço de vitrine que o vendedor vai apresentar.</div>
+
+                  <div className={styles.ownerPillRow} style={{ marginTop: 14 }}>
+                    {(['suggested', 'globalPct', 'perProcedure'] as const).map(mode => (
+                      <button key={mode}
+                        className={`${styles.ownerPill}${draft.tableStrategy.mode === mode ? ' ' + styles.ownerPillActive : ''}`}
+                        onClick={() => update(m => { m.tableStrategy.mode = mode; })}>
+                        {mode === 'suggested' ? 'Usar sugerido' : mode === 'globalPct' ? 'Percentual global' : 'Ajuste por procedimento'}
+                      </button>
+                    ))}
+                    <button
+                      className={`${styles.ownerPill}${draft.tableStrategy.mode === 'manual' ? ' ' + styles.ownerPillActive : ''}`}
+                      onClick={startManualMode}>
+                      100% manual
+                    </button>
+                  </div>
+
+                  {draft.tableStrategy.mode === 'globalPct' && (
+                    <div className={styles.ownerField} style={{ marginTop: 14, maxWidth: 200 }}>
+                      <label>Gordura global (%)</label>
+                      <input className={styles.ownerInput} type="number" min="0" max="300" step="0.1"
+                        value={draft.tableStrategy.globalGorduraPct}
+                        onChange={e => update(m => { m.tableStrategy.globalGorduraPct = clamp(safeNumber(e.target.value, 25), 0, 300); })} />
+                    </div>
+                  )}
+
+                  {draft.tableStrategy.mode !== 'manual' && hasMinimums && (
+                    <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
+                      <table className={styles.ownerTable}>
+                        <thead>
+                          <tr>
+                            <th>Serviço</th>
+                            <th>Mínimo</th>
+                            <th>Sugerido</th>
+                            {draft.tableStrategy.mode === 'perProcedure' && <><th>Modo</th><th>Entrada</th></>}
+                            <th>Tabela final</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {procedureRows.map(proc => {
+                            const state = procedureRowState(proc.name);
+                            const ps = draft.tableStrategy.perProcedure[proc.name] || { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
+                            return (
+                              <tr key={proc.name}>
+                                <td><strong>{proc.name}</strong></td>
+                                <td>{fmt(state.minPrice)}</td>
+                                <td>{fmt(suggestedTableValue(proc.name))}</td>
+                                {draft.tableStrategy.mode === 'perProcedure' && (
+                                  <td>
+                                    <select className={styles.ownerInlineSelect} value={ps.inputMode}
+                                      onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].inputMode = e.target.value as any; })}>
+                                      <option value="auto">Automático</option>
+                                      <option value="pct">Percentual</option>
+                                      <option value="absolute">Valor em R$</option>
+                                    </select>
+                                  </td>
+                                )}
+                                {draft.tableStrategy.mode === 'perProcedure' && (
+                                  <td>
+                                    {ps.inputMode === 'pct' && (
+                                      <input className={styles.ownerInlineInput} type="number" min="0" max="300" step="0.1"
+                                        value={ps.gorduraPct ?? ''}
+                                        onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].gorduraPct = safeNumber(e.target.value, 0); })} />
+                                    )}
+                                    {ps.inputMode === 'absolute' && (
+                                      <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                        value={ps.tableAbsolute ?? ''}
+                                        onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].tableAbsolute = roundMoney(safeNumber(e.target.value, 0)); })} />
+                                    )}
+                                    {ps.inputMode === 'auto' && <span className={styles.ownerNote} style={{ margin: 0 }}>Segue o sugerido</span>}
+                                  </td>
+                                )}
+                                <td>
+                                  <strong>{fmt(state.preview)}</strong>
+                                  <div className={styles.ownerNote}>Diferença: {fmt(state.delta)} · {state.pct}%</div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+
+                  {draft.tableStrategy.mode === 'manual' && (
+                    <>
+                      <div className={styles.ownerNote} style={{ marginTop: 14 }}>No modo 100% manual você pode mexer diretamente no mínimo e na vitrine de cada serviço.</div>
+                      <div className={styles.ownerTableWrap} style={{ marginTop: 14 }}>
+                        <table className={styles.ownerTable}>
+                          <thead>
+                            <tr><th>Serviço</th><th>Mínimo</th><th>Vitrine</th><th>Diferença</th></tr>
+                          </thead>
+                          <tbody>
+                            {procedureRows.map(proc => {
+                              const row = manualDraft[proc.name] ?? { name: proc.name, minPrice: proc.minPrice, tablePrice: suggestedTableValue(proc.name) };
+                              return (
+                                <tr key={proc.name}>
+                                  <td><strong>{proc.name}</strong></td>
+                                  <td>
+                                    <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                      value={row.minPrice}
+                                      onChange={e => {
+                                        const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                        setManualDraft(prev => ({ ...prev, [proc.name]: { ...prev[proc.name] ?? row, name: proc.name, minPrice: val, tablePrice: Math.max(prev[proc.name]?.tablePrice ?? row.tablePrice, val) } }));
+                                      }} />
+                                  </td>
+                                  <td>
+                                    <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                      value={row.tablePrice}
+                                      onChange={e => {
+                                        const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                        setManualDraft(prev => ({ ...prev, [proc.name]: { ...prev[proc.name] ?? row, name: proc.name, tablePrice: val } }));
+                                      }} />
+                                  </td>
+                                  <td><strong>{fmt(Math.max(0, row.tablePrice - row.minPrice))}</strong></td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+                        <div className={styles.ownerCallout} style={{ flex: 1, margin: 0 }}>
+                          {manualNotice || (isManualDirty() ? 'Há alterações pendentes. Aplique antes de ativar.' : 'Modo manual alinhado.')}
+                        </div>
+                        <button className={styles.ownerV8BtnPrimary} onClick={applyManualDraft} disabled={!isManualDirty()}>
+                          Aplicar alterações
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Pagamentos */}
+                <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
+                  <div className={styles.ownerImportTitle}>Pagamentos</div>
+                  <div className={styles.ownerNote} style={{ marginTop: 0 }}>Revise quais condições o vendedor pode usar sem precisar te chamar.</div>
+                  <div className={styles.ownerToggleGrid} style={{ marginTop: 14 }}>
+                    {(['avista', 'entrada', 'parcelado', 'debito', 'boleto'] as const).map(method => {
+                      const labels: Record<string, string> = { avista: 'À vista', entrada: 'Entrada', parcelado: 'Cartão parcelado', debito: 'Débito', boleto: 'Boleto' };
+                      return (
+                        <label key={method} className={styles.ownerToggle}>
+                          <input type="checkbox" checked={Boolean(draft.payments[method])}
+                            onChange={e => update(m => { m.payments[method] = e.target.checked; })} />
+                          <span>{labels[method]}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className={styles.ownerSectionFooter}>
+                  <button className={styles.ownerV8Btn} onClick={() => setSection(0)}>Revisar tudo</button>
                   <button className={styles.ownerV8BtnPrimary} onClick={save}>
                     {draft.completed ? 'Reaplicar configuração' : 'Ativar configuração'}
                   </button>

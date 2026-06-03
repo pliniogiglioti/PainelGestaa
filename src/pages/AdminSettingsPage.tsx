@@ -30,6 +30,64 @@ const EXEMPLOS_ESTATICOS = [
 
 const USERS_PER_PAGE = 5
 
+// Mapeamento classificação → grupo (espelha FALLBACK_RULES e seed do plano de contas)
+const CLASS_GRUPO_MAP: Record<string, string> = {
+  'Receita Dinheiro':                                         'Receitas Operacionais',
+  'Receita Cartão':                                           'Receitas Operacionais',
+  'Receita Financeiras':                                      'Receitas Operacionais',
+  'Receita PIX / Transferências':                             'Receitas Operacionais',
+  'Receita Subadquirência (BT)':                              'Receitas Operacionais',
+  'Rendimento de Aplicação Financeira':                       'Receitas Financeiras',
+  'Descontos Obtidos':                                        'Receitas Financeiras',
+  'Vendas Canceladas / Devoluções':                           'Deduções de Receita',
+  'Tarifa de Cartão / Aluguel de POS':                        'Deduções de Receita',
+  'Tarifa de Cartão / Antecipação':                           'Deduções de Receita',
+  'Tarifa de Cartão / Padrão':                                'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Antecipação':      'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas': 'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Padrão':           'Deduções de Receita',
+  'Impostos sobre Receitas - Simples Nacional':               'Impostos sobre Faturamento',
+  'Impostos sobre Receitas - Lucro Presumido':                'Impostos sobre Faturamento',
+  'Impostos sobre Receitas - Presumido e Simples Nacional':   'Impostos sobre Faturamento',
+  'OP Gratificações':                                         'Despesas Operacionais',
+  'Custo de Materiais e Insumos':                             'Despesas Operacionais',
+  'Serviços Terceiros PF (dentistas)':                        'Despesas Operacionais',
+  'Serviços Técnicos para Laboratórios':                      'Despesas Operacionais',
+  'Royalties':                                                'Despesas Operacionais',
+  'Fundo Nacional de Marketing':                              'Despesas Operacionais',
+  'Pró-labore':                                               'Despesas com Pessoal',
+  'Salários e Ordenados':                                     'Despesas com Pessoal',
+  '13° Salário':                                              'Despesas com Pessoal',
+  'Rescisões':                                                'Despesas com Pessoal',
+  'INSS':                                                     'Despesas com Pessoal',
+  'FGTS':                                                     'Despesas com Pessoal',
+  'Vale Transporte':                                          'Despesas com Pessoal',
+  'Vale Refeição':                                            'Despesas com Pessoal',
+  'Combustível':                                              'Despesas com Pessoal',
+  'Outras Despesas Com Funcionários':                         'Despesas com Pessoal',
+  'Aluguel':                                                  'Despesas Administrativas',
+  'Energia Elétrica':                                         'Despesas Administrativas',
+  'Água e Esgoto':                                            'Despesas Administrativas',
+  'Telefonia':                                                'Despesas Administrativas',
+  'Limpeza e Higiene':                                        'Despesas Administrativas',
+  'Seguros':                                                  'Despesas Administrativas',
+  'Manutenção e Reparos':                                     'Despesas Administrativas',
+  'Outras Despesas Administrativas':                          'Despesas Administrativas',
+  'Internet':                                                 'Despesas com TI',
+  'Software e Assinaturas':                                   'Despesas com TI',
+  'Equipamentos de TI':                                       'Despesas com TI',
+  'Outras Despesas com TI':                                   'Despesas com TI',
+  'Marketing Digital':                                        'Despesas Comerciais e Marketing',
+  'Agência e Assessoria':                                     'Despesas Comerciais e Marketing',
+  'Outras Despesas Comerciais':                               'Despesas Comerciais e Marketing',
+  'Despesas Bancárias':                                       'Despesas Financeiras',
+  'Juros e Multas':                                           'Despesas Financeiras',
+  'Outras Despesas Financeiras':                              'Despesas Financeiras',
+  'Equipamentos e Mobiliário':                                'Investimentos',
+  'Obras e Reformas':                                         'Investimentos',
+  'Outros Investimentos':                                     'Investimentos',
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
 async function lerCabecalhosArquivo(file: File): Promise<string[]> {
@@ -109,7 +167,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
   const [novaClassNome,  setNovaClassNome]  = useState('')
   const [novaClassTipo,  setNovaClassTipo]  = useState<'receita' | 'despesa'>('despesa')
+  const [novaClassGrupo, setNovaClassGrupo] = useState('')
   const [addingClass,    setAddingClass]    = useState(false)
+  // Mapeamento local: cobre classificações novas adicionadas nesta sessão
+  const [classGrupoExtra, setClassGrupoExtra] = useState<Record<string, string>>({})
 
   // ── Tab: Grupos DRE ───────────────────────────────────────────────────
   const [grupos,        setGrupos]        = useState<DreGrupo[]>([])
@@ -213,7 +274,11 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const adicionarClassificacao = async () => {
     if (!novaClassNome.trim()) return
     setAddingClass(true)
-    await supabase.from('dre_classificacoes').insert({ nome: novaClassNome.trim(), tipo: novaClassTipo, ativo: true })
+    const nome = novaClassNome.trim()
+    await supabase.from('dre_classificacoes').insert({ nome, tipo: novaClassTipo, ativo: true })
+    if (novaClassGrupo) {
+      setClassGrupoExtra(prev => ({ ...prev, [nome]: novaClassGrupo }))
+    }
     setNovaClassNome('')
     await fetchClassificacoes()
     setAddingClass(false)
@@ -722,132 +787,187 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         )}
 
         {/* ── Classificações DRE ────────────────────────────────────────── */}
-        {tab === 'classificacoes' && (
-          <div className={styles.section}>
+        {tab === 'classificacoes' && (() => {
+          // Resolve o grupo de uma classificação: mapa estático → sessão → sem grupo
+          const resolveGrupo = (nome: string) =>
+            CLASS_GRUPO_MAP[nome] ?? classGrupoExtra[nome] ?? ''
 
-            {/* Classificações */}
-            <p className={styles.label} style={{ marginBottom: 8 }}>Classificações</p>
-            <div className={styles.listWrap}>
-              {classificacoes.length === 0 && (
-                <p className={styles.hint}>Nenhuma classificação cadastrada ainda.</p>
-              )}
-              {classificacoes.map(c => (
-                <div key={c.id} className={styles.listItem}>
-                  <span className={`${styles.badge} ${c.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
-                    {c.tipo}
-                  </span>
-                  <span className={styles.itemName}>{c.nome}</span>
+          // Agrupa classificações por grupo — só mostra grupos com ao menos 1 classificação
+          const semGrupo = classificacoes.filter(c => !resolveGrupo(c.nome))
+          const gruposDaClassificacao = grupos
+            .map(g => ({
+              grupo: g,
+              items: classificacoes.filter(c => resolveGrupo(c.nome) === g.nome),
+            }))
+            .filter(({ items }) => items.length > 0)
+
+          return (
+            <div className={styles.section}>
+
+              {/* Formulário: nova classificação */}
+              <div className={styles.addForm}>
+                <p className={styles.label}>Nova classificação</p>
+                <div className={styles.toggleRow}>
                   <button
-                    className={styles.removeBtn}
-                    onClick={() => removerClassificacao(c.id)}
-                    title="Remover"
+                    type="button"
+                    className={`${styles.toggleBtn} ${novaClassTipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setNovaClassTipo('receita')}
                   >
-                    ✕
+                    Receita
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${novaClassTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setNovaClassTipo('despesa')}
+                  >
+                    Despesa
                   </button>
                 </div>
-              ))}
-            </div>
-
-            <div className={styles.addForm}>
-              <p className={styles.label}>Nova classificação</p>
-              <div className={styles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${styles.toggleBtn} ${novaClassTipo === 'receita' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setNovaClassTipo('receita')}
-                >
-                  Receita
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.toggleBtn} ${novaClassTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setNovaClassTipo('despesa')}
-                >
-                  Despesa
-                </button>
-              </div>
-              <div className={styles.addRow}>
-                <input
-                  className={styles.input}
-                  placeholder="Ex: Receita sobre Serviço"
-                  value={novaClassNome}
-                  onChange={e => setNovaClassNome(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && adicionarClassificacao()}
-                />
-                <button
-                  className={styles.btnPrimary}
-                  onClick={adicionarClassificacao}
-                  disabled={addingClass || !novaClassNome.trim()}
-                >
-                  {addingClass ? '...' : '+ Adicionar'}
-                </button>
-              </div>
-            </div>
-
-            {/* Divisor */}
-            <hr style={{ border: 'none', borderTop: '1px solid var(--border, rgba(255,255,255,0.08))', margin: '28px 0' }} />
-
-            {/* Grupos */}
-            <p className={styles.label} style={{ marginBottom: 8 }}>Grupos</p>
-            <div className={styles.listWrap}>
-              {grupos.length === 0 && (
-                <p className={styles.hint}>Nenhum grupo cadastrado ainda.</p>
-              )}
-              {grupos.map(g => (
-                <div key={g.id} className={styles.listItem}>
-                  <span className={`${styles.badge} ${g.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
-                    {g.tipo}
-                  </span>
-                  <span className={styles.itemName}>{g.nome}</span>
-                  <button
-                    className={styles.removeBtn}
-                    onClick={() => removerGrupo(g.id)}
-                    title="Remover"
+                <div className={styles.addRow} style={{ flexWrap: 'wrap', gap: 8 }}>
+                  <select
+                    className={styles.input}
+                    style={{ flex: '0 0 200px' }}
+                    value={novaClassGrupo}
+                    onChange={e => setNovaClassGrupo(e.target.value)}
                   >
-                    ✕
+                    <option value="">— Grupo (opcional) —</option>
+                    {grupos.map(g => (
+                      <option key={g.id} value={g.nome}>{g.nome}</option>
+                    ))}
+                  </select>
+                  <input
+                    className={styles.input}
+                    style={{ flex: 1 }}
+                    placeholder="Ex: Receita sobre Serviço"
+                    value={novaClassNome}
+                    onChange={e => setNovaClassNome(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && adicionarClassificacao()}
+                  />
+                  <button
+                    className={styles.btnPrimary}
+                    onClick={adicionarClassificacao}
+                    disabled={addingClass || !novaClassNome.trim()}
+                  >
+                    {addingClass ? '...' : '+ Adicionar'}
                   </button>
                 </div>
+              </div>
+
+              {/* Formulário: novo grupo */}
+              <div className={styles.addForm} style={{ marginTop: 4 }}>
+                <p className={styles.label}>Novo grupo</p>
+                <div className={styles.toggleRow}>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${novoGrupoTipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setNovoGrupoTipo('receita')}
+                  >
+                    Receita
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${novoGrupoTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setNovoGrupoTipo('despesa')}
+                  >
+                    Despesa
+                  </button>
+                </div>
+                <div className={styles.addRow}>
+                  <input
+                    className={styles.input}
+                    placeholder="Ex: Custos Operacionais"
+                    value={novoGrupoNome}
+                    onChange={e => setNovoGrupoNome(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && adicionarGrupo()}
+                  />
+                  <button
+                    className={styles.btnPrimary}
+                    onClick={adicionarGrupo}
+                    disabled={addingGrupo || !novoGrupoNome.trim()}
+                  >
+                    {addingGrupo ? '...' : '+ Adicionar'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Divisor */}
+              <hr style={{ border: 'none', borderTop: '1px solid var(--border, rgba(255,255,255,0.08))', margin: '20px 0' }} />
+
+              {/* Grupos com classificações aninhadas */}
+              {gruposDaClassificacao.map(({ grupo: g, items }) => (
+                <div key={g.id} style={{ marginBottom: 24 }}>
+                  {/* Cabeçalho do grupo */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <span className={`${styles.badge} ${g.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
+                      {g.tipo}
+                    </span>
+                    <strong style={{ fontSize: 13 }}>{g.nome}</strong>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginLeft: 'auto' }}>
+                      {items.length} classificação{items.length !== 1 ? 'ões' : ''}
+                    </span>
+                    <button
+                      className={styles.removeBtn}
+                      onClick={() => removerGrupo(g.id)}
+                      title="Remover grupo"
+                    >
+                      ✕
+                    </button>
+                  </div>
+
+                  {/* Classificações do grupo */}
+                  <div className={styles.listWrap} style={{ marginLeft: 16, marginBottom: 0 }}>
+                    {items.length === 0 && (
+                      <p className={styles.hint} style={{ margin: '6px 0' }}>Nenhuma classificação neste grupo.</p>
+                    )}
+                    {items.map(c => (
+                      <div key={c.id} className={styles.listItem}>
+                        <span className={styles.itemName}>{c.nome}</span>
+                        <button
+                          className={styles.removeBtn}
+                          onClick={() => removerClassificacao(c.id)}
+                          title="Remover"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
-            </div>
 
-            <div className={styles.addForm}>
-              <p className={styles.label}>Novo grupo</p>
-              <div className={styles.toggleRow}>
-                <button
-                  type="button"
-                  className={`${styles.toggleBtn} ${novoGrupoTipo === 'receita' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setNovoGrupoTipo('receita')}
-                >
-                  Receita
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.toggleBtn} ${novoGrupoTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
-                  onClick={() => setNovoGrupoTipo('despesa')}
-                >
-                  Despesa
-                </button>
-              </div>
-              <div className={styles.addRow}>
-                <input
-                  className={styles.input}
-                  placeholder="Ex: Custos Operacionais"
-                  value={novoGrupoNome}
-                  onChange={e => setNovoGrupoNome(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && adicionarGrupo()}
-                />
-                <button
-                  className={styles.btnPrimary}
-                  onClick={adicionarGrupo}
-                  disabled={addingGrupo || !novoGrupoNome.trim()}
-                >
-                  {addingGrupo ? '...' : '+ Adicionar'}
-                </button>
-              </div>
-            </div>
+              {/* Classificações sem grupo */}
+              {semGrupo.length > 0 && (
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                    <strong style={{ fontSize: 13, color: 'var(--text-muted, #888)' }}>Sem grupo</strong>
+                  </div>
+                  <div className={styles.listWrap} style={{ marginLeft: 16, marginBottom: 0 }}>
+                    {semGrupo.map(c => (
+                      <div key={c.id} className={styles.listItem}>
+                        <span className={`${styles.badge} ${c.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
+                          {c.tipo}
+                        </span>
+                        <span className={styles.itemName}>{c.nome}</span>
+                        <button
+                          className={styles.removeBtn}
+                          onClick={() => removerClassificacao(c.id)}
+                          title="Remover"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-          </div>
-        )}
+              {classificacoes.length === 0 && grupos.length === 0 && (
+                <p className={styles.hint}>Nenhuma classificação ou grupo cadastrado ainda.</p>
+              )}
+
+            </div>
+          )
+        })()}
 
         {/* ── Exemplos de Upload ────────────────────────────────────────── */}
         {tab === 'exemplos' && (

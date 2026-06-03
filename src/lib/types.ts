@@ -240,6 +240,8 @@ export interface Database {
           vendas_tempo_apresentacao_segundos: number
           vendas_oferta_valida_minutos: number
           vendas_exibir_campanha_promocional: boolean
+          vendas_juros_mensal_pct:     number
+          vendas_max_parcelas:         number
           created_at:                  string
           updated_at:                  string
         }
@@ -258,6 +260,8 @@ export interface Database {
           vendas_tempo_apresentacao_segundos?: number
           vendas_oferta_valida_minutos?: number
           vendas_exibir_campanha_promocional?: boolean
+          vendas_juros_mensal_pct?:    number
+          vendas_max_parcelas?:        number
           created_at?:                 string
           updated_at?:                 string
         }
@@ -276,6 +280,8 @@ export interface Database {
           vendas_tempo_apresentacao_segundos?: number
           vendas_oferta_valida_minutos?: number
           vendas_exibir_campanha_promocional?: boolean
+          vendas_juros_mensal_pct?:     number
+          vendas_max_parcelas?:         number
           updated_at?:                  string
         }
         Relationships: []
@@ -341,6 +347,32 @@ export interface Database {
           descricao?:        string
           preco_unitario?:   number
           quantidade?:       number
+        }
+        Relationships: []
+      }
+      empresa_preco_vitrine: {
+        Row: {
+          id:               string
+          empresa_id:       string
+          empresa_preco_id: string
+          preco_minimo:     number
+          preco_vitrine:    number
+          created_at:       string
+          updated_at:       string
+        }
+        Insert: {
+          id?:               string
+          empresa_id:        string
+          empresa_preco_id:  string
+          preco_minimo?:     number
+          preco_vitrine?:    number
+          created_at?:       string
+          updated_at?:       string
+        }
+        Update: {
+          preco_minimo?:     number
+          preco_vitrine?:    number
+          updated_at?:       string
         }
         Relationships: []
       }
@@ -1069,6 +1101,7 @@ export type EmpresaPreco       = Database['public']['Tables']['empresa_precos'][
 export type EmpresaPrecificacaoConfig = Database['public']['Tables']['empresa_precificacao_config']['Row']
 export type EmpresaVenda       = Database['public']['Tables']['empresa_vendas']['Row']
 export type EmpresaVendaItem   = Database['public']['Tables']['empresa_venda_itens']['Row']
+export type EmpresaPrecoVitrine = Database['public']['Tables']['empresa_preco_vitrine']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
 export type DreGrupo           = Database['public']['Tables']['dre_grupos']['Row']
