@@ -1071,6 +1071,7 @@ export type EmpresaVenda       = Database['public']['Tables']['empresa_vendas'][
 export type EmpresaVendaItem   = Database['public']['Tables']['empresa_venda_itens']['Row']
 export type DreLancamento      = Database['public']['Tables']['dre_lancamentos']['Row']
 export type DreClassificacao   = Database['public']['Tables']['dre_classificacoes']['Row']
+export type DreGrupo           = Database['public']['Tables']['dre_grupos']['Row']
 export type ExemploUpload      = Database['public']['Tables']['exemplos_upload']['Row']
 export type Configuracao       = Database['public']['Tables']['configuracoes']['Row']
 export type ForumCategory      = Database['public']['Tables']['forum_categories']['Row']

@@ -108,6 +108,10 @@ function limparEmpresaSelecionada(pathname: string) {
   if (pathname === '/precificacao') {
     localStorage.removeItem('empresa_selecionada_precificacao')
   }
+
+  if (pathname === '/vendas') {
+    localStorage.removeItem('empresa_selecionada_vendas')
+  }
 }
 
 function App() {
@@ -137,6 +141,7 @@ function App() {
   const [empresaSelecionada, setEmpresaSelecionada] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada'))
   const [empresaSelecionadaLab, setEmpresaSelecionadaLab] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_lab_control'))
   const [empresaSelecionadaPrecificacao, setEmpresaSelecionadaPrecificacao] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_precificacao'))
+  const [empresaSelecionadaVendas, setEmpresaSelecionadaVendas] = useState<Empresa | null>(() => restaurarEmpresa('empresa_selecionada_vendas'))
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -331,6 +336,7 @@ function App() {
     localStorage.removeItem('empresa_selecionada')
     localStorage.removeItem('empresa_selecionada_lab_control')
     localStorage.removeItem('empresa_selecionada_precificacao')
+    localStorage.removeItem('empresa_selecionada_vendas')
     await supabase.auth.signOut()
     setTermosAceitos(null)
     setUserId(null)
@@ -364,6 +370,16 @@ function App() {
   const trocarEmpresaPrecificacao = useCallback(() => {
     localStorage.removeItem('empresa_selecionada_precificacao')
     setEmpresaSelecionadaPrecificacao(null)
+  }, [])
+
+  const selecionarEmpresaVendas = (emp: Empresa) => {
+    localStorage.setItem('empresa_selecionada_vendas', JSON.stringify(emp))
+    setEmpresaSelecionadaVendas(emp)
+  }
+
+  const trocarEmpresaVendas = useCallback(() => {
+    localStorage.removeItem('empresa_selecionada_vendas')
+    setEmpresaSelecionadaVendas(null)
   }, [])
 
   if (loading) {
@@ -555,9 +571,23 @@ function App() {
 
         {(activePath === '/vendas' || mountedPaths.includes('/vendas')) && (
           <div style={{ display: activePath === '/vendas' ? 'block' : 'none' }}>
-            <ErrorBoundary>
-              <VendasPage onVoltar={() => navigate('/')} />
-            </ErrorBoundary>
+            {!empresaSelecionadaVendas ? (
+              <ErrorBoundary>
+                <EmpresaGatePage
+                  onSelecionar={selecionarEmpresaVendas}
+                  onVoltar={() => navigate('/')}
+                  contexto="vendas"
+                />
+              </ErrorBoundary>
+            ) : (
+              <ErrorBoundary>
+                <VendasPage
+                  empresa={empresaSelecionadaVendas}
+                  onTrocarEmpresa={trocarEmpresaVendas}
+                  onVoltar={() => navigate('/')}
+                />
+              </ErrorBoundary>
+            )}
           </div>
         )}
       </>

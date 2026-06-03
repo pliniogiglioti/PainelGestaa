@@ -3,7 +3,7 @@ import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
 import { getFunctionErrorMessage } from '../lib/functionError'
-import type { App, DreClassificacao, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
+import type { App, DreClassificacao, DreGrupo, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
 import ModalTransition from '../components/ModalTransition'
 
 // ── Constantes ────────────────────────────────────────────────────────────
@@ -111,6 +111,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [novaClassTipo,  setNovaClassTipo]  = useState<'receita' | 'despesa'>('despesa')
   const [addingClass,    setAddingClass]    = useState(false)
 
+  // ── Tab: Grupos DRE ───────────────────────────────────────────────────
+  const [grupos,        setGrupos]        = useState<DreGrupo[]>([])
+  const [novoGrupoNome, setNovoGrupoNome] = useState('')
+  const [novoGrupoTipo, setNovoGrupoTipo] = useState<'receita' | 'despesa'>('despesa')
+  const [addingGrupo,   setAddingGrupo]   = useState(false)
+
   // ── Tab: Exemplos de Upload ───────────────────────────────────────────
   const [exemplos,        setExemplos]        = useState<ExemploUpload[]>([])
   const [exemplosLoading, setExemplosLoading] = useState(false)
@@ -163,6 +169,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     }
     fetchModels()
     fetchClassificacoes()
+    fetchGrupos()
     fetchExemplos()
     fetchUsuarios()
     fetchAppsDisponiveis()
@@ -215,6 +222,31 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const removerClassificacao = async (id: string) => {
     await supabase.from('dre_classificacoes').delete().eq('id', id)
     setClassificacoes(p => p.filter(c => c.id !== id))
+  }
+
+  // ── Fetch: Grupos ─────────────────────────────────────────────────────
+
+  const fetchGrupos = async () => {
+    const { data } = await supabase
+      .from('dre_grupos')
+      .select('*')
+      .order('tipo')
+      .order('nome')
+    setGrupos(data ?? [])
+  }
+
+  const adicionarGrupo = async () => {
+    if (!novoGrupoNome.trim()) return
+    setAddingGrupo(true)
+    await supabase.from('dre_grupos').insert({ nome: novoGrupoNome.trim(), tipo: novoGrupoTipo, ativo: true })
+    setNovoGrupoNome('')
+    await fetchGrupos()
+    setAddingGrupo(false)
+  }
+
+  const removerGrupo = async (id: string) => {
+    await supabase.from('dre_grupos').delete().eq('id', id)
+    setGrupos(p => p.filter(g => g.id !== id))
   }
 
   // ── Fetch: Exemplos ───────────────────────────────────────────────────
@@ -692,6 +724,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         {/* ── Classificações DRE ────────────────────────────────────────── */}
         {tab === 'classificacoes' && (
           <div className={styles.section}>
+
+            {/* Classificações */}
+            <p className={styles.label} style={{ marginBottom: 8 }}>Classificações</p>
             <div className={styles.listWrap}>
               {classificacoes.length === 0 && (
                 <p className={styles.hint}>Nenhuma classificação cadastrada ainda.</p>
@@ -748,6 +783,69 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                 </button>
               </div>
             </div>
+
+            {/* Divisor */}
+            <hr style={{ border: 'none', borderTop: '1px solid var(--border, rgba(255,255,255,0.08))', margin: '28px 0' }} />
+
+            {/* Grupos */}
+            <p className={styles.label} style={{ marginBottom: 8 }}>Grupos</p>
+            <div className={styles.listWrap}>
+              {grupos.length === 0 && (
+                <p className={styles.hint}>Nenhum grupo cadastrado ainda.</p>
+              )}
+              {grupos.map(g => (
+                <div key={g.id} className={styles.listItem}>
+                  <span className={`${styles.badge} ${g.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
+                    {g.tipo}
+                  </span>
+                  <span className={styles.itemName}>{g.nome}</span>
+                  <button
+                    className={styles.removeBtn}
+                    onClick={() => removerGrupo(g.id)}
+                    title="Remover"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            <div className={styles.addForm}>
+              <p className={styles.label}>Novo grupo</p>
+              <div className={styles.toggleRow}>
+                <button
+                  type="button"
+                  className={`${styles.toggleBtn} ${novoGrupoTipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                  onClick={() => setNovoGrupoTipo('receita')}
+                >
+                  Receita
+                </button>
+                <button
+                  type="button"
+                  className={`${styles.toggleBtn} ${novoGrupoTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                  onClick={() => setNovoGrupoTipo('despesa')}
+                >
+                  Despesa
+                </button>
+              </div>
+              <div className={styles.addRow}>
+                <input
+                  className={styles.input}
+                  placeholder="Ex: Custos Operacionais"
+                  value={novoGrupoNome}
+                  onChange={e => setNovoGrupoNome(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && adicionarGrupo()}
+                />
+                <button
+                  className={styles.btnPrimary}
+                  onClick={adicionarGrupo}
+                  disabled={addingGrupo || !novoGrupoNome.trim()}
+                >
+                  {addingGrupo ? '...' : '+ Adicionar'}
+                </button>
+              </div>
+            </div>
+
           </div>
         )}
 

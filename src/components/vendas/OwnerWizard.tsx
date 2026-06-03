@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import type { OwnerV8Model } from './types';
 import {
   OWNER_V8_SECTIONS,
@@ -64,13 +64,20 @@ function createIndicatorTagId() {
   return `tag-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+interface EmpresaPrecoMinimal {
+  nome_produto: string;
+  categoria: string | null;
+  preco: number;
+}
+
 interface OwnerWizardProps {
   model: OwnerV8Model;
   onSave: (model: OwnerV8Model) => void;
   onClose: () => void;
+  empresaPrecos?: EmpresaPrecoMinimal[];
 }
 
-export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
+export function OwnerWizard({ model, onSave, onClose, empresaPrecos }: OwnerWizardProps) {
   const [draft, setDraft] = useState<OwnerV8Model>(() => hydrateOwnerV8Model(model));
   const [section, setSection] = useState(model.currentSection ?? 0);
   const [importedBadge, setImportedBadge] = useState('');
@@ -102,17 +109,50 @@ export function OwnerWizard({ model, onSave, onClose }: OwnerWizardProps) {
     onSave(final);
   }
 
+  // Auto-popula o snapshot com os preços da empresa na primeira vez que o wizard abre
+  useEffect(() => {
+    if (
+      empresaPrecos && empresaPrecos.length > 0 &&
+      draft.externalMinimumSnapshot.items.length === 0
+    ) {
+      setDraft(prev => ({
+        ...prev,
+        externalMinimumSnapshot: {
+          importedAt: new Date().toISOString(),
+          source: 'empresa-precos',
+          items: empresaPrecos.map(p => ({
+            name: p.nome_produto,
+            category: p.categoria || 'Geral',
+            minPrice: roundMoney(Math.max(0, p.preco)),
+            updatedAt: new Date().toISOString(),
+          })),
+        },
+      }));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const suggestedGordura = ownerV8SuggestedGorduraPct(draft);
   const currentLabel = OWNER_V8_SECTIONS[section]?.label ?? '';
 
   const procedureRows = useMemo(() => {
     const snapshotMap = new Map(draft.externalMinimumSnapshot.items.map(i => [i.name, i]));
+
+    // Se a empresa tem preços cadastrados, usa eles como base da tabela
+    if (empresaPrecos && empresaPrecos.length > 0) {
+      return empresaPrecos.map(p => ({
+        name: p.nome_produto,
+        category: p.categoria || 'Geral',
+        minPrice: snapshotMap.get(p.nome_produto)?.minPrice ?? roundMoney(Math.max(0, p.preco)),
+      }));
+    }
+
     return FLAT_CATALOG.map(proc => ({
       name: proc.name,
       category: proc.category,
       minPrice: snapshotMap.get(proc.name)?.minPrice ?? defaultCatalogMinPrice(proc),
     }));
-  }, [draft.externalMinimumSnapshot]);
+  }, [draft.externalMinimumSnapshot, empresaPrecos]);
 
   const hasMinimums = draft.externalMinimumSnapshot.items.length > 0;
 
