@@ -318,6 +318,322 @@
 
 /* ── Exemplos ───────────────────────────────────────────────────────────── */
 
+.classDashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.classHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(320px, 1fr);
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(213, 175, 69, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at top left, rgba(213, 175, 69, 0.16), transparent 42%),
+    linear-gradient(135deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02));
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.22);
+}
+
+.classHeroCopy {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.classEyebrow {
+  display: inline-flex;
+  width: fit-content;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(213, 175, 69, 0.14);
+  color: #efd48f;
+  border: 1px solid rgba(213, 175, 69, 0.18);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.classHeroTitle {
+  margin: 0;
+  font-size: 24px;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.classHeroText {
+  margin: 0;
+  max-width: 60ch;
+  color: rgba(255,255,255,0.72);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.classMetrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.classMetricCard {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 112px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(7, 10, 16, 0.64);
+}
+
+.classMetricCardWarning {
+  border-color: rgba(255, 115, 0, 0.35);
+  background: linear-gradient(180deg, rgba(255, 115, 0, 0.12), rgba(255,255,255,0.03));
+}
+
+.classMetricLabel {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.classMetricValue {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--text);
+}
+
+.classFormsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.classActionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02));
+}
+
+.classActionHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.classSectionTitle {
+  margin: 0;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classSectionHint {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.classFormStack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.classInlineAction {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.classInlineAction .classSectionHint {
+  margin: 0;
+  max-width: 44ch;
+}
+
+.classSectionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 0 4px;
+}
+
+.classSectionPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.classGroupsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.classGroupCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 220px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)),
+    rgba(8, 10, 15, 0.6);
+}
+
+.classGroupHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.classGroupTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.classGroupTitle {
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.classGroupMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.classGroupList {
+  gap: 8px;
+  max-height: 320px;
+  padding-right: 2px;
+}
+
+.classListItemClean {
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.035);
+}
+
+.classWarningCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 115, 0, 0.28);
+  background: linear-gradient(180deg, rgba(255, 115, 0, 0.12), rgba(255,255,255,0.02));
+}
+
+.classWarningHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.classWarningCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: rgba(255, 115, 0, 0.18);
+  border: 1px solid rgba(255, 115, 0, 0.25);
+  color: #ffd3ad;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classWarningList {
+  max-height: 280px;
+}
+
+.classWarningItem {
+  background: rgba(0,0,0,0.16);
+}
+
+.classEmptyState {
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px dashed rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.025);
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .classHero,
+  .classFormsGrid,
+  .classGroupsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .classSectionBar,
+  .classInlineAction,
+  .classWarningHeader,
+  .classGroupHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .classSectionPill {
+    width: fit-content;
+  }
+}
+
+@media (max-width: 640px) {
+  .classHero {
+    padding: 18px;
+  }
+
+  .classActionCard,
+  .classGroupCard,
+  .classWarningCard,
+  .classEmptyState {
+    padding: 16px;
+  }
+
+  .classMetrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .classMetricCard {
+    min-height: 96px;
+  }
+
+  .classMetricValue {
+    font-size: 24px;
+  }
+}
+
 .exemploInfo {
   display: flex;
   flex-direction: column;

@@ -30,65 +30,149 @@ const EXEMPLOS_ESTATICOS = [
 
 const USERS_PER_PAGE = 5
 
-// Mapeamento classificação → grupo (espelha FALLBACK_RULES e seed do plano de contas)
+// Mapeamento classificação → grupo — espelha FALLBACK_RULES de dre-ai-classify
 const CLASS_GRUPO_MAP: Record<string, string> = {
-  'Receita Dinheiro':                                         'Receitas Operacionais',
-  'Receita Cartão':                                           'Receitas Operacionais',
-  'Receita Financeiras':                                      'Receitas Operacionais',
-  'Receita PIX / Transferências':                             'Receitas Operacionais',
-  'Receita Subadquirência (BT)':                              'Receitas Operacionais',
-  'Rendimento de Aplicação Financeira':                       'Receitas Financeiras',
-  'Descontos Obtidos':                                        'Receitas Financeiras',
-  'Vendas Canceladas / Devoluções':                           'Deduções de Receita',
-  'Tarifa de Cartão / Aluguel de POS':                        'Deduções de Receita',
-  'Tarifa de Cartão / Antecipação':                           'Deduções de Receita',
-  'Tarifa de Cartão / Padrão':                                'Deduções de Receita',
-  'Tarifa de Cartão / Meios de Pagamento - Antecipação':      'Deduções de Receita',
+  // ── nomes antigos do seed inicial (ainda podem existir no banco) ──
+  'Receita sobre Serviço':        'Receitas Operacionais',
+  'Receita de Produtos':          'Receitas Operacionais',
+  'Receita Financeira':           'Receitas Financeiras',
+  'Outras Receitas':              'Receitas Operacionais',
+  'Despesa com Pessoal':          'Despesas com Pessoal',
+  'Despesa com Fornecedor':       'Despesas Operacionais',
+  'Despesa com Aluguel':          'Despesas Administrativas',
+  'Despesa com Marketing':        'Despesas Comerciais e Marketing',
+  'Despesa com Impostos':         'Impostos sobre Faturamento',
+  'Despesa com Infraestrutura':   'Despesas Administrativas',
+  // Receitas Operacionais
+  'Receita Dinheiro':                                                      'Receitas Operacionais',
+  'Receita Cartão':                                                        'Receitas Operacionais',
+  'Receita Financeiras':                                                   'Receitas Operacionais',
+  'Receita PIX / Transferências':                                          'Receitas Operacionais',
+  'Receita Subadquirência (BT)':                                           'Receitas Operacionais',
+  // Receitas Financeiras
+  'Rendimento de Aplicação Financeira':                                    'Receitas Financeiras',
+  'Descontos Obtidos':                                                     'Receitas Financeiras',
+  // Deduções de Receita
+  'Vendas Canceladas / Devoluções':                                        'Deduções de Receita',
   'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas': 'Deduções de Receita',
-  'Tarifa de Cartão / Meios de Pagamento - Padrão':           'Deduções de Receita',
-  'Impostos sobre Receitas - Simples Nacional':               'Impostos sobre Faturamento',
-  'Impostos sobre Receitas - Lucro Presumido':                'Impostos sobre Faturamento',
-  'Impostos sobre Receitas - Presumido e Simples Nacional':   'Impostos sobre Faturamento',
-  'OP Gratificações':                                         'Despesas Operacionais',
-  'Custo de Materiais e Insumos':                             'Despesas Operacionais',
-  'Serviços Terceiros PF (dentistas)':                        'Despesas Operacionais',
-  'Serviços Técnicos para Laboratórios':                      'Despesas Operacionais',
-  'Royalties':                                                'Despesas Operacionais',
-  'Fundo Nacional de Marketing':                              'Despesas Operacionais',
-  'Pró-labore':                                               'Despesas com Pessoal',
-  'Salários e Ordenados':                                     'Despesas com Pessoal',
-  '13° Salário':                                              'Despesas com Pessoal',
-  'Rescisões':                                                'Despesas com Pessoal',
-  'INSS':                                                     'Despesas com Pessoal',
-  'FGTS':                                                     'Despesas com Pessoal',
-  'Vale Transporte':                                          'Despesas com Pessoal',
-  'Vale Refeição':                                            'Despesas com Pessoal',
-  'Combustível':                                              'Despesas com Pessoal',
-  'Outras Despesas Com Funcionários':                         'Despesas com Pessoal',
-  'Aluguel':                                                  'Despesas Administrativas',
-  'Energia Elétrica':                                         'Despesas Administrativas',
-  'Água e Esgoto':                                            'Despesas Administrativas',
-  'Telefonia':                                                'Despesas Administrativas',
-  'Limpeza e Higiene':                                        'Despesas Administrativas',
-  'Seguros':                                                  'Despesas Administrativas',
-  'Manutenção e Reparos':                                     'Despesas Administrativas',
-  'Outras Despesas Administrativas':                          'Despesas Administrativas',
-  'Internet':                                                 'Despesas com TI',
-  'Software e Assinaturas':                                   'Despesas com TI',
-  'Equipamentos de TI':                                       'Despesas com TI',
-  'Outras Despesas com TI':                                   'Despesas com TI',
-  'Marketing Digital':                                        'Despesas Comerciais e Marketing',
-  'Agência e Assessoria':                                     'Despesas Comerciais e Marketing',
-  'Outras Despesas Comerciais':                               'Despesas Comerciais e Marketing',
-  'Despesas Bancárias':                                       'Despesas Financeiras',
-  'Juros e Multas':                                           'Despesas Financeiras',
-  'Outras Despesas Financeiras':                              'Despesas Financeiras',
-  'Equipamentos e Mobiliário':                                'Investimentos',
-  'Obras e Reformas':                                         'Investimentos',
-  'Outros Investimentos':                                     'Investimentos',
+  'Tarifa de Cartão / Meios de Pagamento - Antecipação':                   'Deduções de Receita',
+  'Tarifa de Cartão / Meios de Pagamento - Padrão':                        'Deduções de Receita',
+  'Tarifa de Cartão / Aluguel de POS':                                     'Deduções de Receita',
+  'Tarifa de Cartão / Antecipação':                                        'Deduções de Receita',
+  'Tarifa de Cartão / Padrão':                                             'Deduções de Receita',
+  // Impostos sobre Faturamento
+  'Impostos sobre Receitas - Presumido e Simples Nacional':                'Impostos sobre Faturamento',
+  'Impostos sobre Receitas - Simples Nacional':                            'Impostos sobre Faturamento',
+  'Impostos sobre Receitas - Lucro Presumido':                             'Impostos sobre Faturamento',
+  // Despesas Operacionais
+  'OP Gratificações':                                                      'Despesas Operacionais',
+  'Custo de Materiais e Insumos':                                          'Despesas Operacionais',
+  'Serviços Terceiros PF (dentistas)':                                     'Despesas Operacionais',
+  'Serviços Técnicos para Laboratórios':                                   'Despesas Operacionais',
+  'Royalties':                                                             'Despesas Operacionais',
+  'Royalties e Assistência Técnica':                                       'Despesas Operacionais',
+  'Fundo Nacional de Marketing':                                           'Despesas Operacionais',
+  // Despesas com Pessoal
+  'Pró-labore':                                                            'Despesas com Pessoal',
+  'Salários e Ordenados':                                                  'Despesas com Pessoal',
+  '13° Salário':                                                           'Despesas com Pessoal',
+  'Rescisões':                                                             'Despesas com Pessoal',
+  'INSS':                                                                  'Despesas com Pessoal',
+  'FGTS':                                                                  'Despesas com Pessoal',
+  'Outras Despesas Com Funcionários':                                      'Despesas com Pessoal',
+  'Vale Transporte':                                                       'Despesas com Pessoal',
+  'Vale Refeição':                                                         'Despesas com Pessoal',
+  'Combustível':                                                           'Despesas com Pessoal',
+  // Despesas Administrativas
+  'Adiantamento a Fornecedor':                                             'Despesas Administrativas',
+  'Energia Elétrica':                                                      'Despesas Administrativas',
+  'Água e Esgoto':                                                         'Despesas Administrativas',
+  'Aluguel':                                                               'Despesas Administrativas',
+  'Manutenção e Conservação Predial':                                      'Despesas Administrativas',
+  'Telefonia':                                                             'Despesas Administrativas',
+  'Uniformes':                                                             'Despesas Administrativas',
+  'Manutenção e Reparos':                                                  'Despesas Administrativas',
+  'Seguros':                                                               'Despesas Administrativas',
+  'Uber e Táxi':                                                           'Despesas Administrativas',
+  'Copa e Cozinha':                                                        'Despesas Administrativas',
+  'Cartórios':                                                             'Despesas Administrativas',
+  'Viagens e Estadias':                                                    'Despesas Administrativas',
+  'Material de Escritório':                                                'Despesas Administrativas',
+  'Estacionamento':                                                        'Despesas Administrativas',
+  'Material de Limpeza':                                                   'Despesas Administrativas',
+  'Bens de Pequeno Valor':                                                 'Despesas Administrativas',
+  'Custas Processuais':                                                    'Despesas Administrativas',
+  'Outras Despesas':                                                       'Despesas Administrativas',
+  'Consultoria':                                                           'Despesas Administrativas',
+  'Contabilidade':                                                         'Despesas Administrativas',
+  'Jurídico':                                                              'Despesas Administrativas',
+  'Limpeza':                                                               'Despesas Administrativas',
+  'Segurança e Vigilância':                                                'Despesas Administrativas',
+  'Serviço de Motoboy':                                                    'Despesas Administrativas',
+  'IOF':                                                                   'Despesas Administrativas',
+  'Taxas e Emolumentos':                                                   'Despesas Administrativas',
+  'Multa e Juros s/ Contas Pagas em Atraso':                               'Despesas Administrativas',
+  'Exames Ocupacionais':                                                   'Despesas Administrativas',
+  // Despesas Comerciais e Marketing
+  'Refeições e Lanches':                                                   'Despesas Comerciais e Marketing',
+  'Outras Despesas com Vendas':                                            'Despesas Comerciais e Marketing',
+  'Agência e Assessoria':                                                  'Despesas Comerciais e Marketing',
+  'Produção de Material':                                                  'Despesas Comerciais e Marketing',
+  'Marketing Digital':                                                     'Despesas Comerciais e Marketing',
+  'Feiras e Eventos':                                                      'Despesas Comerciais e Marketing',
+  // Despesas com TI
+  'Internet':                                                              'Despesas com TI',
+  'Informática e Software':                                                'Despesas com TI',
+  'Hospedagem de Dados':                                                   'Despesas com TI',
+  'Sistema de Gestão':                                                     'Despesas com TI',
+  // Despesas Financeiras
+  'Despesas Bancárias':                                                    'Despesas Financeiras',
+  'Depreciação e Amortização':                                             'Despesas Financeiras',
+  'Juros Passivos':                                                        'Despesas Financeiras',
+  'Financiamentos / Empréstimos':                                          'Despesas Financeiras',
+  // Investimentos
+  'Investimento - Máquinas e Equipamentos':                                'Investimentos',
+  'Investimento - Computadores e Periféricos':                             'Investimentos',
+  'Investimento - Móveis e Utensílios':                                    'Investimentos',
+  'Investimento - Instalações de Terceiros':                               'Investimentos',
+  'Dividendos e Despesas dos Sócios':                                      'Investimentos',
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+function normalizeAiLookupValue(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\([^)]*\)/g, ' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const CLASS_GRUPO_MAP_AI_NORMALIZED = new Map<string, string>(
+  Object.entries(CLASS_GRUPO_MAP).map(([classificacao, grupo]) => [
+    normalizeAiLookupValue(classificacao),
+    grupo,
+  ]),
+)
+
+function resolveGrupoAi(nome: string) {
+  const exact = CLASS_GRUPO_MAP[nome]
+  if (exact) return exact
+
+  const normalized = normalizeAiLookupValue(nome)
+  const normalizedExact = CLASS_GRUPO_MAP_AI_NORMALIZED.get(normalized)
+  if (normalizedExact) return normalizedExact
+
+  for (const [classificacao, grupo] of Object.entries(CLASS_GRUPO_MAP)) {
+    const canonical = normalizeAiLookupValue(classificacao)
+    if (normalized.includes(canonical) || canonical.includes(normalized)) return grupo
+  }
+
+  return ''
+}
 
 async function lerCabecalhosArquivo(file: File): Promise<string[]> {
   const buffer = await file.arrayBuffer()
@@ -169,8 +253,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [novaClassTipo,  setNovaClassTipo]  = useState<'receita' | 'despesa'>('despesa')
   const [novaClassGrupo, setNovaClassGrupo] = useState('')
   const [addingClass,    setAddingClass]    = useState(false)
-  // Mapeamento local: cobre classificações novas adicionadas nesta sessão
-  const [classGrupoExtra, setClassGrupoExtra] = useState<Record<string, string>>({})
+  // Mapeamento do banco (classificacao → grupo) via dre_lancamentos
+  const [classGrupoDB,   setClassGrupoDB]   = useState<Record<string, string>>({})
+  // Mapeamento persistido: cobre classificações novas que não estão no CLASS_GRUPO_MAP
+  const [classGrupoExtra, setClassGrupoExtra] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem('dre-class-grupo-extra') ?? '{}') } catch { return {} }
+  })
 
   // ── Tab: Grupos DRE ───────────────────────────────────────────────────
   const [grupos,        setGrupos]        = useState<DreGrupo[]>([])
@@ -231,6 +319,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     fetchModels()
     fetchClassificacoes()
     fetchGrupos()
+    fetchClassGrupoDB()
     fetchExemplos()
     fetchUsuarios()
     fetchAppsDisponiveis()
@@ -271,13 +360,34 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setClassificacoes(data ?? [])
   }
 
+  const fetchClassGrupoDB = async () => {
+    const { data } = await supabase
+      .from('dre_lancamentos')
+      .select('classificacao, grupo')
+      .not('classificacao', 'is', null)
+      .not('grupo', 'is', null)
+      .neq('classificacao', '')
+      .neq('grupo', '')
+    if (data) {
+      const map: Record<string, string> = {}
+      data.forEach((row: { classificacao: string; grupo: string }) => {
+        if (row.classificacao && row.grupo) map[row.classificacao] = row.grupo
+      })
+      setClassGrupoDB(map)
+    }
+  }
+
   const adicionarClassificacao = async () => {
     if (!novaClassNome.trim()) return
     setAddingClass(true)
     const nome = novaClassNome.trim()
     await supabase.from('dre_classificacoes').insert({ nome, tipo: novaClassTipo, ativo: true })
     if (novaClassGrupo) {
-      setClassGrupoExtra(prev => ({ ...prev, [nome]: novaClassGrupo }))
+      setClassGrupoExtra(prev => {
+        const next = { ...prev, [nome]: novaClassGrupo }
+        localStorage.setItem('dre-class-grupo-extra', JSON.stringify(next))
+        return next
+      })
     }
     setNovaClassNome('')
     await fetchClassificacoes()
@@ -788,9 +898,19 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
 
         {/* ── Classificações DRE ────────────────────────────────────────── */}
         {tab === 'classificacoes' && (() => {
-          // Resolve o grupo de uma classificação: mapa estático → sessão → sem grupo
-          const resolveGrupo = (nome: string) =>
-            CLASS_GRUPO_MAP[nome] ?? classGrupoExtra[nome] ?? ''
+          const gruposValidos = new Set(grupos.map(g => g.nome))
+
+          // Resolve o grupo priorizando apenas grupos ainda válidos no catálogo.
+          // Isso evita que grupos antigos do histórico "sumam" com a classificação.
+          const resolveGrupo = (nome: string) => {
+            const candidatos = [
+              classGrupoDB[nome],
+              resolveGrupoAi(nome),
+              classGrupoExtra[nome],
+            ].filter(Boolean) as string[]
+
+            return candidatos.find(grupo => gruposValidos.has(grupo)) ?? ''
+          }
 
           // Agrupa classificações por grupo — só mostra grupos com ao menos 1 classificação
           const semGrupo = classificacoes.filter(c => !resolveGrupo(c.nome))
@@ -800,9 +920,252 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
               items: classificacoes.filter(c => resolveGrupo(c.nome) === g.nome),
             }))
             .filter(({ items }) => items.length > 0)
+          const gruposOrdenados = [...gruposDaClassificacao].sort((a, b) => {
+            if (a.grupo.tipo !== b.grupo.tipo) return a.grupo.tipo === 'receita' ? -1 : 1
+            return a.grupo.nome.localeCompare(b.grupo.nome, 'pt-BR')
+          })
+          const totalReceitas = classificacoes.filter(c => c.tipo === 'receita').length
+          const totalDespesas = classificacoes.length - totalReceitas
+          const totalAgrupadas = classificacoes.length - semGrupo.length
 
           return (
             <div className={styles.section}>
+              <div className={styles.classDashboard}>
+                <div className={styles.classHero}>
+                  <div className={styles.classHeroCopy}>
+                    <span className={styles.classEyebrow}>Fonte de verdade: IA</span>
+                    <h3 className={styles.classHeroTitle}>Classificações DFC organizadas pelo plano canônico</h3>
+                    <p className={styles.classHeroText}>
+                      Esta visão mostra o catálogo em linguagem de negócio: primeiro o panorama geral,
+                      depois as ações de cadastro e por fim os grupos com suas classificações.
+                    </p>
+                  </div>
+
+                  <div className={styles.classMetrics}>
+                    <div className={styles.classMetricCard}>
+                      <span className={styles.classMetricLabel}>Classificações</span>
+                      <strong className={styles.classMetricValue}>{classificacoes.length}</strong>
+                    </div>
+                    <div className={styles.classMetricCard}>
+                      <span className={styles.classMetricLabel}>Receitas</span>
+                      <strong className={styles.classMetricValue}>{totalReceitas}</strong>
+                    </div>
+                    <div className={styles.classMetricCard}>
+                      <span className={styles.classMetricLabel}>Despesas</span>
+                      <strong className={styles.classMetricValue}>{totalDespesas}</strong>
+                    </div>
+                    <div className={`${styles.classMetricCard} ${semGrupo.length > 0 ? styles.classMetricCardWarning : ''}`}>
+                      <span className={styles.classMetricLabel}>Sem grupo</span>
+                      <strong className={styles.classMetricValue}>{semGrupo.length}</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.classFormsGrid}>
+                  <div className={styles.classActionCard}>
+                    <div className={styles.classActionHeader}>
+                      <div>
+                        <p className={styles.classSectionTitle}>Nova classificação</p>
+                        <p className={styles.classSectionHint}>Cadastre o nome já alinhado ao vocabulário usado pela IA.</p>
+                      </div>
+                    </div>
+
+                    <div className={styles.classFormStack}>
+                      <div className={styles.toggleRow}>
+                        <button
+                          type="button"
+                          className={`${styles.toggleBtn} ${novaClassTipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                          onClick={() => setNovaClassTipo('receita')}
+                        >
+                          Receita
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.toggleBtn} ${novaClassTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                          onClick={() => setNovaClassTipo('despesa')}
+                        >
+                          Despesa
+                        </button>
+                      </div>
+
+                      <div className={styles.classFormStack}>
+                        <select
+                          className={styles.input}
+                          value={novaClassGrupo}
+                          onChange={e => setNovaClassGrupo(e.target.value)}
+                        >
+                          <option value="">Selecionar grupo</option>
+                          {grupos.map(g => (
+                            <option key={g.id} value={g.nome}>{g.nome}</option>
+                          ))}
+                        </select>
+                        <input
+                          className={styles.input}
+                          placeholder="Ex: Receita sobre Serviço"
+                          value={novaClassNome}
+                          onChange={e => setNovaClassNome(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && adicionarClassificacao()}
+                        />
+                      </div>
+
+                      <div className={styles.classInlineAction}>
+                        <p className={styles.classSectionHint}>Se o grupo ficar em branco, a tela tentará resolver pela regra canônica da IA.</p>
+                        <button
+                          className={styles.btnPrimary}
+                          onClick={adicionarClassificacao}
+                          disabled={addingClass || !novaClassNome.trim()}
+                        >
+                          {addingClass ? 'Salvando...' : 'Adicionar classificação'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.classActionCard}>
+                    <div className={styles.classActionHeader}>
+                      <div>
+                        <p className={styles.classSectionTitle}>Novo grupo</p>
+                        <p className={styles.classSectionHint}>Crie grupos para acomodar novas classificações sem perder a leitura do DFC.</p>
+                      </div>
+                    </div>
+
+                    <div className={styles.classFormStack}>
+                      <div className={styles.toggleRow}>
+                        <button
+                          type="button"
+                          className={`${styles.toggleBtn} ${novoGrupoTipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                          onClick={() => setNovoGrupoTipo('receita')}
+                        >
+                          Receita
+                        </button>
+                        <button
+                          type="button"
+                          className={`${styles.toggleBtn} ${novoGrupoTipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                          onClick={() => setNovoGrupoTipo('despesa')}
+                        >
+                          Despesa
+                        </button>
+                      </div>
+
+                      <input
+                        className={styles.input}
+                        placeholder="Ex: Custos Operacionais"
+                        value={novoGrupoNome}
+                        onChange={e => setNovoGrupoNome(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && adicionarGrupo()}
+                      />
+
+                      <div className={styles.classInlineAction}>
+                        <p className={styles.classSectionHint}>Os grupos aparecem abaixo já com a contagem de classificações vinculadas.</p>
+                        <button
+                          className={styles.btnPrimary}
+                          onClick={adicionarGrupo}
+                          disabled={addingGrupo || !novoGrupoNome.trim()}
+                        >
+                          {addingGrupo ? 'Salvando...' : 'Adicionar grupo'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className={styles.classSectionBar}>
+                  <div>
+                    <p className={styles.classSectionTitle}>Mapa de grupos</p>
+                    <p className={styles.classSectionHint}>Cada card consolida o grupo, o tipo contábil e as classificações já vinculadas.</p>
+                  </div>
+                  <span className={styles.classSectionPill}>
+                    {totalAgrupadas} de {classificacoes.length} classificações agrupadas
+                  </span>
+                </div>
+
+                {gruposOrdenados.length > 0 ? (
+                  <div className={styles.classGroupsGrid}>
+                    {gruposOrdenados.map(({ grupo: g, items }) => (
+                      <div key={g.id} className={styles.classGroupCard}>
+                        <div className={styles.classGroupHeader}>
+                          <div className={styles.classGroupTitleRow}>
+                            <span className={`${styles.badge} ${g.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
+                              {g.tipo}
+                            </span>
+                            <strong className={styles.classGroupTitle}>{g.nome}</strong>
+                          </div>
+                          <div className={styles.classGroupMeta}>
+                            <span>{items.length} classificações</span>
+                            <button
+                              className={styles.removeBtn}
+                              onClick={() => removerGrupo(g.id)}
+                              title="Remover grupo"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className={`${styles.listWrap} ${styles.classGroupList}`}>
+                          {items.map(c => (
+                            <div key={c.id} className={`${styles.listItem} ${styles.classListItemClean}`}>
+                              <span className={styles.itemName}>{c.nome}</span>
+                              <button
+                                className={styles.removeBtn}
+                                onClick={() => removerClassificacao(c.id)}
+                                title="Remover"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={styles.classEmptyState}>
+                    <p className={styles.classSectionTitle}>Nenhum grupo com classificações ainda</p>
+                    <p className={styles.classSectionHint}>Cadastre grupos ou vincule novas classificações para preencher este painel.</p>
+                  </div>
+                )}
+
+                {semGrupo.length > 0 && (
+                  <div className={styles.classWarningCard}>
+                    <div className={styles.classWarningHeader}>
+                      <div>
+                        <p className={styles.classSectionTitle}>Classificações sem grupo</p>
+                        <p className={styles.classSectionHint}>Esses itens merecem revisão porque ainda não encontraram um grupo válido no catálogo.</p>
+                      </div>
+                      <span className={styles.classWarningCount}>{semGrupo.length}</span>
+                    </div>
+
+                    <div className={`${styles.listWrap} ${styles.classWarningList}`}>
+                      {semGrupo.map(c => (
+                        <div key={c.id} className={`${styles.listItem} ${styles.classWarningItem}`}>
+                          <span className={`${styles.badge} ${c.tipo === 'receita' ? styles.badgeReceita : styles.badgeDespesa}`}>
+                            {c.tipo}
+                          </span>
+                          <span className={styles.itemName}>{c.nome}</span>
+                          <button
+                            className={styles.removeBtn}
+                            onClick={() => removerClassificacao(c.id)}
+                            title="Remover"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {classificacoes.length === 0 && grupos.length === 0 && (
+                  <div className={styles.classEmptyState}>
+                    <p className={styles.classSectionTitle}>Nenhuma classificação ou grupo cadastrado ainda</p>
+                    <p className={styles.classSectionHint}>Quando você começar a montar o plano, esta tela organiza tudo por tipo e por grupo automaticamente.</p>
+                  </div>
+                )}
+              </div>
+
+              {false && (
+                <>
 
               {/* Formulário: nova classificação */}
               <div className={styles.addForm}>
@@ -965,6 +1328,8 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                 <p className={styles.hint}>Nenhuma classificação ou grupo cadastrado ainda.</p>
               )}
 
+                </>
+              )}
             </div>
           )
         })()}
