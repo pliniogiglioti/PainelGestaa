@@ -29,9 +29,13 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
   const rows = useMemo(() => envios.flatMap(envio => {
     const lab = labsById[envio.lab_id]
     const feriados = lab ? getLabFeriados(lab) : []
+    const isInstalado = envio.status === 'Instalado'
 
     return getEnvioEtapas(envio).map(etapa => {
       const dataPrevista = getEtapaDataPrevista(envio, etapa, feriados, precosByLab)
+      const dataConclusao = etapa.data_conclusao ?? envio.data_entrega_real ?? (isInstalado ? today() : null)
+      const instaladoAtrasado = isInstalado && dataPrevista != null && dataConclusao != null && dataConclusao > dataPrevista
+      const atrasado = !etapa.concluido && dataPrevista != null && dataPrevista < today()
 
       return {
         id: `${envio.id}-${etapa.id}`,
@@ -43,10 +47,12 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
         cor: envio.cor,
         dataEnvio: envio.data_envio,
         dataPrevista,
-        status: etapa.concluido ? 'Pronto' : envio.status,
+        status: isInstalado ? (instaladoAtrasado ? 'Instalado atrasado' : 'Instalado no prazo') : etapa.concluido ? 'Pronto' : envio.status,
         etapaConcluida: etapa.concluido,
+        isInstalado,
+        instaladoAtrasado,
         urgente: envio.urgente,
-        atrasado: !etapa.concluido && dataPrevista != null && dataPrevista < today(),
+        atrasado,
         labNome: lab?.nome ?? 'Laboratório removido',
       }
     })
@@ -58,7 +64,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
 
     const generatedAt = new Date().toLocaleString('pt-BR')
     const tableRows = rows.map(row => `
-      <tr class="${row.atrasado ? 'overdue' : ''}">
+      <tr class="${(row.atrasado || row.instaladoAtrasado) ? 'overdue' : ''}">
         <td>
           <strong>${escapeHtml(row.pacienteNome)}</strong>
           ${row.urgente ? '<span class="badge">Urgente</span>' : ''}
@@ -261,7 +267,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.id} className={row.atrasado ? styles.serviceTableRowOverdue : ''}>
+                <tr key={row.id} className={(row.atrasado || row.instaladoAtrasado) ? styles.serviceTableRowOverdue : ''}>
                   <td>
                     <div className={styles.servicePatientCell}>
                       <strong>{row.pacienteNome}</strong>
@@ -275,11 +281,19 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                   <td>{formatDate(row.dataPrevista)}</td>
                   <td>
                     <div className={styles.serviceStatusCell}>
-                      {row.etapaConcluida && (
-                        <span className={styles.serviceStatus}>Pronto</span>
-                      )}
-                      {row.atrasado && (
-                        <span className={styles.serviceStatusOverdue}>Atrasado</span>
+                      {row.isInstalado ? (
+                        <span className={row.instaladoAtrasado ? styles.serviceStatusOverdue : styles.serviceStatusOnTime}>
+                          {row.instaladoAtrasado ? 'Instalado atrasado' : 'Instalado no prazo'}
+                        </span>
+                      ) : (
+                        <>
+                          {row.etapaConcluida && (
+                            <span className={styles.serviceStatus}>Pronto</span>
+                          )}
+                          {row.atrasado && (
+                            <span className={styles.serviceStatusOverdue}>Atrasado</span>
+                          )}
+                        </>
                       )}
                       <select
                         className={styles.serviceStatusSelect}
