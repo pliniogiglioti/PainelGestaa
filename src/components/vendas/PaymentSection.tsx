@@ -6,6 +6,7 @@ import {
   resolveIndicatorTag, normalizeIndicatorColor,
   cashNarrativeStatus, planMinimumCashTotal, sanitizeIndicatorRules,
 } from './calcEngine';
+import { InfoTip } from './InfoTip';
 import styles from './Vendas.module.css';
 
 interface PaymentSectionProps {
@@ -55,6 +56,21 @@ function getPaymentStatus(field: string, plan: Plan, settings: OwnerSettings) {
     return { tone: status.tone, label: status.label };
   }
   return { tone: 'neutral' as PaymentTone, label: 'Ativo' };
+}
+
+function indicatorExplanation(tone: PaymentTone): string {
+  switch (tone) {
+    case 'premium':
+      return 'Indicador "premium": condição muito boa para a clínica e ainda atrativa para o paciente. Ótimo momento para fechar.';
+    case 'good':
+      return 'Indicador "boa condição": dentro do recomendado pelo dono, sem perder margem.';
+    case 'warn':
+      return 'Indicador de atenção: condição fora do ideal. Ainda é permitida, mas vale tentar uma condição melhor antes de fechar.';
+    case 'limit':
+      return 'Indicador "no limite": essa é a condição máxima liberada pela política da clínica. Não dá para esticar mais.';
+    default:
+      return 'Defina um valor para ver como essa condição se compara à política da clínica.';
+  }
 }
 
 function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }: {
@@ -193,6 +209,7 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             })()}
             title={status.label}
           />
+          <InfoTip text={`${status.label}. ${indicatorExplanation(status.tone)}`} />
         </div>
       </div>
       <div className={`${styles.prowValue} ${revealed ? styles.valRevealed : styles.valHidden}`}>
@@ -296,7 +313,10 @@ export function PaymentSection({ plan, ownerSettings, onChange, onNotify }: Paym
           <button className={styles.methodAddBtn} onClick={() => addMethod('debito')}>+ Débito</button>
         )}
         {!plan.cartaNaMangaActive && (
-          <button className={styles.methodAddBtn} onClick={activateCartaNaManga}>Carta na manga</button>
+          <>
+            <button className={styles.methodAddBtn} onClick={activateCartaNaManga}>Carta na manga</button>
+            <InfoTip text="Libera uma forma de pagamento extra (boleto) para oferecer como última alternativa, caso o paciente ainda esteja em dúvida no fechamento." />
+          </>
         )}
         {plan.cartaNaMangaActive && av?.boleto !== false && ownerSettings.paymentPolicy.boletoEnabled && !shown.includes('boleto') && (
           <button className={styles.methodAddBtn} onClick={() => addMethod('boleto')}>+ Boleto</button>

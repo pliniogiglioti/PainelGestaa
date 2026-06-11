@@ -10,6 +10,7 @@ import {
 } from './calcEngine';
 import { CATALOG } from './catalog';
 import { PaymentSection } from './PaymentSection';
+import { InfoTip } from './InfoTip';
 import styles from './Vendas.module.css';
 
 interface PlanCardProps {
@@ -357,7 +358,9 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         <div className={styles.totalArea}>
           <hr className={styles.sectionDivider} />
           <div className={styles.totalRow}>
-            <span className={styles.totalLabel}>Total</span>
+            <span className={styles.totalLabel}>
+              Total <InfoTip text="Clique no valor para ajustar o total da proposta. O sistema não deixa passar do mínimo protegido pelo dono." />
+            </span>
             <div className={`${styles.totalValueWrap} ${plan.totalVisible ? styles.valRevealed : styles.valHidden}`}>
               {hasCampaign && <span className={styles.totalOrig}>{fmt(tableTotal)}</span>}
               {totalEditing ? (
