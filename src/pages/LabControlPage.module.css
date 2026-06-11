@@ -2541,6 +2541,13 @@
   text-transform: uppercase;
 }
 
+.serviceStatusCell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
 .serviceStatus,
 .serviceStatusOverdue {
   display: inline-flex;

@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx'
 import type { Lab, LabEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
 import { IconEdit, IconTrash } from './icons'
-import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, isFinalEnvioStatus, today } from './utils'
+import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, today } from './utils'
 
 function escapeHtml(value: string) {
   return value
@@ -274,21 +274,23 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                   <td>{formatDate(row.dataEnvio)}</td>
                   <td>{formatDate(row.dataPrevista)}</td>
                   <td>
-                    {row.etapaConcluida || isFinalEnvioStatus(row.status) ? (
-                      <span className={row.atrasado ? styles.serviceStatusOverdue : styles.serviceStatus}>
-                        {row.atrasado ? 'Atrasado' : row.status}
-                      </span>
-                    ) : (
+                    <div className={styles.serviceStatusCell}>
+                      {row.etapaConcluida && (
+                        <span className={styles.serviceStatus}>Pronto</span>
+                      )}
+                      {row.atrasado && (
+                        <span className={styles.serviceStatusOverdue}>Atrasado</span>
+                      )}
                       <select
                         className={styles.serviceStatusSelect}
-                        value={row.status}
+                        value={row.envio.status}
                         onChange={e => onMoveEnvio(row.envioId, e.target.value)}
                       >
                         {colunasOrdenadas.map(col => (
                           <option key={col.id} value={col.nome}>{col.nome}</option>
                         ))}
                       </select>
-                    )}
+                    </div>
                   </td>
                   <td>{row.labNome}</td>
                   <td className={styles.serviceActionsCol}>
