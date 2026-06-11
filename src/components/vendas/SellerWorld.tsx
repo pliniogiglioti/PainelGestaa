@@ -17,13 +17,23 @@ interface SellerWorldProps {
 
 const BADGE_LABELS = ['A', 'B', 'C'];
 const BADGE_CLASSES = [styles.badgeA, styles.badgeB, styles.badgeC];
-const PLAN_NAMES = ['Plano A', 'Plano B', 'Plano C'];
 const MAX_PLANS = 3;
 
-function makePlan(index: number, firstName?: string): Plan {
+export const PLAN_NAME_SUGGESTIONS = [
+  'Diamante', 'Ouro', 'Prata',
+  'Premium', 'Essencial', 'Básico',
+  'Prime', 'Médio', 'Básico',
+];
+
+function nextPlanName(baseName: string | undefined, offset: number): string {
+  const baseIndex = baseName ? PLAN_NAME_SUGGESTIONS.indexOf(baseName) : -1;
+  return PLAN_NAME_SUGGESTIONS[(baseIndex >= 0 ? baseIndex : 0) + offset] ?? `Plano ${offset + 1}`;
+}
+
+function makePlan(index: number, firstName?: string, baseName?: string): Plan {
   return {
     id: uid(),
-    name: (index === 0 && firstName) ? firstName : (PLAN_NAMES[index] ?? `Plano ${index + 1}`),
+    name: (index === 0 && firstName) ? firstName : nextPlanName(baseName, index),
     items: [],
     totalRevealed: false,
     totalVisible: false,
@@ -83,7 +93,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialP
 
   function addPlan() {
     if (plans.length >= MAX_PLANS) { notify('Máximo de 3 planos.', 'info'); return; }
-    setPlans(prev => [...prev, makePlan(prev.length)]);
+    setPlans(prev => [...prev, makePlan(prev.length, undefined, prev[0]?.name)]);
   }
 
   function removePlan(id: string) {

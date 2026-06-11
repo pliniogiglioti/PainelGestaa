@@ -9,7 +9,7 @@ import {
   saveOwnerV8ModelToDB,
   applyOwnerV8Model,
 } from '../components/vendas/ownerModel';
-import { SellerWorld } from '../components/vendas/SellerWorld';
+import { SellerWorld, PLAN_NAME_SUGGESTIONS } from '../components/vendas/SellerWorld';
 import { OwnerWizard } from '../components/vendas/OwnerWizard';
 import styles from '../components/vendas/Vendas.module.css';
 
@@ -237,8 +237,6 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   const [proposalTitle, setProposalTitle] = useState('');
   const [planNameInput, setPlanNameInput] = useState('');
 
-  const PLAN_NAME_SUGGESTIONS = ['Diamante', 'Ouro', 'Prata', 'Premium', 'Essencial'];
-
   const titleInputRef = useRef<HTMLInputElement>(null);
   const planNameInputRef = useRef<HTMLInputElement>(null);
 
@@ -272,9 +270,9 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   function startSession() {
     if (!patientName.trim()) return;
-    setPlanNameInput('');
+    setPlanNameInput('Diamante');
     setScreen('naming');
-    setTimeout(() => planNameInputRef.current?.focus(), 50);
+    setTimeout(() => planNameInputRef.current?.select(), 50);
   }
 
   function confirmPlanName() {

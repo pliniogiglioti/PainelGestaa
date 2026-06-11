@@ -278,8 +278,8 @@
 .namingInput:focus { border-color: var(--accent); }
 .namingInput::placeholder { color: var(--text-dim, #6b7585); }
 .namingSuggestions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 8px;
   margin-bottom: 36px;
 }
@@ -292,6 +292,7 @@
   font-family: inherit;
   padding: 7px 16px;
   cursor: pointer;
+  text-align: center;
   transition: border-color 0.2s, color 0.2s, background 0.2s;
 }
 .namingChip:hover, .namingChipActive {
