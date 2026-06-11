@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import type { Lab, LabEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
+import { IconEdit, IconTrash } from './icons'
 import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, isFinalEnvioStatus, today } from './utils'
 
 function escapeHtml(value: string) {
@@ -13,12 +14,15 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;')
 }
 
-export function ServicesListView({ envios, precosByLab, labs, colunas, onMoveEnvio }: {
+export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]
   precosByLab: Record<string, LabPreco[]>
   labs: Lab[]
   colunas: LabKanbanColuna[]
+  isAdmin: boolean
   onMoveEnvio: (envioId: string, status: string) => void
+  onEditEnvio: (envio: LabEnvio) => void
+  onDeleteEnvio: (id: string) => void
 }) {
   const labsById = useMemo(() => Object.fromEntries(labs.map(lab => [lab.id, lab])), [labs])
   const colunasOrdenadas = useMemo(() => [...colunas].sort((a, b) => a.ordem - b.ordem), [colunas])
@@ -32,6 +36,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, onMoveEnv
       return {
         id: `${envio.id}-${etapa.id}`,
         envioId: envio.id,
+        envio,
         pacienteNome: envio.paciente_nome,
         servicoNome: etapa.nome,
         dentes: envio.dentes,
@@ -251,6 +256,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, onMoveEnv
                 <th>Prazo</th>
                 <th>Status</th>
                 <th>Laboratório</th>
+                <th className={styles.serviceActionsCol}>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -285,6 +291,14 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, onMoveEnv
                     )}
                   </td>
                   <td>{row.labNome}</td>
+                  <td className={styles.serviceActionsCol}>
+                    <div className={styles.kanbanCardActions}>
+                      <button type="button" className={styles.btnIcon} onClick={() => onEditEnvio(row.envio)} title="Editar"><IconEdit /></button>
+                      {isAdmin && (
+                        <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => onDeleteEnvio(row.envioId)} title="Excluir"><IconTrash /></button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>

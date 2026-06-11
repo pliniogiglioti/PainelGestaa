@@ -2512,6 +2512,12 @@
   background: rgba(239, 68, 68, 0.06);
 }
 
+.serviceActionsCol {
+  width: 1%;
+  white-space: nowrap;
+  text-align: right;
+}
+
 .servicePatientCell {
   display: flex;
   flex-direction: column;

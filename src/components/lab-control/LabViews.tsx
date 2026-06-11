@@ -706,7 +706,10 @@ export function LabsAggregateDetailView({
           precosByLab={precosByLab}
           labs={labs}
           colunas={colunas}
+          isAdmin={can('excluir_envio')}
           onMoveEnvio={moveEnvioAgg}
+          onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
+          onDeleteEnvio={deleteEnvioAgg}
         />
       ) : (
         <KanbanBoard

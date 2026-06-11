@@ -48,6 +48,10 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
   const currentPrecos = currentLab
     ? (precosByLab?.[currentLab.id] ?? (currentLab.id === lab?.id ? precos : []))
     : []
+  const [precoSearch, setPrecoSearch] = useState('')
+  const filteredPrecos = precoSearch.trim()
+    ? currentPrecos.filter(p => normalizeServicoNome(p.nome_servico).includes(normalizeServicoNome(precoSearch)))
+    : currentPrecos
   const feriadosLab = currentLab ? getLabFeriados(currentLab) : []
   const [servicosSelecionados, setServicosSelecionados] = useState<ServicoSelecionado[]>(() => {
     if (!envio) return []
@@ -371,6 +375,7 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
                 onChange={e => {
                   setSelectedLabId(e.target.value)
                   setServicosSelecionados([])
+                  setPrecoSearch('')
                 }}
               >
                 <option value="">Selecione o laboratório</option>
@@ -402,13 +407,24 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
               </div>
             </div>
 
+            {currentLab && currentPrecos.length > 0 && (
+              <input
+                className={styles.input}
+                type="text"
+                value={precoSearch}
+                onChange={e => setPrecoSearch(e.target.value)}
+                placeholder="Buscar na lista de preços..."
+              />
+            )}
+
             {!currentLab ? (
               <p className={styles.priceSelectionEmpty}>
                 Escolha um laboratório para visualizar os serviços disponíveis.
               </p>
             ) : currentPrecos.length > 0 ? (
+              filteredPrecos.length > 0 ? (
               <div className={styles.precosGrid}>
-                {currentPrecos.map(p => {
+                {filteredPrecos.map(p => {
                   const selected = servicosSelecionados.some(servico => servico.key === `preco:${p.id}`)
 
                   return (
@@ -432,6 +448,11 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
                   )
                 })}
               </div>
+              ) : (
+                <p className={styles.priceSelectionEmpty}>
+                  Nenhum serviço encontrado para "{precoSearch}".
+                </p>
+              )
             ) : (
               <p className={styles.priceSelectionEmpty}>
                 Cadastre os serviços na lista de preços do laboratório antes de criar o envio.
