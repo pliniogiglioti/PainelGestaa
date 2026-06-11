@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import type { OwnerV8Model } from './types';
+import type { OwnerV8Model, OwnerV8PerProcedure } from './types';
 import {
   OWNER_V8_SECTIONS,
   hydrateOwnerV8Model,
@@ -26,6 +27,76 @@ import styles from './Vendas.module.css';
 
 const fmt = (v: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
+
+// Ícone "(i)" com tooltip explicativo, para uso em rótulos de campos complexos.
+// O texto é renderizado via portal em document.body para não ficar preso
+// (cortado) por containers com overflow: hidden/auto, como o .ownerCard.
+function InfoTip({ text }: { text: string }) {
+  const [coords, setCoords] = useState<{ left: number; bottom: number } | null>(null);
+  const ref = useRef<HTMLSpanElement>(null);
+
+  const show = () => {
+    const rect = ref.current?.getBoundingClientRect();
+    if (!rect) return;
+    setCoords({ left: Math.max(8, rect.right - 230), bottom: window.innerHeight - rect.top + 8 });
+  };
+  const hide = () => setCoords(null);
+
+  return (
+    <span ref={ref} className={styles.ownerInfoTip} tabIndex={0}
+      onMouseEnter={show} onMouseLeave={hide} onFocus={show} onBlur={hide}>
+      <span className={styles.ownerInfoIcon} aria-hidden="true">i</span>
+      {coords && createPortal(
+        <span className={styles.ownerInfoTooltip} role="tooltip"
+          style={{ left: coords.left, bottom: coords.bottom }}>
+          {text}
+        </span>,
+        document.body
+      )}
+    </span>
+  );
+}
+
+// Campo numérico que mantém o texto digitado mesmo enquanto o valor está
+// vazio/incompleto, para não "travar" o apagamento do conteúdo a cada tecla
+// (o <input type="number"> controlado pelo valor do modelo voltava sozinho
+// para o padrão assim que o campo ficava vazio).
+function OwnerNumberInput({
+  className, value, onCommit, onBlurExtra,
+}: {
+  className?: string;
+  value: number | null;
+  onCommit: (raw: string) => void;
+  onBlurExtra?: () => void;
+}) {
+  const [text, setText] = useState(() => (value == null ? '' : String(value)));
+  const focusedRef = useRef(false);
+
+  useEffect(() => {
+    if (!focusedRef.current) setText(value == null ? '' : String(value));
+  }, [value]);
+
+  return (
+    <input
+      className={className}
+      type="text"
+      inputMode="decimal"
+      value={text}
+      onFocus={() => { focusedRef.current = true; }}
+      onChange={e => {
+        const raw = e.target.value;
+        if (raw !== '' && raw !== '-' && !/^-?\d*\.?\d*$/.test(raw)) return;
+        setText(raw);
+        onCommit(raw);
+      }}
+      onBlur={() => {
+        focusedRef.current = false;
+        setText(value == null ? '' : String(value));
+        onBlurExtra?.();
+      }}
+    />
+  );
+}
 
 const INDICATOR_ROLE_KEYS = ['premium', 'good', 'warn', 'limit', 'neutral', 'legend'] as const;
 type IndicatorRoleKey = (typeof INDICATOR_ROLE_KEYS)[number];
@@ -96,6 +167,18 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
       return next;
     });
   }, []);
+
+  // Garante que o registro de override exista antes de gravar nele (evita
+  // "Cannot set properties of undefined" quando o procedimento vem de
+  // empresaPrecos e ainda não tem entrada em tableStrategy.perProcedure).
+  const updatePerProcedure = useCallback((procName: string, fn: (ps: OwnerV8PerProcedure) => void) => {
+    update(m => {
+      if (!m.tableStrategy.perProcedure[procName]) {
+        m.tableStrategy.perProcedure[procName] = { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
+      }
+      fn(m.tableStrategy.perProcedure[procName]);
+    });
+  }, [update]);
 
   // ---- Modo 100% manual ----
   const [manualDraft, setManualDraft] = useState<Record<string, { name: string; minPrice: number; tablePrice: number }>>({});
@@ -211,7 +294,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
       {
         empresa_id: empresaId,
         vendas_max_cartao: draft.cardTerms.noInterestEnabled ? draft.cardTerms.noInterestUpToInstallments : 0,
-        taxa_maquina_percent: draft.cardTerms.useDefaultRateTable ? 0 : draft.cardTerms.flatRatePct,
+        taxa_maquina_percent: !draft.cardTerms.cardFeeEnabled || draft.cardTerms.useDefaultRateTable ? 0 : draft.cardTerms.flatRatePct,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'empresa_id' }
@@ -457,7 +540,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
               <div className={styles.ownerCard}>
                 <div className={styles.ownerEyebrow}>Boas-vindas</div>
                 <div className={styles.ownerQuestion}>Quer começar com uma configuração pronta e depois só refinar?</div>
-                <div className={styles.ownerHelper}>A V10 pode montar uma base inicial para você revisar no final, ou você pode decidir tudo passo a passo.</div>
+                <div className={styles.ownerHelper}>Você pode montar uma base inicial para você revisar no final, ou você pode decidir tudo passo a passo.</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginTop: 8 }}>
                   <div className={styles.ownerChoice}>
                     <div className={styles.ownerImportTitle}>Configuração express</div>
@@ -485,7 +568,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 <div className={styles.ownerHelper}>Esse nome identifica as regras ativas da clínica ou unidade no mundo do vendedor.</div>
                 <div className={styles.ownerGrid}>
                   <div className={styles.ownerField}>
-                    <label>Tipo de escopo</label>
+                    <label className={styles.ownerLabelRow}>
+                      <span>Tipo de escopo</span>
+                      <InfoTip text="Escolha 'Unidade' se essa configuração vale só para este endereço. Escolha 'Clínica' se ela representa a marca toda, compartilhada entre unidades." />
+                    </label>
                     <select className={styles.ownerSelect} value={draft.identity.scopeType}
                       onChange={e => update(m => { m.identity.scopeType = e.target.value as 'clinica' | 'unidade'; })}>
                       <option value="unidade">Unidade</option>
@@ -502,7 +588,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 </div>
                 <div className={styles.ownerSectionFooter}>
                   <div className={styles.ownerCallout}>Quanto mais simples o nome, mais fácil para a equipe confiar que está usando a regra certa.</div>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -541,7 +630,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
 
                 <div className={styles.ownerSectionFooter}>
                   <div className={styles.ownerCallout}>Aqui nasce o piso absoluto da sua operação. O vendedor nunca deve descer abaixo dele.</div>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -555,16 +647,16 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 <div className={styles.ownerGrid}>
                   <div className={styles.ownerField}>
                     <label>Juros mensal (%)</label>
-                    <input className={styles.ownerInput} type="number" min="0" max="10" step="0.1"
+                    <OwnerNumberInput className={styles.ownerInput}
                       value={draft.lastChanceCondition.monthlyInterestPct}
-                      onChange={e => update(m => { m.lastChanceCondition.monthlyInterestPct = clamp(safeNumber(e.target.value, 1.5), 0, 10); })} />
+                      onCommit={raw => update(m => { m.lastChanceCondition.monthlyInterestPct = clamp(safeNumber(raw, 1.5), 0, 10); })} />
                     <div className={styles.ownerNote}>Ex.: 1,5% ao mês.</div>
                   </div>
                   <div className={styles.ownerField}>
                     <label>Parcelas máximas</label>
-                    <input className={styles.ownerInput} type="number" min="1" max="60" step="1"
+                    <OwnerNumberInput className={styles.ownerInput}
                       value={draft.lastChanceCondition.maxInstallments}
-                      onChange={e => update(m => { m.lastChanceCondition.maxInstallments = clamp(Math.round(safeNumber(e.target.value, 24)), 1, 60); })} />
+                      onCommit={raw => update(m => { m.lastChanceCondition.maxInstallments = clamp(Math.round(safeNumber(raw, 24)), 1, 60); })} />
                     <div className={styles.ownerNote}>Ex.: 24x.</div>
                   </div>
                 </div>
@@ -574,10 +666,13 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   <div><span>Tabela sugerida</span><strong>{fmt(exampleSuggested)}</strong></div>
                 </div>
                 <div className={styles.ownerSectionFooter}>
-                  <button className={styles.ownerV8BtnPrimary} onClick={() => {
-                    saveLastChanceToDB(draft.lastChanceCondition.monthlyInterestPct, draft.lastChanceCondition.maxInstallments);
-                    goNext();
-                  }}>Continuar</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={() => {
+                      saveLastChanceToDB(draft.lastChanceCondition.monthlyInterestPct, draft.lastChanceCondition.maxInstallments);
+                      goNext();
+                    }}>Continuar</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -588,6 +683,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 <div className={styles.ownerEyebrow}>Tabela e Preços</div>
                 <div className={styles.ownerQuestion}>Como você quer montar a vitrine que o vendedor vai apresentar?</div>
                 <div className={styles.ownerHelper}>Você pode usar o sugerido, aplicar um percentual global, ajustar por procedimento ou definir tudo no modo 100% manual.</div>
+                <div className={styles.ownerLabelRow}>
+                  <span className={styles.ownerMiniLabel}>Modo de ajuste da tabela</span>
+                  <InfoTip text="Sugerido: a V10 calcula a vitrine a partir dos seus mínimos. Percentual global: aplica a mesma margem em tudo. Ajuste por procedimento: você define caso a caso. 100% manual: você digita os preços finais." />
+                </div>
                 <div className={styles.ownerPillRow} style={{ marginBottom: 16 }}>
                   {(['suggested', 'globalPct', 'perProcedure'] as const).map(mode => (
                     <button key={mode}
@@ -607,9 +706,9 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   <div className={styles.ownerGrid} style={{ marginBottom: 16 }}>
                     <div className={styles.ownerField}>
                       <label>Gordura global (%)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="300" step="0.1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.tableStrategy.globalGorduraPct}
-                        onChange={e => update(m => { m.tableStrategy.globalGorduraPct = clamp(safeNumber(e.target.value, 25), 0, 300); })} />
+                        onCommit={raw => update(m => { m.tableStrategy.globalGorduraPct = clamp(safeNumber(raw, 25), 0, 300); })} />
                       <div className={styles.ownerNote}>Aplica o mesmo percentual de vitrine em todos os procedimentos.</div>
                     </div>
                   </div>
@@ -640,7 +739,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                               {draft.tableStrategy.mode === 'perProcedure' && (
                                 <td>
                                   <select className={styles.ownerInlineSelect} value={ps.inputMode}
-                                    onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].inputMode = e.target.value as any; })}>
+                                    onChange={e => updatePerProcedure(proc.name, ps2 => { ps2.inputMode = e.target.value as any; })}>
                                     <option value="auto">Automático</option>
                                     <option value="pct">Percentual</option>
                                     <option value="absolute">Valor em R$</option>
@@ -650,14 +749,14 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                               {draft.tableStrategy.mode === 'perProcedure' && (
                                 <td>
                                   {ps.inputMode === 'pct' && (
-                                    <input className={styles.ownerInlineInput} type="number" min="0" max="300" step="0.1"
-                                      value={ps.gorduraPct ?? ''}
-                                      onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].gorduraPct = safeNumber(e.target.value, 0); })} />
+                                    <OwnerNumberInput className={styles.ownerInlineInput}
+                                      value={ps.gorduraPct}
+                                      onCommit={raw => updatePerProcedure(proc.name, ps2 => { ps2.gorduraPct = safeNumber(raw, 0); })} />
                                   )}
                                   {ps.inputMode === 'absolute' && (
-                                    <input className={styles.ownerInlineInput} type="number" min="0" step="10"
-                                      value={ps.tableAbsolute ?? ''}
-                                      onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].tableAbsolute = roundMoney(safeNumber(e.target.value, 0)); })} />
+                                    <OwnerNumberInput className={styles.ownerInlineInput}
+                                      value={ps.tableAbsolute}
+                                      onCommit={raw => updatePerProcedure(proc.name, ps2 => { ps2.tableAbsolute = roundMoney(safeNumber(raw, 0)); })} />
                                   )}
                                   {ps.inputMode === 'auto' && (
                                     <span className={styles.ownerNote} style={{ margin: 0 }}>Segue o sugerido</span>
@@ -705,12 +804,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                               <tr key={proc.name}>
                                 <td><strong>{proc.name}</strong></td>
                                 <td>
-                                  <input
+                                  <OwnerNumberInput
                                     className={styles.ownerInlineInput}
-                                    type="number" min="0" step="10"
                                     value={row.minPrice}
-                                    onChange={e => {
-                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                    onCommit={raw => {
+                                      const val = roundMoney(Math.max(0, safeNumber(raw, 0)));
                                       setManualDraft(prev => ({
                                         ...prev,
                                         [proc.name]: {
@@ -723,26 +821,25 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                                   />
                                 </td>
                                 <td>
-                                  <input
+                                  <OwnerNumberInput
                                     className={styles.ownerInlineInput}
-                                    type="number" min="0" step="10"
                                     value={row.tablePrice}
-                                    onChange={e => {
-                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                    onCommit={raw => {
+                                      const val = roundMoney(Math.max(0, safeNumber(raw, 0)));
                                       setManualDraft(prev => ({
                                         ...prev,
                                         [proc.name]: { ...prev[proc.name] ?? row, tablePrice: val },
                                       }));
                                     }}
-                                    onBlur={e => {
-                                      const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
-                                      const min = manualDraft[proc.name]?.minPrice ?? row.minPrice;
-                                      if (val < min) {
-                                        setManualDraft(prev => ({
-                                          ...prev,
-                                          [proc.name]: { ...prev[proc.name] ?? row, tablePrice: min },
-                                        }));
-                                      }
+                                    onBlurExtra={() => {
+                                      setManualDraft(prev => {
+                                        const current = prev[proc.name] ?? row;
+                                        const min = prev[proc.name]?.minPrice ?? row.minPrice;
+                                        if (current.tablePrice < min) {
+                                          return { ...prev, [proc.name]: { ...current, tablePrice: min } };
+                                        }
+                                        return prev;
+                                      });
                                     }}
                                   />
                                 </td>
@@ -768,7 +865,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 )}
 
                 <div className={styles.ownerSectionFooter}>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -932,7 +1032,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     </div>
                   </div>
 
-                  <div className={styles.ownerImportTitle} style={{ marginTop: 22 }}>Semáforo comercial</div>
+                  <div className={styles.ownerLabelRow} style={{ marginTop: 22 }}>
+                    <div className={styles.ownerImportTitle} style={{ marginTop: 0 }}>Semáforo comercial</div>
+                    <InfoTip text="Conservador exige condições mais próximas do ideal para marcar premium. Moderado equilibra entre flexibilidade e segurança. Agressivo libera premium e equilibrado com mais facilidade." />
+                  </div>
                   <div className={styles.ownerNote} style={{ marginTop: 0 }}>
                     Essa régua decide quando a equipe enxerga uma condição como premium, equilibrada, flexível ou no limite. Você pode escolher um perfil pronto e só ajustar se quiser.
                   </div>
@@ -951,7 +1054,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     <button
                       type="button"
                       className={`${styles.ownerPill}${indicatorPresetKey === 'custom' ? ` ${styles.ownerPillActive}` : ''}`}
-                      disabled
+                      onClick={() => setSemaforoAdvancedOpen(true)}
                     >
                       Personalizado
                     </button>
@@ -1002,15 +1105,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                       <div className={styles.ownerGrid} style={{ marginTop: 14 }}>
                         <div className={styles.ownerField}>
                           <label>À vista / débito · limite até (%)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
                             value={draft.indicatorRules.cash.limitMaxPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.cash.limitMaxPct = safeNumber(e.target.value, indicatorRules.cash.limitMaxPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.cash.limitMaxPct = safeNumber(raw, indicatorRules.cash.limitMaxPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1018,15 +1117,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                         </div>
                         <div className={styles.ownerField}>
                           <label>À vista / débito · flexível até (%)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
                             value={draft.indicatorRules.cash.warnMaxPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.cash.warnMaxPct = safeNumber(e.target.value, indicatorRules.cash.warnMaxPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.cash.warnMaxPct = safeNumber(raw, indicatorRules.cash.warnMaxPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1034,15 +1129,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                         </div>
                         <div className={styles.ownerField}>
                           <label>À vista / débito · equilibrado até (%)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
                             value={draft.indicatorRules.cash.goodMaxPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.cash.goodMaxPct = safeNumber(e.target.value, indicatorRules.cash.goodMaxPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.cash.goodMaxPct = safeNumber(raw, indicatorRules.cash.goodMaxPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1051,15 +1142,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
 
                         <div className={styles.ownerField}>
                           <label>Entrada · premium acima do sugerido (+pts)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="1"
                             value={draft.indicatorRules.entry.premiumAboveSuggestedPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.entry.premiumAboveSuggestedPct = safeNumber(e.target.value, indicatorRules.entry.premiumAboveSuggestedPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.entry.premiumAboveSuggestedPct = safeNumber(raw, indicatorRules.entry.premiumAboveSuggestedPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1068,15 +1155,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
 
                         <div className={styles.ownerField}>
                           <label>Cartão · premium até (% da faixa ideal)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="1"
                             value={draft.indicatorRules.card.premiumUpToIdealPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.card.premiumUpToIdealPct = safeNumber(e.target.value, indicatorRules.card.premiumUpToIdealPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.card.premiumUpToIdealPct = safeNumber(raw, indicatorRules.card.premiumUpToIdealPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1084,15 +1167,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                         </div>
                         <div className={styles.ownerField}>
                           <label>Cartão · equilibrado até (% da faixa ideal)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="1"
                             value={draft.indicatorRules.card.goodUpToIdealPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.card.goodUpToIdealPct = safeNumber(e.target.value, indicatorRules.card.goodUpToIdealPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.card.goodUpToIdealPct = safeNumber(raw, indicatorRules.card.goodUpToIdealPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1101,15 +1180,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
 
                         <div className={styles.ownerField}>
                           <label>Boleto · premium até (% da faixa ideal)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="1"
                             value={draft.indicatorRules.boleto.premiumUpToIdealPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.boleto.premiumUpToIdealPct = safeNumber(e.target.value, indicatorRules.boleto.premiumUpToIdealPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.boleto.premiumUpToIdealPct = safeNumber(raw, indicatorRules.boleto.premiumUpToIdealPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1117,15 +1192,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                         </div>
                         <div className={styles.ownerField}>
                           <label>Boleto · equilibrado até (% da faixa ideal)</label>
-                          <input
+                          <OwnerNumberInput
                             className={styles.ownerInput}
-                            type="number"
-                            min="0"
-                            max="300"
-                            step="1"
                             value={draft.indicatorRules.boleto.goodUpToIdealPct}
-                            onChange={e => update(m => {
-                              m.indicatorRules.boleto.goodUpToIdealPct = safeNumber(e.target.value, indicatorRules.boleto.goodUpToIdealPct);
+                            onCommit={raw => update(m => {
+                              m.indicatorRules.boleto.goodUpToIdealPct = safeNumber(raw, indicatorRules.boleto.goodUpToIdealPct);
                               normalizeIndicatorConfig(m);
                             })}
                           />
@@ -1138,7 +1209,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
 
                 <div className={styles.ownerSectionFooter}>
                   <div className={styles.ownerCallout}>Se quiser manter o boleto como carta na manga, deixe ligado só quando realmente fizer sentido para a operação.</div>
-                  <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={goNext}>Continuar</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1164,42 +1238,57 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   {draft.cardTerms.noInterestEnabled && (
                     <div className={styles.ownerField}>
                       <label>Sem juros até</label>
-                      <input className={styles.ownerInput} type="number" min="1" max="36" step="1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.cardTerms.noInterestUpToInstallments}
-                        onChange={e => update(m => { m.cardTerms.noInterestUpToInstallments = clamp(Math.round(safeNumber(e.target.value, 0)), 0, 36); })} />
+                        onCommit={raw => update(m => { m.cardTerms.noInterestUpToInstallments = clamp(Math.round(safeNumber(raw, 0)), 0, 36); })} />
                       <div className={styles.ownerNote}>Ex.: 3 significa 1x, 2x e 3x sem juros.</div>
                     </div>
                   )}
                   <div className={styles.ownerField}>
                     <label>Cobrar taxa a partir de</label>
-                    <input className={styles.ownerInput} type="number" min="1" max="36" step="1"
+                    <OwnerNumberInput className={styles.ownerInput}
                       value={draft.cardTerms.chargeInterestFromInstallments}
-                      onChange={e => update(m => { m.cardTerms.chargeInterestFromInstallments = clamp(Math.round(safeNumber(e.target.value, 1)), 1, 36); })} />
+                      onCommit={raw => update(m => { m.cardTerms.chargeInterestFromInstallments = clamp(Math.round(safeNumber(raw, 1)), 1, 36); })} />
                     <div className={styles.ownerNote}>A partir daqui a V10 passa a aplicar taxa no saldo parcelado.</div>
                   </div>
                 </div>
 
                 <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
                   <div className={styles.ownerField}>
-                    <label>Taxa do cartão</label>
+                    <label>Cobrar taxa do cartão</label>
                     <select className={styles.ownerSelect}
-                      value={draft.cardTerms.useDefaultRateTable ? 'true' : 'false'}
-                      onChange={e => update(m => { m.cardTerms.useDefaultRateTable = e.target.value === 'true'; })}>
-                      <option value="true">Usar tabela padrão da V10</option>
-                      <option value="false">Usar taxa fixa</option>
+                      value={draft.cardTerms.cardFeeEnabled ? 'true' : 'false'}
+                      onChange={e => update(m => { m.cardTerms.cardFeeEnabled = e.target.value === 'true'; })}>
+                      <option value="true">Ligado</option>
+                      <option value="false">Desligado</option>
                     </select>
-                    <div className={styles.ownerNote}>A tabela padrão varia por número de parcelas. A taxa fixa usa o mesmo percentual em toda faixa com juros.</div>
+                    <div className={styles.ownerNote}>Quando desligado, nenhuma taxa de máquina é aplicada nas vendas no cartão.</div>
                   </div>
-                  {!draft.cardTerms.useDefaultRateTable && (
-                    <div className={styles.ownerField}>
-                      <label>Taxa fixa do cartão (%)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="40" step="0.1"
-                        value={draft.cardTerms.flatRatePct}
-                        onChange={e => update(m => { m.cardTerms.flatRatePct = clamp(safeNumber(e.target.value, 3.9), 0, 40); })} />
-                      <div className={styles.ownerNote}>Ex.: 3,9% em toda parcela que já tiver juros.</div>
-                    </div>
-                  )}
                 </div>
+
+                {draft.cardTerms.cardFeeEnabled && (
+                  <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
+                    <div className={styles.ownerField}>
+                      <label>Taxa do cartão</label>
+                      <select className={styles.ownerSelect}
+                        value={draft.cardTerms.useDefaultRateTable ? 'true' : 'false'}
+                        onChange={e => update(m => { m.cardTerms.useDefaultRateTable = e.target.value === 'true'; })}>
+                        <option value="true">Usar tabela padrão da V10</option>
+                        <option value="false">Usar taxa fixa</option>
+                      </select>
+                      <div className={styles.ownerNote}>A tabela padrão varia por número de parcelas. A taxa fixa usa o mesmo percentual em toda faixa com juros.</div>
+                    </div>
+                    {!draft.cardTerms.useDefaultRateTable && (
+                      <div className={styles.ownerField}>
+                        <label>Taxa fixa do cartão (%)</label>
+                        <OwnerNumberInput className={styles.ownerInput}
+                          value={draft.cardTerms.flatRatePct}
+                          onCommit={raw => update(m => { m.cardTerms.flatRatePct = clamp(safeNumber(raw, 3.9), 0, 40); })} />
+                        <div className={styles.ownerNote}>Ex.: 3,9% em toda parcela que já tiver juros.</div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
                   <div className={styles.ownerField}>
@@ -1215,16 +1304,16 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   {draft.cardTerms.anticipationEnabled && (<>
                     <div className={styles.ownerField}>
                       <label>Taxa de antecipação (%)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="10" step="0.1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.cardTerms.anticipationPct}
-                        onChange={e => update(m => { m.cardTerms.anticipationPct = clamp(safeNumber(e.target.value, 0.6), 0, 10); })} />
+                        onCommit={raw => update(m => { m.cardTerms.anticipationPct = clamp(safeNumber(raw, 0.6), 0, 10); })} />
                       <div className={styles.ownerNote}>Ex.: 0,6%.</div>
                     </div>
                     <div className={styles.ownerField}>
                       <label>Aplicar antecipação a partir de</label>
-                      <input className={styles.ownerInput} type="number" min="1" max="36" step="1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.cardTerms.anticipationFromInstallments}
-                        onChange={e => update(m => { m.cardTerms.anticipationFromInstallments = clamp(Math.round(safeNumber(e.target.value, 2)), 1, 36); })} />
+                        onCommit={raw => update(m => { m.cardTerms.anticipationFromInstallments = clamp(Math.round(safeNumber(raw, 2)), 1, 36); })} />
                       <div className={styles.ownerNote}>Ex.: a partir de 2x.</div>
                     </div>
                   </>)}
@@ -1262,24 +1351,24 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     {draft.boletoTerms.noInterestEnabled && (
                       <div className={styles.ownerField}>
                         <label>Sem juros até</label>
-                        <input className={styles.ownerInput} type="number" min="1" max="60" step="1"
+                        <OwnerNumberInput className={styles.ownerInput}
                           value={draft.boletoTerms.noInterestUpToInstallments}
-                          onChange={e => update(m => { m.boletoTerms.noInterestUpToInstallments = clamp(Math.round(safeNumber(e.target.value, 0)), 0, 60); })} />
+                          onCommit={raw => update(m => { m.boletoTerms.noInterestUpToInstallments = clamp(Math.round(safeNumber(raw, 0)), 0, 60); })} />
                         <div className={styles.ownerNote}>Ex.: 3 significa até 3x sem juros no boleto.</div>
                       </div>
                     )}
                     <div className={styles.ownerField}>
                       <label>Cobrar juros a partir de</label>
-                      <input className={styles.ownerInput} type="number" min="1" max="60" step="1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.boletoTerms.chargeInterestFromInstallments}
-                        onChange={e => update(m => { m.boletoTerms.chargeInterestFromInstallments = clamp(Math.round(safeNumber(e.target.value, 1)), 1, 60); })} />
+                        onCommit={raw => update(m => { m.boletoTerms.chargeInterestFromInstallments = clamp(Math.round(safeNumber(raw, 1)), 1, 60); })} />
                       <div className={styles.ownerNote}>A partir daqui a V10 passa a aplicar juros no boleto.</div>
                     </div>
                     <div className={styles.ownerField}>
                       <label>Juros do boleto (% ao mês)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="10" step="0.1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.boletoTerms.monthlyInterestPct}
-                        onChange={e => update(m => { m.boletoTerms.monthlyInterestPct = clamp(safeNumber(e.target.value, 1.5), 0, 10); })} />
+                        onCommit={raw => update(m => { m.boletoTerms.monthlyInterestPct = clamp(safeNumber(raw, 1.5), 0, 10); })} />
                       <div className={styles.ownerNote}>Ex.: 1,5% ao mês.</div>
                     </div>
                   </div>
@@ -1305,7 +1394,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 })()}
 
                 <div className={styles.ownerSectionFooter}>
-                  <button className={styles.ownerV8BtnPrimary} onClick={() => { saveCardBoletoTermsToDB(); goNext(); }}>Ir para revisão</button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={() => { saveCardBoletoTermsToDB(); goNext(); }}>Ir para revisão</button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1358,8 +1450,12 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   </div>
                   <div className={styles.ownerSummaryCard}>
                     <div className={styles.ownerSummaryLabel}>Cartão</div>
-                    <strong>{draft.cardTerms.noInterestEnabled ? `Sem juros até ${draft.cardTerms.noInterestUpToInstallments}x` : 'Sem juros desligado'}</strong>
-                    <span>{draft.cardTerms.useDefaultRateTable ? 'Usando tabela padrão da V10' : `Taxa fixa de ${draft.cardTerms.flatRatePct}%`}</span>
+                    <strong>{draft.cardTerms.cardFeeEnabled
+                      ? (draft.cardTerms.noInterestEnabled ? `Sem juros até ${draft.cardTerms.noInterestUpToInstallments}x` : 'Sem juros desligado')
+                      : 'Taxa do cartão desligada'}</strong>
+                    <span>{!draft.cardTerms.cardFeeEnabled
+                      ? 'Nenhuma taxa de máquina aplicada'
+                      : (draft.cardTerms.useDefaultRateTable ? 'Usando tabela padrão da V10' : `Taxa fixa de ${draft.cardTerms.flatRatePct}%`)}</span>
                   </div>
                   <div className={styles.ownerSummaryCard}>
                     <div className={styles.ownerSummaryLabel}>Boleto</div>
@@ -1390,15 +1486,15 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     </div>
                     <div className={styles.ownerField}>
                       <label>Juros mensal (%)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="10" step="0.1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.lastChanceCondition.monthlyInterestPct}
-                        onChange={e => update(m => { m.lastChanceCondition.monthlyInterestPct = clamp(safeNumber(e.target.value, 1.5), 0, 10); })} />
+                        onCommit={raw => update(m => { m.lastChanceCondition.monthlyInterestPct = clamp(safeNumber(raw, 1.5), 0, 10); })} />
                     </div>
                     <div className={styles.ownerField}>
                       <label>Parcelas máximas</label>
-                      <input className={styles.ownerInput} type="number" min="1" max="60" step="1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.lastChanceCondition.maxInstallments}
-                        onChange={e => update(m => { m.lastChanceCondition.maxInstallments = clamp(Math.round(safeNumber(e.target.value, 24)), 1, 60); })} />
+                        onCommit={raw => update(m => { m.lastChanceCondition.maxInstallments = clamp(Math.round(safeNumber(raw, 24)), 1, 60); })} />
                     </div>
                   </div>
                 </div>
@@ -1452,9 +1548,9 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                   {draft.tableStrategy.mode === 'globalPct' && (
                     <div className={styles.ownerField} style={{ marginTop: 14, maxWidth: 200 }}>
                       <label>Gordura global (%)</label>
-                      <input className={styles.ownerInput} type="number" min="0" max="300" step="0.1"
+                      <OwnerNumberInput className={styles.ownerInput}
                         value={draft.tableStrategy.globalGorduraPct}
-                        onChange={e => update(m => { m.tableStrategy.globalGorduraPct = clamp(safeNumber(e.target.value, 25), 0, 300); })} />
+                        onCommit={raw => update(m => { m.tableStrategy.globalGorduraPct = clamp(safeNumber(raw, 25), 0, 300); })} />
                     </div>
                   )}
 
@@ -1482,7 +1578,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                                 {draft.tableStrategy.mode === 'perProcedure' && (
                                   <td>
                                     <select className={styles.ownerInlineSelect} value={ps.inputMode}
-                                      onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].inputMode = e.target.value as any; })}>
+                                      onChange={e => updatePerProcedure(proc.name, ps2 => { ps2.inputMode = e.target.value as any; })}>
                                       <option value="auto">Automático</option>
                                       <option value="pct">Percentual</option>
                                       <option value="absolute">Valor em R$</option>
@@ -1492,14 +1588,14 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                                 {draft.tableStrategy.mode === 'perProcedure' && (
                                   <td>
                                     {ps.inputMode === 'pct' && (
-                                      <input className={styles.ownerInlineInput} type="number" min="0" max="300" step="0.1"
-                                        value={ps.gorduraPct ?? ''}
-                                        onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].gorduraPct = safeNumber(e.target.value, 0); })} />
+                                      <OwnerNumberInput className={styles.ownerInlineInput}
+                                        value={ps.gorduraPct}
+                                        onCommit={raw => updatePerProcedure(proc.name, ps2 => { ps2.gorduraPct = safeNumber(raw, 0); })} />
                                     )}
                                     {ps.inputMode === 'absolute' && (
-                                      <input className={styles.ownerInlineInput} type="number" min="0" step="10"
-                                        value={ps.tableAbsolute ?? ''}
-                                        onChange={e => update(m => { m.tableStrategy.perProcedure[proc.name].tableAbsolute = roundMoney(safeNumber(e.target.value, 0)); })} />
+                                      <OwnerNumberInput className={styles.ownerInlineInput}
+                                        value={ps.tableAbsolute}
+                                        onCommit={raw => updatePerProcedure(proc.name, ps2 => { ps2.tableAbsolute = roundMoney(safeNumber(raw, 0)); })} />
                                     )}
                                     {ps.inputMode === 'auto' && <span className={styles.ownerNote} style={{ margin: 0 }}>Segue o sugerido</span>}
                                   </td>
@@ -1531,19 +1627,29 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                                 <tr key={proc.name}>
                                   <td><strong>{proc.name}</strong></td>
                                   <td>
-                                    <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                    <OwnerNumberInput className={styles.ownerInlineInput}
                                       value={row.minPrice}
-                                      onChange={e => {
-                                        const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                      onCommit={raw => {
+                                        const val = roundMoney(Math.max(0, safeNumber(raw, 0)));
                                         setManualDraft(prev => ({ ...prev, [proc.name]: { ...prev[proc.name] ?? row, name: proc.name, minPrice: val, tablePrice: Math.max(prev[proc.name]?.tablePrice ?? row.tablePrice, val) } }));
                                       }} />
                                   </td>
                                   <td>
-                                    <input className={styles.ownerInlineInput} type="number" min="0" step="10"
+                                    <OwnerNumberInput className={styles.ownerInlineInput}
                                       value={row.tablePrice}
-                                      onChange={e => {
-                                        const val = roundMoney(Math.max(0, safeNumber(e.target.value, 0)));
+                                      onCommit={raw => {
+                                        const val = roundMoney(Math.max(0, safeNumber(raw, 0)));
                                         setManualDraft(prev => ({ ...prev, [proc.name]: { ...prev[proc.name] ?? row, name: proc.name, tablePrice: val } }));
+                                      }}
+                                      onBlurExtra={() => {
+                                        setManualDraft(prev => {
+                                          const current = prev[proc.name] ?? row;
+                                          const min = prev[proc.name]?.minPrice ?? row.minPrice;
+                                          if (current.tablePrice < min) {
+                                            return { ...prev, [proc.name]: { ...current, tablePrice: min } };
+                                          }
+                                          return prev;
+                                        });
                                       }} />
                                   </td>
                                   <td><strong>{fmt(Math.max(0, row.tablePrice - row.minPrice))}</strong></td>
@@ -1584,10 +1690,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 </div>
 
                 <div className={styles.ownerSectionFooter}>
-                  <button className={styles.ownerV8Btn} onClick={() => setSection(0)}>Revisar tudo</button>
-                  <button className={styles.ownerV8BtnPrimary} onClick={save}>
-                    {draft.completed ? 'Reaplicar configuração' : 'Ativar configuração'}
-                  </button>
+                  <div className={styles.ownerFooterActions}>
+                    <button className={styles.ownerV8Btn} onClick={goBack}>‹ Voltar</button>
+                    <button className={styles.ownerV8Btn} onClick={() => setSection(0)}>Revisar tudo</button>
+                    <button className={styles.ownerV8BtnPrimary} onClick={save}>Ativar no vendedor</button>
+                  </div>
                 </div>
               </div>
             </div>

@@ -111,6 +111,7 @@ export interface PaymentPolicy {
   cardNoInterestEnabled: boolean;
   cardNoInterestInstallments: number;
   cardChargeInterestFromInstallments: number;
+  cardFeeEnabled: boolean;
   cardUseDefaultRateTable: boolean;
   cardFlatRatePct: number;
   boletoIdealInstallments: number;
@@ -175,6 +176,7 @@ export interface OwnerV8CardTerms {
   noInterestEnabled: boolean;
   noInterestUpToInstallments: number;
   chargeInterestFromInstallments: number;
+  cardFeeEnabled: boolean;
   useDefaultRateTable: boolean;
   flatRatePct: number;
   anticipationEnabled: boolean;

@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase';
 import {
   loadOwnerV8Model,
   saveOwnerV8Model,
+  loadOwnerV8ModelFromDB,
+  saveOwnerV8ModelToDB,
   applyOwnerV8Model,
 } from '../components/vendas/ownerModel';
 import { SellerWorld } from '../components/vendas/SellerWorld';
@@ -191,6 +193,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   const [empresaPrecos, setEmpresaPrecos] = useState<EmpresaPreco[] | null>(null);
   const [loadingPrecos, setLoadingPrecos] = useState(true);
+  const [loadingOwnerModel, setLoadingOwnerModel] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -206,6 +209,20 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
           setLoadingPrecos(false);
         }
       });
+    return () => { active = false; };
+  }, [empresa.id]);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingOwnerModel(true);
+    loadOwnerV8ModelFromDB(empresa.id).then(model => {
+      if (!active) return;
+      if (model) {
+        setOwnerModel(model);
+        setOwnerSettings(applyOwnerV8Model(model));
+      }
+      setLoadingOwnerModel(false);
+    });
     return () => { active = false; };
   }, [empresa.id]);
 
@@ -227,6 +244,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   function handleSaveWizard(model: OwnerV8Model) {
     saveOwnerV8Model(model);
+    saveOwnerV8ModelToDB(empresa.id, model);
     const settings = applyOwnerV8Model(model);
     setOwnerModel(model);
     setOwnerSettings(settings);
@@ -264,7 +282,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     setScreen('workspace');
   }
 
-  if (loadingPrecos) {
+  if (loadingPrecos || loadingOwnerModel) {
     return (
       <div className={styles.vendasRoot}>
         <div className={styles.entryOverlay}>
@@ -292,7 +310,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
             <div className={styles.launchpadKicker}>{empresa.nome}</div>
             <div className={styles.launchpadTitle}>Para onde você quer ir agora?</div>
             <div className={styles.launchpadSubtitle}>
-              Escolha o ambiente que faz mais sentido neste momento. Se a clínica ainda não estiver configurada, a TOP te leva direto para o lugar certo.
+              Escolha o ambiente que faz mais sentido neste momento.
             </div>
 
             <div className={styles.launchpadGrid}>
@@ -493,6 +511,8 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
         initialPlanName={planNameInput.trim() || 'Diamante'}
         patientName={patientName}
         proposalTitle={proposalTitle}
+        onPatientNameChange={setPatientName}
+        onProposalTitleChange={setProposalTitle}
         onOpenOwnerWizard={openOwnerWorld}
         onBack={() => setScreen('launchpad')}
       />
@@ -503,6 +523,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
           onSave={handleSaveWizard}
           onClose={() => setWizardOpen(false)}
           empresaPrecos={empresaPrecos ?? []}
+          empresaId={empresa.id}
         />
       )}
     </div>

@@ -11,6 +11,8 @@ interface SellerWorldProps {
   initialPlanName?: string;
   patientName?: string;
   proposalTitle?: string;
+  onPatientNameChange?: (value: string) => void;
+  onProposalTitleChange?: (value: string) => void;
 }
 
 const BADGE_LABELS = ['A', 'B', 'C'];
@@ -62,12 +64,10 @@ interface ToastState {
   kind: 'info' | 'danger';
 }
 
-export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialPlanName, patientName, proposalTitle }: SellerWorldProps) {
+export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialPlanName, patientName, proposalTitle, onPatientNameChange, onProposalTitleChange }: SellerWorldProps) {
   const [plans, setPlans] = useState<Plan[]>(() => [makePlan(0, initialPlanName)]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [equalizedPlans, setEqualizedPlans] = useState(false);
-  const [editPatientName, setEditPatientName] = useState(patientName ?? '');
-  const [editProposalTitle, setEditProposalTitle] = useState(proposalTitle ?? '');
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -101,6 +101,13 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialP
     setPlans([makePlan(0, initialPlanName)]);
   }
 
+  const maxItems = Math.max(0, ...plans.map(p => p.items.length));
+  const densityClass =
+    maxItems <= 2 ? styles.densitySpacious :
+    maxItems <= 5 ? styles.densityNormal :
+    maxItems <= 9 ? styles.densityCompact :
+    styles.densityDense;
+
   return (
     <div className={styles.workspaceShell}>
       <div className={styles.workspaceStage}>
@@ -110,7 +117,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialP
             {proposalTitle && <div className={styles.workspaceSubtitle}>{proposalTitle}</div>}
           </div>
         )}
-        <div className={styles.plansArea}>
+        <div className={`${styles.plansArea} ${densityClass}`}>
           {plans.map((plan, idx) => (
             <PlanCard
               key={plan.id}
@@ -149,13 +156,13 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, initialP
               <div className={styles.sbEyebrow}>Editar atendimento</div>
               <div className={styles.sbFieldLabel}>Paciente</div>
               <input className={styles.sbInlineInput} type="text"
-                value={editPatientName}
-                onChange={e => setEditPatientName(e.target.value)}
+                value={patientName ?? ''}
+                onChange={e => onPatientNameChange?.(e.target.value)}
                 placeholder="Nome do paciente" />
               <div className={styles.sbFieldLabel}>Planejamento</div>
               <input className={styles.sbInlineInput} type="text"
-                value={editProposalTitle}
-                onChange={e => setEditProposalTitle(e.target.value)}
+                value={proposalTitle ?? ''}
+                onChange={e => onProposalTitleChange?.(e.target.value)}
                 placeholder="Opcional" />
             </div>
 

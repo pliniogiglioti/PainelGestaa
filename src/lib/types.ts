@@ -242,6 +242,7 @@ export interface Database {
           vendas_exibir_campanha_promocional: boolean
           vendas_juros_mensal_pct:     number
           vendas_max_parcelas:         number
+          owner_wizard_model:          Json | null
           created_at:                  string
           updated_at:                  string
         }
@@ -262,6 +263,7 @@ export interface Database {
           vendas_exibir_campanha_promocional?: boolean
           vendas_juros_mensal_pct?:    number
           vendas_max_parcelas?:        number
+          owner_wizard_model?:         Json | null
           created_at?:                 string
           updated_at?:                 string
         }
@@ -282,6 +284,7 @@ export interface Database {
           vendas_exibir_campanha_promocional?: boolean
           vendas_juros_mensal_pct?:     number
           vendas_max_parcelas?:         number
+          owner_wizard_model?:          Json | null
           updated_at?:                  string
         }
         Relationships: []

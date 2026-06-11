@@ -345,6 +345,32 @@
   color: var(--text-muted);
 }
 .workspaceShell {
+  /* tokens visuais — paridade com top_v10.html (:root) */
+  --bg: #0a0a0a;
+  --text: #f4f6fb;
+  --text-muted: #a5afbf;
+  --text-dim: #6b7585;
+  --border: rgba(255,255,255,0.10);
+  --border-soft: rgba(255,255,255,0.07);
+  --bg-surface: rgba(14,14,14,0.88);
+  --bg-elevated: rgba(20,20,20,0.98);
+  --accent: #f99f35;
+  --accent-strong: #e6e1c4;
+  --accent-dim: rgba(249,159,53,0.10);
+  --accent-ring: rgba(249,159,53,0.24);
+  --strike: #4a5160;
+  --danger: #d93c4c;
+  --sidebar-bg: rgba(10,10,10,0.88);
+  --sidebar-border: rgba(255,255,255,0.08);
+  --radius: 18px;
+  --radius-lg: 26px;
+  --radius-xl: 32px;
+  --sidebar-w: 290px;
+  --sidebar-strip: 40px;
+  --shadow-soft: 0 24px 80px rgba(0,0,0,0.35);
+  --shadow-glow: 0 0 0 1px rgba(249,159,53,0.18), 0 18px 55px rgba(249,159,53,0.10);
+  --font-sans: "DM Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
   flex: 1;
   overflow: hidden;
   position: relative;
@@ -428,7 +454,7 @@
   letter-spacing: 0.06em;
   flex-shrink: 0;
 }
-.badgeA { background: rgba(249,159,53,0.14); color: var(--gold, var(--accent)); }
+.badgeA { background: rgba(249,159,53,0.14); color: var(--accent); }
 .badgeB { background: rgba(230,225,196,0.12); color: #e6e1c4; }
 .badgeC { background: rgba(112,112,112,0.12); color: #707070; }
 .planNameInput {
@@ -526,7 +552,7 @@
 }
 .campaignBtn.active {
   background: rgba(249,159,53,0.12);
-  color: var(--gold);
+  color: var(--accent);
   border-color: rgba(249,159,53,0.25);
 }
 .campaignEditor {
@@ -547,7 +573,7 @@
   outline: none;
   font-family: inherit;
 }
-.campaignInput:focus { border-color: var(--gold); }
+.campaignInput:focus { border-color: var(--accent); }
 .campaignEditor button {
   padding: 4px 8px;
   border-radius: 8px;
@@ -559,6 +585,14 @@
 }
 .campaignEditor button:hover { color: var(--text); background: var(--bg-hover); }
 
+.itemDots {
+  flex: 1;
+  height: 0;
+  border-bottom: 1px dotted var(--border);
+  margin: 0 8px 1px;
+  align-self: flex-end;
+  margin-bottom: 5px;
+}
 .itemPriceArea {
   display: flex;
   align-items: center;
@@ -736,6 +770,24 @@
   transition: font-size 0.3s ease, font-weight 0.3s ease;
 }
 
+/* Densidade — escala conforme a quantidade de itens dos planos */
+.densityNormal {}
+.densitySpacious .totalValue { font-size: 56px; font-weight: 200; }
+.densityCompact  .totalValue { font-size: 32px; font-weight: 400; }
+.densityDense    .totalValue { font-size: 26px; font-weight: 500; }
+
+.densitySpacious .itemBody { padding: 22px 0; }
+.densityCompact  .itemBody { padding: 9px 0; }
+.densityDense    .itemBody { padding: 6px 0; }
+
+.densitySpacious .itemName { font-size: 17px; }
+.densityCompact  .itemName { font-size: 14px; }
+.densityDense    .itemName { font-size: 13px; }
+
+.densitySpacious .itemPrice { font-size: 20px; }
+.densityCompact  .itemPrice { font-size: 15px; }
+.densityDense    .itemPrice { font-size: 13px; }
+
 .narrativeActions {
   display: flex;
   flex-direction: column;
@@ -743,7 +795,7 @@
   align-items: center;
 }
 .narrativeBtn {
-  background: linear-gradient(180deg, var(--gold-light, #e6e1c4), var(--gold, #f99f35));
+  background: linear-gradient(180deg, var(--accent-strong), var(--accent));
   color: #111827;
   border: none;
   border-radius: 999px;
@@ -778,16 +830,52 @@
 .paymentRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: var(--bg-hover);
-  border: 1px solid transparent;
-  transition: border-color 0.2s;
+  gap: 12px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: none;
+  border-left: 3px solid transparent;
+  transition: background 0.2s, border-color 0.2s;
 }
-.paymentRow--limit { border-color: rgba(220,94,94,0.25); }
-.paymentRow--warn  { border-color: rgba(249,159,53,0.2); }
-.paymentRow--good  { border-color: rgba(130,166,255,0.2); }
+.paymentRow:last-of-type { border-bottom: none; }
+.paymentRow--warn,
+.paymentRow--good,
+.paymentRow--premium,
+.paymentRow--limit {
+  margin-left: -10px;
+  padding-left: 10px;
+  border-radius: 0 10px 10px 0;
+}
+.paymentRow--warn {
+  border-left-color: rgba(249,159,53,0.85);
+  background: linear-gradient(90deg, rgba(249,159,53,0.10), transparent 72%);
+  border-bottom-color: rgba(249,159,53,0.20);
+}
+.paymentRow--good {
+  border-left-color: rgba(88,216,181,0.80);
+  background: linear-gradient(90deg, rgba(88,216,181,0.08), transparent 72%);
+  border-bottom-color: rgba(88,216,181,0.18);
+}
+.paymentRow--premium {
+  border-left-color: rgba(249,159,53,0.90);
+  background: linear-gradient(90deg, rgba(249,159,53,0.08), transparent 72%);
+  border-bottom-color: rgba(249,159,53,0.18);
+}
+.paymentRow--limit {
+  border-left-color: rgba(192,64,64,0.78);
+  background: linear-gradient(90deg, rgba(192,64,64,0.10), transparent 72%);
+  border-bottom-color: rgba(192,64,64,0.18);
+}
+.paymentRow--warn .prowLabel,
+.paymentRow--warn .priceClickable,
+.paymentRow--warn .prowValueSub,
+.paymentRow--premium .prowLabel,
+.paymentRow--premium .priceClickable,
+.paymentRow--premium .prowValueSub { color: var(--accent-strong); }
+.paymentRow--limit .prowLabel,
+.paymentRow--limit .priceClickable,
+.paymentRow--limit .prowValueSub { color: #ffd0d0; }
 .prowBody { flex: 1; min-width: 0; }
 .prowMain {
   display: flex;
@@ -812,12 +900,13 @@
   outline: none;
   font-family: inherit;
 }
-.prowInlineInput:focus { border-color: var(--gold); }
+.prowInlineInput:focus { border-color: var(--accent); }
 .prowIndicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
   flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
 }
 .prowValue {
   display: flex;
@@ -838,9 +927,10 @@
   font-weight: 600;
   color: var(--text);
   cursor: pointer;
-  transition: color 0.15s;
+  border-bottom: 1px dashed var(--border);
+  transition: color 0.15s, border-color 0.15s;
 }
-.priceClickable:hover { color: var(--gold); }
+.priceClickable:hover { color: var(--accent); border-bottom-color: var(--accent); }
 .priceEditWrap {
   display: flex;
   align-items: center;
@@ -849,7 +939,7 @@
 .priceEditInput {
   width: 80px;
   background: var(--bg);
-  border: 1px solid var(--gold);
+  border: 1px solid var(--accent);
   border-radius: 8px;
   color: var(--text);
   font-size: 13px;
@@ -858,7 +948,7 @@
   font-family: inherit;
 }
 .priceEditOk {
-  background: var(--gold);
+  background: var(--accent);
   border: none;
   border-radius: 6px;
   color: #111;
@@ -917,7 +1007,7 @@
 }
 .methodAddBtn:hover {
   background: rgba(249,159,53,0.08);
-  color: var(--gold);
+  color: var(--accent);
   border-color: rgba(249,159,53,0.25);
 }
 
@@ -1150,28 +1240,35 @@
    ============================================================ */
 .policyToast {
   position: fixed;
-  bottom: 24px;
+  top: 24px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 200;
   pointer-events: none;
+  width: min(680px, calc(100vw - 32px));
 }
 .policyToastInner {
-  padding: 10px 20px;
-  border-radius: 999px;
+  margin: 0 auto;
+  padding: 14px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(18,18,18,0.92);
+  color: var(--text);
+  box-shadow: 0 24px 40px rgba(0,0,0,0.32);
+  backdrop-filter: blur(18px) saturate(130%);
+  text-align: center;
   font-size: 13px;
-  font-weight: 500;
-  border: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  line-height: 1.45;
 }
 .policyToastInfo {
-  background: rgba(20,20,20,0.92);
-  color: var(--text);
+  border-color: rgba(249,159,53,0.28);
+  background: rgba(44,30,13,0.94);
+  color: #ffe2b8;
 }
 .policyToastDanger {
-  background: rgba(30,10,10,0.92);
-  border-color: rgba(217,60,76,0.3);
-  color: #f87171;
+  border-color: rgba(217,60,76,0.34);
+  background: rgba(57,17,20,0.94);
+  color: #ffd0d5;
 }
 
 /* ============================================================
@@ -1426,6 +1523,59 @@
   margin-top: 8px;
   line-height: 1.4;
 }
+.ownerLabelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.ownerMiniLabel {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.3);
+  margin-bottom: 10px;
+}
+.ownerInfoTip {
+  position: relative;
+  display: inline-flex;
+  cursor: help;
+  outline: none;
+}
+.ownerInfoIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.25);
+  color: rgba(255,255,255,0.55);
+  font-size: 10px;
+  font-style: italic;
+  font-family: Georgia, 'Times New Roman', serif;
+  text-transform: none;
+  letter-spacing: normal;
+  flex-shrink: 0;
+}
+.ownerInfoTooltip {
+  position: fixed;
+  width: 230px;
+  background: rgba(20,20,20,0.97);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(255,255,255,0.78);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 400;
+  z-index: 200;
+  pointer-events: none;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.4);
+}
 .ownerPillRow {
   display: flex;
   flex-wrap: wrap;
@@ -1486,6 +1636,12 @@
   gap: 14px;
   margin-top: 24px;
   flex-wrap: wrap;
+}
+.ownerFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
 }
 .ownerImportTitle {
   font-size: 18px;

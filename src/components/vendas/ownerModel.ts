@@ -10,6 +10,8 @@ import {
   defaultCardRateForInstallments,
 } from './calcEngine';
 import { FLAT_CATALOG } from './catalog';
+import { supabase } from '../../lib/supabase';
+import type { Json } from '../../lib/types';
 
 export const OWNER_V8_STORAGE_KEY = 'top-v9-owner-model';
 export const EXTERNAL_MINIMUM_STORAGE_KEY = 'clinicscale:external-minimum-prices:v1';
@@ -41,6 +43,7 @@ export function defaultOwnerV8CardTerms(): OwnerV8CardTerms {
     noInterestEnabled: false,
     noInterestUpToInstallments: 0,
     chargeInterestFromInstallments: 1,
+    cardFeeEnabled: true,
     useDefaultRateTable: true,
     flatRatePct: 3.9,
     anticipationEnabled: false,
@@ -64,6 +67,7 @@ export function sanitizeOwnerV8CardTerms(raw: unknown): OwnerV8CardTerms {
     chargeInterestFromInstallments: noInterestEnabled
       ? Math.max(chargeInterestFromInstallments, noInterestUpToInstallments + 1)
       : chargeInterestFromInstallments,
+    cardFeeEnabled: Boolean(source.cardFeeEnabled ?? defaults.cardFeeEnabled),
     useDefaultRateTable: Boolean(source.useDefaultRateTable ?? defaults.useDefaultRateTable),
     flatRatePct: clamp(safeNumber(source.flatRatePct, defaults.flatRatePct), 0, 40),
     anticipationEnabled: Boolean(source.anticipationEnabled ?? defaults.anticipationEnabled),
@@ -158,7 +162,7 @@ export function hydrateOwnerV8Model(raw: unknown): OwnerV8Model {
     ...source,
     identity: { ...defaults.identity, ...(source.identity || {}) },
     lastChanceCondition: { ...defaults.lastChanceCondition, ...(source.lastChanceCondition || {}) },
-    tableStrategy: { ...defaults.tableStrategy, ...(source.tableStrategy || {}), perProcedure: createDefaultOwnerV8PerProcedure() },
+    tableStrategy: { ...defaults.tableStrategy, ...(source.tableStrategy || {}), perProcedure: {} },
     payments: { ...defaults.payments, ...(source.payments || {}) },
     cardTerms: sanitizeOwnerV8CardTerms(source.cardTerms),
     boletoTerms: sanitizeOwnerV8BoletoTerms(source.boletoTerms),
@@ -168,13 +172,14 @@ export function hydrateOwnerV8Model(raw: unknown): OwnerV8Model {
     externalMinimumSnapshot: sanitizeOwnerV8Snapshot(source.externalMinimumSnapshot),
   };
 
-  const savedProcedures = source.tableStrategy?.perProcedure || {};
-  FLAT_CATALOG.forEach(proc => {
-    const saved = savedProcedures[proc.name] || {};
-    model.tableStrategy.perProcedure[proc.name] = {
-      ...model.tableStrategy.perProcedure[proc.name],
-      ...saved,
-      inputMode: ['auto', 'pct', 'absolute'].includes(saved.inputMode) ? saved.inputMode : (model.tableStrategy.perProcedure[proc.name].inputMode || 'auto'),
+  // Preserva overrides de qualquer procedimento salvo (catálogo padrão ou
+  // serviços próprios da empresa em empresa_precos), não só os do FLAT_CATALOG.
+  const savedProcedures = (source.tableStrategy?.perProcedure || {}) as Record<string, any>;
+  const procedureNames = new Set([...FLAT_CATALOG.map(proc => proc.name), ...Object.keys(savedProcedures)]);
+  procedureNames.forEach(name => {
+    const saved = savedProcedures[name] || {};
+    model.tableStrategy.perProcedure[name] = {
+      inputMode: ['auto', 'pct', 'absolute'].includes(saved.inputMode) ? saved.inputMode : 'auto',
       gorduraPct: saved.gorduraPct == null ? null : safeNumber(saved.gorduraPct, 0),
       tableAbsolute: saved.tableAbsolute == null ? null : roundMoney(safeNumber(saved.tableAbsolute, 0)),
     };
@@ -220,6 +225,7 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
   settings.paymentPolicy.cardNoInterestEnabled = normalized.cardTerms.noInterestEnabled;
   settings.paymentPolicy.cardNoInterestInstallments = Math.min(normalized.cardTerms.noInterestUpToInstallments, settings.paymentPolicy.maxCardInstallments);
   settings.paymentPolicy.cardChargeInterestFromInstallments = Math.min(Math.max(1, normalized.cardTerms.chargeInterestFromInstallments), settings.paymentPolicy.maxCardInstallments);
+  settings.paymentPolicy.cardFeeEnabled = normalized.cardTerms.cardFeeEnabled;
   settings.paymentPolicy.cardUseDefaultRateTable = normalized.cardTerms.useDefaultRateTable;
   settings.paymentPolicy.cardFlatRatePct = normalized.cardTerms.flatRatePct;
   settings.paymentPolicy.boletoIdealInstallments = Math.min(12, settings.paymentPolicy.maxBoletoInstallments);
@@ -262,6 +268,9 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
 
   Object.keys(settings.paymentPolicy.cardRates).forEach(key => {
     const installment = Math.max(1, Number(key));
+    if (!settings.paymentPolicy.cardFeeEnabled) {
+      settings.paymentPolicy.cardRates[key] = 0; return;
+    }
     if (settings.paymentPolicy.cardNoInterestEnabled && installment <= settings.paymentPolicy.cardNoInterestInstallments) {
       settings.paymentPolicy.cardRates[key] = 0; return;
     }
@@ -296,6 +305,7 @@ export function ownerV8ModelFromLegacySettings(ownerSettings: unknown): OwnerV8M
     noInterestEnabled: settings.paymentPolicy?.cardNoInterestEnabled,
     noInterestUpToInstallments: settings.paymentPolicy?.cardNoInterestInstallments,
     chargeInterestFromInstallments: settings.paymentPolicy?.cardChargeInterestFromInstallments,
+    cardFeeEnabled: settings.paymentPolicy?.cardFeeEnabled,
     useDefaultRateTable: settings.paymentPolicy?.cardUseDefaultRateTable,
     flatRatePct: settings.paymentPolicy?.cardFlatRatePct,
     anticipationEnabled: settings.paymentPolicy?.anticipationEnabled,
@@ -381,6 +391,29 @@ export function saveOwnerV8Model(model: OwnerV8Model): void {
   try {
     localStorage.setItem(OWNER_V8_STORAGE_KEY, JSON.stringify(model));
   } catch {}
+}
+
+// Carrega o modelo salvo no banco para a empresa selecionada. Retorna null se a
+// empresa ainda não tiver configuração salva (ainda não passou pelo wizard).
+export async function loadOwnerV8ModelFromDB(empresaId: string): Promise<OwnerV8Model | null> {
+  const { data, error } = await supabase
+    .from('empresa_precificacao_config')
+    .select('owner_wizard_model')
+    .eq('empresa_id', empresaId)
+    .maybeSingle();
+  if (error || !data?.owner_wizard_model) return null;
+  return hydrateOwnerV8Model(data.owner_wizard_model as Partial<OwnerV8Model>);
+}
+
+export async function saveOwnerV8ModelToDB(empresaId: string, model: OwnerV8Model): Promise<void> {
+  await supabase.from('empresa_precificacao_config').upsert(
+    {
+      empresa_id: empresaId,
+      owner_wizard_model: model as unknown as Json,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'empresa_id' }
+  );
 }
 
 export function applyOwnerV8Model(model: OwnerV8Model): OwnerSettings {

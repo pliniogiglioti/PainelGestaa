@@ -206,6 +206,7 @@ export function createDefaultOwnerSettings(): OwnerSettings {
       cardNoInterestEnabled: false,
       cardNoInterestInstallments: 0,
       cardChargeInterestFromInstallments: 1,
+      cardFeeEnabled: true,
       cardUseDefaultRateTable: true,
       cardFlatRatePct: 3.9,
       boletoIdealInstallments: 12,
@@ -290,6 +291,7 @@ export function hydrateOwnerSettings(raw: unknown): OwnerSettings {
   if (pp.cardNoInterestEnabled) {
     pp.cardChargeInterestFromInstallments = Math.max(pp.cardChargeInterestFromInstallments, pp.cardNoInterestInstallments + 1);
   }
+  pp.cardFeeEnabled = Boolean(pp.cardFeeEnabled ?? dpp.cardFeeEnabled);
   pp.cardUseDefaultRateTable = Boolean(pp.cardUseDefaultRateTable ?? dpp.cardUseDefaultRateTable);
   pp.cardFlatRatePct = clamp(safeNumber(pp.cardFlatRatePct, dpp.cardFlatRatePct), 0, 40);
   pp.boletoIdealInstallments = clamp(Math.round(safeNumber(pp.boletoIdealInstallments, dpp.boletoIdealInstallments)), 1, 60);
@@ -416,6 +418,7 @@ export function boletoTotalWithInterest(baseValue: number, installments: number,
 }
 
 export function cardFeePct(installments: number, settings: OwnerSettings): number {
+  if (!settings.paymentPolicy.cardFeeEnabled) return 0;
   const count = Math.max(1, Math.round(safeNumber(installments, 1)));
   const noInterestEnabled = Boolean(settings.paymentPolicy.cardNoInterestEnabled);
   const noInterestUpTo = Math.max(0, Math.round(safeNumber(settings.paymentPolicy.cardNoInterestInstallments, 0)));
