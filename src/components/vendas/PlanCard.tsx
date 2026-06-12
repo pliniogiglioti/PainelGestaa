@@ -117,8 +117,8 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
   }
 
   function addItem(catalogItem: SaleCatalogItem) {
-    const basePrice = ownerBaseSourcePrice(catalogItem.name, ownerSettings);
     const proc = procedurePolicy(catalogItem.name, ownerSettings);
+    const basePrice = proc ? ownerBaseSourcePrice(catalogItem.name, ownerSettings) : catalogItem.tablePrice;
     const workingPrice = proc?.narrativePriceOverride
       ? roundMoney(proc.narrativePriceOverride)
       : ownerSettings.pricingPolicy.narrativeEnabled
@@ -407,7 +407,6 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                   <button key={item.id} className={`${styles.catalogItem} ${plan.items.some(i => i.empresaPrecoId === item.id) ? styles.catalogItemAdded : ''}`}
                     onClick={() => { if (!plan.items.some(i => i.empresaPrecoId === item.id)) { addItem(item); setDropdownOpen(false); setSearchQuery(''); } }}>
                     <span>{item.name}</span>
-                    <span className={styles.catalogItemPrice}>{fmt(item.tablePrice)}</span>
                   </button>
                 ))}
               </div>
