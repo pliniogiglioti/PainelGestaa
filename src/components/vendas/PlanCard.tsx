@@ -313,7 +313,6 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                   <button className={styles.qtyBtn} onClick={() => changeQty(idx, 1)}>+</button>
                 </div>
                 <span className={styles.itemName}>{item.name}</span>
-                <div className={styles.itemDots} />
                 <div className={styles.itemPriceArea}>
                   {hasDiscount && item.priceVisible && <span className={styles.itemPriceOrig}>{fmt(item.tablePrice * (item.qty || 1))}</span>}
                   {item.priceEditing ? (
