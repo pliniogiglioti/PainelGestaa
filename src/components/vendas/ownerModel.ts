@@ -44,7 +44,7 @@ export function defaultOwnerV8CardTerms(): OwnerV8CardTerms {
     noInterestUpToInstallments: 0,
     chargeInterestFromInstallments: 1,
     cardFeeEnabled: true,
-    useDefaultRateTable: true,
+    useDefaultRateTable: false,
     flatRatePct: 3.9,
     anticipationEnabled: false,
     anticipationPct: 0.6,
@@ -68,7 +68,7 @@ export function sanitizeOwnerV8CardTerms(raw: unknown): OwnerV8CardTerms {
       ? Math.max(chargeInterestFromInstallments, noInterestUpToInstallments + 1)
       : chargeInterestFromInstallments,
     cardFeeEnabled: Boolean(source.cardFeeEnabled ?? defaults.cardFeeEnabled),
-    useDefaultRateTable: Boolean(source.useDefaultRateTable ?? defaults.useDefaultRateTable),
+    useDefaultRateTable: false,
     flatRatePct: clamp(safeNumber(source.flatRatePct, defaults.flatRatePct), 0, 40),
     anticipationEnabled: Boolean(source.anticipationEnabled ?? defaults.anticipationEnabled),
     anticipationPct: clamp(safeNumber(source.anticipationPct, defaults.anticipationPct), 0, 10),

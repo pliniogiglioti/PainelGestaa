@@ -265,7 +265,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
       {
         empresa_id: empresaId,
         vendas_max_cartao: draft.cardTerms.noInterestEnabled ? draft.cardTerms.noInterestUpToInstallments : 0,
-        taxa_maquina_percent: !draft.cardTerms.cardFeeEnabled || draft.cardTerms.useDefaultRateTable ? 0 : draft.cardTerms.flatRatePct,
+        taxa_maquina_percent: !draft.cardTerms.cardFeeEnabled ? 0 : draft.cardTerms.flatRatePct,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'empresa_id' }
@@ -1027,7 +1027,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     <button
                       type="button"
                       className={`${styles.ownerPill}${indicatorPresetKey === 'custom' ? ` ${styles.ownerPillActive}` : ''}`}
-                      onClick={() => setSemaforoAdvancedOpen(true)}
+                      disabled
                     >
                       Personalizado
                     </button>
@@ -1242,24 +1242,12 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 {draft.cardTerms.cardFeeEnabled && (
                   <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
                     <div className={styles.ownerField}>
-                      <label>Taxa do cartão</label>
-                      <select className={styles.ownerSelect}
-                        value={draft.cardTerms.useDefaultRateTable ? 'true' : 'false'}
-                        onChange={e => update(m => { m.cardTerms.useDefaultRateTable = e.target.value === 'true'; })}>
-                        <option value="true">Usar tabela padrão da V10</option>
-                        <option value="false">Usar taxa fixa</option>
-                      </select>
-                      <div className={styles.ownerNote}>A tabela padrão varia por número de parcelas. A taxa fixa usa o mesmo percentual em toda faixa com juros.</div>
+                      <label>Taxa fixa do cartão (%)</label>
+                      <OwnerNumberInput className={styles.ownerInput}
+                        value={draft.cardTerms.flatRatePct}
+                        onCommit={raw => update(m => { m.cardTerms.flatRatePct = clamp(safeNumber(raw, 3.9), 0, 40); })} />
+                      <div className={styles.ownerNote}>Ex.: 3,9% em toda parcela que já tiver juros.</div>
                     </div>
-                    {!draft.cardTerms.useDefaultRateTable && (
-                      <div className={styles.ownerField}>
-                        <label>Taxa fixa do cartão (%)</label>
-                        <OwnerNumberInput className={styles.ownerInput}
-                          value={draft.cardTerms.flatRatePct}
-                          onCommit={raw => update(m => { m.cardTerms.flatRatePct = clamp(safeNumber(raw, 3.9), 0, 40); })} />
-                        <div className={styles.ownerNote}>Ex.: 3,9% em toda parcela que já tiver juros.</div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -1428,7 +1416,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                       : 'Taxa do cartão desligada'}</strong>
                     <span>{!draft.cardTerms.cardFeeEnabled
                       ? 'Nenhuma taxa de máquina aplicada'
-                      : (draft.cardTerms.useDefaultRateTable ? 'Usando tabela padrão da V10' : `Taxa fixa de ${draft.cardTerms.flatRatePct}%`)}</span>
+                      : `Taxa fixa de ${draft.cardTerms.flatRatePct}%`}</span>
                   </div>
                   <div className={styles.ownerSummaryCard}>
                     <div className={styles.ownerSummaryLabel}>Boleto</div>

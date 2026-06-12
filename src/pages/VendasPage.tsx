@@ -574,7 +574,10 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                     />
                     {ownerModel.completed ? 'Configurações prontas' : 'Configure antes de vender'}
                   </div>
-                  <button className={styles.launchpadBtnGhost} onClick={openSellerWorld}>
+                  <button
+                    className={`${styles.launchpadBtnGhost} ${ownerModel.completed ? styles.launchpadBtnGhostReady : ''}`}
+                    onClick={openSellerWorld}
+                  >
                     Começar a Vender
                   </button>
                 </div>
