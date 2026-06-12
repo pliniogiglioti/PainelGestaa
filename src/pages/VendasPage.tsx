@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { OwnerV8Model, OwnerSettings } from '../components/vendas/types';
+import type { OwnerV8Model, OwnerSettings, Plan } from '../components/vendas/types';
 import type { Empresa, EmpresaPreco } from '../lib/types';
 import { supabase } from '../lib/supabase';
 import {
@@ -14,6 +14,54 @@ import { OwnerWizard } from '../components/vendas/OwnerWizard';
 import styles from '../components/vendas/Vendas.module.css';
 
 type Screen = 'launchpad' | 'entry' | 'naming' | 'workspace';
+const SELLER_SESSION_STORAGE_KEY = 'av-v13';
+
+interface SavedSellerSession {
+  patientName: string;
+  proposalTitle: string;
+  started: boolean;
+  plans: Plan[];
+}
+
+function loadSavedSellerSession(): SavedSellerSession | null {
+  try {
+    const raw = localStorage.getItem(SELLER_SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw) as Partial<SavedSellerSession>;
+    if (!data.patientName || !Array.isArray(data.plans) || data.plans.length === 0) return null;
+    return {
+      patientName: data.patientName,
+      proposalTitle: data.proposalTitle || '',
+      started: true,
+      plans: data.plans,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function sanitizePlansForStorage(plans: Plan[]): Plan[] {
+  return plans.map(plan => ({
+    ...plan,
+    dropdownOpen: false,
+    searchQuery: '',
+    programmedInfoOpen: false,
+    items: plan.items.map(item => ({
+      ...item,
+      campaignEditing: false,
+      campaignInput: '',
+      priceEditing: false,
+      priceEditInput: '',
+    })),
+    payment: {
+      ...plan.payment,
+      entradaEditing: false,
+      entradaEditInput: 0,
+      editingField: null,
+      editInput: 0,
+    },
+  }));
+}
 
 interface VendasPageProps {
   empresa: Empresa;
@@ -31,9 +79,11 @@ function parsePriceInput(value: string): number {
 interface SimpleSetupProps {
   empresa: Empresa;
   onConcluir: (precos: EmpresaPreco[]) => void;
+  onTrocarEmpresa: () => void;
+  onVoltar: () => void;
 }
 
-function VendasSetup({ empresa, onConcluir }: SimpleSetupProps) {
+function VendasSetup({ empresa, onConcluir, onTrocarEmpresa, onVoltar }: SimpleSetupProps) {
   const [items, setItems] = useState<EmpresaPreco[]>([]);
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
@@ -168,14 +218,16 @@ function VendasSetup({ empresa, onConcluir }: SimpleSetupProps) {
           >
             Continuar
           </button>
-
-          <button
-            onClick={() => {/* volta pro gate */ window.history.back(); }}
-            style={{ display: 'block', marginTop: 10, width: '100%', background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer' }}
-          >
-            Trocar empresa
-          </button>
         </div>
+      </div>
+
+      <div style={{ position: 'fixed', top: 16, left: 16, zIndex: 110, display: 'flex', gap: 10 }}>
+        <button onClick={onVoltar} style={{ padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+          ← Voltar
+        </button>
+        <button onClick={onTrocarEmpresa} style={{ padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+          {empresa.nome}
+        </button>
       </div>
     </div>
   );
@@ -232,10 +284,12 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     pageToastTimerRef.current = setTimeout(() => setPageToast(null), 3500);
   }, []);
 
-  const [screen, setScreen] = useState<Screen>('launchpad');
-  const [patientName, setPatientName] = useState('');
-  const [proposalTitle, setProposalTitle] = useState('');
+  const [savedSession, setSavedSession] = useState<SavedSellerSession | null>(() => loadSavedSellerSession());
+  const [screen, setScreen] = useState<Screen>(() => savedSession ? 'entry' : 'launchpad');
+  const [patientName, setPatientName] = useState(() => savedSession?.patientName || '');
+  const [proposalTitle, setProposalTitle] = useState(() => savedSession?.proposalTitle || '');
   const [planNameInput, setPlanNameInput] = useState('');
+  const [sessionPlans, setSessionPlans] = useState<Plan[] | null>(() => savedSession?.plans || null);
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const planNameInputRef = useRef<HTMLInputElement>(null);
@@ -271,14 +325,65 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   function startSession() {
     if (!patientName.trim()) return;
     setPlanNameInput('Diamante');
+    setSessionPlans(null);
+    setSavedSession(null);
+    localStorage.removeItem(SELLER_SESSION_STORAGE_KEY);
     setScreen('naming');
     setTimeout(() => planNameInputRef.current?.select(), 50);
   }
 
   function confirmPlanName() {
     if (!planNameInput.trim()) setPlanNameInput('Diamante');
+    setSessionPlans(null);
     setScreen('workspace');
   }
+
+  function startNewAttendance() {
+    if (!window.confirm('Iniciar novo atendimento?')) return;
+    localStorage.removeItem(SELLER_SESSION_STORAGE_KEY);
+    setSavedSession(null);
+    setSessionPlans(null);
+    setPatientName('');
+    setProposalTitle('');
+    setPlanNameInput('');
+    setScreen('launchpad');
+  }
+
+  function clearSavedSession() {
+    localStorage.removeItem(SELLER_SESSION_STORAGE_KEY);
+    setSavedSession(null);
+    setSessionPlans(null);
+    setPatientName('');
+    setProposalTitle('');
+  }
+
+  function resumeSavedSession() {
+    if (!savedSession) return;
+    setPatientName(savedSession.patientName);
+    setProposalTitle(savedSession.proposalTitle);
+    setSessionPlans(savedSession.plans);
+    setPlanNameInput(savedSession.plans[0]?.name?.replace(/^Plano\s+/i, '') || 'Diamante');
+    setSavedSession(null);
+    setScreen('workspace');
+  }
+
+  const handlePlansChange = useCallback((plans: Plan[]) => {
+    setSessionPlans(plans);
+  }, []);
+
+  useEffect(() => {
+    if (screen !== 'workspace' || !patientName.trim() || !sessionPlans?.length) return;
+    try {
+      localStorage.setItem(SELLER_SESSION_STORAGE_KEY, JSON.stringify({
+        patientName,
+        proposalTitle,
+        started: true,
+        plans: sanitizePlansForStorage(sessionPlans),
+      }));
+    } catch {
+      // Ignore storage errors in restricted browser contexts.
+    }
+  }, [patientName, proposalTitle, screen, sessionPlans]);
 
   if (loadingPrecos || loadingOwnerModel) {
     return (
@@ -295,6 +400,8 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
       <VendasSetup
         empresa={empresa}
         onConcluir={precos => setEmpresaPrecos(precos)}
+        onTrocarEmpresa={onTrocarEmpresa}
+        onVoltar={onVoltar}
       />
     );
   }
@@ -361,12 +468,14 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
           </div>
         </div>
 
-        <button onClick={onVoltar} style={{ position: 'fixed', top: 16, left: 16, zIndex: 30, padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-          ← Voltar
-        </button>
-        <button onClick={onTrocarEmpresa} style={{ position: 'fixed', top: 16, left: 100, zIndex: 30, padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
-          {empresa.nome}
-        </button>
+        <div style={{ position: 'fixed', top: 16, left: 16, zIndex: 110, display: 'flex', gap: 10 }}>
+          <button onClick={onVoltar} style={{ padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            ← Voltar
+          </button>
+          <button onClick={onTrocarEmpresa} style={{ padding: '6px 14px', background: 'var(--bg-elevated)', border: '1px solid var(--border)', borderRadius: 10, color: 'var(--text-muted)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            {empresa.nome}
+          </button>
+        </div>
 
         {wizardOpen && (
           <OwnerWizard
@@ -392,6 +501,17 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
       <div className={styles.vendasRoot}>
         <div className={styles.entryOverlay}>
           <div className={styles.entryCard}>
+            {savedSession && (
+              <div className={styles.resumeBanner}>
+                <div className={styles.resumeText}>
+                  Continuar com <span className={styles.resumeName}>{savedSession.patientName}</span>?
+                </div>
+                <div className={styles.resumeBtns}>
+                  <button className={styles.resumeBtn} onClick={clearSavedSession}>Novo</button>
+                  <button className={`${styles.resumeBtn} ${styles.resumeBtnOk}`} onClick={resumeSavedSession}>Continuar</button>
+                </div>
+              </div>
+            )}
             <div className={styles.entryEyebrow}>Novo Atendimento</div>
             <label className={styles.entryFieldLabel}>Nome do paciente</label>
             <input
@@ -415,23 +535,25 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
               onChange={e => setProposalTitle(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') startSession(); }}
             />
+            <div className={styles.entryActions}>
             <button className={styles.entryBtn} onClick={startSession} disabled={!patientName.trim()}>
               Iniciar
             </button>
             <button
+              className={styles.entryGhostBtn}
               onClick={() => setScreen('launchpad')}
-              style={{ display: 'block', marginTop: 12, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
             >
               Voltar
             </button>
             {ownerModel.completed && (
               <button
+                className={styles.entryGhostBtn}
                 onClick={openOwnerWorld}
-                style={{ display: 'block', marginTop: 8, background: 'transparent', border: '1px solid var(--border)', borderRadius: 999, padding: '10px 20px', fontSize: 13, fontFamily: 'inherit', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
               >
-                Revisar Configurações
+                Revisar Mundo do Dono
               </button>
             )}
+            </div>
           </div>
         </div>
 
@@ -506,13 +628,16 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     <div className={`${styles.vendasRoot} ${styles.appWrapper}`}>
       <SellerWorld
         ownerSettings={ownerSettings}
-        initialPlanName={planNameInput.trim() || 'Diamante'}
+        initialPlanName={`Plano ${planNameInput.trim() || 'Diamante'}`}
+        initialPlans={sessionPlans}
+        onPlansChange={handlePlansChange}
         patientName={patientName}
         proposalTitle={proposalTitle}
         onPatientNameChange={setPatientName}
         onProposalTitleChange={setProposalTitle}
         onOpenOwnerWizard={openOwnerWorld}
         onBack={() => setScreen('launchpad')}
+        onNewSession={startNewAttendance}
       />
 
       {wizardOpen && (

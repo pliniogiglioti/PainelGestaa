@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
+import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
 import type { Plan, PlanItem, OwnerSettings } from './types';
 import {
@@ -23,6 +24,12 @@ interface PlanCardProps {
   onNotify: (msg: string, kind?: 'info' | 'danger') => void;
   badgeLabel?: string;
   badgeClass?: string;
+  isWinner?: boolean;
+  isLoser?: boolean;
+  onToggleWinner?: () => void;
+  isDragging?: boolean;
+  dragStyle?: CSSProperties;
+  onCardPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
 function applyItemCampaignLimitFn(item: PlanItem, requestedPct: number, settings: OwnerSettings): PlanItem {
@@ -50,7 +57,7 @@ function sortItems(items: PlanItem[]): PlanItem[] {
   });
 }
 
-export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass }: PlanCardProps) {
+export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass, isWinner, isLoser, onToggleWinner, isDragging, dragStyle, onCardPointerDown }: PlanCardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
@@ -224,24 +231,27 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       .filter(cat => cat.items.length > 0);
   }
 
-  function handleRevealTotal() {
-    update(p => { p.totalVisible = true; p.totalRevealed = true; });
-  }
   function handleRevealPayment() {
     update(p => { p.paymentVisible = true; p.paymentRevealed = true; });
   }
 
   return (
-    <div className={`${styles.planCol} ${plan.items.length > 0 ? styles.hasItems : ''}`}
-      data-plan-id={plan.id}>
+    <div className={`${styles.planCol} ${plan.items.length > 0 ? styles.hasItems : ''} ${isWinner ? styles.planWinner : ''} ${isLoser ? styles.planLoser : ''} ${isDragging ? styles.isDragging : ''}`}
+      data-plan-id={plan.id}
+      style={dragStyle}
+      onPointerDown={onCardPointerDown}>
 
       {/* Plan header */}
       <div className={styles.planHeader}>
-        <span className={`${styles.planBadge} ${resolvedBadgeClass}`}>
-          {resolvedBadgeLabel}
-        </span>
         <input className={styles.planNameInput} value={plan.name}
           onChange={e => update(p => { p.name = e.target.value; })} />
+        {plansCount > 1 && <span className={styles.planChosenLabel}>Escolhido</span>}
+        <span className={`${styles.planBadge} ${resolvedBadgeClass} ${plansCount > 1 ? styles.badgeSelectable : ''} ${isWinner ? styles.badgeWinner : ''}`}
+          data-no-drag
+          onClick={plansCount > 1 ? onToggleWinner : undefined}
+          title={plansCount > 1 ? (isWinner ? 'Clique para desfazer a escolha' : 'Clique para marcar este plano como escolhido') : undefined}>
+          {resolvedBadgeLabel}
+        </span>
       </div>
 
       {/* Items list */}
@@ -298,15 +308,20 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
               </div>
               {item.campaignEditing && (
                 <div className={styles.campaignEditor}>
-                  <input className={styles.campaignInput} type="number" min="0" max="80"
+                  <span className={styles.campaignEditorLabel}>Camp.</span>
+                  <input className={styles.campaignInput} type="number" min="1" max="99"
                     id={`cinp-${item.id}`}
                     value={item.campaignInput}
                     onChange={e => update(p => { p.items[idx].campaignInput = e.target.value; })}
                     onKeyDown={e => { if (e.key === 'Enter') applyCampaignInput(idx); if (e.key === 'Escape') update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; }); }}
-                    placeholder="%" autoFocus />
-                  <button onClick={() => applyCampaignInput(idx)}>✓</button>
-                  <button onClick={() => applyMaxCampaign(idx)} title={`Ir ao mínimo: ${fmt(itemMinPrice(item, ownerSettings) * (item.qty || 1))}`}>min</button>
-                  {hasDiscount && <button onClick={() => update(p => { p.items[idx].overridePrice = null; p.items[idx].campaignPct = null; p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; p.totalOverride = null; })}>×</button>}
+                    placeholder="0" autoFocus />
+                  <span className={styles.campaignEditorPct}>%</span>
+                  <button className={styles.campaignEditorApply} onClick={() => applyCampaignInput(idx)}>Aplicar</button>
+                  {itemMaxCampaignPct(item, ownerSettings) > 0 && (
+                    <button className={styles.campaignEditorMax} onClick={() => applyMaxCampaign(idx)} title={`Ir ao mínimo: ${fmt(itemMinPrice(item, ownerSettings) * (item.qty || 1))}`}>Máx.</button>
+                  )}
+                  <button className={styles.campaignEditorCancel} onClick={() => update(p => { p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; })}>Fechar</button>
+                  {hasDiscount && <button className={styles.campaignEditorRemove} onClick={() => update(p => { p.items[idx].overridePrice = null; p.items[idx].campaignPct = null; p.items[idx].campaignEditing = false; p.items[idx].campaignInput = ''; p.totalOverride = null; })}>Remover</button>}
                 </div>
               )}
             </div>
@@ -384,14 +399,9 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       )}
 
       {/* Narrative progress / action buttons */}
-      {plan.items.length > 0 && (
+      {plan.items.length > 0 && plan.totalRevealed && !plan.paymentRevealed && (
         <div className={styles.narrativeActions}>
-          {!plan.totalRevealed && (
-            <button className={styles.narrativeBtn} onClick={handleRevealTotal}>Revelar Total</button>
-          )}
-          {plan.totalRevealed && !plan.paymentRevealed && (
-            <button className={styles.narrativeBtn} onClick={() => update(p => { p.paymentRevealed = true; })}>Abrir Pagamento</button>
-          )}
+          <button className={styles.narrativeBtn} onClick={() => update(p => { p.paymentRevealed = true; })}>Abrir Pagamento</button>
         </div>
       )}
 
