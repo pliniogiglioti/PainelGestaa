@@ -126,7 +126,6 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         : roundMoney(basePrice);
     update(p => {
       p.items.push({ id: uid(), empresaPrecoId: catalogItem.id, name: catalogItem.name, tablePrice: workingPrice, baseTablePrice: basePrice, qty: 1, priceVisible: false, campaignPct: null, overridePrice: null, campaignEditing: false, campaignInput: '', priceEditing: false, priceEditInput: '' });
-      p.items = sortItems(p.items);
       p.totalOverride = null;
       p.planCampaignPctRequested = 0;
       p.planCampaignPctEffective = 0;
