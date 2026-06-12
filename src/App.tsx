@@ -18,6 +18,11 @@ import TermosPage from './pages/TermosPage'
 const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas', '/vendas/listavendas'] as const
 const KNOWN_PATHS_SET = new Set<string>(KNOWN_PATHS)
 
+function normalizeAppPath(pathname: string) {
+  if (pathname.startsWith('/vendas/listavendas/')) return '/vendas/listavendas'
+  return KNOWN_PATHS_SET.has(pathname) ? pathname : '/'
+}
+
 export interface User {
   name: string
   email: string
@@ -42,7 +47,7 @@ async function sessionToUser(session: Session): Promise<User> {
 
 function getProtectedAppPath(pathname: string) {
   if (pathname === '/analise-dre/termospage') return '/analise-dre'
-  if (pathname === '/vendas/listavendas') return '/vendas'
+  if (pathname === '/vendas/listavendas' || pathname.startsWith('/vendas/listavendas/')) return '/vendas'
   if (pathname === '/analise-dre' || pathname === '/lab-control' || pathname === '/precificacao' || pathname === '/vendas') {
     return pathname
   }
@@ -322,7 +327,7 @@ function App() {
   useEffect(() => {
     if (!user || isInviteFlow || pathname === '/analise-dre/termospage') return
 
-    const normalizedPath = pathname === '/vendas/listavendas' ? '/vendas' : (KNOWN_PATHS_SET.has(pathname) ? pathname : '/')
+    const normalizedPath = pathname.startsWith('/vendas/listavendas') ? '/vendas' : normalizeAppPath(pathname)
     setMountedPaths(prev => (
       prev.includes(normalizedPath) ? prev : [...prev, normalizedPath]
     ))
@@ -472,7 +477,7 @@ function App() {
       )
     }
 
-    const activePath = KNOWN_PATHS_SET.has(pathname) ? pathname : '/'
+    const activePath = normalizeAppPath(pathname)
 
     if (pathname !== activePath) {
       window.history.replaceState({}, '', activePath)
@@ -584,9 +589,11 @@ function App() {
               <ErrorBoundary>
                 <VendasPage
                   empresa={empresaSelecionadaVendas}
+                  userId={userId!}
                   onTrocarEmpresa={trocarEmpresaVendas}
                   onVoltar={() => navigate('/')}
                   routeScreen={activePath === '/vendas/listavendas' ? 'sales' : 'launchpad'}
+                  routeSaleId={pathname.startsWith('/vendas/listavendas/') ? pathname.split('/').filter(Boolean)[2] : null}
                   onNavigateVendas={navigate}
                 />
               </ErrorBoundary>

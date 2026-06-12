@@ -1,12 +1,13 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, CSSProperties } from 'react';
-import type { Plan, OwnerSettings } from './types';
+import type { Plan, PlanItem, OwnerSettings } from './types';
 import { normalizeIndicatorColor, sanitizeIndicatorTags, uid } from './calcEngine';
 import { PlanCard } from './PlanCard';
 import styles from './Vendas.module.css';
 
 interface SellerWorldProps {
   ownerSettings: OwnerSettings;
+  empresaPrecos: Array<{ id: string; nome_produto: string; categoria: string | null; preco: number }>;
   onOpenOwnerWizard: () => void;
   onBack?: () => void;
   onNewSession?: () => void;
@@ -106,7 +107,7 @@ interface ToastState {
 type ColorMode = 'dark' | 'light';
 const THEME_STORAGE_KEY = 'top-v10-theme';
 
-export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSession, initialPlanName, initialPlans, onPlansChange, onSaveSale, patientName, proposalTitle, onPatientNameChange, onProposalTitleChange }: SellerWorldProps) {
+export function SellerWorld({ ownerSettings, empresaPrecos, onOpenOwnerWizard, onBack, onNewSession, initialPlanName, initialPlans, onPlansChange, onSaveSale, patientName, proposalTitle, onPatientNameChange, onProposalTitleChange }: SellerWorldProps) {
   const [plans, setPlans] = useState<Plan[]>(() => (
     initialPlans?.length
       ? initialPlans.map(plan => hydratePlan(plan, initialPlanName))
@@ -427,6 +428,54 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
 
   const activePlans = plans.filter(p => p.items.length > 0);
   const hasItems = activePlans.length > 0;
+  const saleCatalogItems = empresaPrecos
+    .filter(item => item.nome_produto && Number(item.preco) > 0)
+    .map(item => ({
+      id: item.id,
+      name: item.nome_produto,
+      category: item.categoria || 'Produtos',
+      tablePrice: Number(item.preco || 0),
+    }));
+
+  function registeredProductForItem(item: PlanItem) {
+    const itemName = item.name.trim().toLowerCase();
+    return empresaPrecos.find(preco =>
+      preco.id === item.empresaPrecoId ||
+      preco.nome_produto.trim().toLowerCase() === itemName
+    );
+  }
+
+  useEffect(() => {
+    if (empresaPrecos.length === 0) return;
+    let removedCount = 0;
+    setPlans(prev => prev.map(plan => {
+      const registeredItems: PlanItem[] = [];
+      plan.items.forEach(item => {
+        const product = registeredProductForItem(item);
+        if (!product) {
+          removedCount += 1;
+          return;
+        }
+        registeredItems.push({
+          ...item,
+          empresaPrecoId: product.id,
+          name: product.nome_produto,
+        });
+      });
+
+      if (registeredItems.length === plan.items.length) return plan;
+      return {
+        ...plan,
+        items: registeredItems,
+        totalOverride: null,
+        planCampaignPctRequested: 0,
+        planCampaignPctEffective: 0,
+      };
+    }));
+    if (removedCount > 0) {
+      notify(`${removedCount} item(ns) nao cadastrado(s) foram removidos do atendimento.`, 'info');
+    }
+  }, [empresaPrecos]);
   const campaignEditorsOpen = plans.some(plan => plan.items.some(item => item.campaignEditing));
   const indicatorTags = sanitizeIndicatorTags(ownerSettings.ui?.indicatorTags);
   const showRevelarTotal = activePlans.length > 0 && activePlans.some(p => !p.totalRevealed);
@@ -481,6 +530,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
               planIndex={idx}
               plansCount={plans.length}
               ownerSettings={ownerSettings}
+              catalogItems={saleCatalogItems}
               onChange={updated => updatePlan(plan.id, updated)}
               onRemove={() => removePlan(plan.id)}
               onNotify={notify}

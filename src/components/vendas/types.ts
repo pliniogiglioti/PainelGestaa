@@ -7,6 +7,7 @@ export interface CatalogItem {
 
 export interface PlanItem {
   id: string;
+  empresaPrecoId?: string | null;
   name: string;
   tablePrice: number;
   baseTablePrice: number;

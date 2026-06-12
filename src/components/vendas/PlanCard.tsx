@@ -9,10 +9,16 @@ import {
   planMinimumCashTotal, ownerBaseSourcePrice, annualizedNarrativeValue, roundNarrativePrice,
   procedurePolicy,
 } from './calcEngine';
-import { CATALOG } from './catalog';
 import { PaymentSection } from './PaymentSection';
 import { InfoTip } from './InfoTip';
 import styles from './Vendas.module.css';
+
+interface SaleCatalogItem {
+  id: string;
+  name: string;
+  category: string;
+  tablePrice: number;
+}
 
 interface PlanCardProps {
   plan: Plan;
@@ -32,6 +38,7 @@ interface PlanCardProps {
   onCardPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onActivate?: () => void;
   focusClass?: string;
+  catalogItems: SaleCatalogItem[];
 }
 
 function applyItemCampaignLimitFn(item: PlanItem, requestedPct: number, settings: OwnerSettings): PlanItem {
@@ -59,7 +66,7 @@ function sortItems(items: PlanItem[]): PlanItem[] {
   });
 }
 
-export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass, isWinner, isLoser, onToggleWinner, isDragging, dragStyle, onCardPointerDown, onActivate, focusClass }: PlanCardProps) {
+export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass, isWinner, isLoser, onToggleWinner, isDragging, dragStyle, onCardPointerDown, onActivate, focusClass, catalogItems }: PlanCardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
@@ -109,7 +116,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
     setSearchQuery('');
   }
 
-  function addItem(catalogItem: { name: string; tablePrice: number }) {
+  function addItem(catalogItem: SaleCatalogItem) {
     const basePrice = ownerBaseSourcePrice(catalogItem.name, ownerSettings);
     const proc = procedurePolicy(catalogItem.name, ownerSettings);
     const workingPrice = proc?.narrativePriceOverride
@@ -118,7 +125,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         ? roundNarrativePrice(annualizedNarrativeValue(basePrice, ownerSettings, catalogItem.name), ownerSettings)
         : roundMoney(basePrice);
     update(p => {
-      p.items.push({ id: uid(), name: catalogItem.name, tablePrice: workingPrice, baseTablePrice: basePrice, qty: 1, priceVisible: false, campaignPct: null, overridePrice: null, campaignEditing: false, campaignInput: '', priceEditing: false, priceEditInput: '' });
+      p.items.push({ id: uid(), empresaPrecoId: catalogItem.id, name: catalogItem.name, tablePrice: workingPrice, baseTablePrice: basePrice, qty: 1, priceVisible: false, campaignPct: null, overridePrice: null, campaignEditing: false, campaignInput: '', priceEditing: false, priceEditInput: '' });
       p.items = sortItems(p.items);
       p.totalOverride = null;
       p.planCampaignPctRequested = 0;
@@ -256,8 +263,15 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
 
   function filteredCatalog() {
     const q = searchQuery.toLowerCase().trim();
-    return CATALOG
-      .map(cat => ({ name: cat.name, items: cat.items.filter(i => !q || i.name.toLowerCase().includes(q)) }))
+    const grouped = catalogItems.reduce<Record<string, SaleCatalogItem[]>>((acc, item) => {
+      const key = item.category || 'Produtos';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(item);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped)
+      .map(([name, items]) => ({ name, items: items.filter(i => !q || i.name.toLowerCase().includes(q)) }))
       .filter(cat => cat.items.length > 0);
   }
 
@@ -390,8 +404,8 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
               <div key={cat.name}>
                 <div className={styles.catalogCategory}>{cat.name}</div>
                 {cat.items.map(item => (
-                  <button key={item.name} className={`${styles.catalogItem} ${plan.items.some(i => i.name === item.name) ? styles.catalogItemAdded : ''}`}
-                    onClick={() => { if (!plan.items.some(i => i.name === item.name)) { addItem(item); setDropdownOpen(false); setSearchQuery(''); } }}>
+                  <button key={item.id} className={`${styles.catalogItem} ${plan.items.some(i => i.empresaPrecoId === item.id) ? styles.catalogItemAdded : ''}`}
+                    onClick={() => { if (!plan.items.some(i => i.empresaPrecoId === item.id)) { addItem(item); setDropdownOpen(false); setSearchQuery(''); } }}>
                     <span>{item.name}</span>
                     <span className={styles.catalogItemPrice}>{fmt(item.tablePrice)}</span>
                   </button>

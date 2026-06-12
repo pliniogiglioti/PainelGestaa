@@ -27,6 +27,7 @@ interface SavedSellerSession {
 interface SavedSaleItem {
   id: string;
   venda_id: string;
+  empresa_preco_id: string | null;
   descricao: string;
   preco_unitario: number;
   quantidade: number;
@@ -34,6 +35,7 @@ interface SavedSaleItem {
 
 interface SavedSale {
   id: string;
+  vendedor_id: string | null;
   cliente_nome: string;
   observacoes: string | null;
   entrada_valor: number;
@@ -41,6 +43,14 @@ interface SavedSale {
   concretizada: boolean;
   created_at: string;
   empresa_venda_itens?: SavedSaleItem[];
+}
+
+interface SalesSeller {
+  user_id: string;
+  name: string | null;
+  email: string | null;
+  tipo_usuario: 'titular' | 'colaborador';
+  ativo?: boolean;
 }
 
 function loadSavedSellerSession(): SavedSellerSession | null {
@@ -85,9 +95,11 @@ function sanitizePlansForStorage(plans: Plan[]): Plan[] {
 
 interface VendasPageProps {
   empresa: Empresa;
+  userId: string;
   onTrocarEmpresa: () => void;
   onVoltar: () => void;
   routeScreen?: 'launchpad' | 'sales';
+  routeSaleId?: string | null;
   onNavigateVendas?: (path: string) => void;
 }
 
@@ -257,7 +269,7 @@ function VendasSetup({ empresa, onConcluir, onTrocarEmpresa, onVoltar }: SimpleS
 
 // ---- VendasPage principal ----
 
-export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeScreen = 'launchpad', onNavigateVendas }: VendasPageProps) {
+export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar, routeScreen = 'launchpad', routeSaleId = null, onNavigateVendas }: VendasPageProps) {
   const [ownerModel, setOwnerModel] = useState<OwnerV8Model>(() => loadOwnerV8Model());
   const [ownerSettings, setOwnerSettings] = useState<OwnerSettings>(() => applyOwnerV8Model(loadOwnerV8Model()));
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -270,6 +282,11 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
   const [loadingOwnerModel, setLoadingOwnerModel] = useState(true);
   const [sales, setSales] = useState<SavedSale[]>([]);
   const [loadingSales, setLoadingSales] = useState(true);
+  const [salesSellers, setSalesSellers] = useState<SalesSeller[]>([]);
+  const [sellerFilter, setSellerFilter] = useState('all');
+  const [canFilterSellers, setCanFilterSellers] = useState(false);
+  const [canViewAllSales, setCanViewAllSales] = useState(false);
+  const [salesScopeReady, setSalesScopeReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -302,24 +319,117 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
     return () => { active = false; };
   }, [empresa.id]);
 
+  useEffect(() => {
+    let active = true;
+    setSellerFilter('all');
+    setCanFilterSellers(false);
+    setCanViewAllSales(false);
+    setSalesScopeReady(false);
+    setSalesSellers([]);
+
+    async function loadSellers() {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('tipo_usuario')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!active) return;
+      const isTitular = (profile as any)?.tipo_usuario === 'titular';
+      setCanViewAllSales(isTitular);
+      if (!isTitular) {
+        setSalesScopeReady(true);
+        return;
+      }
+
+      const { data, error } = await supabase.rpc('listar_membros_empresa', { p_empresa_id: empresa.id });
+      if (!active) return;
+      if (error) {
+        setSalesScopeReady(true);
+        return;
+      }
+      const sellers = ((data || []) as SalesSeller[]).filter(member => member.ativo !== false);
+      setSalesSellers(sellers);
+      setCanFilterSellers(sellers.length > 0);
+      setSellerFilter(current => current === 'all' || sellers.some(seller => seller.user_id === current) ? current : 'all');
+      setSalesScopeReady(true);
+    }
+
+    void loadSellers();
+    return () => { active = false; };
+  }, [empresa.id, userId]);
+
   const fetchSales = useCallback(async () => {
+    if (!salesScopeReady) return;
     setLoadingSales(true);
     const { data: vendasRaw, error } = await (supabase
       .from('empresa_vendas') as any)
-      .select('id, cliente_nome, observacoes, entrada_valor, max_parcelas, concretizada, created_at')
+      .select('id, vendedor_id, cliente_nome, observacoes, entrada_valor, max_parcelas, concretizada, created_at')
       .eq('empresa_id', empresa.id)
       .eq('ativo', true)
       .order('created_at', { ascending: false })
       .limit(80);
 
-    if (!error) {
-      const vendas = (vendasRaw || []) as SavedSale[];
+    let vendas = (vendasRaw || []) as SavedSale[];
+    let loadError = error;
+
+    if (error && !canViewAllSales) {
+      setSales([]);
+      setLoadingSales(false);
+      return;
+    }
+
+    if (error) {
+      const { data: legacyVendasRaw, error: legacyError } = await (supabase
+        .from('empresa_vendas') as any)
+        .select('id, cliente_nome, observacoes, entrada_valor, max_parcelas, concretizada, created_at')
+        .eq('empresa_id', empresa.id)
+        .eq('ativo', true)
+        .order('created_at', { ascending: false })
+        .limit(80);
+
+      vendas = ((legacyVendasRaw || []) as Partial<SavedSale>[]).map(venda => ({
+        id: venda.id || '',
+        vendedor_id: null,
+        cliente_nome: venda.cliente_nome || '',
+        observacoes: venda.observacoes || null,
+        entrada_valor: Number(venda.entrada_valor || 0),
+        max_parcelas: Number(venda.max_parcelas || 1),
+        concretizada: venda.concretizada ?? true,
+        created_at: venda.created_at || new Date().toISOString(),
+      }));
+      loadError = legacyError;
+    }
+
+    if (loadError) {
+      const { data: minimalVendasRaw, error: minimalError } = await (supabase
+        .from('empresa_vendas') as any)
+        .select('id, cliente_nome, observacoes, max_parcelas, created_at')
+        .eq('empresa_id', empresa.id)
+        .eq('ativo', true)
+        .order('created_at', { ascending: false })
+        .limit(80);
+
+      vendas = ((minimalVendasRaw || []) as Partial<SavedSale>[]).map(venda => ({
+        id: venda.id || '',
+        vendedor_id: null,
+        cliente_nome: venda.cliente_nome || '',
+        observacoes: venda.observacoes || null,
+        entrada_valor: 0,
+        max_parcelas: Number(venda.max_parcelas || 1),
+        concretizada: true,
+        created_at: venda.created_at || new Date().toISOString(),
+      }));
+      loadError = minimalError;
+    }
+
+    if (!loadError) {
       const vendaIds = (vendas || []).map(venda => venda.id);
       let itens: SavedSaleItem[] = [];
       if (vendaIds.length > 0) {
         const { data: itensData } = await supabase
           .from('empresa_venda_itens')
-          .select('id, venda_id, descricao, preco_unitario, quantidade')
+          .select('id, venda_id, empresa_preco_id, descricao, preco_unitario, quantidade')
           .in('venda_id', vendaIds);
         itens = (itensData || []) as SavedSaleItem[];
       }
@@ -330,7 +440,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
       })));
     }
     setLoadingSales(false);
-  }, [empresa.id]);
+  }, [canViewAllSales, empresa.id, salesScopeReady]);
 
   useEffect(() => {
     void fetchSales();
@@ -365,6 +475,14 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
   function closeSalesList() {
     if (onNavigateVendas) onNavigateVendas('/vendas');
     else setScreen('launchpad');
+  }
+
+  function openSaleDetail(saleId: string) {
+    if (onNavigateVendas) onNavigateVendas(`/vendas/listavendas/${saleId}`);
+  }
+
+  function closeSaleDetail() {
+    if (onNavigateVendas) onNavigateVendas('/vendas/listavendas');
   }
 
   function handleSaveWizard(model: OwnerV8Model) {
@@ -459,11 +577,45 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
   }, [patientName, proposalTitle, screen, sessionPlans]);
 
   function saleTotal(sale: SavedSale) {
-    return (sale.empresa_venda_itens || []).reduce(
+    return saleRegisteredItems(sale).reduce(
       (sum, item) => sum + Number(item.preco_unitario || 0) * Number(item.quantidade || 1),
       0
     );
   }
+
+  function saleItemRegisteredName(item: SavedSaleItem) {
+    return item.descricao.replace(/^.*?:\s*/, '').trim();
+  }
+
+  function isRegisteredSaleItem(item: SavedSaleItem) {
+    return empresaPrecos?.some(preco =>
+      preco.id === item.empresa_preco_id ||
+      preco.nome_produto.trim().toLowerCase() === saleItemRegisteredName(item).toLowerCase()
+    ) ?? false;
+  }
+
+  function saleRegisteredItems(sale: SavedSale) {
+    return (sale.empresa_venda_itens || []).filter(isRegisteredSaleItem);
+  }
+
+  function saleIgnoredItems(sale: SavedSale) {
+    return (sale.empresa_venda_itens || []).filter(item => !isRegisteredSaleItem(item));
+  }
+
+  const filteredSales = sales.filter(sale => {
+    const saleSellerId = sale.vendedor_id || userId;
+    if (canViewAllSales) return sellerFilter === 'all' || saleSellerId === sellerFilter;
+    return saleSellerId === userId;
+  });
+  const selectedSale = routeSaleId ? sales.find(sale => sale.id === routeSaleId) : null;
+  const totalSalesValue = filteredSales.reduce((sum, sale) => sum + saleTotal(sale), 0);
+  const concretizedSales = filteredSales.filter(sale => sale.concretizada);
+  const concretizedValue = concretizedSales.reduce((sum, sale) => sum + saleTotal(sale), 0);
+  const averageTicket = filteredSales.length > 0 ? totalSalesValue / filteredSales.length : 0;
+  const totalItemsSold = filteredSales.reduce(
+    (sum, sale) => sum + saleRegisteredItems(sale).reduce((itemSum, item) => itemSum + Number(item.quantidade || 1), 0),
+    0
+  );
 
   async function saveSaleToDatabase(plansToSave: Plan[]) {
     const plansWithItems = plansToSave.filter(plan => plan.items.length > 0);
@@ -477,6 +629,36 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
       return sum + total * (Number(plan.payment.entradaPct || 0) / 100);
     }, 0);
 
+    const itemsDraft = plansWithItems.flatMap(plan => plan.items.map(item => {
+      const registeredProduct = (empresaPrecos || []).find(preco =>
+        preco.id === item.empresaPrecoId ||
+        preco.nome_produto.trim().toLowerCase() === item.name.trim().toLowerCase()
+      );
+      if (!registeredProduct) return null;
+
+      const unitPrice = item.overridePrice !== null
+        ? item.overridePrice
+        : item.campaignPct !== null
+          ? item.tablePrice * (1 - item.campaignPct / 100)
+          : item.tablePrice;
+
+      return {
+        empresa_preco_id: registeredProduct.id,
+        descricao: `${plan.name}: ${registeredProduct.nome_produto}`,
+        preco_unitario: Math.round(unitPrice * 100) / 100,
+        quantidade: item.qty || 1,
+      };
+    }).filter((item): item is {
+      empresa_preco_id: string;
+      descricao: string;
+      preco_unitario: number;
+      quantidade: number;
+    } => Boolean(item)));
+
+    if (itemsDraft.length === 0) {
+      throw new Error('Venda nao salva: adicione somente produtos cadastrados.');
+    }
+
     const { data: venda, error: vendaError } = await supabase
       .from('empresa_vendas')
       .insert({
@@ -486,6 +668,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
         entrada_valor: Math.round(entradaValor * 100) / 100,
         max_parcelas: maxInstallments,
         concretizada: true,
+        vendedor_id: userId,
       })
       .select('id')
       .single();
@@ -494,21 +677,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
       throw new Error(vendaError?.message || 'Nao foi possivel salvar a venda.');
     }
 
-    const items = plansWithItems.flatMap(plan => plan.items.map(item => {
-      const unitPrice = item.overridePrice !== null
-        ? item.overridePrice
-        : item.campaignPct !== null
-          ? item.tablePrice * (1 - item.campaignPct / 100)
-          : item.tablePrice;
-
-      return {
-        venda_id: venda.id,
-        empresa_preco_id: null,
-        descricao: `${plan.name}: ${item.name}`,
-        preco_unitario: Math.round(unitPrice * 100) / 100,
-        quantidade: item.qty || 1,
-      };
-    }));
+    const items = itemsDraft.map(item => ({ ...item, venda_id: venda.id }));
 
     const { error: itensError } = await supabase
       .from('empresa_venda_itens')
@@ -534,6 +703,28 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
     }
   }
 
+  async function deleteSale(saleId: string) {
+    if (!canViewAllSales) return;
+    if (!window.confirm('Deletar esta venda?')) return;
+
+    const previousSales = sales;
+    setSales(prev => prev.filter(sale => sale.id !== saleId));
+    const { error } = await supabase
+      .from('empresa_vendas')
+      .delete()
+      .eq('id', saleId)
+      .eq('empresa_id', empresa.id);
+
+    if (error) {
+      setSales(previousSales);
+      notifyPage('Nao foi possivel deletar a venda.');
+      return;
+    }
+
+    notifyPage('Venda deletada.');
+    if (routeSaleId === saleId) closeSaleDetail();
+  }
+
   if (loadingPrecos || loadingOwnerModel) {
     return (
       <div className={styles.vendasRoot}>
@@ -556,6 +747,119 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
   }
 
   if (screen === 'sales') {
+    if (routeSaleId) {
+      return (
+        <div className={styles.vendasRoot}>
+          <div className={styles.entryOverlay}>
+            <div className={styles.salesPageCard}>
+              <div className={styles.salesPageHeader}>
+                <div>
+                  <div className={styles.launchpadKicker}>{empresa.nome}</div>
+                  <div className={styles.salesPageTitle}>Detalhe da venda</div>
+                  <div className={styles.salesPageSubtitle}>
+                    Veja os itens, total e status de concretizacao da proposta.
+                  </div>
+                </div>
+                <button className={styles.launchpadBtnGhost} onClick={closeSaleDetail}>
+                  Voltar
+                </button>
+              </div>
+
+              {loadingSales && <div className={styles.salesEmpty}>Carregando venda...</div>}
+              {!loadingSales && !selectedSale && <div className={styles.salesEmpty}>Venda nao encontrada.</div>}
+              {!loadingSales && selectedSale && (
+                <>
+                  {(() => {
+                    const registeredItems = saleRegisteredItems(selectedSale);
+                    const ignoredItems = saleIgnoredItems(selectedSale);
+                    return (
+                <>
+                  <div className={styles.saleDetailHero}>
+                    <div>
+                      <div className={styles.saleDetailName}>{selectedSale.cliente_nome}</div>
+                      <div className={styles.saleMeta}>
+                        {new Date(selectedSale.created_at).toLocaleDateString('pt-BR')}
+                        {selectedSale.observacoes ? ` · ${selectedSale.observacoes}` : ''}
+                        {canViewAllSales ? ` · ${salesSellers.find(seller => seller.user_id === selectedSale.vendedor_id)?.name || 'Vendedor'}` : ''}
+                      </div>
+                    </div>
+                    <div className={styles.saleDetailTotal}>{fmt(saleTotal(selectedSale))}</div>
+                  </div>
+
+                  <div className={styles.salesKpiGrid}>
+                    <div className={styles.salesKpi}>
+                      <span>Entrada</span>
+                      <strong>{fmt(Number(selectedSale.entrada_valor || 0))}</strong>
+                    </div>
+                    <div className={styles.salesKpi}>
+                      <span>Parcelas</span>
+                      <strong>{selectedSale.max_parcelas}x</strong>
+                    </div>
+                    <div className={styles.salesKpi}>
+                      <span>Itens</span>
+                      <strong>{registeredItems.length}</strong>
+                    </div>
+                  </div>
+
+                  <label className={styles.saleStatusLine}>
+                    <span>Venda concretizada:</span>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(selectedSale.concretizada)}
+                      onChange={e => void updateSaleConcretizada(selectedSale.id, e.target.checked)}
+                    />
+                    <span>Sim</span>
+                  </label>
+                  {canViewAllSales && (
+                    <button
+                      className={styles.saleDeleteBtn}
+                      onClick={() => void deleteSale(selectedSale.id)}
+                    >
+                      Deletar venda
+                    </button>
+                  )}
+
+                  <div className={styles.salesTable}>
+                    <div className={`${styles.salesDetailRow} ${styles.salesTableHead}`}>
+                      <span>Item</span>
+                      <span>Qtd.</span>
+                      <span>Unitario</span>
+                      <span>Total</span>
+                    </div>
+                    {registeredItems.length === 0 && (
+                      <div className={styles.salesEmpty}>Nenhum produto cadastrado nesta venda.</div>
+                    )}
+                    {registeredItems.map(item => (
+                      <div className={styles.salesDetailRow} key={item.id}>
+                        <span className={styles.saleName}>{item.descricao}</span>
+                        <span className={styles.saleMeta}>{item.quantidade}</span>
+                        <span className={styles.saleMeta}>{fmt(Number(item.preco_unitario || 0))}</span>
+                        <span className={styles.saleTotal}>{fmt(Number(item.preco_unitario || 0) * Number(item.quantidade || 1))}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {ignoredItems.length > 0 && (
+                    <div className={styles.salesIgnoredBox}>
+                      <div className={styles.salesIgnoredTitle}>Itens nao cadastrados ignorados</div>
+                      {ignoredItems.map(item => (
+                        <div className={styles.salesIgnoredItem} key={item.id}>
+                          <span>{item.descricao}</span>
+                          <span>{fmt(Number(item.preco_unitario || 0) * Number(item.quantidade || 1))}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+                    );
+                  })()}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className={styles.vendasRoot}>
         <div className={styles.entryOverlay}>
@@ -574,36 +878,89 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
             </div>
 
             {loadingSales && <div className={styles.salesEmpty}>Carregando vendas...</div>}
-            {!loadingSales && sales.length === 0 && <div className={styles.salesEmpty}>Nenhuma venda salva ainda.</div>}
-            {!loadingSales && sales.length > 0 && (
-              <div className={styles.salesTable}>
-                <div className={`${styles.salesTableRow} ${styles.salesTableHead}`}>
-                  <span>Paciente</span>
-                  <span>Data</span>
-                  <span>Itens</span>
-                  <span>Total</span>
-                  <span>Concretizada</span>
-                </div>
-                {sales.map(sale => (
-                  <div className={styles.salesTableRow} key={sale.id}>
-                    <div>
-                      <div className={styles.saleName}>{sale.cliente_nome}</div>
-                      {sale.observacoes && <div className={styles.saleMeta}>{sale.observacoes}</div>}
-                    </div>
-                    <span className={styles.saleMeta}>{new Date(sale.created_at).toLocaleDateString('pt-BR')}</span>
-                    <span className={styles.saleMeta}>{sale.empresa_venda_itens?.length || 0}</span>
-                    <span className={styles.saleTotal}>{fmt(saleTotal(sale))}</span>
-                    <label className={styles.saleCheckLabel}>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(sale.concretizada)}
-                        onChange={e => void updateSaleConcretizada(sale.id, e.target.checked)}
-                      />
-                      <span>Sim</span>
+            {!loadingSales && (
+              <>
+                {canFilterSellers && (
+                  <div className={styles.salesFilterBar}>
+                    <label>
+                      <span>Vendedor</span>
+                      <select value={sellerFilter} onChange={e => setSellerFilter(e.target.value)}>
+                        <option value="all">Todos os vendedores</option>
+                        {salesSellers.map(seller => (
+                          <option key={seller.user_id} value={seller.user_id}>
+                            {seller.name || seller.email || 'Vendedor'}
+                          </option>
+                        ))}
+                      </select>
                     </label>
                   </div>
-                ))}
-              </div>
+                )}
+                <div className={styles.salesKpiGrid}>
+                  <div className={styles.salesKpi}>
+                    <span>Vendas</span>
+                    <strong>{filteredSales.length}</strong>
+                  </div>
+                  <div className={styles.salesKpi}>
+                    <span>Concretizadas</span>
+                    <strong>{concretizedSales.length}</strong>
+                  </div>
+                  <div className={styles.salesKpi}>
+                    <span>Total</span>
+                    <strong>{fmt(totalSalesValue)}</strong>
+                  </div>
+                  <div className={styles.salesKpi}>
+                    <span>Concretizado</span>
+                    <strong>{fmt(concretizedValue)}</strong>
+                  </div>
+                  <div className={styles.salesKpi}>
+                    <span>Ticket medio</span>
+                    <strong>{fmt(averageTicket)}</strong>
+                  </div>
+                  <div className={styles.salesKpi}>
+                    <span>Itens vendidos</span>
+                    <strong>{totalItemsSold}</strong>
+                  </div>
+                </div>
+
+                {filteredSales.length === 0 && <div className={styles.salesEmpty}>Nenhuma venda salva ainda.</div>}
+                {filteredSales.length > 0 && (
+                  <div className={styles.salesTable}>
+                    <div className={`${styles.salesTableRow} ${styles.salesTableHead}`}>
+                      <span>Paciente</span>
+                      <span>Data</span>
+                      <span>Itens</span>
+                      <span>Total</span>
+                      <span>Status</span>
+                    </div>
+                    {filteredSales.map(sale => (
+                      <div className={styles.salesTableRow} key={sale.id}>
+                        <button className={styles.saleRowButton} onClick={() => openSaleDetail(sale.id)}>
+                          <div className={styles.saleName}>{sale.cliente_nome}</div>
+                          {sale.observacoes && <div className={styles.saleMeta}>{sale.observacoes}</div>}
+                        </button>
+                        <span className={styles.saleMeta}>{new Date(sale.created_at).toLocaleDateString('pt-BR')}</span>
+                        <span className={styles.saleMeta}>{saleRegisteredItems(sale).length}</span>
+                        <span className={styles.saleTotal}>{fmt(saleTotal(sale))}</span>
+                        <div className={styles.saleActions}>
+                          <label className={styles.saleCheckLabel}>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(sale.concretizada)}
+                              onChange={e => void updateSaleConcretizada(sale.id, e.target.checked)}
+                            />
+                            <span>Sim</span>
+                          </label>
+                          {canViewAllSales && (
+                            <button className={styles.saleDeleteSmallBtn} onClick={() => void deleteSale(sale.id)}>
+                              Deletar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -695,7 +1052,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
                       <div>
                         <div className={styles.saleName}>{sale.cliente_nome}</div>
                         <div className={styles.saleMeta}>
-                          {new Date(sale.created_at).toLocaleDateString('pt-BR')} · {sale.empresa_venda_itens?.length || 0} itens
+                          {new Date(sale.created_at).toLocaleDateString('pt-BR')} · {saleRegisteredItems(sale).length} itens
                         </div>
                       </div>
                       <div className={styles.saleTotal}>{fmt(saleTotal(sale))}</div>
@@ -704,7 +1061,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
                 </div>
                 <div className={styles.launchpadFooter}>
                   <button className={styles.launchpadBtnGhost} onClick={openSalesList}>
-                    Ver listagem
+                    Ver vendas
                   </button>
                 </div>
               </div>
@@ -872,6 +1229,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeSc
     <div className={`${styles.vendasRoot} ${styles.appWrapper}`}>
       <SellerWorld
         ownerSettings={ownerSettings}
+        empresaPrecos={empresaPrecos ?? []}
         initialPlanName={`Plano ${planNameInput.trim() || 'Diamante'}`}
         initialPlans={sessionPlans}
         onPlansChange={handlePlansChange}

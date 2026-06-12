@@ -322,6 +322,99 @@
   text-transform: uppercase;
   font-weight: 700;
 }
+.salesFilterBar {
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: flex-end;
+}
+.salesFilterBar label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+.salesFilterBar select {
+  min-width: 220px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  padding: 9px 10px;
+  outline: none;
+}
+.saleRowButton {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.saleRowButton:hover .saleName { color: var(--accent); }
+.salesKpiGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 22px;
+}
+.salesKpi {
+  min-height: 82px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border-soft, rgba(255,255,255,0.07));
+  background: rgba(255,255,255,0.025);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.salesKpi span {
+  color: var(--text-dim);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.10em;
+}
+.salesKpi strong {
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+}
+.saleDetailHero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 0 24px;
+  border-top: 1px solid var(--border-soft, rgba(255,255,255,0.07));
+}
+.saleDetailName {
+  color: var(--text);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.saleDetailTotal {
+  color: var(--accent);
+  font-size: 32px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.salesDetailRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 70px 120px 120px;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border-soft, rgba(255,255,255,0.07));
+}
 .saleCheckLabel {
   display: inline-flex;
   align-items: center;
@@ -333,6 +426,72 @@
 .saleCheckLabel input {
   accent-color: var(--accent);
 }
+.saleStatusLine {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  margin: -8px 0 22px;
+}
+.saleStatusLine input {
+  accent-color: var(--accent);
+}
+.saleDeleteBtn,
+.saleDeleteSmallBtn {
+  border: 1px solid rgba(239, 68, 68, 0.34);
+  background: rgba(239, 68, 68, 0.08);
+  color: #fca5a5;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.saleDeleteBtn {
+  padding: 10px 16px;
+  margin: -8px 0 22px 12px;
+  font-size: 13px;
+}
+.saleDeleteSmallBtn {
+  padding: 6px 10px;
+  font-size: 11px;
+}
+.saleDeleteBtn:hover,
+.saleDeleteSmallBtn:hover {
+  border-color: rgba(248, 113, 113, 0.7);
+  background: rgba(239, 68, 68, 0.16);
+}
+.saleActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.salesIgnoredBox {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-soft, rgba(255,255,255,0.07));
+}
+.salesIgnoredTitle {
+  color: var(--text-dim);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.salesIgnoredItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  padding: 9px 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  border-bottom: 1px solid var(--border-soft, rgba(255,255,255,0.05));
+}
+.salesIgnoredItem span:last-child {
+  text-align: right;
+}
 @media (max-width: 760px) {
   .salesPageCard { padding: 28px 22px; }
   .salesPageHeader { flex-direction: column; }
@@ -341,6 +500,9 @@
     gap: 5px;
     padding: 16px 0;
   }
+  .salesKpiGrid { grid-template-columns: 1fr; }
+  .saleDetailHero { flex-direction: column; align-items: flex-start; }
+  .salesDetailRow { grid-template-columns: 1fr; gap: 5px; }
   .salesTableHead { display: none; }
 }
 .launchpadFooter {
