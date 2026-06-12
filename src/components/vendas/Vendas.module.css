@@ -769,6 +769,19 @@
 .plansArea.isCardDragging .planCol:not(.isDragging) {
   transition: transform 0.22s ease, opacity 0.22s ease, box-shadow 0.22s ease;
 }
+.planFocus0 {
+  opacity: 0.20;
+  transform: scale(0.72);
+  filter: blur(0.5px);
+}
+.planFocus1 {
+  opacity: 0.52;
+  transform: scale(0.90);
+}
+.planFocus2 {
+  opacity: 1;
+  transform: scale(1);
+}
 
 /* Equalizar — aumenta e uniformiza o tamanho dos planos para comparação */
 .plansArea.isEqualized {
@@ -1463,11 +1476,11 @@
    ADD PLAN BUTTON
    ============================================================ */
 .addPlanBtn {
-  position: absolute;
-  right: 52px;
+  position: fixed;
+  right: calc(var(--sidebar-strip, 40px) + 52px);
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
+  z-index: 35;
   width: 28px;
   height: 28px;
   border-radius: 50%;
@@ -1482,6 +1495,9 @@
   box-shadow: var(--shadow-soft);
   transition: border-color 0.2s, color 0.2s, transform 0.2s;
   line-height: 1;
+}
+.addPlanBtnSidebarOpen {
+  right: calc(var(--sidebar-w, 290px) + 52px);
 }
 .addPlanBtn:hover {
   border-color: var(--accent-ring, rgba(249,159,53,0.24));

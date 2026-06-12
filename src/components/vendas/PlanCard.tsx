@@ -30,6 +30,8 @@ interface PlanCardProps {
   isDragging?: boolean;
   dragStyle?: CSSProperties;
   onCardPointerDown?: (event: ReactPointerEvent<HTMLDivElement>) => void;
+  onActivate?: () => void;
+  focusClass?: string;
 }
 
 function applyItemCampaignLimitFn(item: PlanItem, requestedPct: number, settings: OwnerSettings): PlanItem {
@@ -57,7 +59,7 @@ function sortItems(items: PlanItem[]): PlanItem[] {
   });
 }
 
-export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass, isWinner, isLoser, onToggleWinner, isDragging, dragStyle, onCardPointerDown }: PlanCardProps) {
+export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange, onRemove, onNotify, badgeLabel, badgeClass, isWinner, isLoser, onToggleWinner, isDragging, dragStyle, onCardPointerDown, onActivate, focusClass }: PlanCardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
@@ -236,10 +238,12 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
   }
 
   return (
-    <div className={`${styles.planCol} ${plan.items.length > 0 ? styles.hasItems : ''} ${isWinner ? styles.planWinner : ''} ${isLoser ? styles.planLoser : ''} ${isDragging ? styles.isDragging : ''}`}
+    <div className={`${styles.planCol} ${focusClass || ''} ${plan.items.length > 0 ? styles.hasItems : ''} ${isWinner ? styles.planWinner : ''} ${isLoser ? styles.planLoser : ''} ${isDragging ? styles.isDragging : ''}`}
       data-plan-id={plan.id}
       style={dragStyle}
-      onPointerDown={onCardPointerDown}>
+      onPointerDown={onCardPointerDown}
+      onFocus={onActivate}
+      onClick={onActivate}>
 
       {/* Plan header */}
       <div className={styles.planHeader}>

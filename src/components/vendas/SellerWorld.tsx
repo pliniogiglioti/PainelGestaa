@@ -51,7 +51,7 @@ function makePlan(index: number, firstName?: string, baseName?: string): Plan {
     extraDiscountPct: 0,
     planCampaignPctRequested: 0,
     planCampaignPctEffective: 0,
-    shownPayments: ['parcelado', 'avista'],
+    shownPayments: [],
     programmedInfoOpen: false,
     redoStack: [],
     searchQuery: '',
@@ -115,6 +115,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [equalizedPlans, setEqualizedPlans] = useState(false);
   const [winnerPlanId, setWinnerPlanId] = useState<string | null>(null);
+  const [activePlanId, setActivePlanId] = useState<string | null>(() => initialPlans?.[0]?.id ?? null);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const plansAreaRef = useRef<HTMLDivElement>(null);
@@ -164,19 +165,54 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
 
   function addPlan() {
     if (plans.length >= MAX_PLANS) { notify('Máximo de 3 planos.', 'info'); return; }
-    setPlans(prev => [...prev, makePlan(prev.length, undefined, prev[0]?.name)]);
+    const plan = makePlan(plans.length, undefined, plans[0]?.name);
+    setPlans(prev => [...prev, plan]);
+    setActivePlanId(plan.id);
+    setTimeout(() => centerPlan(plan.id, 'smooth'), 40);
   }
 
   function removePlan(id: string) {
     setPlans(prev => {
       if (prev.length <= 1) return prev;
-      return prev.filter(p => p.id !== id);
+      const currentIndex = prev.findIndex(p => p.id === id);
+      const next = prev.filter(p => p.id !== id);
+      if (activePlanId === id) {
+        setActivePlanId(next[Math.min(Math.max(currentIndex, 0), next.length - 1)]?.id ?? next[0]?.id ?? null);
+      }
+      return next;
     });
     setWinnerPlanId(prev => prev === id ? null : prev);
   }
 
   function toggleWinner(id: string) {
     setWinnerPlanId(prev => prev === id ? null : id);
+  }
+
+  function centerPlan(planId: string, behavior: ScrollBehavior = 'auto') {
+    const el = plansAreaRef.current;
+    if (!el || draggingPlanId || equalizedPlans) return;
+    requestAnimationFrame(() => {
+      const card = el.querySelector<HTMLElement>(`[data-plan-id="${planId}"]`);
+      if (!card) return;
+      const maxScroll = Math.max(0, el.scrollWidth - el.clientWidth);
+      const elRect = el.getBoundingClientRect();
+      const cardRect = card.getBoundingClientRect();
+      const nextScrollLeft = Math.max(
+        0,
+        Math.min(maxScroll, el.scrollLeft + ((cardRect.left + cardRect.width / 2) - (elRect.left + el.clientWidth / 2)))
+      );
+      el.scrollTo({ left: nextScrollLeft, behavior });
+    });
+  }
+
+  function planFocusClass(index: number) {
+    if (winnerPlanId || equalizedPlans || plans.length === 1) return '';
+    const activeIndex = activePlanId ? plans.findIndex(plan => plan.id === activePlanId) : plans.length - 1;
+    if (activeIndex < 0) return '';
+    const distance = Math.abs(activeIndex - index);
+    if (distance === 0) return styles.planFocus2;
+    if (distance === 1) return styles.planFocus1;
+    return styles.planFocus0;
   }
 
   function handlePlanPointerDown(planId: string, event: ReactPointerEvent<HTMLDivElement>) {
@@ -282,6 +318,63 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
     setPlans(prev => prev.map(p => p.totalRevealed ? { ...p, totalVisible: true } : p));
   }
 
+  function abrirPagamento() {
+    setPlans(prev => prev.map(p => p.items.length > 0 ? { ...p, paymentRevealed: true } : p));
+  }
+
+  function revelarPagamento() {
+    setPlans(prev => prev.map(p => p.paymentRevealed ? { ...p, paymentVisible: true } : p));
+  }
+
+  function ativarCartaNaManga() {
+    setPlans(prev => prev.map(p => p.paymentVisible ? { ...p, cartaNaMangaActive: true } : p));
+  }
+
+  function canGoBack() {
+    return plans.length > 0;
+  }
+
+  function goBackNarrative() {
+    setPlans(prev => {
+      if (prev.some(p => p.cartaNaMangaActive)) {
+        return prev.map(p => ({
+          ...p,
+          cartaNaMangaActive: false,
+          shownPayments: p.shownPayments.filter(method => method !== 'boleto'),
+          payment: { ...p.payment, parcelasBoleto: 0, boletoOverride: null },
+        }));
+      }
+      if (prev.some(p => p.paymentVisible)) {
+        return prev.map(p => ({ ...p, paymentVisible: false }));
+      }
+      if (prev.some(p => p.paymentRevealed)) {
+        return prev.map(p => ({
+          ...p,
+          paymentRevealed: false,
+          paymentVisible: false,
+          cartaNaMangaActive: false,
+          shownPayments: [],
+        }));
+      }
+      if (prev.some(p => p.totalVisible)) {
+        return prev.map(p => ({ ...p, totalVisible: false }));
+      }
+      if (prev.some(p => p.totalRevealed)) {
+        return prev.map(p => ({
+          ...p,
+          totalRevealed: false,
+          totalVisible: false,
+          paymentRevealed: false,
+          paymentVisible: false,
+          cartaNaMangaActive: false,
+          shownPayments: [],
+        }));
+      }
+      onBack?.();
+      return prev;
+    });
+  }
+
   async function saveSale() {
     if (!onSaveSale) return;
     try {
@@ -299,6 +392,9 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
   const activePlans = plans.filter(p => p.items.length > 0);
   const showRevelarTotal = activePlans.length > 0 && activePlans.some(p => !p.totalRevealed);
   const showMostrarTotal = !showRevelarTotal && activePlans.length > 0 && activePlans.some(p => !p.totalVisible);
+  const showAbrirPagamento = !showRevelarTotal && !showMostrarTotal && activePlans.length > 0 && activePlans.some(p => !p.paymentRevealed);
+  const showRevelarPagamento = !showRevelarTotal && !showMostrarTotal && !showAbrirPagamento && activePlans.length > 0 && activePlans.some(p => !p.paymentVisible);
+  const showCartaNaManga = !showRevelarTotal && !showMostrarTotal && !showAbrirPagamento && !showRevelarPagamento && activePlans.length > 0 && activePlans.some(p => !p.cartaNaMangaActive);
 
   const maxItems = Math.max(0, ...plans.map(p => p.items.length));
   const densityClass =
@@ -332,15 +428,23 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
               isDragging={draggingPlanId === plan.id}
               dragStyle={draggingPlanId === plan.id ? { transform: `translate3d(${dragTransform.x}px, ${dragTransform.y}px, 0) rotate(${dragTransform.rotation}deg)` } : undefined}
               onCardPointerDown={e => handlePlanPointerDown(plan.id, e)}
+              onActivate={() => { setActivePlanId(plan.id); centerPlan(plan.id, 'smooth'); }}
+              focusClass={planFocusClass(idx)}
               isWinner={winnerPlanId === plan.id}
               isLoser={winnerPlanId !== null && winnerPlanId !== plan.id}
               onToggleWinner={() => toggleWinner(plan.id)}
             />
           ))}
-          {plans.length < MAX_PLANS && (
-            <button className={styles.addPlanBtn} onClick={addPlan} title="Adicionar plano">+</button>
-          )}
         </div>
+        {plans.length < MAX_PLANS && (
+          <button
+            className={`${styles.addPlanBtn} ${sidebarOpen ? styles.addPlanBtnSidebarOpen : ''}`}
+            onClick={addPlan}
+            title="Adicionar plano de comparação"
+          >
+            +
+          </button>
+        )}
       </div>
 
       {/* Sidebar */}
@@ -374,12 +478,22 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
             <div className={styles.sbDivider} />
 
             {/* Ação narrativa principal */}
-            {(showRevelarTotal || showMostrarTotal) && (
+            {(showRevelarTotal || showMostrarTotal || showAbrirPagamento || showRevelarPagamento || showCartaNaManga) && (
               <>
                 <div className={styles.sbSection}>
                   <button className={`${styles.sbBtn} ${styles.sbBtnPrimary}`}
-                    onClick={showRevelarTotal ? revelarTotal : mostrarTotal}>
-                    {showRevelarTotal ? 'Revelar Total' : 'Mostrar'}
+                    onClick={
+                      showRevelarTotal ? revelarTotal :
+                      showMostrarTotal ? mostrarTotal :
+                      showAbrirPagamento ? abrirPagamento :
+                      showRevelarPagamento ? revelarPagamento :
+                      ativarCartaNaManga
+                    }>
+                    {showRevelarTotal ? 'Revelar Total' :
+                     showMostrarTotal ? 'Mostrar' :
+                     showAbrirPagamento ? 'Pagamento' :
+                     showRevelarPagamento ? 'Revelar' :
+                     'Avançar'}
                   </button>
                 </div>
                 <div className={styles.sbDivider} />
@@ -398,8 +512,8 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
                   ⊟ Equalizar
                 </button>
               )}
-              {onBack && (
-                <button className={styles.sbBtn} onClick={onBack}>‹ Voltar</button>
+              {canGoBack() && (
+                <button className={styles.sbBtn} onClick={goBackNarrative}>‹ Voltar</button>
               )}
             </div>
 
