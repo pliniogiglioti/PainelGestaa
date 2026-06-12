@@ -766,6 +766,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                             <th>Serviço</th>
                             <th>Mínimo à vista</th>
                             <th>Vitrine</th>
+                            <th>Diferença</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -814,6 +815,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                                     }}
                                   />
                                 </td>
+                                <td><strong>{fmt(Math.max(0, row.tablePrice - row.minPrice))}</strong></td>
                               </tr>
                             );
                           })}
