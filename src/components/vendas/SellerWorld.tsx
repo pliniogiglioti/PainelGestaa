@@ -13,6 +13,7 @@ interface SellerWorldProps {
   initialPlanName?: string;
   initialPlans?: Plan[] | null;
   onPlansChange?: (plans: Plan[]) => void;
+  onSaveSale?: (plans: Plan[]) => Promise<void>;
   patientName?: string;
   proposalTitle?: string;
   onPatientNameChange?: (value: string) => void;
@@ -105,7 +106,7 @@ interface ToastState {
 type ColorMode = 'dark' | 'light';
 const THEME_STORAGE_KEY = 'top-v10-theme';
 
-export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSession, initialPlanName, initialPlans, onPlansChange, patientName, proposalTitle, onPatientNameChange, onProposalTitleChange }: SellerWorldProps) {
+export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSession, initialPlanName, initialPlans, onPlansChange, onSaveSale, patientName, proposalTitle, onPatientNameChange, onProposalTitleChange }: SellerWorldProps) {
   const [plans, setPlans] = useState<Plan[]>(() => (
     initialPlans?.length
       ? initialPlans.map(plan => hydratePlan(plan, initialPlanName))
@@ -120,6 +121,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
   const [draggingPlanId, setDraggingPlanId] = useState<string | null>(null);
   const [dragTransform, setDragTransform] = useState({ x: 0, y: 0, rotation: 0 });
   const [contentScale, setContentScaleState] = useState(1);
+  const [savingSale, setSavingSale] = useState(false);
   const [colorMode, setColorModeState] = useState<ColorMode>(() => {
     try {
       const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
@@ -280,6 +282,20 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
     setPlans(prev => prev.map(p => p.totalRevealed ? { ...p, totalVisible: true } : p));
   }
 
+  async function saveSale() {
+    if (!onSaveSale) return;
+    try {
+      setSavingSale(true);
+      await onSaveSale(plans);
+      notify('Venda salva no banco de dados.', 'info');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel salvar a venda.';
+      notify(message, 'danger');
+    } finally {
+      setSavingSale(false);
+    }
+  }
+
   const activePlans = plans.filter(p => p.items.length > 0);
   const showRevelarTotal = activePlans.length > 0 && activePlans.some(p => !p.totalRevealed);
   const showMostrarTotal = !showRevelarTotal && activePlans.length > 0 && activePlans.some(p => !p.totalVisible);
@@ -404,6 +420,16 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
               onClick={() => (onNewSession ? onNewSession() : clearAll())}>
               Novo atendimento
             </button>
+
+            {onSaveSale && (
+              <button
+                className={`${styles.sbBtn} ${styles.sbBtnPrimary}`}
+                onClick={saveSale}
+                disabled={savingSale || activePlans.length === 0}
+              >
+                {savingSale ? 'Salvando...' : 'Salvar venda'}
+              </button>
+            )}
 
             <div className={styles.sbFooter}>
               <div className={styles.sbThemeSwitch}>

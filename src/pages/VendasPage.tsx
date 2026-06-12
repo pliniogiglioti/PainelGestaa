@@ -9,6 +9,7 @@ import {
   saveOwnerV8ModelToDB,
   applyOwnerV8Model,
 } from '../components/vendas/ownerModel';
+import { fmt, planEffectiveTotal } from '../components/vendas/calcEngine';
 import { SellerWorld, PLAN_NAME_SUGGESTIONS } from '../components/vendas/SellerWorld';
 import { OwnerWizard } from '../components/vendas/OwnerWizard';
 import styles from '../components/vendas/Vendas.module.css';
@@ -21,6 +22,24 @@ interface SavedSellerSession {
   proposalTitle: string;
   started: boolean;
   plans: Plan[];
+}
+
+interface SavedSaleItem {
+  id: string;
+  venda_id: string;
+  descricao: string;
+  preco_unitario: number;
+  quantidade: number;
+}
+
+interface SavedSale {
+  id: string;
+  cliente_nome: string;
+  observacoes: string | null;
+  entrada_valor: number;
+  max_parcelas: number;
+  created_at: string;
+  empresa_venda_itens?: SavedSaleItem[];
 }
 
 function loadSavedSellerSession(): SavedSellerSession | null {
@@ -246,6 +265,8 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   const [empresaPrecos, setEmpresaPrecos] = useState<EmpresaPreco[] | null>(null);
   const [loadingPrecos, setLoadingPrecos] = useState(true);
   const [loadingOwnerModel, setLoadingOwnerModel] = useState(true);
+  const [sales, setSales] = useState<SavedSale[]>([]);
+  const [loadingSales, setLoadingSales] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -277,6 +298,39 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     });
     return () => { active = false; };
   }, [empresa.id]);
+
+  const fetchSales = useCallback(async () => {
+    setLoadingSales(true);
+    const { data: vendas, error } = await supabase
+      .from('empresa_vendas')
+      .select('id, cliente_nome, observacoes, entrada_valor, max_parcelas, created_at')
+      .eq('empresa_id', empresa.id)
+      .eq('ativo', true)
+      .order('created_at', { ascending: false })
+      .limit(6);
+
+    if (!error) {
+      const vendaIds = (vendas || []).map(venda => venda.id);
+      let itens: SavedSaleItem[] = [];
+      if (vendaIds.length > 0) {
+        const { data: itensData } = await supabase
+          .from('empresa_venda_itens')
+          .select('id, venda_id, descricao, preco_unitario, quantidade')
+          .in('venda_id', vendaIds);
+        itens = (itensData || []) as SavedSaleItem[];
+      }
+
+      setSales((vendas || []).map(venda => ({
+        ...venda,
+        empresa_venda_itens: itens.filter(item => item.venda_id === venda.id),
+      })));
+    }
+    setLoadingSales(false);
+  }, [empresa.id]);
+
+  useEffect(() => {
+    void fetchSales();
+  }, [fetchSales]);
 
   const notifyPage = useCallback((msg: string) => {
     if (pageToastTimerRef.current) clearTimeout(pageToastTimerRef.current);
@@ -385,6 +439,67 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     }
   }, [patientName, proposalTitle, screen, sessionPlans]);
 
+  function saleTotal(sale: SavedSale) {
+    return (sale.empresa_venda_itens || []).reduce(
+      (sum, item) => sum + Number(item.preco_unitario || 0) * Number(item.quantidade || 1),
+      0
+    );
+  }
+
+  async function saveSaleToDatabase(plansToSave: Plan[]) {
+    const plansWithItems = plansToSave.filter(plan => plan.items.length > 0);
+    if (!patientName.trim()) throw new Error('Informe o nome do paciente antes de salvar.');
+    if (plansWithItems.length === 0) throw new Error('Adicione ao menos um tratamento antes de salvar.');
+
+    const maxInstallments = Math.max(1, ...plansWithItems.map(plan => Number(plan.payment.parcelas || 1)));
+    const entradaValor = plansWithItems.reduce((sum, plan) => {
+      if (plan.payment.entradaOverride != null) return sum + Number(plan.payment.entradaOverride || 0);
+      const total = planEffectiveTotal(plan);
+      return sum + total * (Number(plan.payment.entradaPct || 0) / 100);
+    }, 0);
+
+    const { data: venda, error: vendaError } = await supabase
+      .from('empresa_vendas')
+      .insert({
+        empresa_id: empresa.id,
+        cliente_nome: patientName.trim(),
+        observacoes: proposalTitle.trim() || null,
+        entrada_valor: Math.round(entradaValor * 100) / 100,
+        max_parcelas: maxInstallments,
+      })
+      .select('id')
+      .single();
+
+    if (vendaError || !venda) {
+      throw new Error(vendaError?.message || 'Nao foi possivel salvar a venda.');
+    }
+
+    const items = plansWithItems.flatMap(plan => plan.items.map(item => {
+      const unitPrice = item.overridePrice !== null
+        ? item.overridePrice
+        : item.campaignPct !== null
+          ? item.tablePrice * (1 - item.campaignPct / 100)
+          : item.tablePrice;
+
+      return {
+        venda_id: venda.id,
+        empresa_preco_id: null,
+        descricao: `${plan.name}: ${item.name}`,
+        preco_unitario: Math.round(unitPrice * 100) / 100,
+        quantidade: item.qty || 1,
+      };
+    }));
+
+    const { error: itensError } = await supabase
+      .from('empresa_venda_itens')
+      .insert(items);
+
+    if (itensError) throw new Error(itensError.message);
+
+    await fetchSales();
+    notifyPage('Venda salva no banco de dados.');
+  }
+
   if (loadingPrecos || loadingOwnerModel) {
     return (
       <div className={styles.vendasRoot}>
@@ -462,6 +577,31 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                   <button className={styles.launchpadBtnGhost} onClick={openSellerWorld}>
                     Começar a Vender
                   </button>
+                </div>
+              </div>
+
+              <div className={styles.launchpadChoice}>
+                <div>
+                  <div className={styles.launchpadChoiceKicker}>Histórico</div>
+                  <div className={styles.launchpadChoiceTitle}>Vendas feitas</div>
+                  <div className={styles.launchpadChoiceText}>
+                    Consulte as últimas propostas salvas no banco de dados.
+                  </div>
+                </div>
+                <div className={styles.salesList}>
+                  {loadingSales && <div className={styles.salesEmpty}>Carregando vendas...</div>}
+                  {!loadingSales && sales.length === 0 && <div className={styles.salesEmpty}>Nenhuma venda salva ainda.</div>}
+                  {!loadingSales && sales.slice(0, 3).map(sale => (
+                    <div className={styles.saleRow} key={sale.id}>
+                      <div>
+                        <div className={styles.saleName}>{sale.cliente_nome}</div>
+                        <div className={styles.saleMeta}>
+                          {new Date(sale.created_at).toLocaleDateString('pt-BR')} · {sale.empresa_venda_itens?.length || 0} itens
+                        </div>
+                      </div>
+                      <div className={styles.saleTotal}>{fmt(saleTotal(sale))}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -631,6 +771,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
         initialPlanName={`Plano ${planNameInput.trim() || 'Diamante'}`}
         initialPlans={sessionPlans}
         onPlansChange={handlePlansChange}
+        onSaveSale={saveSaleToDatabase}
         patientName={patientName}
         proposalTitle={proposalTitle}
         onPatientNameChange={setPatientName}
