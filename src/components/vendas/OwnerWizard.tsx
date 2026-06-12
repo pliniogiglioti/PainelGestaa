@@ -128,6 +128,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
   const [draft, setDraft] = useState<OwnerV8Model>(() => hydrateOwnerV8Model(model));
   const [section, setSection] = useState(model.currentSection ?? 0);
   const [semaforoAdvancedOpen, setSemaforoAdvancedOpen] = useState(false);
+  const [semaforoCustomSelected, setSemaforoCustomSelected] = useState(false);
 
   const totalSections = OWNER_V8_SECTIONS.length;
 
@@ -391,7 +392,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
     }
     return 'custom';
   }, [indicatorRules]);
-  const indicatorPresetDescription = indicatorPresetKey === 'custom'
+  const indicatorPresetDescription = (indicatorPresetKey === 'custom' || semaforoCustomSelected)
     ? 'Personalizado. Você ajustou o semáforo do seu jeito e a V10 vai respeitar essas faixas em todo o vendedor.'
     : INDICATOR_PRESETS[indicatorPresetKey].description;
 
@@ -436,6 +437,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
       normalizeIndicatorConfig(m);
     });
     setSemaforoAdvancedOpen(false);
+    setSemaforoCustomSelected(false);
   }
 
   function addIndicatorTag() {
@@ -1026,8 +1028,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     ))}
                     <button
                       type="button"
-                      className={`${styles.ownerPill}${indicatorPresetKey === 'custom' ? ` ${styles.ownerPillActive}` : ''}`}
-                      disabled
+                      className={`${styles.ownerPill}${(indicatorPresetKey === 'custom' || semaforoCustomSelected) ? ` ${styles.ownerPillActive}` : ''}`}
+                      onClick={() => {
+                        setSemaforoCustomSelected(true);
+                        setSemaforoAdvancedOpen(true);
+                      }}
                     >
                       Personalizado
                     </button>
@@ -1237,10 +1242,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     </select>
                     <div className={styles.ownerNote}>Quando desligado, nenhuma taxa de máquina é aplicada nas vendas no cartão.</div>
                   </div>
-                </div>
-
-                {draft.cardTerms.cardFeeEnabled && (
-                  <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
+                  {draft.cardTerms.cardFeeEnabled && (
                     <div className={styles.ownerField}>
                       <label>Taxa fixa do cartão (%)</label>
                       <OwnerNumberInput className={styles.ownerInput}
@@ -1248,8 +1250,8 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                         onCommit={raw => update(m => { m.cardTerms.flatRatePct = clamp(safeNumber(raw, 3.9), 0, 40); })} />
                       <div className={styles.ownerNote}>Ex.: 3,9% em toda parcela que já tiver juros.</div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
 
                 <div className={styles.ownerGrid} style={{ marginTop: 18 }}>
                   <div className={styles.ownerField}>
