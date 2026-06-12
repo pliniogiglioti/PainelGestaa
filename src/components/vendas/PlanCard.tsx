@@ -68,6 +68,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
   const totalInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const itemSearchRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (dropdownOpen && itemSearchRef.current) {
@@ -75,10 +76,37 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
     }
   }, [dropdownOpen]);
 
+  useEffect(() => {
+    if (!dropdownOpen) return;
+
+    function handlePointerDown(event: PointerEvent) {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (itemSearchRef.current?.contains(target) || dropdownRef.current?.contains(target)) return;
+      closeDropdown();
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') closeDropdown();
+    }
+
+    window.addEventListener('pointerdown', handlePointerDown, true);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown, true);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [dropdownOpen]);
+
   function update(fn: (p: Plan) => void) {
     const next = JSON.parse(JSON.stringify(plan)) as Plan;
     fn(next);
     onChange(next);
+  }
+
+  function closeDropdown() {
+    setDropdownOpen(false);
+    setSearchQuery('');
   }
 
   function addItem(catalogItem: { name: string; tablePrice: number }) {
@@ -233,10 +261,6 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       .filter(cat => cat.items.length > 0);
   }
 
-  function handleRevealPayment() {
-    update(p => { p.paymentVisible = true; p.paymentRevealed = true; });
-  }
-
   return (
     <div className={`${styles.planCol} ${focusClass || ''} ${plan.items.length > 0 ? styles.hasItems : ''} ${isWinner ? styles.planWinner : ''} ${isLoser ? styles.planLoser : ''} ${isDragging ? styles.isDragging : ''}`}
       data-plan-id={plan.id}
@@ -339,13 +363,21 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
           placeholder="+ Adicionar tratamento"
           value={searchQuery}
           onFocus={() => setDropdownOpen(true)}
-          onChange={e => { setSearchQuery(e.target.value); setDropdownOpen(true); }} />
+          onChange={e => { setSearchQuery(e.target.value); setDropdownOpen(true); }}
+          onKeyDown={e => {
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              closeDropdown();
+              searchInputRef.current?.blur();
+            }
+          }} />
       </div>
 
       {dropdownOpen && createPortal(
         <>
-          <div className={styles.dropdownBackdrop} onClick={() => { setDropdownOpen(false); setSearchQuery(''); }} />
+          <div className={styles.dropdownBackdrop} onClick={closeDropdown} />
           <div
+            ref={dropdownRef}
             className={styles.catalogDropdown}
             style={dropdownRect ? {
               position: 'fixed',
@@ -376,7 +408,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       {plan.totalRevealed && plan.items.length > 0 && (
         <div className={styles.totalArea}>
           <hr className={styles.sectionDivider} />
-          <div className={styles.totalRow}>
+          <div className={`${styles.totalRow} ${plan.totalVisible ? styles.valRevealed : styles.valHidden}`}>
             <span className={styles.totalLabel}>
               Total <InfoTip text="Clique no valor para ajustar o total da proposta. O sistema não deixa passar do mínimo protegido pelo dono." />
             </span>
@@ -402,24 +434,9 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         </div>
       )}
 
-      {/* Narrative progress / action buttons */}
-      {plan.items.length > 0 && plan.totalRevealed && !plan.paymentRevealed && (
-        <div className={styles.narrativeActions}>
-          <button className={styles.narrativeBtn} onClick={() => update(p => { p.paymentRevealed = true; })}>Abrir Pagamento</button>
-        </div>
-      )}
-
       {/* Payment section */}
       {plan.paymentRevealed && (
         <PaymentSection plan={plan} ownerSettings={ownerSettings} onChange={onChange} onNotify={onNotify} />
-      )}
-
-      {/* Payment reveal */}
-      {plan.paymentRevealed && !plan.paymentVisible && (
-        <button className={`${styles.narrativeBtn} ${styles.revealPaymentBtn}`}
-          onClick={handleRevealPayment}>
-          Revelar Pagamento
-        </button>
       )}
 
       {/* Remove plan */}

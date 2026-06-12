@@ -531,6 +531,7 @@ export function paymentDisplayValue(
       parcelas: number;
       descontoAVista: number;
       parcelasBoleto: number;
+      entradaOverride: number | null;
       aVistaOverride: number | null;
       parceladoOverride: number | null;
       boletoOverride: number | null;
@@ -556,6 +557,7 @@ export function paymentDisplayValue(
     return plan.payment.boletoOverride ?? (totalWithBoleto / plan.payment.parcelasBoleto);
   }
   if (field === 'debito') return plan.payment.debitoOverride ?? eff;
+  if (field === 'entrada') return plan.payment.entradaOverride ?? roundMoney(eff * (plan.payment.entradaPct || 0) / 100);
   return 0;
 }
 

@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { PointerEvent as ReactPointerEvent, CSSProperties } from 'react';
 import type { Plan, OwnerSettings } from './types';
-import { uid } from './calcEngine';
+import { normalizeIndicatorColor, sanitizeIndicatorTags, uid } from './calcEngine';
 import { PlanCard } from './PlanCard';
 import styles from './Vendas.module.css';
 
@@ -116,6 +116,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
   const [equalizedPlans, setEqualizedPlans] = useState(false);
   const [winnerPlanId, setWinnerPlanId] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(() => initialPlans?.[0]?.id ?? null);
+  const [sidebarTagLegendOpen, setSidebarTagLegendOpen] = useState(false);
   const [toast, setToast] = useState<ToastState | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const plansAreaRef = useRef<HTMLDivElement>(null);
@@ -287,6 +288,18 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
     setPlans(prev => prev.map(p => p.id === id ? updated : p));
   }
 
+  function toggleCampaignEditors() {
+    const anyOpen = plans.some(plan => plan.items.some(item => item.campaignEditing));
+    setPlans(prev => prev.map(plan => ({
+      ...plan,
+      items: plan.items.map(item => ({
+        ...item,
+        campaignEditing: !anyOpen,
+        campaignInput: anyOpen ? '' : (item.campaignPct !== null ? String(item.campaignPct) : ''),
+      })),
+    })));
+  }
+
   function clearAll() {
     setPlans([makePlan(0, initialPlanName)]);
     setWinnerPlanId(null);
@@ -330,11 +343,34 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
     setPlans(prev => prev.map(p => p.paymentVisible ? { ...p, cartaNaMangaActive: true } : p));
   }
 
+  function advanceNarrative() {
+    setPlans(prev => {
+      const active = prev.filter(p => p.items.length > 0);
+      if (!active.length) return prev;
+      if (active.some(p => !p.totalRevealed)) {
+        return prev.map(p => p.items.length > 0 ? { ...p, totalRevealed: true } : p);
+      }
+      if (active.some(p => !p.totalVisible)) {
+        return prev.map(p => p.totalRevealed ? { ...p, totalVisible: true } : p);
+      }
+      if (active.some(p => !p.paymentRevealed)) {
+        return prev.map(p => p.items.length > 0 ? { ...p, paymentRevealed: true } : p);
+      }
+      if (active.some(p => !p.paymentVisible)) {
+        return prev.map(p => p.paymentRevealed ? { ...p, paymentVisible: true } : p);
+      }
+      if (active.some(p => !p.cartaNaMangaActive)) {
+        return prev.map(p => p.paymentVisible ? { ...p, cartaNaMangaActive: true } : p);
+      }
+      return prev;
+    });
+  }
+
   function canGoBack() {
     return plans.length > 0;
   }
 
-  function goBackNarrative() {
+  function goBackNarrative(allowExit = true) {
     setPlans(prev => {
       if (prev.some(p => p.cartaNaMangaActive)) {
         return prev.map(p => ({
@@ -370,7 +406,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
           shownPayments: [],
         }));
       }
-      onBack?.();
+      if (allowExit) onBack?.();
       return prev;
     });
   }
@@ -390,11 +426,36 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
   }
 
   const activePlans = plans.filter(p => p.items.length > 0);
+  const hasItems = activePlans.length > 0;
+  const campaignEditorsOpen = plans.some(plan => plan.items.some(item => item.campaignEditing));
+  const indicatorTags = sanitizeIndicatorTags(ownerSettings.ui?.indicatorTags);
   const showRevelarTotal = activePlans.length > 0 && activePlans.some(p => !p.totalRevealed);
   const showMostrarTotal = !showRevelarTotal && activePlans.length > 0 && activePlans.some(p => !p.totalVisible);
   const showAbrirPagamento = !showRevelarTotal && !showMostrarTotal && activePlans.length > 0 && activePlans.some(p => !p.paymentRevealed);
   const showRevelarPagamento = !showRevelarTotal && !showMostrarTotal && !showAbrirPagamento && activePlans.length > 0 && activePlans.some(p => !p.paymentVisible);
   const showCartaNaManga = !showRevelarTotal && !showMostrarTotal && !showAbrirPagamento && !showRevelarPagamento && activePlans.length > 0 && activePlans.some(p => !p.cartaNaMangaActive);
+
+  useEffect(() => {
+    function isTypingTarget(target: EventTarget | null) {
+      return target instanceof HTMLElement && Boolean(target.closest('input, textarea, select, button, [contenteditable="true"], [data-no-shortcuts]'));
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      if (isTypingTarget(event.target)) return;
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        advanceNarrative();
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        goBackNarrative(false);
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [plans]);
 
   const maxItems = Math.max(0, ...plans.map(p => p.items.length));
   const densityClass =
@@ -502,9 +563,47 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
 
             {/* Ações secundárias */}
             <div className={styles.sbSection}>
+              {onBack && (
+                <button className={styles.sbBtn} onClick={onBack}>Voltar ao menu vendedor</button>
+              )}
               <button className={styles.sbBtn} onClick={onOpenOwnerWizard}>Voltar ao Dono</button>
+              {hasItems && (
+                <button
+                  className={`${styles.sbBtn} ${campaignEditorsOpen ? styles.sbBtnActive : ''}`}
+                  onClick={toggleCampaignEditors}
+                >
+                  Camp
+                </button>
+              )}
               {plans.length < MAX_PLANS && (
                 <button className={styles.sbBtn} onClick={addPlan}>+ Comparação</button>
+              )}
+              {hasItems && (
+                <>
+                  <button
+                    className={`${styles.sbBtn} ${sidebarTagLegendOpen ? styles.sbBtnActive : ''}`}
+                    onClick={() => setSidebarTagLegendOpen(open => !open)}
+                  >
+                    Explicações das tags
+                  </button>
+                  {sidebarTagLegendOpen && (
+                    <div className={styles.sbLegendPanel}>
+                      <div className={styles.paymentLegendTitle}>Leitura dos indicadores</div>
+                      {indicatorTags.map(tag => {
+                        const color = normalizeIndicatorColor(tag.color);
+                        return (
+                          <div className={styles.paymentLegendRow} key={tag.id}>
+                            <span
+                              className={styles.prowIndicator}
+                              style={{ background: color, boxShadow: `0 0 0 1px ${color}44,0 0 14px ${color}33` }}
+                            />
+                            <span>{tag.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </>
               )}
               {plans.length > 1 && (
                 <button className={`${styles.sbBtn} ${equalizedPlans ? styles.sbBtnActive : ''}`}
@@ -513,7 +612,7 @@ export function SellerWorld({ ownerSettings, onOpenOwnerWizard, onBack, onNewSes
                 </button>
               )}
               {canGoBack() && (
-                <button className={styles.sbBtn} onClick={goBackNarrative}>‹ Voltar</button>
+                <button className={styles.sbBtn} onClick={() => goBackNarrative()}>‹ Voltar</button>
               )}
             </div>
 

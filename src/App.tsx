@@ -15,7 +15,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import VendasPage from './pages/VendasPage'
 import TermosPage from './pages/TermosPage'
 
-const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas'] as const
+const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas', '/vendas/listavendas'] as const
 const KNOWN_PATHS_SET = new Set<string>(KNOWN_PATHS)
 
 export interface User {
@@ -42,7 +42,8 @@ async function sessionToUser(session: Session): Promise<User> {
 
 function getProtectedAppPath(pathname: string) {
   if (pathname === '/analise-dre/termospage') return '/analise-dre'
-  if (pathname === '/analise-dre' || pathname === '/lab-control' || pathname === '/precificacao') {
+  if (pathname === '/vendas/listavendas') return '/vendas'
+  if (pathname === '/analise-dre' || pathname === '/lab-control' || pathname === '/precificacao' || pathname === '/vendas') {
     return pathname
   }
   return null
@@ -321,7 +322,7 @@ function App() {
   useEffect(() => {
     if (!user || isInviteFlow || pathname === '/analise-dre/termospage') return
 
-    const normalizedPath = KNOWN_PATHS_SET.has(pathname) ? pathname : '/'
+    const normalizedPath = pathname === '/vendas/listavendas' ? '/vendas' : (KNOWN_PATHS_SET.has(pathname) ? pathname : '/')
     setMountedPaths(prev => (
       prev.includes(normalizedPath) ? prev : [...prev, normalizedPath]
     ))
@@ -569,8 +570,8 @@ function App() {
           </div>
         )}
 
-        {(activePath === '/vendas' || mountedPaths.includes('/vendas')) && (
-          <div style={{ display: activePath === '/vendas' ? 'block' : 'none' }}>
+        {((activePath === '/vendas' || activePath === '/vendas/listavendas') || mountedPaths.includes('/vendas')) && (
+          <div style={{ display: (activePath === '/vendas' || activePath === '/vendas/listavendas') ? 'block' : 'none' }}>
             {!empresaSelecionadaVendas ? (
               <ErrorBoundary>
                 <EmpresaGatePage
@@ -585,6 +586,8 @@ function App() {
                   empresa={empresaSelecionadaVendas}
                   onTrocarEmpresa={trocarEmpresaVendas}
                   onVoltar={() => navigate('/')}
+                  routeScreen={activePath === '/vendas/listavendas' ? 'sales' : 'launchpad'}
+                  onNavigateVendas={navigate}
                 />
               </ErrorBoundary>
             )}

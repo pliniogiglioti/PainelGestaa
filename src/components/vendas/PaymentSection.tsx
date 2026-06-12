@@ -216,7 +216,21 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
         {hasCampaign && field === 'avista' && (
           <span className={styles.prowOrig}>{fmt(planEffectiveTotal(plan) * (1 - plan.payment.descontoAVista / 100))}</span>
         )}
-        {isEditing ? (
+        {field === 'entrada' ? (
+          <>
+            <span className={styles.prowLabel}>R$</span>
+            <input className={styles.priceEditInput} type="number" min="0"
+              value={Math.round(value)}
+              onChange={e => {
+                const val = Math.max(0, parseFloat(e.target.value) || 0);
+                updatePlan(p => {
+                  const eff = planEffectiveTotal(p);
+                  p.payment.entradaOverride = val;
+                  p.payment.entradaPct = eff > 0 ? Math.round(Math.max(0, Math.min(100, (val / eff) * 100)) * 10) / 10 : 0;
+                });
+              }} />
+          </>
+        ) : isEditing ? (
           <span className={styles.priceEditWrap} onClick={e => e.stopPropagation()}>
             <input ref={inputRef} className={styles.priceEditInput} type="number" min="0"
               value={plan.payment.editInput}
@@ -247,12 +261,6 @@ export function PaymentSection({ plan, ownerSettings, onChange, onNotify }: Paym
   function addMethod(method: PaymentMethod) {
     const next = JSON.parse(JSON.stringify(plan)) as Plan;
     if (!next.shownPayments.includes(method)) next.shownPayments.push(method);
-    onChange(next);
-  }
-
-  function activateCartaNaManga() {
-    const next = JSON.parse(JSON.stringify(plan)) as Plan;
-    next.cartaNaMangaActive = true;
     onChange(next);
   }
 
@@ -311,12 +319,6 @@ export function PaymentSection({ plan, ownerSettings, onChange, onNotify }: Paym
         )}
         {av?.debito !== false && !shown.includes('debito') && (
           <button className={styles.methodAddBtn} onClick={() => addMethod('debito')}>+ Débito</button>
-        )}
-        {!plan.cartaNaMangaActive && (
-          <>
-            <button className={styles.methodAddBtn} onClick={activateCartaNaManga}>Carta na manga</button>
-            <InfoTip text="Libera uma forma de pagamento extra (boleto) para oferecer como última alternativa, caso o paciente ainda esteja em dúvida no fechamento." />
-          </>
         )}
         {plan.cartaNaMangaActive && av?.boleto !== false && ownerSettings.paymentPolicy.boletoEnabled && !shown.includes('boleto') && (
           <button className={styles.methodAddBtn} onClick={() => addMethod('boleto')}>+ Boleto</button>

@@ -14,7 +14,7 @@ import { SellerWorld, PLAN_NAME_SUGGESTIONS } from '../components/vendas/SellerW
 import { OwnerWizard } from '../components/vendas/OwnerWizard';
 import styles from '../components/vendas/Vendas.module.css';
 
-type Screen = 'launchpad' | 'entry' | 'naming' | 'workspace';
+type Screen = 'launchpad' | 'entry' | 'naming' | 'workspace' | 'sales';
 const SELLER_SESSION_STORAGE_KEY = 'av-v13';
 
 interface SavedSellerSession {
@@ -38,6 +38,7 @@ interface SavedSale {
   observacoes: string | null;
   entrada_valor: number;
   max_parcelas: number;
+  concretizada: boolean;
   created_at: string;
   empresa_venda_itens?: SavedSaleItem[];
 }
@@ -86,6 +87,8 @@ interface VendasPageProps {
   empresa: Empresa;
   onTrocarEmpresa: () => void;
   onVoltar: () => void;
+  routeScreen?: 'launchpad' | 'sales';
+  onNavigateVendas?: (path: string) => void;
 }
 
 // ---- Cadastro simples de serviços ----
@@ -254,7 +257,7 @@ function VendasSetup({ empresa, onConcluir, onTrocarEmpresa, onVoltar }: SimpleS
 
 // ---- VendasPage principal ----
 
-export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: VendasPageProps) {
+export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar, routeScreen = 'launchpad', onNavigateVendas }: VendasPageProps) {
   const [ownerModel, setOwnerModel] = useState<OwnerV8Model>(() => loadOwnerV8Model());
   const [ownerSettings, setOwnerSettings] = useState<OwnerSettings>(() => applyOwnerV8Model(loadOwnerV8Model()));
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -301,15 +304,16 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   const fetchSales = useCallback(async () => {
     setLoadingSales(true);
-    const { data: vendas, error } = await supabase
-      .from('empresa_vendas')
-      .select('id, cliente_nome, observacoes, entrada_valor, max_parcelas, created_at')
+    const { data: vendasRaw, error } = await (supabase
+      .from('empresa_vendas') as any)
+      .select('id, cliente_nome, observacoes, entrada_valor, max_parcelas, concretizada, created_at')
       .eq('empresa_id', empresa.id)
       .eq('ativo', true)
       .order('created_at', { ascending: false })
-      .limit(6);
+      .limit(80);
 
     if (!error) {
+      const vendas = (vendasRaw || []) as SavedSale[];
       const vendaIds = (vendas || []).map(venda => venda.id);
       let itens: SavedSaleItem[] = [];
       if (vendaIds.length > 0) {
@@ -339,7 +343,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
   }, []);
 
   const [savedSession, setSavedSession] = useState<SavedSellerSession | null>(() => loadSavedSellerSession());
-  const [screen, setScreen] = useState<Screen>(() => savedSession ? 'entry' : 'launchpad');
+  const [screen, setScreen] = useState<Screen>(() => routeScreen === 'sales' ? 'sales' : (savedSession ? 'entry' : 'launchpad'));
   const [patientName, setPatientName] = useState(() => savedSession?.patientName || '');
   const [proposalTitle, setProposalTitle] = useState(() => savedSession?.proposalTitle || '');
   const [planNameInput, setPlanNameInput] = useState('');
@@ -347,6 +351,21 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
 
   const titleInputRef = useRef<HTMLInputElement>(null);
   const planNameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (routeScreen === 'sales') setScreen('sales');
+    if (routeScreen === 'launchpad' && screen === 'sales') setScreen('launchpad');
+  }, [routeScreen, screen]);
+
+  function openSalesList() {
+    if (onNavigateVendas) onNavigateVendas('/vendas/listavendas');
+    else setScreen('sales');
+  }
+
+  function closeSalesList() {
+    if (onNavigateVendas) onNavigateVendas('/vendas');
+    else setScreen('launchpad');
+  }
 
   function handleSaveWizard(model: OwnerV8Model) {
     saveOwnerV8Model(model);
@@ -466,6 +485,7 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
         observacoes: proposalTitle.trim() || null,
         entrada_valor: Math.round(entradaValor * 100) / 100,
         max_parcelas: maxInstallments,
+        concretizada: true,
       })
       .select('id')
       .single();
@@ -500,6 +520,20 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
     notifyPage('Venda salva no banco de dados.');
   }
 
+  async function updateSaleConcretizada(saleId: string, concretizada: boolean) {
+    setSales(prev => prev.map(sale => sale.id === saleId ? { ...sale, concretizada } : sale));
+    const { error } = await supabase
+      .from('empresa_vendas')
+      .update({ concretizada, updated_at: new Date().toISOString() })
+      .eq('id', saleId)
+      .eq('empresa_id', empresa.id);
+
+    if (error) {
+      setSales(prev => prev.map(sale => sale.id === saleId ? { ...sale, concretizada: !concretizada } : sale));
+      notifyPage('Nao foi possivel atualizar a venda.');
+    }
+  }
+
   if (loadingPrecos || loadingOwnerModel) {
     return (
       <div className={styles.vendasRoot}>
@@ -518,6 +552,68 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
         onTrocarEmpresa={onTrocarEmpresa}
         onVoltar={onVoltar}
       />
+    );
+  }
+
+  if (screen === 'sales') {
+    return (
+      <div className={styles.vendasRoot}>
+        <div className={styles.entryOverlay}>
+          <div className={styles.salesPageCard}>
+            <div className={styles.salesPageHeader}>
+              <div>
+                <div className={styles.launchpadKicker}>{empresa.nome}</div>
+                <div className={styles.salesPageTitle}>Vendas feitas</div>
+                <div className={styles.salesPageSubtitle}>
+                  Acompanhe as propostas salvas e marque quais foram concretizadas.
+                </div>
+              </div>
+              <button className={styles.launchpadBtnGhost} onClick={closeSalesList}>
+                Voltar
+              </button>
+            </div>
+
+            {loadingSales && <div className={styles.salesEmpty}>Carregando vendas...</div>}
+            {!loadingSales && sales.length === 0 && <div className={styles.salesEmpty}>Nenhuma venda salva ainda.</div>}
+            {!loadingSales && sales.length > 0 && (
+              <div className={styles.salesTable}>
+                <div className={`${styles.salesTableRow} ${styles.salesTableHead}`}>
+                  <span>Paciente</span>
+                  <span>Data</span>
+                  <span>Itens</span>
+                  <span>Total</span>
+                  <span>Concretizada</span>
+                </div>
+                {sales.map(sale => (
+                  <div className={styles.salesTableRow} key={sale.id}>
+                    <div>
+                      <div className={styles.saleName}>{sale.cliente_nome}</div>
+                      {sale.observacoes && <div className={styles.saleMeta}>{sale.observacoes}</div>}
+                    </div>
+                    <span className={styles.saleMeta}>{new Date(sale.created_at).toLocaleDateString('pt-BR')}</span>
+                    <span className={styles.saleMeta}>{sale.empresa_venda_itens?.length || 0}</span>
+                    <span className={styles.saleTotal}>{fmt(saleTotal(sale))}</span>
+                    <label className={styles.saleCheckLabel}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(sale.concretizada)}
+                        onChange={e => void updateSaleConcretizada(sale.id, e.target.checked)}
+                      />
+                      <span>Sim</span>
+                    </label>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {pageToast && (
+          <div className={styles.pageToast}>
+            <div className={styles.pageToastInner}>{pageToast}</div>
+          </div>
+        )}
+      </div>
     );
   }
 
@@ -605,6 +701,11 @@ export default function VendasPage({ empresa, onTrocarEmpresa, onVoltar }: Venda
                       <div className={styles.saleTotal}>{fmt(saleTotal(sale))}</div>
                     </div>
                   ))}
+                </div>
+                <div className={styles.launchpadFooter}>
+                  <button className={styles.launchpadBtnGhost} onClick={openSalesList}>
+                    Ver listagem
+                  </button>
                 </div>
               </div>
             </div>
