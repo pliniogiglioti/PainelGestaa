@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
 import { supabase } from '../../lib/supabase'
-import type { Lab, LabDentista, LabEnvio, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
+import type { Lab, LabDentista, LabEnvio, LabEtiqueta, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { FORMA_ENVIO_OPTIONS, LAB_CONTROL_PERMISSION_OPTIONS, type LabControlPermissionKey } from './constants'
+import { ETIQUETA_COR_PADRAO, FORMA_ENVIO_OPTIONS, LAB_CONTROL_PERMISSION_OPTIONS, type LabControlPermissionKey } from './constants'
 import { IconEdit, IconPlus, IconTrash, IconUpload } from './icons'
 import { Modal, Spinner } from './shared'
 import { formatCurrencyMask, formatDate, formatWhatsAppInput, normalizeWhatsAppNumber, parseMaskedCurrency, registrarHistorico } from './utils'
@@ -452,6 +452,148 @@ export function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
           <input className={styles.input} placeholder="Nome da coluna" value={novoNome} onChange={e => setNovoNome(e.target.value)} />
           <input type="color" className={styles.colorInput} value={novaCor} onChange={e => setNovaCor(e.target.value)} />
           <button type="button" className={styles.btnPrimary} onClick={addColuna} disabled={saving}>
+            <IconPlus /> Adicionar
+          </button>
+        </div>
+        {error && <p className={styles.errorMsg}>{error}</p>}
+        <div className={styles.formActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose}>Fechar</button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ── EtiquetasModal ───────────────────────────────────────────────────────
+
+export function EtiquetasModal({ empresaId, onClose }: { empresaId: string; onClose: () => void }) {
+  const [etiquetas, setEtiquetas] = useState<LabEtiqueta[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [novoNome,  setNovoNome]  = useState('')
+  const [novaCor,   setNovaCor]   = useState(ETIQUETA_COR_PADRAO)
+  const [saving,    setSaving]    = useState(false)
+  const [error,     setError]     = useState('')
+  const [editingId,   setEditingId]   = useState<string | null>(null)
+  const [editingNome, setEditingNome] = useState('')
+
+  const fetch = useCallback(async () => {
+    const { data } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).order('nome')
+    setEtiquetas(data ?? [])
+    setLoading(false)
+  }, [empresaId])
+
+  useEffect(() => { void fetch() }, [fetch])
+
+  const addEtiqueta = async () => {
+    if (!novoNome.trim()) return
+    setSaving(true); setError('')
+    const { error: err } = await supabase.from('lab_etiquetas').insert({ empresa_id: empresaId, nome: novoNome.trim(), cor: novaCor })
+    if (err) { setError(err.message); setSaving(false); return }
+    setNovoNome(''); setNovaCor(ETIQUETA_COR_PADRAO)
+    setSaving(false)
+    void fetch()
+  }
+
+  const updateCor = async (id: string, cor: string) => {
+    setEtiquetas(prev => prev.map(et => et.id === id ? { ...et, cor } : et))
+    await supabase.from('lab_etiquetas').update({ cor }).eq('id', id)
+  }
+
+  const startEdit = (et: LabEtiqueta) => {
+    setEditingId(et.id); setEditingNome(et.nome); setError('')
+  }
+
+  const cancelEdit = () => { setEditingId(null); setEditingNome('') }
+
+  const saveEdit = async (id: string) => {
+    if (!editingNome.trim()) { setError('Informe o nome da etiqueta.'); return }
+    setSaving(true); setError('')
+    const nome = editingNome.trim()
+    const { error: err } = await supabase.from('lab_etiquetas').update({ nome }).eq('id', id)
+    if (err) { setError(err.message); setSaving(false); return }
+    setEtiquetas(prev => prev.map(et => et.id === id ? { ...et, nome } : et))
+    setSaving(false); cancelEdit()
+  }
+
+  const toggleAtivo = async (et: LabEtiqueta) => {
+    await supabase.from('lab_etiquetas').update({ ativo: !et.ativo }).eq('id', et.id)
+    setEtiquetas(prev => prev.map(item => item.id === et.id ? { ...item, ativo: !item.ativo } : item))
+  }
+
+  const removeEtiqueta = async (id: string) => {
+    if (!confirm('Excluir esta etiqueta? Ela será removida de todos os trabalhos marcados com ela.')) return
+    const { error: err } = await supabase.from('lab_etiquetas').delete().eq('id', id)
+    if (err) { setError(err.message); return }
+    setEtiquetas(prev => prev.filter(et => et.id !== id))
+  }
+
+  return (
+    <Modal title="Etiquetas" onClose={onClose}>
+      <div className={styles.kanbanConfigWrap}>
+        {loading ? <Spinner /> : (
+          <div className={styles.kanbanColList}>
+            {etiquetas.map(et => (
+              <div key={et.id} className={`${styles.kanbanColRow} ${!et.ativo ? styles.dentistaInativo : ''}`}>
+                <input
+                  type="color"
+                  className={styles.colorInput}
+                  value={et.cor}
+                  onChange={e => void updateCor(et.id, e.target.value)}
+                  title="Cor da etiqueta"
+                />
+                {editingId === et.id ? (
+                  <input
+                    className={`${styles.input} ${styles.kanbanColInput}`}
+                    value={editingNome}
+                    onChange={e => setEditingNome(e.target.value)}
+                    autoFocus
+                    disabled={saving}
+                  />
+                ) : (
+                  <span className={styles.kanbanColNome}>
+                    {et.nome}
+                    {!et.ativo && <span className={styles.dentistaInativoBadge} style={{ marginLeft: 8 }}>Inativo</span>}
+                  </span>
+                )}
+                <div className={styles.kanbanColActions}>
+                  {editingId === et.id ? (
+                    <>
+                      <button type="button" className={styles.btnIcon} onClick={() => void saveEdit(et.id)} disabled={saving} title="Salvar">
+                        <IconEdit />
+                      </button>
+                      <button type="button" className={styles.btnIcon} onClick={cancelEdit} disabled={saving} title="Cancelar">
+                        ✕
+                      </button>
+                    </>
+                  ) : (
+                    <button type="button" className={styles.btnIcon} onClick={() => startEdit(et)} title="Editar nome">
+                      <IconEdit />
+                    </button>
+                  )}
+                  <button type="button" className={styles.btnSecondary} onClick={() => void toggleAtivo(et)}>
+                    {et.ativo ? 'Desativar' : 'Ativar'}
+                  </button>
+                  <button type="button" className={styles.btnIcon} onClick={() => void removeEtiqueta(et.id)} title="Excluir">
+                    <IconTrash />
+                  </button>
+                </div>
+              </div>
+            ))}
+            {etiquetas.length === 0 && (
+              <p style={{ color: 'var(--text-muted)' }}>Nenhuma etiqueta cadastrada ainda.</p>
+            )}
+          </div>
+        )}
+        <div className={styles.kanbanAddRow}>
+          <input
+            className={styles.input}
+            placeholder="Nome da etiqueta"
+            value={novoNome}
+            onChange={e => setNovoNome(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') void addEtiqueta() }}
+          />
+          <input type="color" className={styles.colorInput} value={novaCor} onChange={e => setNovaCor(e.target.value)} title="Cor da nova etiqueta" />
+          <button type="button" className={styles.btnPrimary} onClick={() => void addEtiqueta()} disabled={saving || !novoNome.trim()}>
             <IconPlus /> Adicionar
           </button>
         </div>

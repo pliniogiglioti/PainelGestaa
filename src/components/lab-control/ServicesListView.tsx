@@ -1,9 +1,13 @@
 import { useMemo } from 'react'
 import * as XLSX from 'xlsx'
-import type { Lab, LabEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
+import type { Lab, LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
 import { IconEdit, IconTrash } from './icons'
-import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, today } from './utils'
+import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, hexToRgba, today } from './utils'
+
+const STATUS_COLOR_INSTALADO_ATRASADO = '#fbbf24'
+const STATUS_COLOR_ATRASADO = '#f87171'
+const STATUS_COLOR_PADRAO = '#34d399'
 
 function escapeHtml(value: string) {
   return value
@@ -14,12 +18,13 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;')
 }
 
-export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, onMoveEnvio, onEditEnvio, onDeleteEnvio }: {
+export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, etiquetasByEnvio, onMoveEnvio, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]
   precosByLab: Record<string, LabPreco[]>
   labs: Lab[]
   colunas: LabKanbanColuna[]
   isAdmin: boolean
+  etiquetasByEnvio?: Record<string, LabEtiqueta[]>
   onMoveEnvio: (envioId: string, status: string) => void
   onEditEnvio: (envio: LabEnvio) => void
   onDeleteEnvio: (id: string) => void
@@ -36,6 +41,12 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
       const dataConclusao = etapa.data_conclusao ?? envio.data_entrega_real ?? (isInstalado ? today() : null)
       const instaladoAtrasado = isInstalado && dataPrevista != null && dataConclusao != null && dataConclusao > dataPrevista
       const atrasado = !etapa.concluido && dataPrevista != null && dataPrevista < today()
+      const status = isInstalado ? (instaladoAtrasado ? 'Instalado atrasado' : 'Instalado no prazo') : etapa.concluido ? 'Pronto' : envio.status
+      const statusColor = instaladoAtrasado
+        ? STATUS_COLOR_INSTALADO_ATRASADO
+        : atrasado
+          ? STATUS_COLOR_ATRASADO
+          : colunasOrdenadas.find(col => col.nome === status)?.cor ?? STATUS_COLOR_PADRAO
 
       return {
         id: `${envio.id}-${etapa.id}`,
@@ -46,17 +57,20 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
         dentes: envio.dentes,
         cor: envio.cor,
         dataEnvio: envio.data_envio,
+        dataConsulta: envio.data_consulta,
         dataPrevista,
-        status: isInstalado ? (instaladoAtrasado ? 'Instalado atrasado' : 'Instalado no prazo') : etapa.concluido ? 'Pronto' : envio.status,
+        status,
+        statusColor,
         etapaConcluida: etapa.concluido,
         isInstalado,
         instaladoAtrasado,
         urgente: envio.urgente,
         atrasado,
         labNome: lab?.nome ?? 'Laboratório removido',
+        etiquetas: etiquetasByEnvio?.[envio.id] ?? [],
       }
     })
-  }), [envios, labsById, precosByLab])
+  }), [envios, labsById, precosByLab, colunasOrdenadas, etiquetasByEnvio])
 
   const handleExportPdf = () => {
     const reportWindow = window.open('', '_blank')
@@ -74,7 +88,8 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
         <td>${escapeHtml(row.cor || '-')}</td>
         <td>${escapeHtml(formatDate(row.dataEnvio))}</td>
         <td>${escapeHtml(formatDate(row.dataPrevista))}</td>
-        <td>${escapeHtml(row.atrasado ? 'Atrasado' : row.status)}</td>
+        <td>${escapeHtml(formatDate(row.dataConsulta))}</td>
+        <td>${escapeHtml(row.status)}</td>
         <td>${escapeHtml(row.labNome)}</td>
       </tr>
     `).join('')
@@ -198,6 +213,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                   <th>Cor</th>
                   <th>Data de envio</th>
                   <th>Prazo</th>
+                  <th>Agendamento</th>
                   <th>Status</th>
                   <th>Laboratório</th>
                 </tr>
@@ -230,6 +246,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                 Cor: r.cor ?? '',
                 'Data Envio': r.dataEnvio,
                 Prazo: r.dataPrevista ?? '',
+                Agendamento: r.dataConsulta ?? '',
                 Status: r.status,
                 Laboratório: r.labNome,
                 Urgente: r.urgente ? 'Sim' : 'Não',
@@ -260,6 +277,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                 <th>Cor</th>
                 <th>Data de envio</th>
                 <th>Prazo</th>
+                <th>Agendamento</th>
                 <th>Status</th>
                 <th>Laboratório</th>
                 <th className={styles.serviceActionsCol}>Ações</th>
@@ -267,11 +285,18 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
             </thead>
             <tbody>
               {rows.map(row => (
-                <tr key={row.id} className={(row.atrasado || row.instaladoAtrasado) ? styles.serviceTableRowOverdue : ''}>
+                <tr key={row.id}>
                   <td>
                     <div className={styles.servicePatientCell}>
                       <strong>{row.pacienteNome}</strong>
                       {row.urgente && <span>Urgente</span>}
+                      {row.etiquetas.length > 0 && (
+                        <div className={styles.serviceTagDots}>
+                          {row.etiquetas.map(et => (
+                            <span key={et.id} className={styles.tagDot} style={{ background: et.cor }} title={et.nome} />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td>{row.servicoNome}</td>
@@ -279,22 +304,19 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                   <td>{row.cor || '—'}</td>
                   <td>{formatDate(row.dataEnvio)}</td>
                   <td>{formatDate(row.dataPrevista)}</td>
+                  <td>{formatDate(row.dataConsulta)}</td>
                   <td>
                     <div className={styles.serviceStatusCell}>
-                      {row.isInstalado ? (
-                        <span className={row.instaladoAtrasado ? styles.serviceStatusOverdue : styles.serviceStatusOnTime}>
-                          {row.instaladoAtrasado ? 'Instalado atrasado' : 'Instalado no prazo'}
-                        </span>
-                      ) : (
-                        <>
-                          {row.etapaConcluida && (
-                            <span className={styles.serviceStatus}>Pronto</span>
-                          )}
-                          {row.atrasado && (
-                            <span className={styles.serviceStatusOverdue}>Atrasado</span>
-                          )}
-                        </>
-                      )}
+                      <span
+                        className={styles.serviceStatusBadge}
+                        style={{
+                          color: row.statusColor,
+                          background: hexToRgba(row.statusColor, 0.12),
+                          borderColor: hexToRgba(row.statusColor, 0.32),
+                        }}
+                      >
+                        {row.status}
+                      </span>
                       <select
                         className={styles.serviceStatusSelect}
                         value={row.envio.status}

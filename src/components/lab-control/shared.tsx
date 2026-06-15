@@ -1,11 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
+import { createPortal } from 'react-dom'
 import type { Lab, LabEnvio, LabKanbanColuna } from '../../lib/types'
 import { Modal as UiModal } from '../ui'
 import styles from '../../pages/LabControlPage.module.css'
 import type { LabControlPermissions } from './constants'
-import { IconArchive, IconEdit, IconList, IconMoney, IconPlus, IconSettings2, IconUser } from './icons'
+import { IconArchive, IconEdit, IconList, IconMoney, IconPlus, IconSettings2, IconTag, IconUser } from './icons'
 import { formatDate, isFinalEnvioStatus, isOverdue } from './utils'
+
+// Ícone "?" com tooltip explicativo, renderizado via portal em document.body
+// para não ficar cortado por containers com overflow (ex: colunas do kanban).
+export function HelpTooltip({ text }: { text: string }) {
+  const [coords, setCoords] = useState<{ left: number; top: number } | null>(null)
+  const ref = useRef<HTMLSpanElement>(null)
+
+  const show = () => {
+    const rect = ref.current?.getBoundingClientRect()
+    if (!rect) return
+    setCoords({ left: Math.max(8, rect.right - 260), top: rect.bottom + 8 })
+  }
+  const hide = () => setCoords(null)
+
+  return (
+    <span
+      ref={ref}
+      className={styles.fieldHelpIcon}
+      tabIndex={0}
+      onMouseEnter={show}
+      onMouseLeave={hide}
+      onFocus={show}
+      onBlur={hide}
+    >
+      ?
+      {coords && createPortal(
+        <span className={styles.fieldHelpTooltipFixed} role="tooltip" style={{ left: coords.left, top: coords.top }}>
+          {text}
+        </span>,
+        document.body,
+      )}
+    </span>
+  )
+}
 
 export function Spinner() {
   return (
@@ -77,6 +112,7 @@ export function OverviewMenu({
   onOpenDentistas,
   onOpenFormasEnvio,
   onOpenFinanceiro,
+  onOpenEtiquetas,
 }: {
   labs: Lab[]
   envios: LabEnvio[]
@@ -93,6 +129,7 @@ export function OverviewMenu({
   onOpenDentistas: () => void
   onOpenFormasEnvio: () => void
   onOpenFinanceiro: () => void
+  onOpenEtiquetas: () => void
 }) {
   const [open, setOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement | null>(null)
@@ -145,6 +182,7 @@ export function OverviewMenu({
     { id: 'financeiro', label: 'Financeiro', icon: <IconMoney />, onClick: onOpenFinanceiro },
     { id: 'dentistas',  label: 'Dentistas',  icon: <IconUser />,    onClick: onOpenDentistas },
     { id: 'formas-envio', label: 'Tipos de envio', icon: <IconArchive />, onClick: onOpenFormasEnvio },
+    { id: 'etiquetas', label: 'Etiquetas', icon: <IconTag />, onClick: onOpenEtiquetas },
     ...(can('arquivados') ? [
       { id: 'arquivados', label: 'Arquivados', icon: <IconArchive />, onClick: onOpenArquivados },
     ] : []),

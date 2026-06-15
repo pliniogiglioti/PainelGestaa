@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import type { Lab, LabPreco, LabEnvio } from '../../lib/types'
+import type { Lab, LabEtiqueta, LabPreco, LabEnvio } from '../../lib/types'
 import { FINAL_ENVIO_STATUSES, type LabEtapa } from './constants'
 export type { LabEtapa } from './constants'
 
@@ -365,4 +365,40 @@ export function buildCalendarEvents(
     }
   }
   return events
+}
+
+export function hexToRgba(hex: string, alpha: number) {
+  const normalized = hex.replace('#', '')
+  const full = normalized.length === 3
+    ? normalized.split('').map(c => c + c).join('')
+    : normalized
+  const r = parseInt(full.slice(0, 2), 16)
+  const g = parseInt(full.slice(2, 4), 16)
+  const b = parseInt(full.slice(4, 6), 16)
+  if ([r, g, b].some(Number.isNaN)) return hex
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
+}
+
+// ── Etiquetas ─────────────────────────────────────────────────────────────
+
+export async function fetchEtiquetasByEnvio(
+  envioIds: string[],
+  etiquetas: LabEtiqueta[],
+): Promise<Record<string, LabEtiqueta[]>> {
+  if (envioIds.length === 0) return {}
+
+  const { data } = await supabase
+    .from('lab_envio_etiquetas')
+    .select('envio_id, etiqueta_id')
+    .in('envio_id', envioIds)
+
+  const etiquetasById = Object.fromEntries(etiquetas.map(et => [et.id, et]))
+  const map: Record<string, LabEtiqueta[]> = {}
+  for (const row of data ?? []) {
+    const etiqueta = etiquetasById[row.etiqueta_id]
+    if (!etiqueta) continue
+    if (!map[row.envio_id]) map[row.envio_id] = []
+    map[row.envio_id].push(etiqueta)
+  }
+  return map
 }

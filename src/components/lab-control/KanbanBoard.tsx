@@ -1,15 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
-import type { LabEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
+import type { LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { KANBAN_PAGE_SIZE } from './constants'
+import { COLUNA_DESCRICAO_PADRAO, COLUNA_DESCRICOES, COLUNA_EDITAR_DICA, KANBAN_PAGE_SIZE } from './constants'
 import { IconAlert, IconClock, IconEdit, IconTrash } from './icons'
+import { HelpTooltip } from './shared'
 import { formatDate, getEnvioEtapas, getEnvioResumo, getEtapaDataPrevista, getOverdueEtapas, isOverdue } from './utils'
 
-export function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, onDragStart, onOpenResumo, onEdit, onDelete }: {
+export function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precosByLab, etiquetas, onDragStart, onOpenResumo, onEdit, onDelete }: {
   envio: LabEnvio; dragging: boolean; isAdmin: boolean; labNome?: string | null
   feriados?: string[]
   precosByLab?: Record<string, LabPreco[]>
+  etiquetas?: LabEtiqueta[]
   onDragStart: (e: React.DragEvent, id: string) => void
   onOpenResumo: () => void
   onEdit: () => void; onDelete: () => void
@@ -46,6 +48,13 @@ export function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precos
           {envio.cor    && <span>Cor: {envio.cor}</span>}
         </div>
       )}
+      {!!etiquetas?.length && (
+        <div className={styles.kanbanCardTags}>
+          {etiquetas.map(et => (
+            <span key={et.id} className={styles.tagDot} style={{ background: et.cor }} title={et.nome} />
+          ))}
+        </div>
+      )}
       {cardDataPrevista && (
         <div className={`${styles.kanbanCardDate} ${overdue ? styles.kanbanCardDateOverdue : ''}`}>
           <IconClock /> {formatDate(cardDataPrevista)}
@@ -72,12 +81,13 @@ export function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precos
 
 // ── Kanban Board ──────────────────────────────────────────────────────────
 
-export function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
+export function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName, getLabFeriados, precosByLab, etiquetasByEnvio, onMoveEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio }: {
   envios: LabEnvio[]; colunas: LabKanbanColuna[]; isAdmin: boolean
   showLabName?: boolean
   getLabName?: (labId: string) => string
   getLabFeriados?: (labId: string) => string[]
   precosByLab?: Record<string, LabPreco[]>
+  etiquetasByEnvio?: Record<string, LabEtiqueta[]>
   onMoveEnvio: (id: string, status: string) => void
   onOpenResumo: (envio: LabEnvio) => void
   onEditEnvio: (envio: LabEnvio) => void
@@ -145,6 +155,7 @@ export function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName,
             <div className={styles.kanbanColHeader}>
               <span className={styles.kanbanColIndicator} style={{ background: col.cor }} />
               <span className={styles.kanbanColName}>{col.nome}</span>
+              <HelpTooltip text={`${COLUNA_DESCRICOES[col.nome] ?? COLUNA_DESCRICAO_PADRAO} ${COLUNA_EDITAR_DICA}`} />
               <span className={styles.kanbanColCount}>{colEnvios.length}</span>
             </div>
             <div className={styles.kanbanCards} onScroll={e => handleColumnScroll(e, col.nome, colEnvios.length)}>
@@ -157,6 +168,7 @@ export function KanbanBoard({ envios, colunas, isAdmin, showLabName, getLabName,
                   labNome={showLabName ? getLabName?.(envio.lab_id) ?? 'Laboratório' : null}
                   feriados={getLabFeriados?.(envio.lab_id)}
                   precosByLab={precosByLab}
+                  etiquetas={etiquetasByEnvio?.[envio.id]}
                   onDragStart={(e, id) => { setDraggingId(id); e.dataTransfer.effectAllowed = 'move' }}
                   onOpenResumo={() => onOpenResumo(envio)}
                   onEdit={() => onEditEnvio(envio)}

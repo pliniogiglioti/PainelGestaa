@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { Lab, LabDentista, LabEnvio, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
+import type { Lab, LabDentista, LabEnvio, LabEtiqueta, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { CLASSIFICACAO_PROTESE_OPTIONS, DEFAULT_ENVIO_STATUS, FORMA_RECEBIMENTO_OPTIONS, SHADE_OPTIONS } from './constants'
-import { IconAlert, IconTrash } from './icons'
+import { CLASSIFICACAO_PROTESE_OPTIONS, DEFAULT_ENVIO_STATUS, ETIQUETA_COR_PADRAO, FORMA_RECEBIMENTO_OPTIONS, SHADE_OPTIONS } from './constants'
+import { IconAlert, IconPlus, IconTrash } from './icons'
 import { Modal, ReviewRow } from './shared'
 import { addBusinessDays, calcularPrazoEntrega, formatCurrencyMask, formatDate, getEnvioEtapas, getLabFeriados, normalizeServicoNome, parseMaskedCurrency, registrarHistorico, today } from './utils'
 
@@ -17,6 +17,7 @@ interface EnvioFormState {
   conferencia_ok: boolean; anotacao_recebimento: string
   desconto: string; data_pagamento: string; observacao_financeira: string
   urgente: boolean
+  etiqueta_ids: string[]
 }
 
 interface ServicoSelecionado {
@@ -31,10 +32,11 @@ interface ServicoSelecionado {
   data_conclusao: string
 }
 
-export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, onClose, onSaved }: {
+export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId, userId, envio, colunas, etiquetas, onEtiquetasChange, onClose, onSaved }: {
   lab?: Lab | null; labs?: Lab[]; precos?: LabPreco[]; precosByLab?: Record<string, LabPreco[]>
   empresaId: string; userId: string
   envio: LabEnvio | null; colunas: LabKanbanColuna[]
+  etiquetas: LabEtiqueta[]; onEtiquetasChange: (etiquetas: LabEtiqueta[]) => void
   onClose: () => void; onSaved: () => void
 }) {
   const [step,   setStep]   = useState(1)
@@ -95,6 +97,7 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
     data_pagamento:              envio?.data_pagamento ?? '',
     observacao_financeira:       envio?.observacao_financeira ?? '',
     urgente:                     envio?.urgente ?? false,
+    etiqueta_ids:                [],
   })
 
   const [dentistas,       setDentistas]       = useState<LabDentista[]>([])
@@ -105,6 +108,10 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
   const [addingFormaEnvio,  setAddingFormaEnvio]  = useState(false)
   const [novaFormaEnvioName, setNovaFormaEnvioName] = useState('')
   const [savingFormaEnvio,  setSavingFormaEnvio]  = useState(false)
+  const [addingEtiqueta,   setAddingEtiqueta]   = useState(false)
+  const [novaEtiquetaNome, setNovaEtiquetaNome] = useState('')
+  const [novaEtiquetaCor,  setNovaEtiquetaCor]  = useState(ETIQUETA_COR_PADRAO)
+  const [savingEtiqueta,   setSavingEtiqueta]   = useState(false)
 
   useEffect(() => {
     void supabase.from('lab_dentistas').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
@@ -115,6 +122,12 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
     void supabase.from('lab_formas_envio').select('*').eq('empresa_id', empresaId).eq('ativo', true).order('nome')
       .then(({ data }) => setFormasEnvio(data ?? []))
   }, [empresaId])
+
+  useEffect(() => {
+    if (!envio) return
+    void supabase.from('lab_envio_etiquetas').select('etiqueta_id').eq('envio_id', envio.id)
+      .then(({ data }) => setForm(p => ({ ...p, etiqueta_ids: (data ?? []).map(row => row.etiqueta_id) })))
+  }, [envio])
 
   const formasEnvioOptions = formasEnvio.map(forma => forma.nome)
 
@@ -148,6 +161,30 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
     setAddingFormaEnvio(false)
     setNovaFormaEnvioName('')
     setSavingFormaEnvio(false)
+  }
+
+  const toggleEtiqueta = (id: string) => {
+    setForm(p => ({
+      ...p,
+      etiqueta_ids: p.etiqueta_ids.includes(id)
+        ? p.etiqueta_ids.filter(item => item !== id)
+        : [...p.etiqueta_ids, id],
+    }))
+  }
+
+  const handleSaveEtiqueta = async () => {
+    if (!novaEtiquetaNome.trim()) return
+    setSavingEtiqueta(true)
+    const { data } = await supabase.from('lab_etiquetas').insert({ empresa_id: empresaId, nome: novaEtiquetaNome.trim(), cor: novaEtiquetaCor }).select().single()
+    if (data) {
+      const nova = data as LabEtiqueta
+      onEtiquetasChange([...etiquetas, nova].sort((a, b) => a.nome.localeCompare(b.nome)))
+      setForm(p => ({ ...p, etiqueta_ids: [...p.etiqueta_ids, nova.id] }))
+    }
+    setAddingEtiqueta(false)
+    setNovaEtiquetaNome('')
+    setNovaEtiquetaCor(ETIQUETA_COR_PADRAO)
+    setSavingEtiqueta(false)
   }
 
   const set = (f: keyof EnvioFormState) =>
@@ -293,6 +330,8 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
       pago:                        form.data_pagamento ? true : envio?.pago ?? false,
     }
 
+    let envioId = envio?.id ?? null
+
     if (envio) {
       const changedFields: string[] = []
       const fieldsToCheck: (keyof typeof payload)[] = ['paciente_nome', 'dentista_nome', 'tipo_trabalho', 'classificacao_protese', 'preco_servico', 'dentes', 'cor', 'observacoes', 'data_envio', 'data_entrega_prometida', 'data_consulta', 'forma_envio', 'retirado_por', 'data_recebimento', 'forma_recebimento', 'urgente', 'desconto', 'data_pagamento', 'observacao_financeira']
@@ -309,9 +348,20 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
       const { data: inserted, error: err } = await supabase.from('lab_envios').insert(payload).select().single()
       if (err) { setError(err.message); setSaving(false); return }
       if (inserted) {
+        envioId = inserted.id
         await registrarHistorico(inserted.id, empresaId, userId, 'Envio criado')
       }
     }
+
+    if (envioId) {
+      await supabase.from('lab_envio_etiquetas').delete().eq('envio_id', envioId)
+      if (form.etiqueta_ids.length > 0) {
+        await supabase.from('lab_envio_etiquetas').insert(
+          form.etiqueta_ids.map(etiqueta_id => ({ envio_id: envioId, etiqueta_id })),
+        )
+      }
+    }
+
     onSaved(); onClose()
   }
 
@@ -568,6 +618,49 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
             <div className={`${styles.formField} ${styles.colSpan2}`}>
               <label className={styles.label}>Observações</label>
               <textarea className={styles.textarea} value={form.observacoes} onChange={set('observacoes')} rows={3} placeholder="Instruções especiais, referências de cor..." />
+            </div>
+            <div className={`${styles.formField} ${styles.colSpan2}`}>
+              <label className={styles.label}>Etiquetas</label>
+              <div className={styles.etiquetaChips}>
+                {etiquetas.map(et => {
+                  const selected = form.etiqueta_ids.includes(et.id)
+                  return (
+                    <button
+                      key={et.id}
+                      type="button"
+                      className={`${styles.etiquetaChip} ${selected ? styles.etiquetaChipActive : ''}`}
+                      style={selected ? { borderColor: et.cor, color: et.cor } : undefined}
+                      onClick={() => toggleEtiqueta(et.id)}
+                    >
+                      <span className={styles.tagDot} style={{ background: et.cor }} />
+                      {et.nome}
+                    </button>
+                  )
+                })}
+                {addingEtiqueta ? (
+                  <div className={styles.inlineAddRow}>
+                    <input
+                      className={styles.input}
+                      value={novaEtiquetaNome}
+                      onChange={e => setNovaEtiquetaNome(e.target.value)}
+                      placeholder="Nome da etiqueta"
+                      autoFocus
+                      onKeyDown={e => { if (e.key === 'Enter') void handleSaveEtiqueta() }}
+                    />
+                    <input type="color" className={styles.colorInput} value={novaEtiquetaCor} onChange={e => setNovaEtiquetaCor(e.target.value)} />
+                    <button type="button" className={styles.btnPrimary} onClick={() => void handleSaveEtiqueta()} disabled={savingEtiqueta || !novaEtiquetaNome.trim()}>
+                      {savingEtiqueta ? '…' : 'Salvar'}
+                    </button>
+                    <button type="button" className={styles.btnSecondary} onClick={() => { setAddingEtiqueta(false); setNovaEtiquetaNome('') }}>
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" className={styles.etiquetaChipAdd} onClick={() => setAddingEtiqueta(true)}>
+                    <IconPlus /> Nova etiqueta
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

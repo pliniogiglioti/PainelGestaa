@@ -6,10 +6,24 @@ export const DEFAULT_COLUNAS = [
   { nome: 'Instalado',               ordem: 4, cor: '#10b981' },
 ]
 
+export const COLUNA_DESCRICOES: Record<string, string> = {
+  'Pré-envio': 'Trabalhos que ainda não foram enviados ao laboratório.',
+  'Envio / Em laboratório': 'Trabalhos enviados e em produção no laboratório.',
+  'Anexos': 'Trabalhos com anexos/arquivos pendentes ou disponíveis.',
+  'Agendamento do paciente': 'Trabalhos prontos, aguardando agendamento/consulta do paciente.',
+  'Instalado': 'Trabalhos já instalados/concluídos no paciente.',
+}
+
+export const COLUNA_DESCRICAO_PADRAO = 'Coluna personalizada do kanban.'
+
+export const COLUNA_EDITAR_DICA = 'Para editar ou criar colunas, use o menu (⋯) → "Editar Kanbans".'
+
 export const DEFAULT_ENVIO_STATUS = 'Pré-envio'
 export const FINAL_ENVIO_STATUSES = ['Instalado', 'Concluído', 'Entregue']
 
 export const KANBAN_PAGE_SIZE = 5
+
+export const ETIQUETA_COR_PADRAO = '#6366f1'
 
 export const SHADE_OPTIONS = [
   'A1', 'A2', 'A3', 'A3.5', 'A4',

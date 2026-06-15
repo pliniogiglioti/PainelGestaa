@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
-import type { Lab, LabEnvio, LabKanbanColuna, LabPreco, LabDentista } from '../../lib/types'
+import type { Lab, LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco, LabDentista } from '../../lib/types'
 import ModalTransition from '../ModalTransition'
 import { useSessionStorageState } from '../../hooks/useSessionStorageState'
 import styles from '../../pages/LabControlPage.module.css'
 import { DENTISTA_FILTER_ALL, HOME_MODE_OPTIONS, LAB_FILTER_ALL, isLabDetailTab, isString, type LabControlPermissions, type LabHomeMode } from './constants'
 import { IconAlert, IconArchive, IconBack, IconCalendar, IconClock, IconEdit, IconList, IconMail, IconPhone, IconPlus, IconSettings2, IconTrash } from './icons'
-import { ArquivadosModal, DentistasModal, FormasEnvioModal, KanbanConfigModal, LabModal, PrecosModal } from './LabModals'
+import { ArquivadosModal, DentistasModal, EtiquetasModal, FormasEnvioModal, KanbanConfigModal, LabModal, PrecosModal } from './LabModals'
 import { CalendarView } from './CalendarView'
 import { EnvioResumoModal } from './EnvioResumoModal'
 import { EnvioSteps } from './EnvioSteps'
@@ -15,7 +15,7 @@ import { ServicesListView } from './ServicesListView'
 import { FinancialListView } from './FinancialListView'
 import { InfoRow, Modal, OverviewMenu, Spinner } from './shared'
 import type { LabEtapa } from './utils'
-import { applyEtapaChanges, formatDate, formatWhatsAppNumber, getEnvioDataEntregaRealFromEtapas, getEnvioEtapas, getLabFeriados, isOverdue, registrarHistorico, serializeLabEtapas, sortEnviosByCreatedAt, today } from './utils'
+import { applyEtapaChanges, fetchEtiquetasByEnvio, formatDate, formatWhatsAppNumber, getEnvioDataEntregaRealFromEtapas, getEnvioEtapas, getLabFeriados, isOverdue, registrarHistorico, serializeLabEtapas, sortEnviosByCreatedAt, today } from './utils'
 
 export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, colunas, onBack, onLabUpdated, onColunasUpdated }: {
   lab: Lab; empresaId: string; userId: string; isAdmin: boolean
@@ -46,6 +46,8 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
     isString,
   )
   const [novoFeriado,     setNovoFeriado]     = useState('')
+  const [etiquetas,        setEtiquetas]        = useState<LabEtiqueta[]>([])
+  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
   const can = (permission: keyof LabControlPermissions) => isAdmin || !!permissions[permission]
 
   const fetchEnvios = useCallback(async () => {
@@ -65,10 +67,20 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
     if (data) setPrecos(data)
   }, [lab.id])
 
+  const fetchEtiquetas = useCallback(async () => {
+    const { data } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).order('nome')
+    setEtiquetas(data ?? [])
+  }, [empresaId])
+
   useEffect(() => {
     void fetchEnvios()
     void fetchPrecos()
-  }, [fetchEnvios, fetchPrecos])
+    void fetchEtiquetas()
+  }, [fetchEnvios, fetchPrecos, fetchEtiquetas])
+
+  useEffect(() => {
+    void fetchEtiquetasByEnvio(envios.map(e => e.id), etiquetas).then(setEtiquetasByEnvio)
+  }, [envios, etiquetas])
 
   const moveEnvio = async (envioId: string, status: string) => {
     const { error } = await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
@@ -226,6 +238,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
               isAdmin={can('excluir_envio')}
               getLabFeriados={() => getLabFeriados(lab)}
               precosByLab={{ [lab.id]: precos }}
+              etiquetasByEnvio={etiquetasByEnvio}
               onMoveEnvio={moveEnvio}
               onOpenResumo={setResumoEnvio}
               onEditEnvio={e => { setEditingEnvio(e); setShowEnvioSteps(true) }}
@@ -355,6 +368,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
         <EnvioSteps
           lab={lab} precos={precos} empresaId={empresaId} userId={userId}
           envio={editingEnvio} colunas={colunas}
+          etiquetas={etiquetas} onEtiquetasChange={setEtiquetas}
           onClose={() => setShowEnvioSteps(false)} onSaved={fetchEnvios}
         />
       )}
@@ -456,7 +470,10 @@ export function LabsAggregateDetailView({
   const [showFinanceiro,   setShowFinanceiro]   = useState(false)
   const [showDentistas,    setShowDentistas]    = useState(false)
   const [showFormasEnvio,  setShowFormasEnvio]  = useState(false)
+  const [showEtiquetas,    setShowEtiquetas]    = useState(false)
   const [dentistas,        setDentistas]        = useState<LabDentista[]>([])
+  const [etiquetas,        setEtiquetas]        = useState<LabEtiqueta[]>([])
+  const [etiquetasByEnvio, setEtiquetasByEnvio] = useState<Record<string, LabEtiqueta[]>>({})
   const [patientSearch, setPatientSearch] = useSessionStorageState(
     `${storagePrefix}:patient-search`,
     '',
@@ -512,10 +529,19 @@ export function LabsAggregateDetailView({
     setDentistas(data ?? [])
   }, [empresaId])
 
+  const fetchEtiquetas = useCallback(async () => {
+    const { data } = await supabase.from('lab_etiquetas').select('*').eq('empresa_id', empresaId).order('nome')
+    setEtiquetas(data ?? [])
+  }, [empresaId])
+
   useEffect(() => {
     setLoading(true)
-    void Promise.all([fetchEnvios(), fetchPrecos(), fetchDentistas()]).then(() => setLoading(false))
-  }, [fetchEnvios, fetchPrecos, fetchDentistas])
+    void Promise.all([fetchEnvios(), fetchPrecos(), fetchDentistas(), fetchEtiquetas()]).then(() => setLoading(false))
+  }, [fetchEnvios, fetchPrecos, fetchDentistas, fetchEtiquetas])
+
+  useEffect(() => {
+    void fetchEtiquetasByEnvio(envios.map(e => e.id), etiquetas).then(setEtiquetasByEnvio)
+  }, [envios, etiquetas])
 
   useEffect(() => {
     if (labFilterId === LAB_FILTER_ALL) return
@@ -649,6 +675,7 @@ export function LabsAggregateDetailView({
             onOpenDentistas={() => setShowDentistas(true)}
             onOpenFormasEnvio={() => setShowFormasEnvio(true)}
             onOpenFinanceiro={() => setShowFinanceiro(true)}
+            onOpenEtiquetas={() => setShowEtiquetas(true)}
           />
         </div>
       </div>
@@ -707,6 +734,7 @@ export function LabsAggregateDetailView({
           labs={labs}
           colunas={colunas}
           isAdmin={can('excluir_envio')}
+          etiquetasByEnvio={etiquetasByEnvio}
           onMoveEnvio={moveEnvioAgg}
           onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
           onDeleteEnvio={deleteEnvioAgg}
@@ -720,6 +748,7 @@ export function LabsAggregateDetailView({
           getLabName={labId => labsById[labId]?.nome ?? 'Laboratório removido'}
           getLabFeriados={labId => labsById[labId] ? getLabFeriados(labsById[labId]) : []}
           precosByLab={precosByLab}
+          etiquetasByEnvio={etiquetasByEnvio}
           onMoveEnvio={moveEnvioAgg}
           onOpenResumo={setResumoEnvio}
           onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
@@ -738,6 +767,7 @@ export function LabsAggregateDetailView({
           userId={userId}
           envio={editingEnvio}
           colunas={colunas}
+          etiquetas={etiquetas} onEtiquetasChange={setEtiquetas}
           onClose={() => {
             setShowEnvioSteps(false)
             setEditingEnvio(null)
@@ -784,6 +814,14 @@ export function LabsAggregateDetailView({
           <FormasEnvioModal
             empresaId={empresaId}
             onClose={() => setShowFormasEnvio(false)}
+          />
+        )}
+      </ModalTransition>
+      <ModalTransition open={showEtiquetas}>
+        {showEtiquetas && (
+          <EtiquetasModal
+            empresaId={empresaId}
+            onClose={() => { setShowEtiquetas(false); void fetchEtiquetas() }}
           />
         )}
       </ModalTransition>
