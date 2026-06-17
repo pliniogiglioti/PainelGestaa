@@ -2094,7 +2094,9 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                     {precosVisiveis.length === 0 ? (
                       <p className={styles.emptyMsg} style={{ padding: '24px 18px' }}>Nenhum item encontrado para "{busca}".</p>
                     ) : precosVisiveis.map(item => {
-                      const margemPercentual = getItemMargemPercent(item, configPadraoMemo)
+                      const margemCalculada = getItemMargemPercent(item, configPadraoMemo)
+                      // importados sem cálculo Gestaa mostram "Sem precificação" — margem_percent da planilha é só referência
+                      const margemPercentual = (item.importado && !hasGestaaCalculatedPrice(item)) ? null : margemCalculada
                       const margemSaudavel = isMargemSaudavel(margemPercentual)
 
                       return (
