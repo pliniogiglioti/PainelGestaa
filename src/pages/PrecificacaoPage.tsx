@@ -95,6 +95,14 @@ const IconUpload = () => (
   </svg>
 )
 
+const IconDownload = () => (
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+)
+
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
@@ -845,7 +853,7 @@ function CalculadoraPrecificacaoModal({
       setErroLocal('Informe o nome do produto ou servico.')
       return
     }
-    if (isCreating && !categoria) {
+    if (!categoria) {
       setErroLocal('Selecione uma categoria odontologica.')
       return
     }
@@ -1259,7 +1267,9 @@ function CalculadoraPrecificacaoModal({
                           ? 'Ao salvar, o novo produto ou servico será criado com este preço e com toda a configuração da calculadora.'
                           : hasChanges
                             ? 'Use o botão salvar para gravar o preço de venda e toda a configuração desta janela.'
-                            : 'Alterações salvas neste produto.'}
+                            : item && !hasGestaaCalculatedPrice(item)
+                              ? 'Este preço ainda não tem um cálculo salvo. Clique em "Salvar preço" para registrar a margem calculada.'
+                              : 'Alterações salvas neste produto.'}
                       </p>
                     )}
                   </>
@@ -1455,6 +1465,8 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const importFileRef = useRef<HTMLInputElement>(null)
   const [showConfigModal, setShowConfigModal] = useState(false)
   const [precos, setPrecos] = useState<EmpresaPreco[]>([])
+  const [busca, setBusca] = useState('')
+  const [pagina, setPagina] = useState(1)
   const [savingPreco, setSavingPreco] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
@@ -1627,6 +1639,20 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     setSavingPreco(false)
   }
 
+  const downloadExemplo = () => {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['Nome do produto/serviço', 'Categoria', 'Margem (%)', 'Preço (R$)'],
+      ['Consulta de avaliação', 'Consultas e avaliacao', '', 200],
+      ['Restauração 1F', 'Dentistica restauradora', 50, 250],
+      ['Implante', 'Implantodontia', '', 4000],
+      ['Clareamento dental', 'Estetica dental e clareamento', 60, 800],
+      ['Ortodontia convencional', '', '', 1200],
+    ])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Preços')
+    XLSX.writeFile(wb, 'exemplo_importacao_precos.xlsx')
+  }
+
   const handleImportarLista = async () => {
     setImportError('')
 
@@ -1647,30 +1673,49 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
     }
 
     // ignora primeira linha (cabeçalho)
-    const dataRows = rows.slice(1).filter(r => Array.isArray(r) && r.length >= 3)
+    const dataRows = rows.slice(1).filter(r => Array.isArray(r) && r.length >= 2)
 
     if (dataRows.length === 0) {
       setImportError('Nenhuma linha encontrada após o cabeçalho.')
       return
     }
 
-    const itens: { nome: string; margem: number | null; preco: number }[] = []
+    // detecta formato: 4 colunas (nome, categoria, margem, preco) ou 3 (nome, margem, preco)
+    const usa4Colunas = (dataRows[0] as unknown[]).length >= 4
+
+    const itens: { nome: string; categoria: string | null; margem: number | null; preco: number }[] = []
     for (let i = 0; i < dataRows.length; i++) {
-      const [nomeRaw, margemRaw, precoRaw] = dataRows[i] as unknown[]
+      const row = dataRows[i] as unknown[]
+      const nomeRaw  = row[0]
       const nome = String(nomeRaw ?? '').trim()
-      if (!nome) {
-        setImportError(`Linha ${i + 2}: nome nao pode ser vazio.`)
-        return
+      if (!nome) continue
+
+      let categoriaRaw: unknown
+      let margemRaw: unknown
+      let precoRaw: unknown
+
+      if (usa4Colunas) {
+        categoriaRaw = row[1]; margemRaw = row[2]; precoRaw = row[3]
+      } else {
+        categoriaRaw = undefined; margemRaw = row[1]; precoRaw = row[2]
       }
+
       const preco = typeof precoRaw === 'number' ? precoRaw : parsePreco(String(precoRaw ?? ''))
       if (preco <= 0) {
-        setImportError(`Linha ${i + 2}: preco invalido "${precoRaw}".`)
+        setImportError(`Linha ${i + 2}: preço inválido "${precoRaw}".`)
         return
       }
       const margem = typeof margemRaw === 'number'
         ? normalizeImportedPercentValue(margemRaw)
         : parseMargem(String(margemRaw ?? ''))
-      itens.push({ nome, margem, preco })
+      const categoriaStr = String(categoriaRaw ?? '').trim()
+      const categoria = categoriaStr || null
+      itens.push({ nome, categoria, margem, preco })
+    }
+
+    if (itens.length === 0) {
+      setImportError('Nenhuma linha válida encontrada.')
+      return
     }
 
     const empresaValida = await ensureEmpresaAtiva()
@@ -1683,6 +1728,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       .insert(itens.map(it => ({
         empresa_id: empresa.id,
         nome_produto: it.nome,
+        categoria: it.categoria,
         preco: it.preco,
         margem_percent: it.margem,
       })))
@@ -2009,80 +2055,140 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 </div>
               </div>
             </div>
-          ) : (
-            <div className={styles.priceTable}>
-              <div className={styles.priceTableHead}>
-                <span>Produto / servico</span>
-                <span>Margem</span>
-                <span>Ação</span>
-                <span style={{ textAlign: 'right' }}>Preço</span>
-              </div>
-              <div className={styles.priceTableBody}>
-                {precos.map(item => {
-                  const margemPercentual = getItemMargemPercent(item, configPadraoMemo)
-                  const margemSaudavel = isMargemSaudavel(margemPercentual)
+          ) : (() => {
+            const PAGE_SIZE = 10
+            const buscaLower = busca.toLowerCase()
+            const precosFiltrados = precos.filter(item =>
+              item.nome_produto.toLowerCase().includes(buscaLower) ||
+              (item.categoria ?? '').toLowerCase().includes(buscaLower),
+            )
+            const totalPaginas = Math.max(1, Math.ceil(precosFiltrados.length / PAGE_SIZE))
+            const paginaAtual = Math.min(pagina, totalPaginas)
+            const precosVisiveis = precosFiltrados.slice((paginaAtual - 1) * PAGE_SIZE, paginaAtual * PAGE_SIZE)
 
-                  return (
-                    <div key={item.id} className={styles.priceRow}>
-                      <div className={styles.priceNameWrap}>
-                        <span className={styles.priceName}>{item.nome_produto}</span>
-                        <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
-                        {hasGestaaCalculatedPrice(item) && (
-                          <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
-                        )}
-                      </div>
-                      <div
-                        className={`${styles.priceMarginValue} ${
-                          margemSaudavel
-                            ? styles.priceMarginGood
-                            : margemPercentual == null
-                              ? styles.priceMarginEmpty
-                              : styles.priceMarginBad
-                        }`}
-                      >
-                        {margemPercentual == null || margemPercentual === 0 ? 'Sem precificação' : formatPercent(margemPercentual)}
-                      </div>
-                      <div className={styles.priceActions}>
-                        <button
-                          type="button"
-                          className={`${styles.calcButton} ${margemSaudavel ? styles.calcButtonGood : styles.calcButtonBad}`}
-                          onClick={() => setItemCalculadora(item)}
-                        >
-                          {margemSaudavel ? 'Preco com margem correta' : 'Rever precificacao'}
-                        </button>
-                      </div>
-                      <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
-                      {canManage && (
-                        <div className={styles.priceIconActions}>
-                          <button
-                            type="button"
-                            className={styles.priceIconBtn}
-                            title="Editar"
-                            onClick={() => {
-                              setError('')
-                              setFeedback('')
-                              setPrecoEditando(item)
-                              setShowPrecoModal(true)
-                            }}
+            return (
+              <>
+                <div className={styles.priceSearchRow}>
+                  <input
+                    className={styles.priceSearchInput}
+                    type="search"
+                    placeholder="Buscar por nome ou categoria..."
+                    value={busca}
+                    onChange={e => { setBusca(e.target.value); setPagina(1) }}
+                  />
+                  <span className={styles.priceSearchCount}>
+                    {precosFiltrados.length} de {precos.length} ite{precos.length === 1 ? 'm' : 'ns'}
+                  </span>
+                </div>
+
+                <div className={styles.priceTable}>
+                  <div className={styles.priceTableHead}>
+                    <span>Produto / servico</span>
+                    <span>Margem</span>
+                    <span>Ação</span>
+                    <span style={{ textAlign: 'right' }}>Preço</span>
+                  </div>
+                  <div className={styles.priceTableBody}>
+                    {precosVisiveis.length === 0 ? (
+                      <p className={styles.emptyMsg} style={{ padding: '24px 18px' }}>Nenhum item encontrado para "{busca}".</p>
+                    ) : precosVisiveis.map(item => {
+                      const margemPercentual = getItemMargemPercent(item, configPadraoMemo)
+                      const margemSaudavel = isMargemSaudavel(margemPercentual)
+
+                      return (
+                        <div key={item.id} className={styles.priceRow}>
+                          <div className={styles.priceNameWrap}>
+                            <span className={styles.priceName}>{item.nome_produto}</span>
+                            <span className={styles.priceCategory}>{getCategoriaLabel(item.categoria)}</span>
+                            {hasGestaaCalculatedPrice(item) && (
+                              <span className={styles.priceCalculatedBadge}>Preço ajustado pela calculadora da Gestaa</span>
+                            )}
+                          </div>
+                          <div
+                            className={`${styles.priceMarginValue} ${
+                              margemSaudavel
+                                ? styles.priceMarginGood
+                                : margemPercentual == null
+                                  ? styles.priceMarginEmpty
+                                  : styles.priceMarginBad
+                            }`}
                           >
-                            <IconEdit />
-                          </button>
-                          <button
-                            type="button"
-                            className={`${styles.priceIconBtn} ${styles.priceIconBtnDanger}`}
-                            title="Excluir"
-                            onClick={() => handleDeletePreco(item.id)}
-                          >
-                            <IconTrash />
-                          </button>
+                            {margemPercentual == null || margemPercentual === 0 ? 'Sem precificação' : formatPercent(margemPercentual)}
+                          </div>
+                          <div className={styles.priceActions}>
+                            <button
+                              type="button"
+                              className={`${styles.calcButton} ${margemSaudavel ? styles.calcButtonGood : styles.calcButtonBad}`}
+                              onClick={() => setItemCalculadora(item)}
+                            >
+                              {margemSaudavel ? 'Preco com margem correta' : 'Rever precificacao'}
+                            </button>
+                          </div>
+                          <strong className={styles.priceValue}>{formatCurrency(item.preco)}</strong>
+                          {canManage && (
+                            <div className={styles.priceIconActions}>
+                              <button
+                                type="button"
+                                className={styles.priceIconBtn}
+                                title="Editar"
+                                onClick={() => {
+                                  setError('')
+                                  setFeedback('')
+                                  setPrecoEditando(item)
+                                  setShowPrecoModal(true)
+                                }}
+                              >
+                                <IconEdit />
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.priceIconBtn} ${styles.priceIconBtnDanger}`}
+                                title="Excluir"
+                                onClick={() => handleDeletePreco(item.id)}
+                              >
+                                <IconTrash />
+                              </button>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {totalPaginas > 1 && (
+                  <div className={styles.pagination}>
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={paginaAtual === 1}
+                      onClick={() => setPagina(p => p - 1)}
+                    >
+                      ‹ Anterior
+                    </button>
+                    {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(p => (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`${styles.pageBtn} ${p === paginaAtual ? styles.pageBtnActive : ''}`}
+                        onClick={() => setPagina(p)}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      className={styles.pageBtn}
+                      disabled={paginaAtual === totalPaginas}
+                      onClick={() => setPagina(p => p + 1)}
+                    >
+                      Próxima ›
+                    </button>
+                  </div>
+                )}
+              </>
+            )
+          })()}
       </div>
 
       <ModalTransition open={showPrecoModal}>
@@ -2167,10 +2273,23 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
                 <button className={styles.modalClose} onClick={() => setShowImportModal(false)} disabled={importando}>✕</button>
               </div>
               <div className={styles.modalBody}>
-                <p className={styles.modalFieldHint} style={{ marginBottom: 12 }}>
-                  Selecione um arquivo <strong>.xlsx</strong>. A primeira linha (cabeçalho) será ignorada.<br />
-                  As colunas devem estar na ordem: <strong>nome, margem, preco</strong>.
+                <p className={styles.modalFieldHint} style={{ marginBottom: 8 }}>
+                  Arquivo <strong>.xlsx</strong> com a primeira linha como cabeçalho (ignorada).<br />
+                  Formatos aceitos:
                 </p>
+                <ul className={styles.importFormatList}>
+                  <li><strong>4 colunas:</strong> nome · categoria · margem (%) · preço — categoria e margem são opcionais, deixe vazio para "Sem categoria" / "Sem precificação"</li>
+                  <li><strong>3 colunas (legado):</strong> nome · margem (%) · preço</li>
+                </ul>
+                <button
+                  type="button"
+                  className={styles.btnSecondary}
+                  style={{ marginBottom: 12 }}
+                  onClick={downloadExemplo}
+                  disabled={importando}
+                >
+                  <IconDownload /> Baixar planilha de exemplo
+                </button>
                 <input
                   ref={importFileRef}
                   type="file"

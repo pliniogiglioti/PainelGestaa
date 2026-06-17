@@ -3,7 +3,7 @@ import type React from 'react'
 import type { LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
 import { COLUNA_DESCRICAO_PADRAO, COLUNA_DESCRICOES, COLUNA_EDITAR_DICA, KANBAN_PAGE_SIZE } from './constants'
-import { IconAlert, IconClock, IconEdit, IconTrash } from './icons'
+import { IconAlert, IconArchive, IconClock, IconEdit } from './icons'
 import { HelpTooltip } from './shared'
 import { formatDate, getEnvioEtapas, getEnvioResumo, getEtapaDataPrevista, getOverdueEtapas, isOverdue } from './utils'
 
@@ -72,7 +72,7 @@ export function KanbanCard({ envio, dragging, isAdmin, labNome, feriados, precos
       <div className={styles.kanbanCardActions}>
         <button type="button" className={styles.btnIcon} onClick={e => { e.stopPropagation(); onEdit() }} title="Editar"><IconEdit /></button>
         {isAdmin && (
-          <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={e => { e.stopPropagation(); onDelete() }} title="Excluir"><IconTrash /></button>
+          <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={e => { e.stopPropagation(); onDelete() }} title="Arquivar"><IconArchive /></button>
         )}
       </div>
     </div>

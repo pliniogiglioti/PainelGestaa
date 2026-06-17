@@ -300,6 +300,72 @@
   line-height: 1.6;
 }
 
+.priceSearchRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.priceSearchInput {
+  flex: 1;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 14px;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.priceSearchInput:focus { border-color: var(--border-gold); }
+.priceSearchInput::placeholder { color: var(--text-dim); }
+
+.priceSearchCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+
+.pageBtn {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pageBtn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: var(--border-gold);
+}
+.pageBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.pageBtnActive {
+  background: var(--gold);
+  border-color: var(--gold);
+  color: #000;
+  font-weight: 600;
+}
+.pageBtnActive:hover:not(:disabled) {
+  background: var(--gold);
+  color: #000;
+}
+
 .priceTable {
   border: 1px solid var(--border);
   border-radius: 18px;
@@ -881,6 +947,18 @@
 .switchButtonActive .switchThumb {
   transform: translateX(24px);
 }
+
+.importFormatList {
+  list-style: disc;
+  padding-left: 20px;
+  margin-bottom: 14px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.importFormatList li { line-height: 1.5; }
 
 .modalInput {
   width: 100%;

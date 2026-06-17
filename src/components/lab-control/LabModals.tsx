@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Lab, LabDentista, LabEnvio, LabEtiqueta, LabFormaEnvio, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
 import { ETIQUETA_COR_PADRAO, FORMA_ENVIO_OPTIONS, LAB_CONTROL_PERMISSION_OPTIONS, type LabControlPermissionKey } from './constants'
-import { IconEdit, IconPlus, IconTrash, IconUpload } from './icons'
+import { IconArchive, IconEdit, IconPlus, IconTrash, IconUpload } from './icons'
 import { Modal, Spinner } from './shared'
 import { formatCurrencyMask, formatDate, formatWhatsAppInput, normalizeWhatsAppNumber, parseMaskedCurrency, registrarHistorico } from './utils'
 
@@ -661,6 +661,7 @@ export function ArquivadosModal({ empresaId, userId, labId, allowPermanentDelete
                   <strong>{e.paciente_nome}</strong>
                   <span>{e.tipo_trabalho}</span>
                   <small>Arquivado em {formatDate(e.arquivado_em)}</small>
+                  {e.motivo_arquivamento && <small style={{ color: 'var(--text-muted)' }}>Motivo: {e.motivo_arquivamento}</small>}
                   {allowPermanentDelete && confirmDeleteId === e.id && (
                     <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
                       <input
@@ -902,6 +903,50 @@ export function LabAccessModal({ empresaId, onClose }: {
           )}
         </div>
       )}
+    </Modal>
+  )
+}
+
+// ── ConfirmarArquivamentoModal ─────────────────────────────────────────────
+
+export function ConfirmarArquivamentoModal({ onConfirm, onClose }: {
+  onConfirm: (motivo: string) => Promise<void>
+  onClose: () => void
+}) {
+  const [motivo, setMotivo] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const handleConfirm = async () => {
+    setSaving(true)
+    await onConfirm(motivo.trim())
+    setSaving(false)
+  }
+
+  return (
+    <Modal title="Arquivar envio" onClose={onClose}>
+      <div className={styles.form}>
+        <div className={styles.formField}>
+          <label className={styles.label}>
+            Motivo do arquivamento <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(opcional)</span>
+          </label>
+          <textarea
+            className={styles.textarea}
+            value={motivo}
+            onChange={e => setMotivo(e.target.value)}
+            placeholder="Ex: trabalho cancelado, paciente desistiu..."
+            rows={3}
+            autoFocus
+          />
+        </div>
+        <div className={styles.formActions}>
+          <button type="button" className={styles.btnSecondary} onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <button type="button" className={styles.btnPrimary} onClick={() => void handleConfirm()} disabled={saving}>
+            <IconArchive /> {saving ? 'Arquivando...' : 'Arquivar'}
+          </button>
+        </div>
+      </div>
     </Modal>
   )
 }

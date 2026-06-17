@@ -6,7 +6,7 @@ import { useSessionStorageState } from '../../hooks/useSessionStorageState'
 import styles from '../../pages/LabControlPage.module.css'
 import { DENTISTA_FILTER_ALL, HOME_MODE_OPTIONS, LAB_FILTER_ALL, isLabDetailTab, isString, type LabControlPermissions, type LabHomeMode } from './constants'
 import { IconAlert, IconArchive, IconBack, IconCalendar, IconClock, IconEdit, IconList, IconMail, IconPhone, IconPlus, IconSettings2, IconTrash } from './icons'
-import { ArquivadosModal, DentistasModal, EtiquetasModal, FormasEnvioModal, KanbanConfigModal, LabModal, PrecosModal } from './LabModals'
+import { ArquivadosModal, ConfirmarArquivamentoModal, DentistasModal, EtiquetasModal, FormasEnvioModal, KanbanConfigModal, LabModal, PrecosModal } from './LabModals'
 import { CalendarView } from './CalendarView'
 import { EnvioResumoModal } from './EnvioResumoModal'
 import { EnvioSteps } from './EnvioSteps'
@@ -39,6 +39,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
   const [showPrecos,        setShowPrecos]        = useState(false)
   const [showKanbanCfg,     setShowKanbanCfg]     = useState(false)
   const [showArquivados,    setShowArquivados]    = useState(false)
+  const [pendingArchiveId,  setPendingArchiveId]  = useState<string | null>(null)
   const [editingPrecoId,    setEditingPrecoId]    = useState<string | null>(null)
   const [patientSearch, setPatientSearch] = useSessionStorageState(
     `${storagePrefix}:patient-search`,
@@ -90,26 +91,23 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
     if (e) await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
 
-  const deleteEnvio = async (envioId: string) => {
-    const envio = envios.find(e => e.id === envioId)
-    if (!envio) return
-    if (isAdmin) {
-      const choice = confirm('Arquivar este envio?\n\nClique em OK para arquivar.\nClique em Cancelar para outras opções.')
-      if (choice) {
-        const arquivado_em = new Date().toISOString()
-        const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
-        if (error) return
-        await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
-        setEnvios(prev => prev.filter(e => e.id !== envioId))
-      }
-    } else {
-      if (!confirm('Arquivar este envio?')) return
-      const arquivado_em = new Date().toISOString()
-      const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
-      if (error) return
-      await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
-      setEnvios(prev => prev.filter(e => e.id !== envioId))
-    }
+  const deleteEnvio = (envioId: string) => {
+    setPendingArchiveId(envioId)
+  }
+
+  const confirmarArquivamento = async (motivo: string) => {
+    const envioId = pendingArchiveId
+    if (!envioId) return
+    const arquivado_em = new Date().toISOString()
+    const { error } = await supabase.from('lab_envios').update({
+      arquivado_em,
+      motivo_arquivamento: motivo || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', envioId)
+    if (error) { setPendingArchiveId(null); return }
+    await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
+    setEnvios(prev => prev.filter(e => e.id !== envioId))
+    setPendingArchiveId(null)
   }
 
   const togglePagoEnvio = async (envio: LabEnvio) => {
@@ -397,6 +395,14 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
           onRestored={() => void fetchEnvios()}
         />
       </ModalTransition>
+      <ModalTransition open={!!pendingArchiveId}>
+        {pendingArchiveId && (
+          <ConfirmarArquivamentoModal
+            onConfirm={confirmarArquivamento}
+            onClose={() => setPendingArchiveId(null)}
+          />
+        )}
+      </ModalTransition>
       <ModalTransition open={!!resumoEnvio}>
         {resumoEnvio && (
           <EnvioResumoModal
@@ -467,6 +473,7 @@ export function LabsAggregateDetailView({
   const [resumoEnvio,      setResumoEnvio]      = useState<LabEnvio | null>(null)
   const [showKanbanCfg,    setShowKanbanCfg]    = useState(false)
   const [showArquivados,   setShowArquivados]   = useState(false)
+  const [pendingArchiveId, setPendingArchiveId] = useState<string | null>(null)
   const [showFinanceiro,   setShowFinanceiro]   = useState(false)
   const [showDentistas,    setShowDentistas]    = useState(false)
   const [showFormasEnvio,  setShowFormasEnvio]  = useState(false)
@@ -558,13 +565,23 @@ export function LabsAggregateDetailView({
     await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
 
-  const deleteEnvioAgg = async (envioId: string) => {
-    if (!confirm('Arquivar este envio?')) return
+  const deleteEnvioAgg = (envioId: string) => {
+    setPendingArchiveId(envioId)
+  }
+
+  const confirmarArquivamentoAgg = async (motivo: string) => {
+    const envioId = pendingArchiveId
+    if (!envioId) return
     const arquivado_em = new Date().toISOString()
-    const { error } = await supabase.from('lab_envios').update({ arquivado_em, updated_at: new Date().toISOString() }).eq('id', envioId)
-    if (error) return
+    const { error } = await supabase.from('lab_envios').update({
+      arquivado_em,
+      motivo_arquivamento: motivo || null,
+      updated_at: new Date().toISOString(),
+    }).eq('id', envioId)
+    if (error) { setPendingArchiveId(null); return }
     await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
     setEnvios(prev => prev.filter(item => item.id !== envioId))
+    setPendingArchiveId(null)
   }
 
   const togglePagoEnvio = async (envio: LabEnvio) => {
@@ -797,6 +814,14 @@ export function LabsAggregateDetailView({
           onClose={() => setShowArquivados(false)}
           onRestored={() => void fetchEnvios()}
         />
+      </ModalTransition>
+      <ModalTransition open={!!pendingArchiveId}>
+        {pendingArchiveId && (
+          <ConfirmarArquivamentoModal
+            onConfirm={confirmarArquivamentoAgg}
+            onClose={() => setPendingArchiveId(null)}
+          />
+        )}
       </ModalTransition>
       <ModalTransition open={showFinanceiro}>
         {showFinanceiro && (

@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import type { Lab, LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { IconEdit, IconTrash } from './icons'
+import { IconArchive, IconEdit } from './icons'
 import { formatDate, getEnvioEtapas, getEtapaDataPrevista, getLabFeriados, hexToRgba, today } from './utils'
 
 const STATUS_COLOR_INSTALADO_ATRASADO = '#fbbf24'
@@ -333,7 +333,7 @@ export function ServicesListView({ envios, precosByLab, labs, colunas, isAdmin, 
                     <div className={styles.kanbanCardActions}>
                       <button type="button" className={styles.btnIcon} onClick={() => onEditEnvio(row.envio)} title="Editar"><IconEdit /></button>
                       {isAdmin && (
-                        <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => onDeleteEnvio(row.envioId)} title="Excluir"><IconTrash /></button>
+                        <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => onDeleteEnvio(row.envioId)} title="Arquivar"><IconArchive /></button>
                       )}
                     </div>
                   </td>

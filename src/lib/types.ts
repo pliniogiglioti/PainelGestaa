@@ -778,6 +778,7 @@ export interface Database {
           observacoes:              string | null
           status:                   string
           arquivado_em:             string | null
+          motivo_arquivamento:      string | null
           data_envio:               string
           forma_envio:              string | null
           retirado_por:             string | null
@@ -814,6 +815,7 @@ export interface Database {
           observacoes?:              string | null
           status?:                   string
           arquivado_em?:             string | null
+          motivo_arquivamento?:      string | null
           data_envio?:               string
           forma_envio?:              string | null
           retirado_por?:             string | null
@@ -846,6 +848,7 @@ export interface Database {
           observacoes?:              string | null
           status?:                   string
           arquivado_em?:             string | null
+          motivo_arquivamento?:      string | null
           data_envio?:               string
           forma_envio?:              string | null
           retirado_por?:             string | null

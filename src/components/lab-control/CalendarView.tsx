@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import type { Lab, LabEnvio, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { IconClock, IconEdit, IconTrash } from './icons'
+import { IconArchive, IconClock, IconEdit } from './icons'
 import { buildCalendarEvents, formatDate, today, type CalendarEvent } from './utils'
 
 export function CalendarView({ envios, precosByLab, labs, canDeleteEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio, onClose }: {
@@ -124,9 +124,9 @@ export function CalendarView({ envios, precosByLab, labs, canDeleteEnvio, onOpen
                             event.stopPropagation()
                             onDeleteEnvio(ev.envioId)
                           }}
-                          title="Excluir"
+                          title="Arquivar"
                         >
-                          <IconTrash />
+                          <IconArchive />
                         </button>
                       )}
                     </div>
