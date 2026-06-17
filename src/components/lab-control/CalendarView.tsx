@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
 import type { Lab, LabEnvio, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
-import { IconClock } from './icons'
+import { IconClock, IconEdit, IconTrash } from './icons'
 import { buildCalendarEvents, formatDate, today, type CalendarEvent } from './utils'
 
-export function CalendarView({ envios, precosByLab, labs, onClose }: {
+export function CalendarView({ envios, precosByLab, labs, canDeleteEnvio, onOpenResumo, onEditEnvio, onDeleteEnvio, onClose }: {
   envios: LabEnvio[]
   precosByLab: Record<string, LabPreco[]>
   labs: Lab[]
+  canDeleteEnvio: boolean
+  onOpenResumo: (envio: LabEnvio) => void
+  onEditEnvio: (envio: LabEnvio) => void
+  onDeleteEnvio: (envioId: string) => void
   onClose: () => void
 }) {
   const [currentMonth, setCurrentMonth] = useState(() => {
@@ -16,6 +20,7 @@ export function CalendarView({ envios, precosByLab, labs, onClose }: {
   })
 
   const labsById = useMemo(() => Object.fromEntries(labs.map(l => [l.id, l])), [labs])
+  const enviosById = useMemo(() => Object.fromEntries(envios.map(envio => [envio.id, envio])), [envios])
   const events = useMemo(() => buildCalendarEvents(envios, precosByLab, labsById), [envios, precosByLab, labsById])
 
   const { year, month } = currentMonth
@@ -80,9 +85,52 @@ export function CalendarView({ envios, precosByLab, labs, onClose }: {
                 {dayEvents.length > 0 && <span className={styles.calendarDayCount}>{dayEvents.length}</span>}
               </div>
               {dayEvents.map((ev, idx) => (
-                <div key={`${ev.envioId}-${idx}`} className={styles.calendarEvent}>
+                <div
+                  key={`${ev.envioId}-${idx}`}
+                  className={styles.calendarEvent}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => {
+                    const envio = enviosById[ev.envioId]
+                    if (envio) onOpenResumo(envio)
+                  }}
+                  onKeyDown={event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return
+                    event.preventDefault()
+                    const envio = enviosById[ev.envioId]
+                    if (envio) onOpenResumo(envio)
+                  }}
+                >
                   <span className={styles.calendarEventPatient}>{ev.urgente ? '⚡ ' : ''}{ev.pacienteNome}</span>
                   <span className={styles.calendarEventService}>{ev.servicoNome}</span>
+                  {enviosById[ev.envioId] && (
+                    <div className={`${styles.kanbanCardActions} ${styles.calendarEventActions}`}>
+                      <button
+                        type="button"
+                        className={styles.btnIcon}
+                        onClick={event => {
+                          event.stopPropagation()
+                          onEditEnvio(enviosById[ev.envioId])
+                        }}
+                        title="Editar"
+                      >
+                        <IconEdit />
+                      </button>
+                      {canDeleteEnvio && (
+                        <button
+                          type="button"
+                          className={`${styles.btnIcon} ${styles.btnIconDanger}`}
+                          onClick={event => {
+                            event.stopPropagation()
+                            onDeleteEnvio(ev.envioId)
+                          }}
+                          title="Excluir"
+                        >
+                          <IconTrash />
+                        </button>
+                      )}
+                    </div>
+                  )}
                   <div className={styles.calendarEventTooltip}>
                     {ev.urgente && <div className={styles.kanbanCardUrgent}>⚡ Urgente</div>}
                     {ev.labNome && <div className={styles.kanbanCardLab}>{ev.labNome}</div>}

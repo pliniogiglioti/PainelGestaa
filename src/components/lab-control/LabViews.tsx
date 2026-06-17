@@ -725,6 +725,10 @@ export function LabsAggregateDetailView({
           envios={visibleEnvios}
           precosByLab={precosByLab}
           labs={labs}
+          canDeleteEnvio={can('excluir_envio')}
+          onOpenResumo={setResumoEnvio}
+          onEditEnvio={envio => { setEditingEnvio(envio); setShowEnvioSteps(true) }}
+          onDeleteEnvio={deleteEnvioAgg}
           onClose={() => onHomeModeChange('kanban')}
         />
       ) : homeMode === 'list' ? (
