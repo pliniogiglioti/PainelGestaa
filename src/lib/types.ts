@@ -196,6 +196,7 @@ export interface Database {
           margem_percent: number | null
           precificacao_calculo: Json
           ativo:        boolean
+          importado:    boolean
           created_at:   string
           updated_at:   string
         }
@@ -208,6 +209,7 @@ export interface Database {
           margem_percent?: number | null
           precificacao_calculo?: Json
           ativo?:        boolean
+          importado?:    boolean
           created_at?:   string
           updated_at?:   string
         }
@@ -220,6 +222,7 @@ export interface Database {
           margem_percent?: number | null
           precificacao_calculo?: Json
           ativo?:        boolean
+          importado?:    boolean
           updated_at?:   string
         }
         Relationships: []

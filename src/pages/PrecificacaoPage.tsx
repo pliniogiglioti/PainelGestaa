@@ -634,6 +634,7 @@ function PrecoModal({
             margem_percent: parseMargem(margem),
             precificacao_calculo: null,
             ativo: initialItem?.ativo ?? true,
+            importado: initialItem?.importado ?? false,
             created_at: initialItem?.created_at ?? new Date().toISOString(),
             updated_at: initialItem?.updated_at ?? new Date().toISOString(),
           }}
@@ -1731,6 +1732,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
         categoria: it.categoria,
         preco: it.preco,
         margem_percent: it.margem,
+        importado: true,
       })))
       .select('*')
 
