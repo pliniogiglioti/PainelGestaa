@@ -246,14 +246,21 @@ function hasGestaaCalculatedPrice(item: EmpresaPreco) {
   return Object.keys(saved).length > 0 && typeof saved.precoVenda === 'string' && saved.precoVenda.trim() !== ''
 }
 
+function normalizeImportedPercentValue(value: number | null) {
+  if (value == null || !Number.isFinite(value)) return null
+  return value > 0 && value <= 1 ? value * 100 : value
+}
+
 function getItemMargemPercent(item: EmpresaPreco, configPadrao: ConfiguracaoGeralForm) {
+  if (hasGestaaCalculatedPrice(item)) {
+    return calcularPrecificacao(item.preco, getCalculadoraPersistida(item, configPadrao)).margem
+  }
+
   if (typeof item.margem_percent === 'number' && Number.isFinite(item.margem_percent)) {
     return item.margem_percent
   }
 
-  if (!hasGestaaCalculatedPrice(item)) return null
-
-  return calcularPrecificacao(item.preco, getCalculadoraPersistida(item, configPadrao)).margem
+  return null
 }
 
 function isMargemSaudavel(margem: number | null) {
@@ -397,6 +404,7 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
   )
   const precoSugerido = precoSugeridoMarkup.precoSugerido
   const diferencaParaMargemIdeal = precoSugerido == null ? null : roundCurrencyValue(precoSugerido - precoVenda)
+  const margemAtingeIdeal = margem >= MARGEM_IDEAL_PERCENT
 
   return {
     custoInsumos,
@@ -431,12 +439,14 @@ function calcularPrecificacao(precoVenda: number, form: CalculadoraForm) {
     diferencaParaMargemIdeal,
     margem,
     resultadoMargem: precoSugeridoMarkup.inviavel
-      ? 'Preço sugerido inviável'
-      : precoSugerido == null
-        ? 'Preço abaixo da margem ideal'
-      : diferencaParaMargemIdeal != null && diferencaParaMargemIdeal <= 0
-        ? 'Preço de venda acima do mínimo'
-        : 'Preço abaixo do mínimo',
+      ? 'Preco sugerido inviavel'
+      : margemAtingeIdeal
+        ? 'Preco de venda acima do minimo'
+        : precoSugerido == null
+          ? 'Preco abaixo da margem ideal'
+          : diferencaParaMargemIdeal != null && diferencaParaMargemIdeal <= 0
+            ? 'Preco de venda acima do minimo'
+            : 'Preco abaixo do minimo',
   }
 }
 
@@ -1257,7 +1267,7 @@ function CalculadoraPrecificacaoModal({
                   <strong>{formatCurrency(precoVendaAtual)}</strong>
                 )}
               </div>
-              <div className={`${styles.calcHighlight} ${!temPrecoExplicito ? '' : calculo.resultadoMargem === 'Preço de venda acima do mínimo' ? styles.calcHighlightGood : styles.calcHighlightBad}`}>
+              <div className={`${styles.calcHighlight} ${!temPrecoExplicito ? '' : isMargemSaudavel(calculo.margem) ? styles.calcHighlightGood : styles.calcHighlightBad}`}>
                 <span>Resultado da margem</span>
                 <strong>{temPrecoExplicito ? calculo.resultadoMargem : '—'}</strong>
               </div>
@@ -1649,16 +1659,16 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
       const [nomeRaw, margemRaw, precoRaw] = dataRows[i] as unknown[]
       const nome = String(nomeRaw ?? '').trim()
       if (!nome) {
-        setImportError(`Linha ${i + 2}: nome não pode ser vazio.`)
+        setImportError(`Linha ${i + 2}: nome nao pode ser vazio.`)
         return
       }
       const preco = typeof precoRaw === 'number' ? precoRaw : parsePreco(String(precoRaw ?? ''))
       if (preco <= 0) {
-        setImportError(`Linha ${i + 2}: preço inválido "${precoRaw}".`)
+        setImportError(`Linha ${i + 2}: preco invalido "${precoRaw}".`)
         return
       }
       const margem = typeof margemRaw === 'number'
-        ? margemRaw
+        ? normalizeImportedPercentValue(margemRaw)
         : parseMargem(String(margemRaw ?? ''))
       itens.push({ nome, margem, preco })
     }
