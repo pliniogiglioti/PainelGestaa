@@ -119,7 +119,7 @@ GRUPOS e suas CLASSIFICAÇÕES (use exatamente esses nomes):
   - Dividendos e Despesas dos Sócios
 `
 
-type ClassificacaoItem = { nome: string; tipo: 'receita' | 'despesa' }
+type ClassificacaoItem = { nome: string; tipo: 'receita' | 'despesa'; grupo?: string }
 type AiResult = {
   tipo: 'receita' | 'despesa'
   classificacao_nome: string
@@ -132,6 +132,24 @@ type LancamentoInput = { descricao: string; valor: number; tipo: 'receita' | 'de
 
 const normalize = (value: string) =>
   value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
+
+/** Monta o plano de contas dinamicamente a partir das classifica\u00e7\u00f5es com grupo do banco */
+function buildPlanoContas(classificacoesDisponiveis: ClassificacaoItem[]): string {
+  const gruposMap = new Map<string, { tipo: 'receita' | 'despesa'; classificacoes: string[] }>()
+  for (const c of classificacoesDisponiveis) {
+    if (!c.grupo) continue
+    if (!gruposMap.has(c.grupo)) gruposMap.set(c.grupo, { tipo: c.tipo, classificacoes: [] })
+    gruposMap.get(c.grupo)!.classificacoes.push(c.nome)
+  }
+  if (gruposMap.size === 0) return PLANO_DE_CONTAS_RESUMIDO
+  const lines: string[] = ['GRUPOS e suas CLASSIFICA\u00c7\u00d5ES (use exatamente esses nomes):', '']
+  for (const [grupo, { tipo, classificacoes }] of gruposMap) {
+    lines.push(`[${grupo}] \u2192 tipo: ${tipo}`)
+    for (const c of classificacoes) lines.push(`  - ${c}`)
+    lines.push('')
+  }
+  return lines.join('\n')
+}
 
 const parseAiResponse = (content: string): { tipo: string; classificacao_nome: string; grupo: string } | null => {
   try {
@@ -244,7 +262,7 @@ const pickFallback = (
       return {
         tipo: rule.tipo,
         classificacao_nome: matched?.nome ?? rule.classificacao,
-        grupo: rule.grupo,
+        grupo: matched?.grupo || rule.grupo,
         fonte: 'fallback',
         confianca: 'confirmada',
       }
@@ -292,7 +310,7 @@ const toFinalResult = (
   // 1. Bate exatamente com o banco de classificações cadastradas (normalizado)
   const matched = classificacoesDisponiveis.find(c => normalize(c.nome) === normalize(nomeAi))
   if (matched) {
-    return { tipo, classificacao_nome: matched.nome, grupo, fonte: 'ia', confianca: 'confirmada' }
+    return { tipo, classificacao_nome: matched.nome, grupo: matched.grupo || grupo, fonte: 'ia', confianca: 'confirmada' }
   }
 
   // 2. IA não encontrou exato → tenta fallback por regras locais
@@ -352,11 +370,18 @@ async function handleBatch(
     .map((l, i) => `${i + 1}. "${l.descricao}" | ${l.tipo}`)
     .join('\n')
 
+  const gruposUnicos = [...new Set(classificacoesDisponiveis.filter(c => c.grupo).map(c => c.grupo as string))]
+  const gruposHint = gruposUnicos.length > 0
+    ? gruposUnicos.map(g => `"${g}"`).join(', ')
+    : '"Despesas Administrativas", "Despesas com Pessoal", "Receitas Operacionais"'
+
   const prompt = `Assistente contábil DRE Brasil. Classifique cada lançamento usando EXATAMENTE os nomes abaixo.
 
 CLASSIFICAÇÕES DISPONÍVEIS (use o nome EXATO, incluindo acentos e capitalização):
 Receitas: ${listaReceitas || '"Receita Dinheiro"'}
 Despesas: ${listaDespesas || '"Outras Despesas"'}
+
+GRUPOS DISPONÍVEIS: ${gruposHint}
 
 LANÇAMENTOS:
 ${itensTexto}
@@ -364,7 +389,7 @@ ${itensTexto}
 REGRAS:
 - Use SOMENTE os nomes da lista acima (cópia exata, sem alterar nada)
 - Para "tipo" use "receita" ou "despesa" conforme o lançamento
-- Para "grupo" use o grupo DRE adequado (ex: "Despesas Administrativas", "Despesas com Pessoal", "Receitas Operacionais", etc.)
+- Para "grupo" use um dos grupos disponíveis listados acima
 - Se não souber, escolha o mais parecido da lista
 
 RETORNE APENAS array JSON com ${lancamentos.length} objetos na mesma ordem:
@@ -419,6 +444,7 @@ async function handleSingle(
       classificacoesDisponiveis.map((c, i) => `${i + 1}. "${c.nome}" (${c.tipo})`).join('\n')
     : ''
 
+  const planoConta = buildPlanoContas(classificacoesDisponiveis)
   const prompt = `Você é um assistente contábil especializado em DRE para clínicas e pequenas empresas brasileiras.
 
 Lançamento financeiro a classificar:
@@ -427,7 +453,7 @@ Lançamento financeiro a classificar:
 - Tipo informado pelo usuário: ${tipoEntrada}
 
 ═══════════ PLANO DE CONTAS (referência principal) ═══════════
-${PLANO_DE_CONTAS_RESUMIDO}
+${planoConta}
 ═════════════════════════════════════════════════════════════${listaClassificacoesBanco}
 
 TAREFA:

@@ -66,96 +66,6 @@ function normalizeKey(s: string): string {
     .trim()
 }
 
-// ── Mapeamento oficial: classificação → grupo (plano de contas) ───────────────
-const CLASSIFICACAO_TO_GRUPO: Record<string, string> = {
-  // Receitas Operacionais
-  'Receita Dinheiro': 'Receitas Operacionais',
-  'Receita Cartão': 'Receitas Operacionais',
-  'Receita Financeiras': 'Receitas Operacionais',
-  'Receita PIX / Transferências': 'Receitas Operacionais',
-  'Receita Subadquirência (BT)': 'Receitas Operacionais',
-  // Receitas Financeiras
-  'Rendimento de Aplicação Financeira': 'Receitas Financeiras',
-  'Descontos Obtidos': 'Receitas Financeiras',
-  // Deduções de Receita
-  'Vendas Canceladas / Devoluções': 'Deduções de Receita',
-  'Tarifa de Cartão / Meios de Pagamento - Aluguel de POS / Outras Taxas': 'Deduções de Receita',
-  'Tarifa de Cartão / Meios de Pagamento - Antecipação': 'Deduções de Receita',
-  'Tarifa de Cartão / Meios de Pagamento - Padrão': 'Deduções de Receita',
-  // Impostos sobre Faturamento
-  'Impostos sobre Receitas - Presumido e Simples Nacional': 'Impostos sobre Faturamento',
-  // Despesas Operacionais
-  'OP Gratificações': 'Despesas Operacionais',
-  'Custo de Materiais e Insumos': 'Despesas Operacionais',
-  'Serviços Terceiros PF (dentistas)': 'Despesas Operacionais',
-  'Serviços Técnicos para Laboratórios': 'Despesas Operacionais',
-  'Royalties': 'Despesas Operacionais',
-  'Fundo Nacional de Marketing': 'Despesas Operacionais',
-  // Despesas com Pessoal
-  'Pró-labore': 'Despesas com Pessoal',
-  'Salários e Ordenados': 'Despesas com Pessoal',
-  '13° Salário': 'Despesas com Pessoal',
-  'Rescisões': 'Despesas com Pessoal',
-  'INSS': 'Despesas com Pessoal',
-  'FGTS': 'Despesas com Pessoal',
-  'Outras Despesas Com Funcionários': 'Despesas com Pessoal',
-  'Vale Transporte': 'Despesas com Pessoal',
-  'Vale Refeição': 'Despesas com Pessoal',
-  'Combustível': 'Despesas com Pessoal',
-  // Despesas Administrativas
-  'Adiantamento a Fornecedor': 'Despesas Administrativas',
-  'Energia Elétrica': 'Despesas Administrativas',
-  'Água e Esgoto': 'Despesas Administrativas',
-  'Aluguel': 'Despesas Administrativas',
-  'Manutenção e Conservação Predial': 'Despesas Administrativas',
-  'Telefonia': 'Despesas Administrativas',
-  'Uniformes': 'Despesas Administrativas',
-  'Manutenção e Reparos': 'Despesas Administrativas',
-  'Seguros': 'Despesas Administrativas',
-  'Uber e Táxi': 'Despesas Administrativas',
-  'Copa e Cozinha': 'Despesas Administrativas',
-  'Cartórios': 'Despesas Administrativas',
-  'Viagens e Estadias': 'Despesas Administrativas',
-  'Material de Escritório': 'Despesas Administrativas',
-  'Estacionamento': 'Despesas Administrativas',
-  'Material de Limpeza': 'Despesas Administrativas',
-  'Bens de Pequeno Valor': 'Despesas Administrativas',
-  'Custas Processuais': 'Despesas Administrativas',
-  'Outras Despesas': 'Despesas Administrativas',
-  'Consultoria': 'Despesas Administrativas',
-  'Contabilidade': 'Despesas Administrativas',
-  'Jurídico': 'Despesas Administrativas',
-  'Limpeza': 'Despesas Administrativas',
-  'Segurança e Vigilância': 'Despesas Administrativas',
-  'Serviço de Motoboy': 'Despesas Administrativas',
-  'IOF': 'Despesas Administrativas',
-  'Taxas e Emolumentos': 'Despesas Administrativas',
-  'Multa e Juros s/ Contas Pagas em Atraso': 'Despesas Administrativas',
-  'Exames Ocupacionais': 'Despesas Administrativas',
-  // Despesas Comerciais e Marketing
-  'Refeições e Lanches': 'Despesas Comerciais e Marketing',
-  'Outras Despesas com Vendas': 'Despesas Comerciais e Marketing',
-  'Agência e Assessoria': 'Despesas Comerciais e Marketing',
-  'Produção de Material': 'Despesas Comerciais e Marketing',
-  'Marketing Digital': 'Despesas Comerciais e Marketing',
-  'Feiras e Eventos': 'Despesas Comerciais e Marketing',
-  // Despesas com TI
-  'Internet': 'Despesas com TI',
-  'Informática e Software': 'Despesas com TI',
-  'Hospedagem de Dados': 'Despesas com TI',
-  'Sistema de Gestão': 'Despesas com TI',
-  // Despesas Financeiras
-  'Despesas Bancárias': 'Despesas Financeiras',
-  'Depreciação e Amortização': 'Despesas Financeiras',
-  'Juros Passivos': 'Despesas Financeiras',
-  'Financiamentos / Empréstimos': 'Despesas Financeiras',
-  // Investimentos
-  'Investimento - Máquinas e Equipamentos': 'Investimentos',
-  'Investimento - Computadores e Periféricos': 'Investimentos',
-  'Investimento - Móveis e Utensílios': 'Investimentos',
-  'Investimento - Instalações de Terceiros': 'Investimentos',
-  'Dividendos e Despesas dos Sócios': 'Investimentos',
-}
 
 // ── Conjunto de grupos canônicos do DRE (evita double-counting no fallback) ──
 const GRUPOS_CANONICOS_DRE = new Set([
@@ -411,7 +321,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [error,          setError]          = useState('')
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
-  const [classificacoes, setClassificacoes] = useState<DreClassificacao[]>([])
+  const [classificacoes, setClassificacoes] = useState<(DreClassificacao & { grupo: { nome: string } | null })[]>([])
   const [grupos,         setGrupos]         = useState<DreGrupo[]>([])
   const [anoFiltro, setAnoFiltro] = useSessionStorageState(
     `${storagePrefix}:ano-filtro`,
@@ -500,8 +410,10 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
   const fetchClassificacoes = async () => {
     const { data } = await supabase
-      .from('dre_classificacoes').select('*').neq('ativo', false).order('tipo').order('nome')
-    setClassificacoes(data ?? [])
+      .from('dre_classificacoes')
+      .select('*, grupo:dre_grupos!grupo_id(nome)')
+      .neq('ativo', false).order('tipo').order('nome')
+    setClassificacoes((data ?? []) as (DreClassificacao & { grupo: { nome: string } | null })[])
   }
 
   const fetchGrupos = async () => {
@@ -665,13 +577,21 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     [lancamentosFiltrados],
   )
 
+  const classificacaoToGrupo = useMemo(() =>
+    Object.fromEntries(
+      classificacoes
+        .filter(c => c.grupo?.nome)
+        .map(c => [c.nome, c.grupo!.nome])
+    ),
+  [classificacoes])
+
   const lancamentosAgrupados = useMemo(() => {
     const grupoMap = new Map<string, {
       total: number; tipo: 'receita' | 'despesa'
       classificacoes: Map<string, { total: number; items: DreLancamento[] }>
     }>()
     for (const l of lancamentosFiltrados) {
-      const gKey = l.grupo?.trim() || CLASSIFICACAO_TO_GRUPO[l.classificacao] || 'Sem grupo'
+      const gKey = l.grupo?.trim() || classificacaoToGrupo[l.classificacao] || 'Sem grupo'
       const cKey = l.classificacao || 'Sem classificação'
       const tipo = (l.tipo ?? tipoMap[l.classificacao] ?? 'despesa') as 'receita' | 'despesa'
       if (!grupoMap.has(gKey)) grupoMap.set(gKey, { total: 0, tipo, classificacoes: new Map() })
@@ -693,7 +613,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         if (a.tipo !== b.tipo) return a.tipo === 'receita' ? -1 : 1
         return b.total - a.total
       })
-  }, [lancamentosFiltrados, tipoMap])
+  }, [lancamentosFiltrados, tipoMap, classificacaoToGrupo])
 
   // ── DRE ordered list com totalizadores ────────────────────────────────────
   const dreOrdenadoItems = useMemo<DreListItem[]>(() => {
@@ -1059,11 +979,14 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
     const tipoGrupo: 'receita' | 'despesa' = tipoRaw === 'receita' ? 'receita' : 'despesa'
 
-    const { error } = await supabase
+    // Verifica se o grupo já existe com qualquer tipo — evita duplicatas (nome,tipo=receita) + (nome,tipo=despesa)
+    const { data: existing } = await supabase
       .from('dre_grupos')
-      .upsert({ nome: grupoNome, tipo: tipoGrupo, ativo: true }, { onConflict: 'nome,tipo' })
+      .select('id')
+      .eq('nome', grupoNome)
+      .maybeSingle()
 
-    if (!error) return { ok: true as const }
+    if (existing) return { ok: true as const }
 
     const { error: insertError } = await supabase
       .from('dre_grupos')
@@ -1121,7 +1044,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
 
       const classesDoTipo = classificacoes
         .filter(c => c.tipo === form.tipo)
-        .map(c => ({ nome: c.nome, tipo: c.tipo }))
+        .map(c => ({ nome: c.nome, tipo: c.tipo, grupo: c.grupo?.nome ?? '' }))
 
       const { data, error: fnError } = await supabase.functions.invoke('dre-ai-classify', {
         body: {
@@ -1145,7 +1068,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         const gruposOficiais = grupos.filter(g => g.tipo === form.tipo).map(g => g.nome)
         const grupoFinal =
           gruposOficiais.includes(grupoIa) ? grupoIa :
-          (CLASSIFICACAO_TO_GRUPO[classificacaoIa] ?? '')
+          (classificacaoToGrupo[classificacaoIa] ?? '')
 
         setForm(p => ({ ...p, classificacaoNome: classificacaoIa, grupo: grupoFinal }))
         if (data?.aviso) setAiWarning(String(data.aviso))
@@ -1879,7 +1802,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
                             key={c.id}
                             className={`${styles.listboxItem} ${form.classificacaoNome === c.nome ? styles.listboxItemSelected : ''}`}
                             onClick={() => {
-                              const grupoMapeado = CLASSIFICACAO_TO_GRUPO[c.nome] ?? form.grupo
+                              const grupoMapeado = classificacaoToGrupo[c.nome] ?? form.grupo
                               setForm(p => ({ ...p, classificacaoNome: c.nome, grupo: grupoMapeado }))
                             }}
                           >
@@ -2064,7 +1987,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
                         setEditClassForm(p => ({
                           ...p,
                           classificacaoNome: c.nome,
-                          grupo: CLASSIFICACAO_TO_GRUPO[c.nome] ?? p.grupo,
+                          grupo: classificacaoToGrupo[c.nome] ?? p.grupo,
                         }))
                       }}
                     >

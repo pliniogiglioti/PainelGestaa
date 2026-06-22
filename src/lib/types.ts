@@ -430,6 +430,7 @@ export interface Database {
           tipo:       'receita' | 'despesa'
           ativo:      boolean
           created_at: string
+          grupo_id:   string | null
         }
         Insert: {
           id?:         string
@@ -437,14 +438,24 @@ export interface Database {
           tipo:        'receita' | 'despesa'
           ativo?:      boolean
           created_at?: string
+          grupo_id?:   string | null
         }
         Update: {
-          id?:    string
-          nome?:  string
-          tipo?:  'receita' | 'despesa'
-          ativo?: boolean
+          id?:      string
+          nome?:    string
+          tipo?:    'receita' | 'despesa'
+          ativo?:   boolean
+          grupo_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "dre_classificacoes_grupo_id_fkey"
+            columns: ["grupo_id"]
+            isOneToOne: false
+            referencedRelation: "dre_grupos"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       dre_grupos: {
         Row: {

@@ -354,10 +354,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const fetchClassificacoes = async () => {
     const { data } = await supabase
       .from('dre_classificacoes')
-      .select('*')
+      .select('*, grupo:dre_grupos!grupo_id(nome)')
       .order('tipo')
       .order('nome')
-    setClassificacoes(data ?? [])
+    setClassificacoes((data ?? []) as DreClassificacao[])
   }
 
   const fetchClassGrupoDB = async () => {
@@ -900,10 +900,17 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         {tab === 'classificacoes' && (() => {
           const gruposValidos = new Set(grupos.map(g => g.nome))
 
-          // Resolve o grupo priorizando apenas grupos ainda válidos no catálogo.
-          // Isso evita que grupos antigos do histórico "sumam" com a classificação.
+          // Mapa direto via FK (grupo_id) — fonte mais confiável
+          const classGrupoFK: Record<string, string> = {}
+          for (const c of classificacoes) {
+            const g = (c as DreClassificacao & { grupo?: { nome: string } | null }).grupo
+            if (g?.nome) classGrupoFK[c.nome] = g.nome
+          }
+
+          // Resolve o grupo priorizando FK, depois dre_lancamentos, depois mapa estático
           const resolveGrupo = (nome: string) => {
             const candidatos = [
+              classGrupoFK[nome],
               classGrupoDB[nome],
               resolveGrupoAi(nome),
               classGrupoExtra[nome],

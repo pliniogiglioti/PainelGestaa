@@ -247,9 +247,11 @@ const LOOKUP_GRUPO_NORM = new Map<string, string>([
 ])
 
 
-/** Resolve o grupo de uma classificação com múltiplos níveis de fallback */
-function resolveGrupo(nome: string, tipo: 'receita' | 'despesa'): string {
+/** Resolve o grupo de uma classificação com múltiplos níveis de fallback.
+ *  dbMap (opcional) é construído a partir dos dados do banco e tem prioridade. */
+function resolveGrupo(nome: string, tipo: 'receita' | 'despesa', dbMap?: ReadonlyMap<string, string>): string {
   return (
+    dbMap?.get(nome) ??
     CLASSIFICACAO_GRUPO[nome] ??
     LOOKUP_GRUPO_NORM.get(normalize(nome)) ??
     (tipo === 'receita' ? 'Receitas Operacionais' : 'Despesas Administrativas')
@@ -947,7 +949,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
   const [erroSalvar, setErroSalvar]                 = useState<string>('')
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
   const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
-  const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string }[]>([])
+  const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string; grupo: string }[]>([])
   const modeloIARef  = useRef<string>(DEFAULT_OPENAI_MODEL)
   const isSavingRef  = useRef(false)
   const [showSugeridaModal,    setShowSugeridaModal]    = useState(false)
@@ -996,9 +998,9 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
   )
 
   const handleClassChange = useCallback((idx: number, novoNome: string) => {
-    // Usa functional update para evitar dependência de linhasClass no callback
+    const dbMap = new Map(classificacoesDisp.filter(c => c.grupo).map(c => [c.nome, c.grupo] as [string, string]))
     setLinhasClass(prev => {
-      const novoGrupo = resolveGrupo(novoNome, prev[idx].tipo)
+      const novoGrupo = resolveGrupo(novoNome, prev[idx].tipo, dbMap)
       // Procura similares do mesmo tipo antes de atualizar o estado
       if (novoNome !== 'Não Identificado') {
         const tipoAtual = prev[idx].tipo
@@ -1021,7 +1023,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
     if (novoNome !== 'Não Identificado') {
       setSelecionados(prev => new Set([...prev, idx]))
     }
-  }, [])
+  }, [classificacoesDisp])
 
   const handleGrupoChange = useCallback((idx: number, novoGrupo: string) => {
     setLinhasClass(prev => prev.map((l, i) =>
@@ -1030,12 +1032,12 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
   }, [])
 
   const handleAplicarSugestao = useCallback((idx: number) => {
+    const dbMap = new Map(classificacoesDisp.filter(c => c.grupo).map(c => [c.nome, c.grupo] as [string, string]))
     setLinhasClass(prev => {
       const linha = prev[idx]
-      // Só aplica se for uma sugestão válida da IA (do plano de contas)
       if (!linha?.sugestaoIA || !linha.sugestaoIAValida) return prev
       const novoNome = linha.sugestaoIA
-      const novoGrupo = resolveGrupo(novoNome, linha.tipo)
+      const novoGrupo = resolveGrupo(novoNome, linha.tipo, dbMap)
       const similares = prev
         .map((l, i) => ({ l, i }))
         .filter(({ l, i }) => i !== idx && l.tipo === linha.tipo && descricaoParecida(l.descricao, linha.descricao))
@@ -1048,7 +1050,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
       )
     })
     setSelecionados(prev => new Set([...prev, idx]))
-  }, [])
+  }, [classificacoesDisp])
 
   const aplicarClassificacaoParecidos = () => {
     if (!sugestaoParecidos) return
@@ -1220,7 +1222,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
     // Busca modelo e classificações em paralelo; histórico é paginado (sem limite server-side)
     const [{ data: configData }, { data: classData }] = await Promise.all([
       supabase.from('configuracoes').select('valor').eq('chave', 'modelo_openai').single(),
-      supabase.from('dre_classificacoes').select('nome,tipo').or('ativo.is.null,ativo.eq.true'),
+      supabase.from('dre_classificacoes').select('nome, tipo, grupo:dre_grupos!grupo_id(nome)').or('ativo.is.null,ativo.eq.true'),
     ])
 
     // Pagina o histórico para garantir que tudo é lido, independente do max_rows do Supabase
@@ -1245,7 +1247,14 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
     }
     const modelo = configData?.valor ?? DEFAULT_OPENAI_MODEL
     modeloIARef.current = modelo
-    const classificacoes = (classData ?? []) as { nome: string; tipo: string }[]
+    const classificacoes = (classData ?? []).map((c: { nome: string; tipo: string; grupo?: { nome?: string } | null }) => ({
+      nome: c.nome,
+      tipo: c.tipo,
+      grupo: c.grupo?.nome ?? '',
+    }))
+
+    // Mapa classificação → grupo a partir do banco (prioridade sobre hardcoded)
+    const grupoFromDB = new Map(classificacoes.filter(c => c.grupo).map(c => [c.nome, c.grupo] as [string, string]))
 
     // Filtra histórico: só mantém entradas cujas classificações ainda existem no plano de contas oficial
     const nomesOficiaisSet = new Set(classificacoes.map(c => c.nome))
@@ -1373,7 +1382,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           : (nomesOficiaisNormMap.get(normalize(hist.classificacao)) ?? null)
         // Usa nome oficial se disponível, senão usa exatamente o que estava no histórico
         const classParaUsar = nomeOficial ?? hist.classificacao
-        const grupoParaUsar = hist.grupo || (nomeOficial ? resolveGrupo(nomeOficial, hist.tipo) : '')
+        const grupoParaUsar = hist.grupo || (nomeOficial ? resolveGrupo(nomeOficial, hist.tipo, grupoFromDB) : '')
         indicesDoHistorico.add(i)  // marca para não ser sobrescrito pela validação
         classificadas[i] = {
           ...linha,
@@ -1402,7 +1411,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           classificadas[i] = {
             ...linha,
             classificacao: nomeOficial,
-            grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo),
+            grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo, grupoFromDB),
             status: 'ok',
             sugerida: undefined,
             sugestaoIA: undefined,
@@ -1471,7 +1480,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           body: {
             mode: 'mapear_categorias',
             categorias: categoriasUnicas,
-            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
+            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo, grupo: c.grupo })),
             modelo,
           },
         })
@@ -1529,7 +1538,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           body: {
             lancamentos: lote.map(l => ({ descricao: l.descricao, valor: l.valor, tipo: l.tipo })),
             modelo,
-            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo })),
+            classificacoes_disponiveis: classificacoes.map(c => ({ nome: c.nome, tipo: c.tipo, grupo: c.grupo })),
           },
         })
 
