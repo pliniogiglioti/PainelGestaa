@@ -1177,8 +1177,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                               className={styles.removeBtn}
                               onClick={() => abrirEdicaoGrupo(g)}
                               title="Renomear grupo"
-                              style={{ color: '#6b9fff' }}
-                            >
+                              >
                               ✎
                             </button>
                             <button
@@ -1199,7 +1198,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                                 className={styles.removeBtn}
                                 onClick={() => abrirEdicaoClassificacao(c as DreClassificacao & { grupo?: { nome: string } | null })}
                                 title="Editar classificação"
-                                style={{ color: '#6b9fff', marginRight: 2 }}
+                                style={{ marginRight: 2 }}
                               >
                                 ✎
                               </button>
