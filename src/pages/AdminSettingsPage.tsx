@@ -259,6 +259,16 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [classGrupoExtra, setClassGrupoExtra] = useState<Record<string, string>>(() => {
     try { return JSON.parse(localStorage.getItem('dre-class-grupo-extra') ?? '{}') } catch { return {} }
   })
+  // Edição de classificação
+  const [editingClass,    setEditingClass]    = useState<(DreClassificacao & { grupo?: { nome: string } | null }) | null>(null)
+  const [editClassForm,   setEditClassForm]   = useState<{ nome: string; tipo: 'receita' | 'despesa'; grupoId: string }>({ nome: '', tipo: 'despesa', grupoId: '' })
+  const [savingEditClass, setSavingEditClass] = useState(false)
+  const [editClassError,  setEditClassError]  = useState('')
+  // Edição de grupo
+  const [editingGrupo,    setEditingGrupo]    = useState<DreGrupo | null>(null)
+  const [editGrupoNome,   setEditGrupoNome]   = useState('')
+  const [savingEditGrupo, setSavingEditGrupo] = useState(false)
+  const [editGrupoError,  setEditGrupoError]  = useState('')
 
   // ── Tab: Grupos DRE ───────────────────────────────────────────────────
   const [grupos,        setGrupos]        = useState<DreGrupo[]>([])
@@ -381,7 +391,11 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     if (!novaClassNome.trim()) return
     setAddingClass(true)
     const nome = novaClassNome.trim()
-    await supabase.from('dre_classificacoes').insert({ nome, tipo: novaClassTipo, ativo: true })
+    const grupoSelecionado = grupos.find(g => g.nome === novaClassGrupo)
+    await supabase.from('dre_classificacoes').insert({
+      nome, tipo: novaClassTipo, ativo: true,
+      grupo_id: grupoSelecionado?.id ?? null,
+    })
     if (novaClassGrupo) {
       setClassGrupoExtra(prev => {
         const next = { ...prev, [nome]: novaClassGrupo }
@@ -397,6 +411,66 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const removerClassificacao = async (id: string) => {
     await supabase.from('dre_classificacoes').delete().eq('id', id)
     setClassificacoes(p => p.filter(c => c.id !== id))
+  }
+
+  const abrirEdicaoClassificacao = (c: DreClassificacao & { grupo?: { nome: string } | null }) => {
+    setEditingClass(c)
+    setEditClassForm({ nome: c.nome, tipo: c.tipo, grupoId: c.grupo_id ?? '' })
+    setEditClassError('')
+  }
+
+  const salvarEdicaoClassificacao = async () => {
+    if (!editingClass || !editClassForm.nome.trim()) return
+    setSavingEditClass(true)
+    setEditClassError('')
+
+    const nomeAntigo = editingClass.nome
+    const nomeNovo   = editClassForm.nome.trim()
+    const grupoNovo  = grupos.find(g => g.id === editClassForm.grupoId)
+
+    const { error } = await supabase
+      .from('dre_classificacoes')
+      .update({ nome: nomeNovo, tipo: editClassForm.tipo, grupo_id: editClassForm.grupoId || null })
+      .eq('id', editingClass.id)
+
+    if (error) { setEditClassError(error.message); setSavingEditClass(false); return }
+
+    if (nomeAntigo !== nomeNovo) {
+      await supabase.from('dre_lancamentos').update({ classificacao: nomeNovo }).eq('classificacao', nomeAntigo)
+    }
+
+    if (grupoNovo) {
+      await supabase.from('dre_lancamentos').update({ grupo: grupoNovo.nome }).eq('classificacao', nomeNovo)
+    }
+
+    setEditingClass(null)
+    setSavingEditClass(false)
+    await fetchClassificacoes()
+  }
+
+  const abrirEdicaoGrupo = (g: DreGrupo) => {
+    setEditingGrupo(g)
+    setEditGrupoNome(g.nome)
+    setEditGrupoError('')
+  }
+
+  const salvarEdicaoGrupo = async () => {
+    if (!editingGrupo || !editGrupoNome.trim()) return
+    setSavingEditGrupo(true)
+    setEditGrupoError('')
+
+    const { error } = await supabase
+      .from('dre_grupos')
+      .update({ nome: editGrupoNome.trim() })
+      .eq('id', editingGrupo.id)
+    // O trigger trg_propagate_grupo_rename cascateia automaticamente para dre_lancamentos.grupo
+
+    if (error) { setEditGrupoError(error.message); setSavingEditGrupo(false); return }
+
+    setEditingGrupo(null)
+    setSavingEditGrupo(false)
+    await fetchGrupos()
+    await fetchClassificacoes()
   }
 
   // ── Fetch: Grupos ─────────────────────────────────────────────────────
@@ -1101,6 +1175,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                             <span>{items.length} classificações</span>
                             <button
                               className={styles.removeBtn}
+                              onClick={() => abrirEdicaoGrupo(g)}
+                              title="Renomear grupo"
+                              style={{ color: '#888' }}
+                            >
+                              ✎
+                            </button>
+                            <button
+                              className={styles.removeBtn}
                               onClick={() => removerGrupo(g.id)}
                               title="Remover grupo"
                             >
@@ -1113,6 +1195,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                           {items.map(c => (
                             <div key={c.id} className={`${styles.listItem} ${styles.classListItemClean}`}>
                               <span className={styles.itemName}>{c.nome}</span>
+                              <button
+                                className={styles.removeBtn}
+                                onClick={() => abrirEdicaoClassificacao(c as DreClassificacao & { grupo?: { nome: string } | null })}
+                                title="Editar classificação"
+                                style={{ color: '#888', marginRight: 2 }}
+                              >
+                                ✎
+                              </button>
                               <button
                                 className={styles.removeBtn}
                                 onClick={() => removerClassificacao(c.id)}
@@ -1150,6 +1240,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                             {c.tipo}
                           </span>
                           <span className={styles.itemName}>{c.nome}</span>
+                          <button
+                            className={styles.removeBtn}
+                            onClick={() => abrirEdicaoClassificacao(c as DreClassificacao & { grupo?: { nome: string } | null })}
+                            title="Editar classificação"
+                            style={{ color: '#888', marginRight: 2 }}
+                          >
+                            ✎
+                          </button>
                           <button
                             className={styles.removeBtn}
                             onClick={() => removerClassificacao(c.id)}
@@ -1277,6 +1375,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                     </span>
                     <button
                       className={styles.removeBtn}
+                      onClick={() => abrirEdicaoGrupo(g)}
+                      title="Renomear grupo"
+                      style={{ color: '#888' }}
+                    >
+                      ✎
+                    </button>
+                    <button
+                      className={styles.removeBtn}
                       onClick={() => removerGrupo(g.id)}
                       title="Remover grupo"
                     >
@@ -1292,6 +1398,14 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                     {items.map(c => (
                       <div key={c.id} className={styles.listItem}>
                         <span className={styles.itemName}>{c.nome}</span>
+                        <button
+                          className={styles.removeBtn}
+                          onClick={() => abrirEdicaoClassificacao(c as DreClassificacao & { grupo?: { nome: string } | null })}
+                          title="Editar classificação"
+                          style={{ color: '#888', marginRight: 2 }}
+                        >
+                          ✎
+                        </button>
                         <button
                           className={styles.removeBtn}
                           onClick={() => removerClassificacao(c.id)}
@@ -1823,6 +1937,107 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
             )}
           </div>
         )}
+
+      {/* ── Modal: Editar Classificação ── */}
+      <ModalTransition open={!!editingClass}>
+        {editingClass && (
+          <div className={styles.modalOverlay} onClick={() => setEditingClass(null)}>
+            <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+              <h3 className={styles.modalTitle}>Editar classificação</h3>
+              <p style={{ color: 'var(--text-muted, #888)', fontSize: 13, marginBottom: 16 }}>
+                Alterações no nome e grupo refletem nos lançamentos existentes.
+              </p>
+
+              <div style={{ marginBottom: 12 }}>
+                <p className={styles.label} style={{ marginBottom: 6 }}>Nome</p>
+                <input
+                  className={styles.input}
+                  value={editClassForm.nome}
+                  onChange={e => setEditClassForm(p => ({ ...p, nome: e.target.value }))}
+                  autoFocus
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <p className={styles.label} style={{ marginBottom: 6 }}>Tipo</p>
+                <div className={styles.toggleRow}>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${editClassForm.tipo === 'receita' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setEditClassForm(p => ({ ...p, tipo: 'receita' }))}
+                  >Receita</button>
+                  <button
+                    type="button"
+                    className={`${styles.toggleBtn} ${editClassForm.tipo === 'despesa' ? styles.toggleBtnActive : ''}`}
+                    onClick={() => setEditClassForm(p => ({ ...p, tipo: 'despesa' }))}
+                  >Despesa</button>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 20 }}>
+                <p className={styles.label} style={{ marginBottom: 6 }}>Grupo</p>
+                <select
+                  className={styles.input}
+                  value={editClassForm.grupoId}
+                  onChange={e => setEditClassForm(p => ({ ...p, grupoId: e.target.value }))}
+                >
+                  <option value="">Sem grupo</option>
+                  {grupos.map(g => (
+                    <option key={g.id} value={g.id}>{g.nome} ({g.tipo})</option>
+                  ))}
+                </select>
+              </div>
+
+              {editClassError && <p className={styles.erro} style={{ marginBottom: 12 }}>{editClassError}</p>}
+
+              <div className={styles.modalActions}>
+                <button className={styles.btnSecondary} onClick={() => setEditingClass(null)} disabled={savingEditClass}>
+                  Cancelar
+                </button>
+                <button className={styles.btnPrimary} onClick={salvarEdicaoClassificacao} disabled={savingEditClass || !editClassForm.nome.trim()}>
+                  {savingEditClass ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </ModalTransition>
+
+      {/* ── Modal: Renomear Grupo ── */}
+      <ModalTransition open={!!editingGrupo}>
+        {editingGrupo && (
+          <div className={styles.modalOverlay} onClick={() => setEditingGrupo(null)}>
+            <div className={styles.modalBox} onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
+              <h3 className={styles.modalTitle}>Renomear grupo</h3>
+              <p style={{ color: 'var(--text-muted, #888)', fontSize: 13, marginBottom: 16 }}>
+                O novo nome será aplicado em todos os lançamentos existentes automaticamente.
+              </p>
+
+              <div style={{ marginBottom: 20 }}>
+                <p className={styles.label} style={{ marginBottom: 6 }}>Nome do grupo</p>
+                <input
+                  className={styles.input}
+                  value={editGrupoNome}
+                  onChange={e => setEditGrupoNome(e.target.value)}
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && salvarEdicaoGrupo()}
+                />
+              </div>
+
+              {editGrupoError && <p className={styles.erro} style={{ marginBottom: 12 }}>{editGrupoError}</p>}
+
+              <div className={styles.modalActions}>
+                <button className={styles.btnSecondary} onClick={() => setEditingGrupo(null)} disabled={savingEditGrupo}>
+                  Cancelar
+                </button>
+                <button className={styles.btnPrimary} onClick={salvarEdicaoGrupo} disabled={savingEditGrupo || !editGrupoNome.trim()}>
+                  {savingEditGrupo ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </ModalTransition>
 
       </div>
     </div>
