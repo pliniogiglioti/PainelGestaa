@@ -876,6 +876,19 @@
   background: rgba(255,250,244,0.7);
   border-color: rgba(114, 84, 43, 0.12);
 }
+:global(html.light) .ownerPaymentTypeCardCredit {
+  background: rgba(226, 126, 35, 0.06);
+  border-color: rgba(201, 105, 30, 0.24);
+}
+:global(html.light) .ownerPaymentTypeCardBoleto {
+  background: rgba(29, 138, 98, 0.06);
+  border-color: rgba(29, 138, 98, 0.24);
+}
+:global(html.light) .ownerPaymentTypeHeader > div > span {
+  color: rgba(74, 55, 35, 0.58);
+}
+:global(html.light) .ownerPaymentTypeCardCredit .ownerPaymentTypeBadge { color: #a95212; }
+:global(html.light) .ownerPaymentTypeCardBoleto .ownerPaymentTypeBadge { color: #176e50; }
 .workspaceStage {
   --content-scale: 1;
   display: flex;
@@ -2274,6 +2287,66 @@
   color: rgba(255,255,255,0.28);
   margin-top: 8px;
   line-height: 1.4;
+}
+.ownerPaymentTypeCard {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid rgba(255,255,255,0.10);
+  border-radius: 8px;
+}
+.ownerPaymentTypeCardCredit {
+  background: rgba(249,159,53,0.055);
+  border-color: rgba(249,159,53,0.26);
+}
+.ownerPaymentTypeCardBoleto {
+  background: rgba(45,170,126,0.055);
+  border-color: rgba(45,170,126,0.26);
+}
+.ownerPaymentTypeHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ownerPaymentTypeHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.ownerPaymentTypeHeader strong {
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+}
+.ownerPaymentTypeHeader > div > span {
+  color: rgba(255,255,255,0.42);
+  font-size: 12px;
+}
+.ownerPaymentTypeBadge {
+  min-width: 72px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ownerPaymentTypeCardCredit .ownerPaymentTypeBadge {
+  color: #ffc173;
+  background: rgba(249,159,53,0.14);
+  border: 1px solid rgba(249,159,53,0.28);
+}
+.ownerPaymentTypeCardBoleto .ownerPaymentTypeBadge {
+  color: #6fd7b1;
+  background: rgba(45,170,126,0.14);
+  border: 1px solid rgba(45,170,126,0.28);
+}
+.ownerPaymentPreviewCredit > div {
+  border-top: 2px solid rgba(249,159,53,0.48);
+}
+.ownerPaymentPreviewBoleto > div {
+  border-top: 2px solid rgba(45,170,126,0.48);
 }
 .ownerLabelRow {
   display: flex;

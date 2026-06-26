@@ -16,6 +16,12 @@ export function roundMoney(value: number): number {
   return Math.round(safeNumber(value, 0) * 100) / 100;
 }
 
+export function roundMoneyUpToTen(value: number): number {
+  const base = roundMoney(value);
+  if (base <= 0) return 0;
+  return Math.ceil(base / 10) * 10;
+}
+
 export function cloneData<T>(value: T): T {
   return JSON.parse(JSON.stringify(value));
 }
@@ -453,19 +459,7 @@ export function narrativeTargetPrice(baseValue: number, settings: OwnerSettings)
 }
 
 export function roundWholePriceUp(value: number): number {
-  const base = roundMoney(value);
-  if (base <= 0) return 0;
-  if (base >= 1000) {
-    const remainder = base % 100;
-    if (remainder === 0 || remainder === 50) return base;
-    return Math.ceil(base / 100) * 100;
-  }
-  if (base >= 100) {
-    const remainder = base % 10;
-    if (remainder === 0 || remainder === 5) return base;
-    return Math.ceil(base / 10) * 10;
-  }
-  return Math.ceil(base);
+  return roundMoneyUpToTen(value);
 }
 
 export function roundPsychologicalPrice(value: number): number {

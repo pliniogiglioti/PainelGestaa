@@ -4,6 +4,7 @@ import type {
 } from './types';
 import {
   clamp, safeNumber, roundMoney, cloneData,
+  roundMoneyUpToTen,
   defaultIndicatorTags, defaultIndicatorRoleLabels, defaultIndicatorRules,
   sanitizeIndicatorTags, sanitizeIndicatorRoleLabels, sanitizeIndicatorRules,
   createDefaultOwnerSettings, hydrateOwnerSettings, defaultCatalogMinPrice,
@@ -253,12 +254,12 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
     const procStrategy = normalized.tableStrategy.perProcedure[proc.name] || { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
     let override: number | null = null;
     if (normalized.tableStrategy.mode === 'globalPct') {
-      override = roundMoney(minPrice * (1 + (safeNumber(normalized.tableStrategy.globalGorduraPct, 0) / 100)));
+      override = roundMoneyUpToTen(minPrice * (1 + (safeNumber(normalized.tableStrategy.globalGorduraPct, 0) / 100)));
     } else if (normalized.tableStrategy.mode === 'perProcedure' || normalized.tableStrategy.mode === 'manual') {
       if (procStrategy.inputMode === 'pct') {
-        override = roundMoney(minPrice * (1 + (safeNumber(procStrategy.gorduraPct, 0) / 100)));
+        override = roundMoneyUpToTen(minPrice * (1 + (safeNumber(procStrategy.gorduraPct, 0) / 100)));
       } else if (procStrategy.inputMode === 'absolute') {
-        override = roundMoney(safeNumber(procStrategy.tableAbsolute, 0));
+        override = roundMoneyUpToTen(safeNumber(procStrategy.tableAbsolute, 0));
       }
       // inputMode 'auto' → override stays null (engine calculates via annualizedNarrativeValue)
     }
@@ -368,12 +369,12 @@ export function ownerV8ProcedureTablePreview(procName: string, model: OwnerV8Mod
   const minPrice = roundMoney(Math.max(0, safeNumber(minimumItem?.minPrice, defaultCatalogMinPrice(fallbackProc || { minPrice: 0 }))));
   const strategy = model.tableStrategy;
   const procStrategy = strategy.perProcedure[procName] || { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
-  const suggested = roundMoney(Math.max(minPrice, safeNumber(fallbackProc?.tablePrice, minPrice)));
+  const suggested = roundMoneyUpToTen(Math.max(minPrice, safeNumber(fallbackProc?.tablePrice, minPrice)));
   if (strategy.mode === 'suggested') return suggested;
-  if (strategy.mode === 'globalPct') return roundMoney(minPrice * (1 + (safeNumber(strategy.globalGorduraPct, 0) / 100)));
-  if (strategy.mode === 'manual') return roundMoney(Math.max(minPrice, safeNumber(procStrategy.tableAbsolute, minPrice)));
-  if (procStrategy.inputMode === 'pct') return roundMoney(minPrice * (1 + (safeNumber(procStrategy.gorduraPct, 0) / 100)));
-  if (procStrategy.inputMode === 'absolute') return roundMoney(safeNumber(procStrategy.tableAbsolute, minPrice));
+  if (strategy.mode === 'globalPct') return roundMoneyUpToTen(minPrice * (1 + (safeNumber(strategy.globalGorduraPct, 0) / 100)));
+  if (strategy.mode === 'manual') return roundMoneyUpToTen(Math.max(minPrice, safeNumber(procStrategy.tableAbsolute, minPrice)));
+  if (procStrategy.inputMode === 'pct') return roundMoneyUpToTen(minPrice * (1 + (safeNumber(procStrategy.gorduraPct, 0) / 100)));
+  if (procStrategy.inputMode === 'absolute') return roundMoneyUpToTen(safeNumber(procStrategy.tableAbsolute, minPrice));
   return suggested;
 }
 

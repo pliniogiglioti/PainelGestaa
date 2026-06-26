@@ -12,6 +12,7 @@ import {
   safeNumber,
   clamp,
   roundMoney,
+  roundMoneyUpToTen,
   defaultCatalogMinPrice,
   sanitizeIndicatorTags,
   sanitizeIndicatorRules,
@@ -184,7 +185,11 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
   }
 
   function applyManualDraft() {
-    const rows = Object.values(manualDraft);
+    const rows = Object.values(manualDraft).map(row => ({
+      ...row,
+      minPrice: roundMoney(row.minPrice),
+      tablePrice: roundMoneyUpToTen(row.tablePrice),
+    }));
     for (const row of rows) {
       if (row.minPrice <= 0) {
         setManualNotice(`"${row.name}" precisa ter um mínimo maior que zero.`);
@@ -195,6 +200,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
         return;
       }
     }
+    setManualDraft(Object.fromEntries(rows.map(row => [row.name, row])));
     const now = new Date().toISOString();
     update(m => {
       m.externalMinimumSnapshot = {
@@ -341,7 +347,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
     const minPrice = row?.minPrice ?? 0;
     const interest = safeNumber(draft.lastChanceCondition.monthlyInterestPct, 0) / 100;
     const installments = Math.max(1, Math.round(safeNumber(draft.lastChanceCondition.maxInstallments, 1)));
-    return roundMoney(minPrice * Math.pow(1 + interest, installments));
+    return roundMoneyUpToTen(minPrice * Math.pow(1 + interest, installments));
   }
 
   function procedureRowState(procName: string) {
@@ -350,10 +356,10 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
     const ps = draft.tableStrategy.perProcedure[procName] || { inputMode: 'auto', gorduraPct: null, tableAbsolute: null };
     let preview = suggestedTableValue(procName);
     if (draft.tableStrategy.mode === 'globalPct') {
-      preview = roundMoney(minPrice * (1 + safeNumber(draft.tableStrategy.globalGorduraPct, 0) / 100));
+      preview = roundMoneyUpToTen(minPrice * (1 + safeNumber(draft.tableStrategy.globalGorduraPct, 0) / 100));
     } else if (draft.tableStrategy.mode === 'perProcedure') {
-      if (ps.inputMode === 'pct') preview = roundMoney(minPrice * (1 + safeNumber(ps.gorduraPct, 0) / 100));
-      else if (ps.inputMode === 'absolute') preview = roundMoney(Math.max(minPrice, safeNumber(ps.tableAbsolute, minPrice)));
+      if (ps.inputMode === 'pct') preview = roundMoneyUpToTen(minPrice * (1 + safeNumber(ps.gorduraPct, 0) / 100));
+      else if (ps.inputMode === 'absolute') preview = roundMoneyUpToTen(Math.max(minPrice, safeNumber(ps.tableAbsolute, minPrice)));
     }
     const delta = roundMoney(preview - minPrice);
     const pct = minPrice > 0 ? Math.round((delta / minPrice) * 1000) / 10 : 0;
@@ -1202,6 +1208,15 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 <div className={styles.ownerQuestion}>Como cartão e boleto devem se comportar quando o vendedor parcelar?</div>
                 <div className={styles.ownerHelper}>Aqui você decide se existe faixa sem juros, quando começa a cobrar taxa no cartão e como o boleto deve se comportar.</div>
 
+                <div className={`${styles.ownerPaymentTypeCard} ${styles.ownerPaymentTypeCardCredit}`}>
+                  <div className={styles.ownerPaymentTypeHeader}>
+                    <span className={styles.ownerPaymentTypeBadge}>Cartão</span>
+                    <div>
+                      <strong>Cartão de crédito</strong>
+                      <span>Parcelamento, taxas e antecipação</span>
+                    </div>
+                  </div>
+
                 <div className={styles.ownerGrid}>
                   <div className={styles.ownerField}>
                     <label>Parcelamento sem juros</label>
@@ -1286,7 +1301,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                 {(() => {
                   const settings = applyOwnerV8Model(draft);
                   return (
-                    <div className={styles.ownerPreviewKpi} style={{ marginTop: 18 }}>
+                    <div className={`${styles.ownerPreviewKpi} ${styles.ownerPaymentPreviewCredit}`} style={{ marginTop: 18 }}>
                       {[1, 2, 6, 12].map(n => (
                         <div key={n}>
                           <span>{n}x</span>
@@ -1296,9 +1311,16 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     </div>
                   );
                 })()}
+                </div>
 
-                <div className={styles.ownerTableCard} style={{ marginTop: 18 }}>
-                  <div className={styles.ownerImportTitle}>Boleto</div>
+                <div className={`${styles.ownerPaymentTypeCard} ${styles.ownerPaymentTypeCardBoleto}`}>
+                  <div className={styles.ownerPaymentTypeHeader}>
+                    <span className={styles.ownerPaymentTypeBadge}>Boleto</span>
+                    <div>
+                      <strong>Boleto parcelado</strong>
+                      <span>Faixa sem juros e juros mensais</span>
+                    </div>
+                  </div>
                   <div className={styles.ownerNote} style={{ marginTop: 0 }}>Use a mesma lógica: você pode ter uma faixa sem juros e depois começar a cobrar juros ao mês.</div>
                   <div className={styles.ownerGrid} style={{ marginTop: 14 }}>
                     <div className={styles.ownerField}>
@@ -1335,14 +1357,13 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                       <div className={styles.ownerNote}>Ex.: 1,5% ao mês.</div>
                     </div>
                   </div>
-                </div>
 
                 {/* Preview boleto */}
                 {(() => {
                   const settings = applyOwnerV8Model(draft);
                   const BASE = 1000;
                   return (
-                    <div className={styles.ownerPreviewKpi} style={{ marginTop: 18 }}>
+                    <div className={`${styles.ownerPreviewKpi} ${styles.ownerPaymentPreviewBoleto}`} style={{ marginTop: 18 }}>
                       {[1, 3, 6, 12].map(n => {
                         const total = boletoTotalWithInterest(BASE, n, settings);
                         return (
@@ -1355,6 +1376,7 @@ export function OwnerWizard({ model, onSave, onClose, empresaPrecos, empresaId }
                     </div>
                   );
                 })()}
+                </div>
 
                 <div className={styles.ownerSectionFooter}>
                   <div className={styles.ownerFooterActions}>
