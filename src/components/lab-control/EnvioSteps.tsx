@@ -475,14 +475,23 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
               filteredPrecos.length > 0 ? (
               <div className={styles.precosGrid}>
                 {filteredPrecos.map(p => {
-                  const selected = servicosSelecionados.some(servico => servico.key === `preco:${p.id}`)
+                  const servicoSelecionado = servicosSelecionados.find(servico => servico.key === `preco:${p.id}`)
+                  const selected = Boolean(servicoSelecionado)
 
                   return (
-                    <button
+                    <div
                       key={p.id}
-                      type="button"
                       className={`${styles.precoOption} ${selected ? styles.precoOptionActive : ''}`}
                       onClick={() => togglePreco(p)}
+                      onKeyDown={e => {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          togglePreco(p)
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={selected}
                     >
                       <span className={styles.precoOptionCheck}>{selected ? '✓' : '+'}</span>
                       <span className={styles.precoOptionMeta}>
@@ -491,10 +500,29 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
                           <span className={styles.precoOptionPrazo}>{p.prazo_producao_dias} dias úteis</span>
                         )}
                       </span>
-                      <span className={styles.precoOptionValor}>
-                        {p.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      <span className={styles.precoOptionActions}>
+                        <span className={styles.precoOptionValor}>
+                          {p.preco.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </span>
+                        {servicoSelecionado && (
+                          <span className={styles.precoOptionQuantity} onClick={e => e.stopPropagation()}>
+                            <label htmlFor={`quantidade-lista-${p.id}`}>Qtd.</label>
+                            <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servicoSelecionado.key, 'quantidade', Math.max(1, servicoSelecionado.quantidade - 1))} disabled={servicoSelecionado.quantidade <= 1} aria-label={`Diminuir quantidade de ${servicoSelecionado.nome}`}>−</button>
+                            <input
+                              id={`quantidade-lista-${p.id}`}
+                              className={styles.qtdInput}
+                              type="number"
+                              min="1"
+                              step="1"
+                              inputMode="numeric"
+                              value={servicoSelecionado.quantidade}
+                              onChange={e => updateServico(servicoSelecionado.key, 'quantidade', Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                            />
+                            <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servicoSelecionado.key, 'quantidade', servicoSelecionado.quantidade + 1)} aria-label={`Aumentar quantidade de ${servicoSelecionado.nome}`}>+</button>
+                          </span>
+                        )}
                       </span>
-                    </button>
+                    </div>
                   )
                 })}
               </div>

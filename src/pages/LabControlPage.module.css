@@ -1386,6 +1386,26 @@
   white-space: nowrap;
 }
 
+.precoOptionActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.precoOptionQuantity {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: default;
+}
+
+.precoOptionQuantity label {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+
 .manualServiceHeader {
   display: flex;
   align-items: center;
