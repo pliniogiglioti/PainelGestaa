@@ -14,5 +14,8 @@
       "Bash(npm install:*)",
       "Bash(echo \"EXIT:$?\")"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ]
 }

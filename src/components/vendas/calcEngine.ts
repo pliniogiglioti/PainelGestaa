@@ -278,6 +278,34 @@ export function hydrateOwnerSettings(raw: unknown): OwnerSettings {
     policy.narrativePriceOverride = (!isNaN(override) && override > 0) ? override : null;
   });
 
+  // Preserva políticas de serviços próprios da empresa. Esses procedimentos
+  // não existem no catálogo estático, mas carregam o preço mínimo importado no
+  // modelo do proprietário. Sem esta etapa, o hydrate descartava o mínimo e o
+  // vendedor tratava o preço de vitrine como limite inferior.
+  const savedProcedurePolicies = source.pricingPolicy?.procedurePolicies || {};
+  Object.entries(savedProcedurePolicies).forEach(([name, rawPolicy]) => {
+    if (settings.pricingPolicy.procedurePolicies[name]) return;
+    const saved = (rawPolicy || {}) as Partial<ProcedurePolicy>;
+    const tablePrice = roundMoney(Math.max(0, safeNumber(saved.tablePrice, saved.minPrice || 0)));
+    const minPrice = roundMoney(Math.max(0, safeNumber(saved.minPrice, tablePrice)));
+    settings.pricingPolicy.procedurePolicies[name] = {
+      category: String(saved.category || 'Geral'),
+      tablePrice,
+      idealCashPrice: roundMoney(Math.max(minPrice, safeNumber(saved.idealCashPrice, tablePrice))),
+      minPrice,
+      narrativePriceOverride: saved.narrativePriceOverride != null && safeNumber(saved.narrativePriceOverride, 0) > 0
+        ? roundMoney(safeNumber(saved.narrativePriceOverride, 0))
+        : null,
+      maxDiscountPct: clamp(safeNumber(saved.maxDiscountPct, defaults.discountPolicy.maxItemDiscountPct), 0, 80),
+      campaignEnabled: saved.campaignEnabled !== false,
+      maxCampaignPct: clamp(safeNumber(saved.maxCampaignPct, defaults.discountPolicy.maxItemDiscountPct), 0, 80),
+      programmedEnabled: Boolean(saved.programmedEnabled),
+      programmedStartPct: clamp(safeNumber(saved.programmedStartPct, 30), 0, 100),
+      programmedFinishPct: clamp(safeNumber(saved.programmedFinishPct, 80), 0, 100),
+      programmedStartMonth: clamp(Math.round(safeNumber(saved.programmedStartMonth, 1)), 1, 24),
+    };
+  });
+
   settings.discountPolicy.maxItemDiscountPct = clamp(safeNumber(settings.discountPolicy.maxItemDiscountPct, defaults.discountPolicy.maxItemDiscountPct), 0, 80);
   settings.discountPolicy.maxPlanDiscountPct = clamp(safeNumber(settings.discountPolicy.maxPlanDiscountPct, defaults.discountPolicy.maxPlanDiscountPct), 0, 80);
   settings.discountPolicy.maxTotalDiscountPct = clamp(safeNumber(settings.discountPolicy.maxTotalDiscountPct, defaults.discountPolicy.maxTotalDiscountPct), 0, 80);

@@ -899,6 +899,10 @@
   transform-origin: top center;
   transition: transform 0.18s ease, width 0.18s ease;
 }
+.workspaceStageSidebarOpen {
+  width: calc((100% - var(--sidebar-w, 290px)) / var(--content-scale));
+  transform-origin: top left;
+}
 
 /* Controle de zoom da tela */
 .canvasZoom {
@@ -959,6 +963,10 @@
 }
 
 @media (max-width: 768px) {
+  .workspaceStageSidebarOpen {
+    width: calc(100% / var(--content-scale));
+    transform-origin: top center;
+  }
   .canvasZoom {
     display: none;
   }

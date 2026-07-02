@@ -515,7 +515,7 @@ export function SellerWorld({ ownerSettings, empresaPrecos, onOpenOwnerWizard, o
 
   return (
     <div className={styles.workspaceShell}>
-      <div className={styles.workspaceStage} style={{ '--content-scale': contentScale } as CSSProperties}>
+      <div className={`${styles.workspaceStage} ${sidebarOpen ? styles.workspaceStageSidebarOpen : ''}`} style={{ '--content-scale': contentScale } as CSSProperties}>
         {(patientName || proposalTitle) && (
           <div className={styles.workspaceHeader}>
             {patientName && <div className={styles.workspaceTitle}>{patientName}</div>}

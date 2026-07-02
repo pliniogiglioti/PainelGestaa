@@ -157,7 +157,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
 
   if (selectedTicket) {
     return (
-      <div className={styles.page}>
+      <div className={`${styles.page} ${isAdmin ? styles.adminPage : styles.userPage}`}>
         <button className={styles.backButton} onClick={() => { setSelectedId(null); setMessages([]); setError('') }}>
           <span>←</span> Voltar para tickets
         </button>
@@ -220,20 +220,24 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${isAdmin ? styles.adminPage : styles.userPage}`}>
       <header className={styles.hero}>
         <div>
-          <p>Central de atendimento</p>
+          <p>{isAdmin ? 'Painel da equipe' : 'Central de atendimento'}</p>
           <h1>{isAdmin ? 'Tickets de suporte' : 'Como podemos ajudar?'}</h1>
           <span>{isAdmin ? 'Acompanhe e responda às solicitações dos usuários.' : 'Abra um chamado e acompanhe toda a conversa por aqui.'}</span>
         </div>
-        <button className={styles.primaryButton} onClick={() => setShowCreate(true)}><span>＋</span> Novo ticket</button>
+        {isAdmin ? (
+          <div className={styles.adminModeBadge}><span>●</span> Modo administrador</div>
+        ) : (
+          <button className={styles.primaryButton} onClick={() => setShowCreate(true)}><span>＋</span> Novo ticket</button>
+        )}
       </header>
 
       <div className={styles.stats}>
-        <div><span className={styles.statIcon}>◌</span><p>Em andamento<strong>{openCount}</strong></p></div>
-        <div><span className={styles.statIcon}>⌛</span><p>Aguardando você<strong>{waitingCount}</strong></p></div>
-        <div><span className={styles.statIcon}>✓</span><p>Resolvidos<strong>{resolvedCount}</strong></p></div>
+        <div><span className={styles.statIcon}>◌</span><p>{isAdmin ? 'Fila ativa' : 'Em andamento'}<strong>{openCount}</strong></p></div>
+        <div><span className={styles.statIcon}>⌛</span><p>{isAdmin ? 'Aguardando cliente' : 'Aguardando você'}<strong>{waitingCount}</strong></p></div>
+        <div><span className={styles.statIcon}>✓</span><p>{isAdmin ? 'Finalizados' : 'Resolvidos'}<strong>{resolvedCount}</strong></p></div>
       </div>
 
       <section className={styles.ticketSection}>
