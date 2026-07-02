@@ -248,7 +248,7 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
 }
 
 export function PaymentSection({ plan, ownerSettings, onChange, onNotify }: PaymentSectionProps) {
-  const revealed = plan.paymentVisible;
+  const revealed = plan.paymentVisible || plan.shownPayments.length > 0;
   const av = ownerSettings.paymentAvailability;
 
   function addMethod(method: PaymentMethod) {

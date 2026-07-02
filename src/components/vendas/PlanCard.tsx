@@ -126,7 +126,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         ? roundNarrativePrice(annualizedNarrativeValue(basePrice, ownerSettings, catalogItem.name), ownerSettings)
         : roundMoney(basePrice);
     update(p => {
-      p.items.push({ id: uid(), empresaPrecoId: catalogItem.id, name: catalogItem.name, tablePrice: workingPrice, baseTablePrice: basePrice, qty: 1, priceVisible: false, campaignPct: null, overridePrice: null, campaignEditing: false, campaignInput: '', priceEditing: false, priceEditInput: '' });
+      p.items.push({ id: uid(), empresaPrecoId: catalogItem.id, name: catalogItem.name, tablePrice: workingPrice, baseTablePrice: basePrice, qty: 1, priceVisible: true, campaignPct: null, overridePrice: null, campaignEditing: false, campaignInput: '', priceEditing: false, priceEditInput: '' });
       p.totalOverride = null;
       p.planCampaignPctRequested = 0;
       p.planCampaignPctEffective = 0;
@@ -141,6 +141,25 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       p.totalOverride = null;
       p.planCampaignPctRequested = 0;
       p.planCampaignPctEffective = 0;
+      if (p.items.length === 0) {
+        p.totalRevealed = false;
+        p.totalVisible = false;
+        p.paymentRevealed = false;
+        p.paymentVisible = false;
+        p.cartaNaMangaActive = false;
+        p.extraDiscountPct = 0;
+        p.shownPayments = [];
+        p.payment.entradaPct = 0;
+        p.payment.parcelas = 0;
+        p.payment.descontoAVista = 0;
+        p.payment.parcelasBoleto = 0;
+        p.payment.entradaOverride = null;
+        p.payment.aVistaOverride = null;
+        p.payment.parceladoOverride = null;
+        p.payment.boletoOverride = null;
+        p.payment.debitoOverride = null;
+        p.payment.editingField = null;
+      }
     });
   }
 
@@ -328,9 +347,8 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                       <button className={styles.priceEditOk} onClick={() => applyPriceEdit(idx)}>✓</button>
                     </span>
                   ) : (
-                    <span data-no-drag className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
+                    <span data-no-drag className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''}`}
                       onClick={() => {
-                        if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); return; }
                         update(p => { p.items[idx].priceEditInput = String(roundMoney(totalForItem)); p.items[idx].priceEditing = true; });
                         setTimeout(() => itemPriceInputRef.current?.select(), 50);
                       }}>
@@ -451,7 +469,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       )}
 
       {/* Payment section */}
-      {plan.paymentRevealed && (
+      {plan.paymentRevealed && plan.items.length > 0 && (
         <PaymentSection plan={plan} ownerSettings={ownerSettings} onChange={onChange} onNotify={onNotify} />
       )}
 
