@@ -216,9 +216,8 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
       if (!isNaN(val) && val > 0) {
         const minUnit = itemMinPrice(item, ownerSettings);
         const minTotal = minUnit * qty;
-        const adjustedValue = Math.max(val, minTotal);
-        if (val < minTotal) onNotify(`${item.name} ajustado ao preço mínimo.`, 'info');
-        const unitPrice = adjustedValue / qty;
+        if (val < minTotal) onNotify(`${item.name} abaixo do preço mínimo protegido.`, 'danger');
+        const unitPrice = val / qty;
         const pct = item.tablePrice > 0 ? (1 - unitPrice / item.tablePrice) * 100 : 0;
         if (Math.abs(unitPrice - item.tablePrice) < 0.01) {
           p.items[index].overridePrice = null;

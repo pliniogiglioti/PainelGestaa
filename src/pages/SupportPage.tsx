@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabase'
 import type { SupportTicket, SupportTicketMessage } from '../lib/types'
 import styles from './SupportPage.module.css'
 
+type AppOption = { id: string; name: string }
+
 type TicketStatus = SupportTicket['status']
 type TicketPriority = SupportTicket['priority']
 type TicketCategory = SupportTicket['category']
@@ -37,18 +39,22 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
   const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [messages, setMessages] = useState<SupportTicketMessage[]>([])
   const [profileNames, setProfileNames] = useState<Record<string, string>>({})
+  const [apps, setApps] = useState<AppOption[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [filter, setFilter] = useState<'todos' | TicketStatus>('todos')
   const [loading, setLoading] = useState(true)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [subject, setSubject] = useState('')
+  const [appId, setAppId] = useState('')
   const [category, setCategory] = useState<TicketCategory>('duvida')
   const [priority, setPriority] = useState<TicketPriority>('normal')
   const [description, setDescription] = useState('')
   const [reply, setReply] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  const appNames = useMemo(() => Object.fromEntries(apps.map(app => [app.id, app.name])), [apps])
 
   const fetchProfiles = useCallback(async (ids: string[]) => {
     const uniqueIds = [...new Set(ids)].filter(Boolean)
@@ -88,6 +94,9 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
     setLoadingMessages(false)
   }, [fetchProfiles])
 
+  useEffect(() => {
+    void supabase.from('apps').select('id, name').order('name').then(({ data }) => setApps(data ?? []))
+  }, [])
   useEffect(() => { void fetchTickets() }, [fetchTickets])
   useEffect(() => {
     if (selectedId == null) return
@@ -103,7 +112,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
   const resolvedCount = tickets.filter(ticket => ['resolvido', 'fechado'].includes(ticket.status)).length
 
   const resetCreateForm = () => {
-    setSubject(''); setCategory('duvida'); setPriority('normal'); setDescription(''); setError('')
+    setSubject(''); setAppId(''); setCategory('duvida'); setPriority('normal'); setDescription(''); setError('')
   }
 
   const createTicket = async (event: FormEvent) => {
@@ -117,7 +126,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
     if (!authData.user) { setError('Sua sessão expirou. Entre novamente.'); setSaving(false); return }
     const { data: ticket, error: ticketError } = await supabase
       .from('support_tickets')
-      .insert({ user_id: authData.user.id, subject: subject.trim(), category, priority })
+      .insert({ user_id: authData.user.id, subject: subject.trim(), app_id: appId || null, category, priority })
       .select('*')
       .single()
     if (ticketError || !ticket) { setError(ticketError?.message ?? 'Não foi possível abrir o ticket.'); setSaving(false); return }
@@ -163,7 +172,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
         </button>
         <div className={styles.detailHeader}>
           <div>
-            <div className={styles.detailEyebrow}>{ticketCode(selectedTicket.id)} · {categoryLabels[selectedTicket.category]}</div>
+            <div className={styles.detailEyebrow}>{ticketCode(selectedTicket.id)} · {categoryLabels[selectedTicket.category]}{selectedTicket.app_id ? ` · ${appNames[selectedTicket.app_id] ?? 'App'}` : ''}</div>
             <h1>{selectedTicket.subject}</h1>
             <p>Aberto por {profileNames[selectedTicket.user_id] ?? 'Usuário'} em {formatDate(selectedTicket.created_at)}</p>
           </div>
@@ -261,7 +270,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
                 <span className={`${styles.ticketMarker} ${styles[`priority_${ticket.priority}`]}`} />
                 <div className={styles.ticketMain}>
                   <div className={styles.ticketTitle}><strong>{ticket.subject}</strong><span>{ticketCode(ticket.id)}</span></div>
-                  <p>{categoryLabels[ticket.category]}{isAdmin ? ` · ${profileNames[ticket.user_id] ?? 'Usuário'}` : ''}</p>
+                  <p>{categoryLabels[ticket.category]}{ticket.app_id ? ` · ${appNames[ticket.app_id] ?? 'App'}` : ''}{isAdmin ? ` · ${profileNames[ticket.user_id] ?? 'Usuário'}` : ''}</p>
                 </div>
                 <span className={`${styles.badge} ${styles[`status_${ticket.status}`]}`}>{statusLabels[ticket.status]}</span>
                 <time>{formatDate(ticket.last_message_at)}</time><span className={styles.chevron}>›</span>
@@ -274,12 +283,13 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
       {showCreate && (
         <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget && !saving) setShowCreate(false) }}>
           <form className={styles.modal} onSubmit={createTicket}>
-            <div className={styles.modalHeader}><div><p>Novo atendimento</p><h2>Abrir ticket</h2></div><button type="button" onClick={() => setShowCreate(false)}>×</button></div>
+            <div className={styles.modalHeader}><h2>Abrir ticket</h2><button type="button" onClick={() => setShowCreate(false)}>×</button></div>
             <label>Assunto<input value={subject} onChange={e => setSubject(e.target.value)} maxLength={140} placeholder="Resuma sua solicitação" autoFocus /></label>
             <div className={styles.formRow}>
+              <label>App relacionado<select value={appId} onChange={e => setAppId(e.target.value)}><option value="">Nenhum específico</option>{apps.map(app => <option key={app.id} value={app.id}>{app.name}</option>)}</select></label>
               <label>Categoria<select value={category} onChange={e => setCategory(e.target.value as TicketCategory)}>{Object.entries(categoryLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label>Prioridade<select value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
+            <label>Prioridade<select value={priority} onChange={e => setPriority(e.target.value as TicketPriority)}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label>Como podemos ajudar?<textarea value={description} onChange={e => setDescription(e.target.value)} maxLength={5000} placeholder="Conte o que aconteceu e inclua os detalhes importantes..." /></label>
             {error && <p className={styles.error}>{error}</p>}
             <div className={styles.modalActions}><button type="button" onClick={() => setShowCreate(false)} disabled={saving}>Cancelar</button><button type="submit" disabled={saving}>{saving ? 'Abrindo...' : 'Abrir ticket'}</button></div>

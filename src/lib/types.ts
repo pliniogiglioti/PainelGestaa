@@ -607,6 +607,7 @@ export interface Database {
           category: 'duvida' | 'problema' | 'financeiro' | 'sugestao' | 'outro'
           priority: 'baixa' | 'normal' | 'alta' | 'urgente'
           status: 'aberto' | 'em_atendimento' | 'aguardando_cliente' | 'resolvido' | 'fechado'
+          app_id: string | null
           last_message_at: string
           created_at: string
           updated_at: string
@@ -618,6 +619,7 @@ export interface Database {
           category?: 'duvida' | 'problema' | 'financeiro' | 'sugestao' | 'outro'
           priority?: 'baixa' | 'normal' | 'alta' | 'urgente'
           status?: 'aberto' | 'em_atendimento' | 'aguardando_cliente' | 'resolvido' | 'fechado'
+          app_id?: string | null
           last_message_at?: string
           created_at?: string
           updated_at?: string
