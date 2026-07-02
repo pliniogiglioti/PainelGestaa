@@ -7,6 +7,7 @@ import AcceptInvitePage from './pages/AcceptInvitePage'
 import AdminSettingsPage from './pages/AdminSettingsPage'
 import AnaliseDrePage from './pages/AnaliseDrePage'
 import DashboardPage from './pages/DashboardPage'
+import type { DashboardRoutePath } from './pages/DashboardPage'
 import EmpresaGatePage from './pages/EmpresaGatePage'
 import LabControlPage from './pages/LabControlPage'
 import LoginPage from './pages/LoginPage'
@@ -15,8 +16,9 @@ import ResetPasswordPage from './pages/ResetPasswordPage'
 import VendasPage from './pages/VendasPage'
 import TermosPage from './pages/TermosPage'
 
-const KNOWN_PATHS = ['/', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas', '/vendas/listavendas'] as const
+const KNOWN_PATHS = ['/', '/empresas', '/comunidade', '/suporte', '/analise-dre', '/admin-settings', '/lab-control', '/precificacao', '/vendas', '/vendas/listavendas'] as const
 const KNOWN_PATHS_SET = new Set<string>(KNOWN_PATHS)
+const DASHBOARD_PATHS = new Set<string>(['/', '/empresas', '/comunidade', '/suporte'])
 
 function normalizeAppPath(pathname: string) {
   if (pathname.startsWith('/vendas/listavendas/')) return '/vendas/listavendas'
@@ -485,8 +487,8 @@ function App() {
 
     return (
       <>
-        {(activePath === '/' || mountedPaths.includes('/')) && (
-          <div style={{ display: activePath === '/' ? 'block' : 'none' }}>
+        {DASHBOARD_PATHS.has(activePath) && (
+          <div>
             <ErrorBoundary>
               <DashboardPage
                 user={user}
@@ -495,6 +497,7 @@ function App() {
                 theme={theme}
                 onToggleTheme={toggleTheme}
                 onNavigate={navigate}
+                dashboardPath={activePath as DashboardRoutePath}
               />
             </ErrorBoundary>
           </div>

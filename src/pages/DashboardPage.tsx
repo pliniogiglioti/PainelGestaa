@@ -10,12 +10,14 @@ import {
   validateCompanyCardBackground,
 } from '../lib/companyCardBackground'
 import ForumTopicPage from './ForumTopicPage'
+import SupportPage from './SupportPage'
 import { DesignButton, DesignIconButton } from '../components/design/DesignSystem'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
 import ModalTransition from '../components/ModalTransition'
 import { Button, Field, Input, Modal, Select, Textarea } from '../components/ui'
 
-type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade'
+type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade' | 'suporte'
+export type DashboardRoutePath = '/' | '/empresas' | '/comunidade' | '/suporte'
 
 
 interface DashboardPageProps {
@@ -25,6 +27,7 @@ interface DashboardPageProps {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onNavigate: (path: string) => void
+  dashboardPath: DashboardRoutePath
 }
 
 interface AppCategoryRow extends AppCategory {
@@ -37,16 +40,24 @@ interface EmpresaListItem extends Pick<Empresa, 'id' | 'nome' | 'cnpj' | 'card_b
 
 type TipoUsuario = 'titular' | 'colaborador'
 
-const DASHBOARD_PAGES: Page[] = ['aplicativos', 'minhas-empresas', 'comunidade']
+const pageByPath: Record<DashboardRoutePath, Page> = {
+  '/': 'aplicativos',
+  '/empresas': 'minhas-empresas',
+  '/comunidade': 'comunidade',
+  '/suporte': 'suporte',
+}
+
+const pathByPage: Record<Page, DashboardRoutePath> = {
+  aplicativos: '/',
+  'minhas-empresas': '/empresas',
+  comunidade: '/comunidade',
+  suporte: '/suporte',
+}
 
 function normalizeInternalAppLink(link?: string | null) {
   const trimmed = link?.trim() ?? ''
   if (!trimmed || trimmed.startsWith('http')) return trimmed
   return trimmed.startsWith('/') ? trimmed : `/${trimmed}`
-}
-
-function isDashboardPage(value: unknown): value is Page {
-  return typeof value === 'string' && DASHBOARD_PAGES.includes(value as Page)
 }
 
 function isString(value: unknown): value is string {
@@ -132,6 +143,13 @@ const IconCommunity = () => (
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
     <circle cx="9" cy="7" r="4"/>
     <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+  </svg>
+)
+const IconSupport = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M5.64 5.64l4.24 4.24M14.12 14.12l4.24 4.24M18.36 5.64l-4.24 4.24M9.88 14.12l-4.24 4.24"/>
   </svg>
 )
 const IconBuilding = () => (
@@ -1122,13 +1140,9 @@ function AppCard({
 
 // ── Main Component ────────────────────────────────────────────────────────
 
-export default function DashboardPage({ user, onLogout, onUpdateUserName, theme, onToggleTheme, onNavigate }: DashboardPageProps) {
+export default function DashboardPage({ user, onLogout, onUpdateUserName, theme, onToggleTheme, onNavigate, dashboardPath }: DashboardPageProps) {
   const storagePrefix = `dashboard:${user.email.toLowerCase()}`
-  const [activePage, setActivePage] = useSessionStorageState<Page>(
-    `${storagePrefix}:active-page`,
-    'aplicativos',
-    isDashboardPage,
-  )
+  const activePage = pageByPath[dashboardPath]
   const [activeCategory, setActiveCategory] = useSessionStorageState(
     `${storagePrefix}:active-category`,
     'todos',
@@ -1789,7 +1803,12 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     { id: 'aplicativos' as Page, label: 'Aplicativos', icon: <IconApps /> },
     ...(tipoUsuario === 'titular' || isAdmin ? [{ id: 'minhas-empresas' as Page, label: 'Minhas empresas', icon: <IconBuilding /> }] : []),
     { id: 'comunidade'  as Page, label: 'Comunidade',  icon: <IconCommunity /> },
+    { id: 'suporte'     as Page, label: 'Suporte',     icon: <IconSupport /> },
   ]
+  const handlePageSelect = (page: Page) => {
+    setOpenTopicId(null)
+    onNavigate(pathByPage[page])
+  }
 
   // Forum topic detail view overlays the community page
   if (activePage === 'comunidade' && openTopicId) {
@@ -1800,7 +1819,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
           tipoUsuario={tipoUsuario}
           navItems={navItems}
           activePage={activePage}
-          onSelect={page => { setActivePage(page); setOpenTopicId(null) }}
+          onSelect={handlePageSelect}
           isAdmin={isAdmin}
           onSettings={() => onNavigate('/admin-settings')}
           onLogout={onLogout}
@@ -1822,7 +1841,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
         tipoUsuario={tipoUsuario}
         navItems={navItems}
         activePage={activePage}
-        onSelect={setActivePage}
+        onSelect={handlePageSelect}
         isAdmin={isAdmin}
         onSettings={() => onNavigate('/admin-settings')}
         onLogout={onLogout}
@@ -2172,6 +2191,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
               </div>
             )}
           </div>
+        )}
+
+        {/* SUPORTE */}
+        {activePage === 'suporte' && (
+          <SupportPage isAdmin={isAdmin} />
         )}
 
       </main>

@@ -599,6 +599,56 @@ export interface Database {
         }
         Relationships: []
       }
+      support_tickets: {
+        Row: {
+          id: number
+          user_id: string
+          subject: string
+          category: 'duvida' | 'problema' | 'financeiro' | 'sugestao' | 'outro'
+          priority: 'baixa' | 'normal' | 'alta' | 'urgente'
+          status: 'aberto' | 'em_atendimento' | 'aguardando_cliente' | 'resolvido' | 'fechado'
+          last_message_at: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id?: string
+          subject: string
+          category?: 'duvida' | 'problema' | 'financeiro' | 'sugestao' | 'outro'
+          priority?: 'baixa' | 'normal' | 'alta' | 'urgente'
+          status?: 'aberto' | 'em_atendimento' | 'aguardando_cliente' | 'resolvido' | 'fechado'
+          last_message_at?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          priority?: 'baixa' | 'normal' | 'alta' | 'urgente'
+          status?: 'aberto' | 'em_atendimento' | 'aguardando_cliente' | 'resolvido' | 'fechado'
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      support_ticket_messages: {
+        Row: {
+          id: string
+          ticket_id: number
+          author_id: string
+          message: string
+          is_staff: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          ticket_id: number
+          author_id?: string
+          message: string
+          is_staff?: boolean
+          created_at?: string
+        }
+        Update: Record<string, never>
+        Relationships: []
+      }
       termos_aceite: {
         Row: {
           id:          string
@@ -1130,6 +1180,8 @@ export type Configuracao       = Database['public']['Tables']['configuracoes']['
 export type ForumCategory      = Database['public']['Tables']['forum_categories']['Row']
 export type ForumTopic         = Database['public']['Tables']['forum_topics']['Row']
 export type ForumReply                  = Database['public']['Tables']['forum_replies']['Row']
+export type SupportTicket               = Database['public']['Tables']['support_tickets']['Row']
+export type SupportTicketMessage        = Database['public']['Tables']['support_ticket_messages']['Row']
 export type DreClassificacaoHistorico  = Database['public']['Tables']['dre_classificacao_historico']['Row']
 export type UserInvitation             = Database['public']['Tables']['user_invitations']['Row']
 export type TermosAceite               = Database['public']['Tables']['termos_aceite']['Row']
