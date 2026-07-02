@@ -244,10 +244,40 @@ export function ownerV8ToV7Settings(model: OwnerV8Model): OwnerSettings {
 
   const snapshotMap = new Map((normalized.externalMinimumSnapshot.items || []).map(item => [item.name, item]));
 
-  FLAT_CATALOG.forEach(proc => {
-    const policy = settings.pricingPolicy.procedurePolicies[proc.name];
+  // O catálogo de vendas pode vir de empresa_precos e conter procedimentos que
+  // não existem no FLAT_CATALOG. Esses itens também precisam de uma policy;
+  // caso contrário itemMinPrice() usa o preço de vitrine como fallback e bloqueia
+  // qualquer edição abaixo dele, mesmo quando há um mínimo menor salvo.
+  const procedures = new Map(FLAT_CATALOG.map(proc => [proc.name, proc]));
+  normalized.externalMinimumSnapshot.items.forEach(item => {
+    if (!procedures.has(item.name)) {
+      procedures.set(item.name, {
+        name: item.name,
+        category: item.category || 'Geral',
+        tablePrice: item.minPrice,
+        minPrice: item.minPrice,
+      });
+    }
+  });
+
+  procedures.forEach(proc => {
     const minimumRow = snapshotMap.get(proc.name);
     const minPrice = roundMoney(Math.max(0, safeNumber(minimumRow?.minPrice, defaultCatalogMinPrice(proc))));
+    const policy = settings.pricingPolicy.procedurePolicies[proc.name] =
+      settings.pricingPolicy.procedurePolicies[proc.name] || {
+        category: proc.category,
+        tablePrice: proc.tablePrice,
+        idealCashPrice: proc.tablePrice,
+        minPrice,
+        narrativePriceOverride: null,
+        maxDiscountPct: settings.discountPolicy.maxItemDiscountPct,
+        campaignEnabled: true,
+        maxCampaignPct: settings.discountPolicy.maxItemDiscountPct,
+        programmedEnabled: false,
+        programmedStartPct: 30,
+        programmedFinishPct: 80,
+        programmedStartMonth: 1,
+      };
     policy.minPrice = minPrice;
     policy.idealCashPrice = roundMoney(Math.max(minPrice, safeNumber(proc.tablePrice, minPrice)));
 
