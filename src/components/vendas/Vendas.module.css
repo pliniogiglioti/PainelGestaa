@@ -1619,7 +1619,8 @@
   color: var(--text-muted);
 }
 .prowInlineInput {
-  width: 52px;
+  width: 64px;
+  box-sizing: border-box;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1630,6 +1631,7 @@
   text-align: center;
   outline: none;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
 }
 .prowInlineInput:focus { border-color: var(--accent); }
 .prowIndicator {
@@ -1668,7 +1670,8 @@
   gap: 4px;
 }
 .priceEditInput {
-  width: 80px;
+  width: 108px;
+  box-sizing: border-box;
   background: var(--bg);
   border: 1px solid var(--accent);
   border-radius: 8px;
@@ -1677,6 +1680,7 @@
   padding: 3px 8px;
   outline: none;
   font-family: inherit;
+  font-variant-numeric: tabular-nums;
 }
 .priceEditOk {
   background: var(--accent);

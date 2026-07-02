@@ -73,6 +73,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
   const [totalEditing, setTotalEditing] = useState(false);
   const [totalEditInput, setTotalEditInput] = useState(0);
   const totalInputRef = useRef<HTMLInputElement>(null);
+  const itemPriceInputRef = useRef<HTMLInputElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const itemSearchRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -199,13 +200,15 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         const adjustedValue = Math.max(val, minTotal);
         if (val < minTotal) onNotify(`${item.name} ajustado ao preço mínimo.`, 'info');
         const unitPrice = adjustedValue / qty;
-        const pct = (1 - unitPrice / item.tablePrice) * 100;
-        if (pct > 0.01 && pct < 100) {
-          p.items[index].overridePrice = unitPrice;
-          p.items[index].campaignPct = Math.round(pct * 10) / 10;
-        } else {
+        const pct = item.tablePrice > 0 ? (1 - unitPrice / item.tablePrice) * 100 : 0;
+        if (Math.abs(unitPrice - item.tablePrice) < 0.01) {
           p.items[index].overridePrice = null;
           p.items[index].campaignPct = null;
+        } else {
+          p.items[index].overridePrice = unitPrice;
+          p.items[index].campaignPct = pct > 0.01 && pct < 100
+            ? Math.round(pct * 10) / 10
+            : null;
         }
         p.totalOverride = null;
         p.planCampaignPctRequested = 0;
@@ -234,7 +237,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
         return;
       }
       update(p => {
-        if (val >= tableTotal) {
+        if (Math.abs(val - tableTotal) < 0.01) {
           p.totalOverride = null;
           p.extraDiscountPct = 0;
           p.planCampaignPctRequested = 0;
@@ -317,7 +320,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                   {hasDiscount && item.priceVisible && <span className={styles.itemPriceOrig}>{fmt(item.tablePrice * (item.qty || 1))}</span>}
                   {item.priceEditing ? (
                     <span className={styles.priceEditWrap}>
-                      <input className={styles.priceEditInput} type="number" min="0"
+                      <input ref={itemPriceInputRef} className={styles.priceEditInput} type="number" min="0" step="0.01" autoFocus
                         id={`pedit-${item.id}`}
                         value={item.priceEditInput}
                         onChange={e => update(p => { p.items[idx].priceEditInput = e.target.value; })}
@@ -328,7 +331,8 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                     <span className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
                       onClick={() => {
                         if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); return; }
-                        update(p => { p.items[idx].priceEditInput = String(Math.round(totalForItem)); p.items[idx].priceEditing = true; });
+                        update(p => { p.items[idx].priceEditInput = String(roundMoney(totalForItem)); p.items[idx].priceEditing = true; });
+                        setTimeout(() => itemPriceInputRef.current?.select(), 50);
                       }}>
                       {fmt(totalForItem)}
                     </span>
@@ -427,9 +431,10 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
               {hasCampaign && <span className={styles.totalOrig}>{fmt(tableTotal)}</span>}
               {totalEditing ? (
                 <span className={styles.priceEditWrap}>
-                  <input ref={totalInputRef} className={styles.priceEditInput} type="number" min="0"
+                  <input ref={totalInputRef} className={styles.priceEditInput} type="number" min="0" step="0.01"
                     id={`total-edit-${plan.id}`}
-                    value={totalEditInput}
+                    value={totalEditInput > 0 ? totalEditInput : ''}
+                    placeholder="0"
                     onChange={e => setTotalEditInput(parseFloat(e.target.value) || 0)}
                     onKeyDown={e => { if (e.key === 'Enter') applyTotalEdit(); if (e.key === 'Escape') setTotalEditing(false); }} />
                   <button className={styles.priceEditOk} onClick={applyTotalEdit}>✓</button>

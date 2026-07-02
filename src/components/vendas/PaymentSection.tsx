@@ -2,7 +2,7 @@ import { useRef } from 'react';
 import type { Plan, OwnerSettings, PaymentMethod, IndicatorTone } from './types';
 import {
   fmt, planEffectiveTotal, planHasCampaign, paymentDisplayValue,
-  boletoTotalWithInterest, cardFeePct, safeNumber,
+  safeNumber,
   resolveIndicatorTag, normalizeIndicatorColor,
   cashNarrativeStatus, planMinimumCashTotal, sanitizeIndicatorRules,
 } from './calcEngine';
@@ -122,25 +122,12 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
           }
         }
         if (field === 'parcelado') {
-          const base = p.shownPayments.includes('entrada') ? eff * (1 - (p.payment.entradaPct || 0) / 100) : eff;
-          let parcelas = 1;
-          for (let c = 1; c <= ownerSettings.paymentPolicy.maxCardInstallments; c++) {
-            const total = base * (1 + cardFeePct(c, ownerSettings) / 100);
-            if (total / c <= val) { parcelas = c; break; }
-            parcelas = c;
-          }
-          p.payment.parcelas = Math.min(parcelas, ownerSettings.paymentPolicy.maxCardInstallments);
+          p.payment.parceladoOverride = val;
         }
         if (field === 'boleto') {
-          const base = p.shownPayments.includes('entrada') ? eff * (1 - (p.payment.entradaPct || 0) / 100) : eff;
-          let parcs = 1;
-          for (let c = 1; c <= ownerSettings.paymentPolicy.maxBoletoInstallments; c++) {
-            const total = boletoTotalWithInterest(base, c, ownerSettings);
-            if (total / c <= val) { parcs = c; break; }
-            parcs = c;
-          }
-          p.payment.parcelasBoleto = Math.min(parcs, ownerSettings.paymentPolicy.maxBoletoInstallments);
+          p.payment.boletoOverride = val;
         }
+        if (field === 'debito') p.payment.debitoOverride = val;
       }
       p.payment.editingField = null;
     });
@@ -156,7 +143,8 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             <>
               <span className={styles.prowLabel}>Entrada</span>
               <input className={styles.prowInlineInput} type="number" min="0" max="100"
-                value={plan.payment.entradaPct}
+                value={plan.payment.entradaPct > 0 ? plan.payment.entradaPct : ''}
+                placeholder="0"
                 onChange={e => {
                   const v = Math.min(100, Math.max(0, parseFloat(e.target.value) || 0));
                   updatePlan(p => { p.payment.entradaPct = v; p.payment.entradaOverride = null; });
@@ -168,7 +156,8 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             <>
               <span className={styles.prowLabel}>Cartão</span>
               <input className={styles.prowInlineInput} type="number" min="0" max={ownerSettings.paymentPolicy.maxCardInstallments}
-                value={plan.payment.parcelas}
+                value={plan.payment.parcelas > 0 ? plan.payment.parcelas : ''}
+                placeholder="0"
                 onChange={e => {
                   const v = Math.min(ownerSettings.paymentPolicy.maxCardInstallments, Math.max(0, parseInt(e.target.value) || 0));
                   updatePlan(p => { p.payment.parcelas = v; p.payment.parceladoOverride = null; });
@@ -181,7 +170,8 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             <>
               <span className={styles.prowLabel}>À vista</span>
               <input className={styles.prowInlineInput} type="number" min="0" max="50"
-                value={plan.payment.descontoAVista}
+                value={plan.payment.descontoAVista > 0 ? plan.payment.descontoAVista : ''}
+                placeholder="0"
                 onChange={e => {
                   const v = Math.min(50, Math.max(0, parseFloat(e.target.value) || 0));
                   updatePlan(p => { p.payment.descontoAVista = v; p.payment.aVistaOverride = null; });
@@ -193,7 +183,8 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             <>
               <span className={styles.prowLabel}>{plan.shownPayments.includes('entrada') ? 'Saldo boleto' : 'Boleto'}</span>
               <input className={styles.prowInlineInput} type="number" min="0" max={ownerSettings.paymentPolicy.maxBoletoInstallments}
-                value={plan.payment.parcelasBoleto}
+                value={plan.payment.parcelasBoleto > 0 ? plan.payment.parcelasBoleto : ''}
+                placeholder="0"
                 onChange={e => {
                   const v = Math.min(ownerSettings.paymentPolicy.maxBoletoInstallments, Math.max(0, parseInt(e.target.value) || 0));
                   updatePlan(p => { p.payment.parcelasBoleto = v; p.payment.boletoOverride = null; });
@@ -220,7 +211,8 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
           <>
             <span className={styles.prowLabel}>R$</span>
             <input className={styles.priceEditInput} type="number" min="0"
-              value={Math.round(value)}
+              value={value > 0 ? Math.round(value * 100) / 100 : ''}
+              placeholder="0"
               onChange={e => {
                 const val = Math.max(0, parseFloat(e.target.value) || 0);
                 updatePlan(p => {
@@ -232,8 +224,9 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
           </>
         ) : isEditing ? (
           <span className={styles.priceEditWrap} onClick={e => e.stopPropagation()}>
-            <input ref={inputRef} className={styles.priceEditInput} type="number" min="0"
-              value={plan.payment.editInput}
+            <input ref={inputRef} className={styles.priceEditInput} type="number" min="0" step="0.01" autoFocus
+              value={plan.payment.editInput > 0 ? plan.payment.editInput : ''}
+              placeholder="0"
               onChange={e => updatePlan(p => { p.payment.editInput = parseFloat(e.target.value) || 0; })}
               onKeyDown={e => { if (e.key === 'Enter') applyEdit(); if (e.key === 'Escape') updatePlan(p => { p.payment.editingField = null; }); }} />
             <button className={styles.priceEditOk} onClick={applyEdit}>✓</button>
