@@ -1432,11 +1432,49 @@
   color: var(--text-muted);
 }
 
+.qtdField {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.qtdLabel {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
 .qtdControls {
   display: flex;
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
+}
+
+.qtdInput {
+  width: 48px;
+  height: 26px;
+  padding: 0 4px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  color: var(--text);
+  font: 600 12px/1 inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.qtdInput::-webkit-inner-spin-button,
+.qtdInput::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.qtdInput:focus {
+  border-color: var(--border-gold);
+  outline: none;
 }
 
 .qtdBtn {

@@ -521,10 +521,22 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
                           : 'Sem valor'}
                       </span>
                     </div>
-                    <div className={styles.qtdControls}>
-                      <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', Math.max(1, servico.quantidade - 1))} disabled={servico.quantidade <= 1}>−</button>
-                      <span className={styles.qtdValue}>{servico.quantidade}</span>
-                      <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', servico.quantidade + 1)}>+</button>
+                    <div className={styles.qtdField}>
+                      <label className={styles.qtdLabel} htmlFor={`quantidade-${servico.key}`}>Quantidade</label>
+                      <div className={styles.qtdControls}>
+                        <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', Math.max(1, servico.quantidade - 1))} disabled={servico.quantidade <= 1} aria-label={`Diminuir quantidade de ${servico.nome}`}>−</button>
+                        <input
+                          id={`quantidade-${servico.key}`}
+                          className={styles.qtdInput}
+                          type="number"
+                          min="1"
+                          step="1"
+                          inputMode="numeric"
+                          value={servico.quantidade}
+                          onChange={e => updateServico(servico.key, 'quantidade', Math.max(1, Math.floor(Number(e.target.value) || 1)))}
+                        />
+                        <button type="button" className={styles.qtdBtn} onClick={() => updateServico(servico.key, 'quantidade', servico.quantidade + 1)} aria-label={`Aumentar quantidade de ${servico.nome}`}>+</button>
+                      </div>
                     </div>
                     <button type="button" className={`${styles.btnIcon} ${styles.btnIconDanger}`} onClick={() => removeServico(servico.key)} title="Remover serviço">
                       <IconTrash />
