@@ -131,7 +131,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
       .single()
     if (ticketError || !ticket) { setError(ticketError?.message ?? 'Não foi possível abrir o ticket.'); setSaving(false); return }
     const { error: messageError } = await supabase.from('support_ticket_messages').insert({
-      ticket_id: ticket.id, author_id: authData.user.id, message: description.trim(), is_staff: false,
+      ticket_id: ticket.id, author_id: authData.user.id, message: description.trim(), is_staff: isAdmin,
     })
     if (messageError) { setError(messageError.message); setSaving(false); return }
     await fetchTickets()
@@ -236,11 +236,10 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
           <h1>{isAdmin ? 'Tickets de suporte' : 'Como podemos ajudar?'}</h1>
           <span>{isAdmin ? 'Acompanhe e responda às solicitações dos usuários.' : 'Abra um chamado e acompanhe toda a conversa por aqui.'}</span>
         </div>
-        {isAdmin ? (
-          <div className={styles.adminModeBadge}><span>●</span> Modo administrador</div>
-        ) : (
+        <div className={styles.heroActions}>
+          {isAdmin && <div className={styles.adminModeBadge}><span>●</span> Modo administrador</div>}
           <button className={styles.primaryButton} onClick={() => setShowCreate(true)}><span>＋</span> Novo ticket</button>
-        )}
+        </div>
       </header>
 
       <div className={styles.stats}>
