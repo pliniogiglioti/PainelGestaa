@@ -232,7 +232,7 @@ function PaymentRow({ plan, field, onChange, onNotify, ownerSettings, revealed }
             <button className={styles.priceEditOk} onClick={applyEdit}>✓</button>
           </span>
         ) : (
-          <span className={styles.priceClickable} onClick={startEdit}>
+          <span data-no-drag className={styles.priceClickable} onClick={startEdit}>
             {field === 'boleto' && plan.payment.parcelasBoleto > 0 ? fmt(value) :
              field === 'parcelado' && plan.payment.parcelas > 0 ? fmt(value) :
              field === 'boleto' || field === 'parcelado' ? '—' : fmt(value)}

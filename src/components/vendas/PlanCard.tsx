@@ -328,7 +328,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                       <button className={styles.priceEditOk} onClick={() => applyPriceEdit(idx)}>✓</button>
                     </span>
                   ) : (
-                    <span className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
+                    <span data-no-drag className={`${styles.itemPrice} ${hasDiscount ? styles.discounted : ''} ${item.priceVisible ? '' : styles.hidden}`}
                       onClick={() => {
                         if (!item.priceVisible) { update(p => { p.items[idx].priceVisible = true; }); return; }
                         update(p => { p.items[idx].priceEditInput = String(roundMoney(totalForItem)); p.items[idx].priceEditing = true; });
@@ -440,7 +440,7 @@ export function PlanCard({ plan, planIndex, plansCount, ownerSettings, onChange,
                   <button className={styles.priceEditOk} onClick={applyTotalEdit}>✓</button>
                 </span>
               ) : (
-                <span className={styles.totalValue}
+                <span data-no-drag className={styles.totalValue}
                   onClick={() => { if (plan.totalVisible) startTotalEdit(); }}>
                   {fmt(eff)}
                 </span>
