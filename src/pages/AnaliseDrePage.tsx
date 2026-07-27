@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 import styles from './AnaliseDrePage.module.css'
 import { supabase } from '../lib/supabase'
 import type { DreClassificacao, DreLancamento, Empresa, Database } from '../lib/types'
@@ -1181,6 +1182,64 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     }
   }
 
+  // ── Exportar relatório em .xlsx, no mesmo layout do modelo de DFC, ────────
+  // respeitando os filtros de ano/mês/tipo/busca aplicados na tela.
+  const exportarRelatorio = () => {
+    const meses = dreComparativoPorMes
+    const mostrarTotal = meses.length !== 1
+    const pctDe = (valor: number, base: number) => (base > 0 ? Number(((valor / base) * 100).toFixed(1)) : 0)
+
+    const linhas: (string | number)[][] = []
+    const periodoLabel = anoFiltro === 'todos' ? 'Todos os anos' : anoFiltro
+    linhas.push([`Análise DFC — ${empresa.nome}`])
+    linhas.push([`Período: ${periodoLabel} · ${mesesFiltroLabel}`])
+    linhas.push([])
+
+    const header: (string | number)[] = ['Categoria']
+    if (meses.length === 0) {
+      header.push('Valor', '%')
+    } else {
+      meses.forEach(m => header.push(m.label, '%'))
+      if (mostrarTotal) header.push('Total', '%')
+    }
+    linhas.push(header)
+
+    const pushRow = (label: string, valorMes: (m: MesComparativoData) => number, valorTotal: number) => {
+      const row: (string | number)[] = [label]
+      if (meses.length === 0) {
+        row.push(Number(valorTotal.toFixed(2)), pctDe(valorTotal, kpis.receitaOperacional))
+      } else {
+        meses.forEach(m => {
+          const v = valorMes(m)
+          row.push(Number(v.toFixed(2)), pctDe(v, m.kpis.receitaOperacional))
+        })
+        if (mostrarTotal) {
+          row.push(Number(valorTotal.toFixed(2)), pctDe(valorTotal, kpis.receitaOperacional))
+        }
+      }
+      linhas.push(row)
+    }
+
+    dreOrdenadoItems.forEach(item => {
+      if (item.kind === 'totalizador') {
+        pushRow(item.label, m => getMesTotalizadorValor(item.label, m), item.valor)
+        return
+      }
+      const grupo = item.data
+      pushRow(grupo.nome, m => getMesGrupoTotal(grupo.nome, m), grupo.total)
+      grupo.classificacoes.forEach(clf => {
+        pushRow(`   ${clf.nome}`, m => getMesClfTotal(grupo.nome, clf.nome, m), clf.total)
+      })
+    })
+
+    const ws = XLSX.utils.aoa_to_sheet(linhas)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'DFC')
+    const sufixoPeriodo = anoFiltro === 'todos' ? 'todos-os-anos' : anoFiltro
+    const nomeEmpresa = empresa.nome.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    XLSX.writeFile(wb, `DFC_${nomeEmpresa}_${sufixoPeriodo}.xlsx`)
+  }
+
   return (
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
@@ -1211,6 +1270,16 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             <span className={styles.btnUploadTooltip}>Importe um extrato bancário (.xlsx, .xls ou .csv). A IA classifica automaticamente os lançamentos.</span>
             <span className={styles.btnUploadEyebrow}>• IA • OPENAI</span>
             <span className={styles.btnUploadTitle}>Importar Extrato</span>
+          </button>
+          <button
+            className={styles.btnExport}
+            onClick={exportarRelatorio}
+            disabled={lancamentosFiltrados.length === 0}
+          >
+            <span className={styles.btnExportInfo}>ⓘ</span>
+            <span className={styles.btnExportTooltip}>Exporta a DFC do período filtrado (ano, meses, tipo e busca) em uma planilha .xlsx, no mesmo layout do modelo de DFC — categorias por linha e meses por coluna.</span>
+            <span className={styles.btnExportEyebrow}>• RELATÓRIO</span>
+            <span className={styles.btnExportTitle}>Exportar Relatório</span>
           </button>
         </div>
       </header>
