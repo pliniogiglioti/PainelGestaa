@@ -341,6 +341,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   )
   const [showAssistente,   setShowAssistente]   = useState(false)
   const [showUpload,       setShowUpload]       = useState(false)
+  const [showExportModal,  setShowExportModal]  = useState(false)
   // Admin
   const [isAdmin,          setIsAdmin]          = useState(false)
   const [canExcluirPeriodo, setCanExcluirPeriodo] = useState(false)
@@ -833,6 +834,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const editClassBackdropDismiss = useBackdropDismiss(closeEditClassModal)
   const assistenteBackdropDismiss = useBackdropDismiss(() => setShowAssistente(false))
   const uploadBackdropDismiss = useBackdropDismiss(() => setShowUpload(false))
+  const exportBackdropDismiss = useBackdropDismiss(() => setShowExportModal(false))
 
   const salvarClassificacao = async () => {
     if (!editClassItem) return
@@ -1182,9 +1184,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     }
   }
 
-  // ── Exportar relatório em .xlsx, no mesmo layout do modelo de DFC, ────────
+  const periodoLabelExport = anoFiltro === 'todos' ? 'Todos os anos' : `${mesesFiltroLabel}, ${anoFiltro}`
+
+  // ── Exportar relatório "Completo" em .xlsx, no mesmo layout do modelo de DFC, ─
   // respeitando os filtros de ano/mês/tipo/busca aplicados na tela.
-  const exportarRelatorio = () => {
+  const exportarRelatorioCompleto = () => {
     const meses = dreComparativoPorMes
     const mostrarTotal = meses.length !== 1
     const pctDe = (valor: number, base: number) => (base > 0 ? Number(((valor / base) * 100).toFixed(1)) : 0)
@@ -1204,7 +1208,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     }
     linhas.push(header)
 
-    const pushRow = (label: string, valorMes: (m: MesComparativoData) => number, valorTotal: number) => {
+    // Nível de estrutura de tópicos (outline) por linha: grupo = 0 (visível),
+    // classificação = 1 (recolhida por padrão sob o grupo).
+    const niveis: number[] = linhas.map(() => 0)
+
+    const pushRow = (label: string, valorMes: (m: MesComparativoData) => number, valorTotal: number, nivel = 0) => {
       const row: (string | number)[] = [label]
       if (meses.length === 0) {
         row.push(Number(valorTotal.toFixed(2)), pctDe(valorTotal, kpis.receitaOperacional))
@@ -1218,6 +1226,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         }
       }
       linhas.push(row)
+      niveis.push(nivel)
     }
 
     dreOrdenadoItems.forEach(item => {
@@ -1228,16 +1237,87 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       const grupo = item.data
       pushRow(grupo.nome, m => getMesGrupoTotal(grupo.nome, m), grupo.total)
       grupo.classificacoes.forEach(clf => {
-        pushRow(`   ${clf.nome}`, m => getMesClfTotal(grupo.nome, clf.nome, m), clf.total)
+        pushRow(`   ${clf.nome}`, m => getMesClfTotal(grupo.nome, clf.nome, m), clf.total, 1)
       })
     })
 
     const ws = XLSX.utils.aoa_to_sheet(linhas)
+    // Estrutura de tópicos: controle +/- acima do grupo (grupo vem antes das
+    // classificações), com as classificações recolhidas por padrão.
+    ws['!outline'] = { above: true }
+    ws['!rows'] = niveis.map(nivel => (nivel > 0 ? { level: nivel, hidden: true } : { level: nivel }))
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, 'DFC')
     const sufixoPeriodo = anoFiltro === 'todos' ? 'todos-os-anos' : anoFiltro
     const nomeEmpresa = empresa.nome.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-    XLSX.writeFile(wb, `DFC_${nomeEmpresa}_${sufixoPeriodo}.xlsx`)
+    XLSX.writeFile(wb, `DFC_Completo_${nomeEmpresa}_${sufixoPeriodo}.xlsx`)
+    setShowExportModal(false)
+  }
+
+  // ── Exportar relatório "Analítico" em .xlsx: uma aba por mês, listando ────
+  // cada lançamento individual (data, descrição, classificação, grupo, valor).
+  const exportarRelatorioAnalitico = () => {
+    const mesesEfetivos = mesesFiltro.length > 0 ? mesesFiltro : mesesOptions.map(m => m.value)
+    const formatter = new Intl.DateTimeFormat('pt-BR', { month: 'long', timeZone: 'UTC' })
+
+    const wb = XLSX.utils.book_new()
+    const nomesUsados = new Set<string>()
+
+    const gerarAba = (itensDoMes: DreLancamento[], nomeAba: string) => {
+      const linhas: (string | number)[][] = [
+        ['Data', 'Descrição', 'Tipo', 'Classificação', 'Grupo', 'Valor'],
+      ]
+      itensDoMes
+        .slice()
+        .sort((a, b) => (a.data_lancamento ?? a.created_at).localeCompare(b.data_lancamento ?? b.created_at))
+        .forEach(item => {
+          const src = item.data_lancamento ?? item.created_at
+          const tipo = item.tipo ?? tipoMap[item.classificacao] ?? 'despesa'
+          linhas.push([
+            new Date(src).toLocaleDateString('pt-BR', { timeZone: 'UTC' }),
+            item.descricao ?? '',
+            tipo === 'receita' ? 'Receita' : 'Despesa',
+            item.classificacao ?? '',
+            item.grupo ?? '',
+            Number(Number(item.valor).toFixed(2)),
+          ])
+        })
+      const total = itensDoMes.reduce((s, item) => s + Number(item.valor), 0)
+      linhas.push([])
+      linhas.push(['', '', '', '', 'Total', Number(total.toFixed(2))])
+
+      const ws = XLSX.utils.aoa_to_sheet(linhas)
+      // Excel limita nomes de aba a 31 caracteres e não aceita alguns símbolos
+      let abaNome = nomeAba.replace(/[\\/?*[\]:]/g, '').slice(0, 31)
+      let sufixo = 2
+      while (nomesUsados.has(abaNome)) {
+        abaNome = `${nomeAba.slice(0, 28)}(${sufixo})`
+        sufixo += 1
+      }
+      nomesUsados.add(abaNome)
+      XLSX.utils.book_append_sheet(wb, ws, abaNome)
+    }
+
+    if (mesesEfetivos.length === 0) {
+      gerarAba(lancamentosFiltrados, 'Relatório')
+    } else {
+      mesesEfetivos.forEach(mes => {
+        const itensDoMes = lancamentosFiltrados.filter(item => {
+          const src = item.data_lancamento ?? item.created_at
+          return !!src && src.slice(5, 7) === mes
+        })
+        const label = formatter.format(new Date(`2000-${mes}-01T00:00:00Z`))
+        const nomeAba = anoFiltro === 'todos'
+          ? label.charAt(0).toUpperCase() + label.slice(1)
+          : `${label.charAt(0).toUpperCase()}${label.slice(1)} ${anoFiltro}`
+        gerarAba(itensDoMes, nomeAba)
+      })
+    }
+
+    const sufixoPeriodo = anoFiltro === 'todos' ? 'todos-os-anos' : anoFiltro
+    const nomeEmpresa = empresa.nome.replace(/[^a-zA-Z0-9]+/g, '_').replace(/^_+|_+$/g, '')
+    XLSX.writeFile(wb, `DFC_Analitico_${nomeEmpresa}_${sufixoPeriodo}.xlsx`)
+    setShowExportModal(false)
   }
 
   return (
@@ -1273,11 +1353,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           </button>
           <button
             className={styles.btnExport}
-            onClick={exportarRelatorio}
+            onClick={() => setShowExportModal(true)}
             disabled={lancamentosFiltrados.length === 0}
           >
             <span className={styles.btnExportInfo}>ⓘ</span>
-            <span className={styles.btnExportTooltip}>Exporta a DFC do período filtrado (ano, meses, tipo e busca) em uma planilha .xlsx, no mesmo layout do modelo de DFC — categorias por linha e meses por coluna.</span>
+            <span className={styles.btnExportTooltip}>Exporta a DFC do período filtrado (ano, meses, tipo e busca) em uma planilha .xlsx.</span>
             <span className={styles.btnExportEyebrow}>• RELATÓRIO</span>
             <span className={styles.btnExportTitle}>Exportar Relatório</span>
           </button>
@@ -1355,6 +1435,43 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           </p>
         </section>
       )}
+
+      {/* ── Modal Exportar Relatório ── */}
+      <ModalTransition open={showExportModal}>
+        {showExportModal && (
+          <div
+            className={styles.modalOverlay}
+            onPointerDown={exportBackdropDismiss.handleBackdropPointerDown}
+            onClick={exportBackdropDismiss.handleBackdropClick}
+          >
+            <div className={styles.modal} onClick={e => e.stopPropagation()}>
+              <div className={styles.modalHeader}>
+                <h2>Exportar Relatório</h2>
+                <button className={styles.closeBtn} onClick={() => setShowExportModal(false)}>✕</button>
+              </div>
+
+              <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 18 }}>
+                Escolha o formato do relatório em .xlsx do período filtrado ({periodoLabelExport}).
+              </p>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <button className={styles.exportOptionBtn} onClick={exportarRelatorioAnalitico}>
+                  <span className={styles.exportOptionTitle}>Relatório Analítico</span>
+                  <span className={styles.exportOptionDesc}>Uma aba por mês, com todos os lançamentos individuais (data, descrição, classificação, grupo e valor).</span>
+                </button>
+                <button className={styles.exportOptionBtn} onClick={exportarRelatorioCompleto}>
+                  <span className={styles.exportOptionTitle}>Relatório Completo</span>
+                  <span className={styles.exportOptionDesc}>Visão consolidada da DFC — categorias por linha e meses por coluna, no layout oficial do modelo.</span>
+                </button>
+              </div>
+
+              <div className={styles.deletePeriodoBtns}>
+                <button className={styles.cancelBtn} onClick={() => setShowExportModal(false)}>Cancelar</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </ModalTransition>
 
       {/* ── Modal Upload Extrato ── */}
       <ModalTransition open={showUpload}>
