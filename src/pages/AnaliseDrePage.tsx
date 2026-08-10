@@ -846,7 +846,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     setEditClassError('')
 
     const classificacaoNome = editClassForm.classificacaoNome.trim()
-    const grupoNome         = editClassForm.grupo.trim()
+    const grupoNome         = classificacaoToGrupo[classificacaoNome] ?? editClassForm.grupo.trim()
     const tipo              = editClassForm.tipo as 'receita' | 'despesa'
     const payload           = { tipo, classificacao: classificacaoNome, grupo: grupoNome }
 
@@ -1033,7 +1033,8 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         // Valida contra o plano de contas oficial antes de usar o histórico
         const nomesOficiais = new Set(classificacoes.map(c => c.nome))
         if (nomesOficiais.has(histData.classificacao)) {
-          setForm(p => ({ ...p, classificacaoNome: histData.classificacao, grupo: histData.grupo ?? '' }))
+          const grupoOficial = classificacaoToGrupo[histData.classificacao]
+          setForm(p => ({ ...p, classificacaoNome: histData.classificacao, grupo: grupoOficial ?? histData.grupo ?? '' }))
           setAiWarning('Classificado pelo histórico da empresa.')
           return
         }
@@ -1093,7 +1094,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     const { data: authData } = await supabase.auth.getUser()
 
     const classificacaoNome  = form.classificacaoNome.trim()
-    const grupoNome          = form.grupo.trim()
+    const grupoNome          = classificacaoToGrupo[classificacaoNome] ?? form.grupo.trim()
     const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const dataLancamento     = form.data || today()
 

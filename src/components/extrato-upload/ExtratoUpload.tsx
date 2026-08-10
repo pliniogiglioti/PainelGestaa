@@ -1382,7 +1382,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           : (nomesOficiaisNormMap.get(normalize(hist.classificacao)) ?? null)
         // Usa nome oficial se disponível, senão usa exatamente o que estava no histórico
         const classParaUsar = nomeOficial ?? hist.classificacao
-        const grupoParaUsar = hist.grupo || (nomeOficial ? resolveGrupo(nomeOficial, hist.tipo, grupoFromDB) : '')
+        const grupoParaUsar = nomeOficial ? resolveGrupo(nomeOficial, hist.tipo, grupoFromDB) : hist.grupo
         indicesDoHistorico.add(i)  // marca para não ser sobrescrito pela validação
         classificadas[i] = {
           ...linha,
@@ -1411,7 +1411,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           classificadas[i] = {
             ...linha,
             classificacao: nomeOficial,
-            grupo: linha.grupoArquivo || resolveGrupo(nomeOficial, linha.tipo, grupoFromDB),
+            grupo: resolveGrupo(nomeOficial, linha.tipo, grupoFromDB),
             status: 'ok',
             sugerida: undefined,
             sugestaoIA: undefined,
@@ -1637,16 +1637,20 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
     setErroSalvar('')
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      const toInsert = [...indices].sort((a, b) => a - b).map(i => ({
-        user_id:          user?.id ?? null,
-        empresa_id:       empresaId,
-        descricao:        linhasClass[i].descricao,
-        valor:            linhasClass[i].valor,
-        tipo:             linhasClass[i].tipo,
-        classificacao:    linhasClass[i].classificacao,
-        grupo:            linhasClass[i].grupo,
-        data_lancamento:  toISO(linhasClass[i].data),
-      }))
+      const dbMap = new Map(classificacoesDisp.filter(c => c.grupo).map(c => [c.nome, c.grupo] as [string, string]))
+      const toInsert = [...indices].sort((a, b) => a - b).map(i => {
+        const linha = linhasClass[i]
+        return {
+          user_id:          user?.id ?? null,
+          empresa_id:       empresaId,
+          descricao:        linha.descricao,
+          valor:            linha.valor,
+          tipo:             linha.tipo,
+          classificacao:    linha.classificacao,
+          grupo:            resolveGrupo(linha.classificacao, linha.tipo, dbMap) || linha.grupo,
+          data_lancamento:  toISO(linha.data),
+        }
+      })
       const { error } = await supabase.from('dre_lancamentos').insert(toInsert)
       if (error) throw new Error(error.message)
 
@@ -1660,11 +1664,12 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
         const now        = new Date().toISOString()
         const exato      = normalize(linha.descricao)
         const keyExato   = `${empresaId}|${exato}`
+        const grupoOficial = resolveGrupo(linha.classificacao, linha.tipo, dbMap) || linha.grupo
         historicoMap.set(keyExato, {
           empresa_id:            empresaId,
           descricao_normalizada: exato,
           classificacao:         linha.classificacao,
-          grupo:                 linha.grupo,
+          grupo:                 grupoOficial,
           tipo:                  linha.tipo,
           updated_at:            now,
         })
@@ -1677,7 +1682,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
             empresa_id:            empresaId,
             descricao_normalizada: stripped,
             classificacao:         linha.classificacao,
-            grupo:                 linha.grupo,
+            grupo:                 grupoOficial,
             tipo:                  linha.tipo,
             updated_at:            now,
           })
