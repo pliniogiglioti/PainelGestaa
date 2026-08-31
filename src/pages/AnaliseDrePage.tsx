@@ -850,12 +850,19 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     const tipo              = editClassForm.tipo as 'receita' | 'despesa'
     const payload           = { tipo, classificacao: classificacaoNome, grupo: grupoNome }
 
-    const { error: errUpdate } = await supabase
+    const { data: updated, error: errUpdate } = await supabase
       .from('dre_lancamentos')
       .update(payload)
       .eq('id', editClassItem.id)
+      .eq('empresa_id', empresa.id)
+      .select('id')
 
     if (errUpdate) { setEditClassError(errUpdate.message); setEditClassSaving(false); return }
+    if (!updated || updated.length === 0) {
+      setEditClassError('Nao foi possivel alterar este lancamento. Verifique se o usuario tem permissao para editar a empresa.')
+      setEditClassSaving(false)
+      return
+    }
 
     const idsAtualizados = new Set<string>([editClassItem.id])
 
@@ -871,11 +878,18 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
         )
         if (confirmar) {
           const otherIds = outros.map(l => l.id)
-          const { error: errOutros } = await supabase
+          const { data: outrosAtualizados, error: errOutros } = await supabase
             .from('dre_lancamentos')
             .update(payload)
+            .eq('empresa_id', empresa.id)
             .in('id', otherIds)
+            .select('id')
           if (errOutros) { setEditClassError(errOutros.message); setEditClassSaving(false); return }
+          if (!outrosAtualizados || outrosAtualizados.length !== otherIds.length) {
+            setEditClassError('Alguns lancamentos com a mesma descricao nao puderam ser alterados. Recarregue a tela e tente novamente.')
+            setEditClassSaving(false)
+            return
+          }
           otherIds.forEach(id => idsAtualizados.add(id))
         }
       }
@@ -1117,16 +1131,30 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       data_lancamento:  dataLancamento,
     }
 
-    const { error } = editingId
-      ? await supabase.from('dre_lancamentos').update(payload).eq('id', editingId)
-      : await supabase.from('dre_lancamentos').insert({
-          ...payload,
-          user_id:    authData.user?.id ?? null,
-          empresa_id: empresa.id,
-        })
+    let errorMessage = ''
+    if (editingId) {
+      const { data: updated, error } = await supabase
+        .from('dre_lancamentos')
+        .update(payload)
+        .eq('id', editingId)
+        .eq('empresa_id', empresa.id)
+        .select('id')
+
+      if (error) errorMessage = error.message
+      else if (!updated || updated.length === 0) {
+        errorMessage = 'Nao foi possivel alterar este lancamento. Verifique se o usuario tem permissao para editar a empresa.'
+      }
+    } else {
+      const { error } = await supabase.from('dre_lancamentos').insert({
+        ...payload,
+        user_id:    authData.user?.id ?? null,
+        empresa_id: empresa.id,
+      })
+      if (error) errorMessage = error.message
+    }
 
     setSaving(false)
-    if (error) { setError(error.message); return }
+    if (errorMessage) { setError(errorMessage); return }
 
     // Só aprende quando o usuário edita um lançamento existente (correção manual).
     // Novos lançamentos não são gravados no histórico aqui.
