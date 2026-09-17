@@ -846,7 +846,10 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     setEditClassError('')
 
     const classificacaoNome = editClassForm.classificacaoNome.trim()
-    const grupoNome         = classificacaoToGrupo[classificacaoNome] ?? editClassForm.grupo.trim()
+    // O grupo escolhido manualmente no modal deve prevalecer sobre o grupo
+    // sugerido pela classificação. Antes, qualquer alteração de grupo era
+    // descartada aqui e o lançamento permanecia no grupo antigo.
+    const grupoNome         = editClassForm.grupo.trim()
     const tipo              = editClassForm.tipo as 'receita' | 'despesa'
     const payload           = { tipo, classificacao: classificacaoNome, grupo: grupoNome }
 
@@ -1108,7 +1111,9 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     const { data: authData } = await supabase.auth.getUser()
 
     const classificacaoNome  = form.classificacaoNome.trim()
-    const grupoNome          = classificacaoToGrupo[classificacaoNome] ?? form.grupo.trim()
+    // A classificação preenche uma sugestão inicial, mas no passo seguinte o
+    // usuário pode escolher outro grupo. Persistir a escolha final do formulário.
+    const grupoNome          = form.grupo.trim()
     const tipoClassificacao  = form.tipo || (tipoMap[classificacaoNome] === 'receita' ? 'receita' : 'despesa')
     const dataLancamento     = form.data || today()
 
