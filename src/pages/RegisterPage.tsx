@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import styles from './RegisterPage.module.css'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface RegisterPageProps {
   onBack: () => void
@@ -12,7 +13,7 @@ export default function RegisterPage({ onBack }: RegisterPageProps) {
   const [password,        setPassword]        = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword,    setShowPassword]    = useState(false)
-  const [error,           setError]           = useState('')
+  const [error,           setError]           = useToastErrorState()
   const [success,         setSuccess]         = useState('')
   const [loading,         setLoading]         = useState(false)
 

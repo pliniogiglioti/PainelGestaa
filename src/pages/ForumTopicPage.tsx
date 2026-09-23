@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '../lib/supabase'
+import { toast } from '../lib/toast'
 import type { ForumTopicWithMeta, ForumReplyWithAuthor } from '../lib/types'
 import { User } from '../App'
 import styles from './ForumTopicPage.module.css'
@@ -60,7 +61,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
     async function load() {
       setLoading(true)
 
-      const [{ data: topicData }, { data: repliesData }] = await Promise.all([
+      const [{ data: topicData, error: topicError }, { data: repliesData, error: repliesError }] = await Promise.all([
         supabase
           .from('forum_topics')
           .select(`*, profiles(name, avatar_url), forum_categories(name, slug)`)
@@ -72,6 +73,9 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
           .eq('topic_id', topicId)
           .order('created_at', { ascending: true }),
       ])
+
+      if (topicError) toast.error(topicError, 'Não foi possível carregar o tópico.')
+      if (repliesError) toast.error(repliesError, 'Não foi possível carregar as respostas.')
 
       if (topicData) {
         setTopic({
@@ -118,7 +122,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
 
     // Get current user profile id from supabase auth
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSubmitting(false); return }
+    if (!user) { toast.error('Sua sessão expirou. Entre novamente para responder.'); setSubmitting(false); return }
 
     const { error } = await supabase.from('forum_replies').insert({
       topic_id:  topicId,
@@ -130,6 +134,7 @@ export default function ForumTopicPage({ topicId, currentUser, onBack }: ForumTo
       setReplyText('')
       setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100)
     }
+    if (error) toast.error(error, 'Não foi possível publicar sua resposta.')
     setSubmitting(false)
   }
 

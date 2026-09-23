@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { DreLancamento } from '../../lib/types'
 import { supabase } from '../../lib/supabase'
 import styles from './DreAssistentePanel.module.css'
+import { useToastErrorState } from '../../hooks/useToastErrorState'
 
 type DreAssistentePanelProps = {
   lancamentos: DreLancamento[]
@@ -119,7 +120,7 @@ function stripMarkdownForSpeech(text: string): string {
 
 export function DreAssistentePanel({ lancamentos, onClose }: DreAssistentePanelProps) {
   const [loading, setLoading]   = useState(false)
-  const [error, setError]       = useState('')
+  const [error, setError]       = useToastErrorState()
   const [analysis, setAnalysis] = useState('')
   const [audioState, setAudioState] = useState<'idle' | 'playing' | 'paused'>('idle')
   const [audioRate, setAudioRate]   = useState(1.0)

@@ -4,6 +4,7 @@ import type { Plan, PlanItem, OwnerSettings } from './types';
 import { normalizeIndicatorColor, sanitizeIndicatorTags, uid } from './calcEngine';
 import { PlanCard } from './PlanCard';
 import styles from './Vendas.module.css';
+import { toast } from '../../lib/toast';
 
 interface SellerWorldProps {
   ownerSettings: OwnerSettings;
@@ -99,11 +100,6 @@ function hydratePlan(input: Partial<Plan> | undefined, fallbackName?: string): P
   };
 }
 
-interface ToastState {
-  msg: string;
-  kind: 'info' | 'danger';
-}
-
 type ColorMode = 'dark' | 'light';
 const THEME_STORAGE_KEY = 'top-v10-theme';
 
@@ -118,8 +114,6 @@ export function SellerWorld({ ownerSettings, empresaPrecos, onOpenOwnerWizard, o
   const [winnerPlanId, setWinnerPlanId] = useState<string | null>(null);
   const [activePlanId, setActivePlanId] = useState<string | null>(() => initialPlans?.[0]?.id ?? null);
   const [sidebarTagLegendOpen, setSidebarTagLegendOpen] = useState(false);
-  const [toast, setToast] = useState<ToastState | null>(null);
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const plansAreaRef = useRef<HTMLDivElement>(null);
   const [draggingPlanId, setDraggingPlanId] = useState<string | null>(null);
   const [dragTransform, setDragTransform] = useState({ x: 0, y: 0, rotation: 0 });
@@ -135,13 +129,8 @@ export function SellerWorld({ ownerSettings, empresaPrecos, onOpenOwnerWizard, o
   });
 
   const notify = useCallback((msg: string, kind: 'info' | 'danger' = 'info') => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToast({ msg, kind });
-    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
-  }, []);
-
-  useEffect(() => {
-    return () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); };
+    if (kind === 'danger') toast.error(msg);
+    else toast.info(msg);
   }, []);
 
   useEffect(() => {
@@ -727,14 +716,6 @@ export function SellerWorld({ ownerSettings, empresaPrecos, onOpenOwnerWizard, o
         <button className={styles.canvasZoomBtn} onClick={zoomIn} title="Aumentar zoom">+</button>
       </div>
 
-      {/* Policy toast */}
-      {toast && (
-        <div className={styles.policyToast}>
-          <div className={`${styles.policyToastInner} ${toast.kind === 'danger' ? styles.policyToastDanger : styles.policyToastInfo}`}>
-            {toast.msg}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

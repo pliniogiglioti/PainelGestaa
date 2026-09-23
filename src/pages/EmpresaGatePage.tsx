@@ -9,6 +9,7 @@ import {
 } from '../lib/companyCardBackground'
 import styles from './EmpresaGatePage.module.css'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface Props {
   /** Chamado quando o usuário seleciona (ou cria e seleciona) uma empresa */
@@ -113,7 +114,7 @@ function EmpresaFormModal({
 }: EmpresaFormModalProps) {
   const [membros, setMembros] = useState<EmpresaMembroResumo[]>([])
   const [loadingMembros, setLoadingMembros] = useState(false)
-  const [erroMembros, setErroMembros] = useState('')
+  const [erroMembros, setErroMembros] = useToastErrorState()
   const backdropDismiss = useBackdropDismiss(onClose, salvando)
 
   useEffect(() => {
@@ -332,12 +333,12 @@ export default function EmpresaGatePage({
   const [empresaEmEdicao, setEmpresaEmEdicao] = useState<Empresa | null>(null)
   const [empresaParaDeletar, setEmpresaParaDeletar] = useState<EmpresaCard | null>(null)
   const [deletando, setDeletando]         = useState(false)
-  const [erroDelete, setErroDelete]       = useState('')
+  const [erroDelete, setErroDelete]       = useToastErrorState()
   const [busca, setBusca]                 = useState('')
   const [nome, setNome]                   = useState('')
   const [cnpj, setCnpj]                   = useState('')
   const [salvando, setSalvando]           = useState(false)
-  const [erro, setErro]                   = useState('')
+  const [erro, setErro]                   = useToastErrorState()
   const [hoveredId, setHoveredId]         = useState<string | null>(null)
   const [isSystemAdmin, setIsSystemAdmin] = useState(false)
   const [empresaRoles, setEmpresaRoles]   = useState<EmpresaRoleMap>({})

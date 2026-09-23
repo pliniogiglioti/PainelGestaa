@@ -15,6 +15,9 @@ import { DesignButton, DesignIconButton } from '../components/design/DesignSyste
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
 import ModalTransition from '../components/ModalTransition'
 import { Button, Field, Input, Modal, Select, Textarea } from '../components/ui'
+import { useToastErrorState } from '../hooks/useToastErrorState'
+import { toast } from '../lib/toast'
+import { translateFunctionErrorMessage } from '../lib/functionError'
 
 type Page = 'aplicativos' | 'minhas-empresas' | 'comunidade' | 'suporte'
 export type DashboardRoutePath = '/' | '/empresas' | '/comunidade' | '/suporte'
@@ -259,7 +262,7 @@ function TopNavigation({
   const [showEditNameModal, setShowEditNameModal] = useState(false)
   const [nameDraft, setNameDraft] = useState(user.name)
   const [savingName, setSavingName] = useState(false)
-  const [nameError, setNameError] = useState('')
+  const [nameError, setNameError] = useToastErrorState()
   const menuRef = useRef<HTMLDivElement | null>(null)
   const userInitial = user.name.trim().charAt(0).toUpperCase() || user.email.trim().charAt(0).toUpperCase() || 'U'
   const roleLabel = isAdmin ? 'Admin' : 'Usuario'
@@ -507,7 +510,7 @@ function CreateAppModal({ categories, onClose, onCreated }: {
     linkType: 'externo', link: '', backgroundImage: '',
   })
   const [saving, setSaving] = useState(false)
-  const [error, setError]   = useState('')
+  const [error, setError]   = useToastErrorState()
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -621,7 +624,7 @@ function EditAppModal({
     backgroundImage: app.background_image ?? '',
   })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
 
   const set = (f: keyof NewAppForm) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
@@ -1182,7 +1185,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
   const [companyModalMode, setCompanyModalMode] = useState<'create' | 'edit' | null>(null)
   const [editingCompany, setEditingCompany] = useState<EmpresaListItem | null>(null)
   const [companyForm, setCompanyForm] = useState<CompanyFormState>({ nome: '', cnpj: '', cardBackgroundUrl: '' })
-  const [companyFormError, setCompanyFormError] = useState('')
+  const [companyFormError, setCompanyFormError] = useToastErrorState()
   const [savingCompany, setSavingCompany] = useState(false)
   const [companyBackgroundFile, setCompanyBackgroundFile] = useState<File | null>(null)
   const [companyBackgroundPreview, setCompanyBackgroundPreview] = useState('')
@@ -1297,9 +1300,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     })
 
     if (error) {
+      const message = translateFunctionErrorMessage(error.message, 'Não foi possível carregar os colaboradores.')
+      toast.error(message)
       setEmpresaMemberErrors(prev => ({
         ...prev,
-        [empresaId]: error.message ?? 'Nao foi possivel carregar os colaboradores.',
+        [empresaId]: message,
       }))
       setLoadingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
       return
@@ -1323,9 +1328,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     })
 
     if (error) {
+      const message = translateFunctionErrorMessage(error.message, 'Não foi possível carregar os convites pendentes.')
+      toast.error(message)
       setEmpresaMemberErrors(prev => ({
         ...prev,
-        [empresaId]: error.message ?? 'Nao foi possivel carregar os convites pendentes.',
+        [empresaId]: message,
       }))
       setLoadingEmpresaConvites(prev => ({ ...prev, [empresaId]: false }))
       return
@@ -1401,9 +1408,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     })
 
     if (error) {
+      const message = translateFunctionErrorMessage(error.message, 'Não foi possível atualizar o colaborador.')
+      toast.error(message)
       setEmpresaMemberErrors(prev => ({
         ...prev,
-        [empresaId]: error.message ?? 'Nao foi possivel atualizar o colaborador.',
+        [empresaId]: message,
       }))
       setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
       return false
@@ -1441,6 +1450,7 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
   const handleAdicionarColaborador = async (empresaId: string, appAccessIds: string[]) => {
     const email = inviteEmailByEmpresa[empresaId]?.trim().toLowerCase() ?? ''
     if (!email) {
+      toast.warning('Informe o e-mail do colaborador.')
       setEmpresaMemberErrors(prev => ({ ...prev, [empresaId]: 'Informe o e-mail do colaborador.' }))
       return
     }
@@ -1462,9 +1472,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     })
 
     if (error) {
+      const message = translateFunctionErrorMessage(error.message, 'Não foi possível adicionar o colaborador.')
+      toast.error(message)
       setEmpresaMemberErrors(prev => ({
         ...prev,
-        [empresaId]: error.message ?? 'Nao foi possivel adicionar o colaborador.',
+        [empresaId]: message,
       }))
       setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
       return
@@ -1502,9 +1514,11 @@ export default function DashboardPage({ user, onLogout, onUpdateUserName, theme,
     })
 
     if (error) {
+      const message = translateFunctionErrorMessage(error.message, 'Não foi possível remover o colaborador.')
+      toast.error(message)
       setEmpresaMemberErrors(prev => ({
         ...prev,
-        [empresaId]: error.message ?? 'Nao foi possivel remover o colaborador.',
+        [empresaId]: message,
       }))
       setSavingEmpresaMembros(prev => ({ ...prev, [empresaId]: false }))
       return

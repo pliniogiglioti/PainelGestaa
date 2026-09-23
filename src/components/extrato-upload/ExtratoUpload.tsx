@@ -2,8 +2,10 @@ import { useCallback, useEffect, memo, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import * as pdfjsLib from 'pdfjs-dist'
 import { supabase } from '../../lib/supabase'
+import { toast } from '../../lib/toast'
 import styles from './ExtratoUpload.module.css'
 import ModalTransition from '../ModalTransition'
+import { useToastErrorState } from '../../hooks/useToastErrorState'
 
 // Configure PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -946,9 +948,9 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
   const [linhasClass, setLinhasClass]               = useState<LinhaClassificada[]>([])
   const [selecionados, setSelecionados]             = useState<Set<number>>(new Set())
   const [filtroFonte, setFiltroFonte]               = useState<'total' | 'ia' | 'historico' | 'arquivo' | 'naoId' | 'pendente' | 'erro' | null>(null)
-  const [erroSalvar, setErroSalvar]                 = useState<string>('')
+  const [erroSalvar, setErroSalvar]                 = useToastErrorState()
   const [sucessoSalvo, setSucessoSalvo]             = useState(0)
-  const [msgErroUpload, setMsgErroUpload]           = useState<string>('')
+  const [msgErroUpload, setMsgErroUpload]           = useToastErrorState()
   const [classificacoesDisp, setClassificacoesDisp] = useState<{ nome: string; tipo: string; grupo: string }[]>([])
   const modeloIARef  = useRef<string>(DEFAULT_OPENAI_MODEL)
   const isSavingRef  = useRef(false)
@@ -1238,7 +1240,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
         .order('updated_at', { ascending: false })
         .range(histFrom, histFrom + HIST_PAGE - 1)
       if (histErr) {
-        console.error('[Histórico] Erro ao carregar:', histErr)
+        toast.error(histErr, 'Não foi possível carregar o histórico de classificações.')
         break
       }
       histAll = histAll.concat(page ?? [])

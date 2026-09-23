@@ -9,6 +9,7 @@ import type {
   EmpresaPreco,
   EmpresaPrecificacaoConfig,
 } from '../lib/types'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface PrecificacaoPageProps {
   empresa: Empresa
@@ -490,7 +491,7 @@ function PrecoModal({
     const margemInicial = initialItem ? getItemMargemPercent(initialItem, configPadrao) : null
     return margemInicial != null ? formatPercentInput(margemInicial) : ''
   })
-  const [erroLocal, setErroLocal] = useState('')
+  const [erroLocal, setErroLocal] = useToastErrorState()
   const [showCalculadora, setShowCalculadora] = useState(false)
   const backdropDismiss = useBackdropDismiss(onClose, saving)
   const isEditing = Boolean(initialItem)
@@ -760,7 +761,7 @@ function CalculadoraPrecificacaoModal({
   const [precoVendaEditado, setPrecoVendaEditado] = useState(() =>
     initialPersisted.precoVenda || (item?.preco && item.preco > 0 ? formatCurrencyInput(item.preco) : '')
   )
-  const [erroLocal, setErroLocal] = useState('')
+  const [erroLocal, setErroLocal] = useToastErrorState()
   const precoVendaNumerico = parsePreco(precoVendaEditado)
   const temPrecoExplicito = precoVendaNumerico > 0
   const precoVendaAtual = precoVendaNumerico > 0 ? precoVendaNumerico : item?.preco ?? 0
@@ -1461,7 +1462,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [showPrecoCalculadoModal, setShowPrecoCalculadoModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
-  const [importError, setImportError] = useState('')
+  const [importError, setImportError] = useToastErrorState()
   const [importando, setImportando] = useState(false)
   const importFileRef = useRef<HTMLInputElement>(null)
   const [showConfigModal, setShowConfigModal] = useState(false)
@@ -1471,7 +1472,7 @@ export default function PrecificacaoPage({ empresa, onTrocarEmpresa, onVoltar }:
   const [savingPreco, setSavingPreco] = useState(false)
   const [savingConfig, setSavingConfig] = useState(false)
   const [loadingWorkspace, setLoadingWorkspace] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
   const [feedback, setFeedback] = useState('')
   const [precoEditando, setPrecoEditando] = useState<EmpresaPreco | null>(null)
   const [itemCalculadora, setItemCalculadora] = useState<EmpresaPreco | null>(null)

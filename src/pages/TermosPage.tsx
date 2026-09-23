@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface TermosPageProps {
   userId:   string
@@ -11,7 +12,7 @@ export default function TermosPage({ userId, userName, onAceitar }: TermosPagePr
   const [lido,       setLido]       = useState(false)
   const [aceito,     setAceito]     = useState(false)
   const [loading,    setLoading]    = useState(false)
-  const [erro,       setErro]       = useState('')
+  const [erro,       setErro]       = useToastErrorState()
   const [aceitoEm,   setAceitoEm]   = useState<string | null>(null) // data do aceite já registrado
   const scrollRef = useRef<HTMLDivElement>(null)
 

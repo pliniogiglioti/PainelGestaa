@@ -7,6 +7,7 @@ import { ETIQUETA_COR_PADRAO, FORMA_ENVIO_OPTIONS, LAB_CONTROL_PERMISSION_OPTION
 import { IconArchive, IconEdit, IconPlus, IconTrash, IconUpload } from './icons'
 import { Modal, Spinner } from './shared'
 import { formatCurrencyMask, formatDate, formatWhatsAppInput, normalizeWhatsAppNumber, parseMaskedCurrency, registrarHistorico } from './utils'
+import { useToastErrorState } from '../../hooks/useToastErrorState'
 
 interface LabFormState {
   nome: string; cnpj: string; telefone: string; email: string
@@ -27,7 +28,7 @@ export function LabModal({ lab, empresaId, onClose, onSaved }: {
     observacoes:      lab?.observacoes ?? '',
   })
   const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState('')
+  const [error,  setError]  = useToastErrorState()
 
   const set = (f: keyof LabFormState) =>
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
@@ -131,7 +132,7 @@ export function PrecosModal({ lab, initialEditingId, onClose, onSaved }: {
   const [novoPreco,  setNovoPreco]  = useState('')
   const [novoPrazo,  setNovoPrazo]  = useState('')
   const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
+  const [error,      setError]      = useToastErrorState()
   const [editingId,  setEditingId]  = useState<string | null>(null)
   const [editNome,   setEditNome]   = useState('')
   const [editPreco,  setEditPreco]  = useState('')
@@ -331,7 +332,7 @@ export function KanbanConfigModal({ empresaId, colunas, onClose, onSaved }: {
   const [novoNome, setNovoNome] = useState('')
   const [novaCor,  setNovaCor]  = useState('#6366f1')
   const [saving,   setSaving]   = useState(false)
-  const [error,    setError]    = useState('')
+  const [error,    setError]    = useToastErrorState()
   const [editingColId, setEditingColId] = useState<string | null>(null)
   const [editingColNome, setEditingColNome] = useState('')
 
@@ -472,7 +473,7 @@ export function EtiquetasModal({ empresaId, onClose }: { empresaId: string; onCl
   const [novoNome,  setNovoNome]  = useState('')
   const [novaCor,   setNovaCor]   = useState(ETIQUETA_COR_PADRAO)
   const [saving,    setSaving]    = useState(false)
-  const [error,     setError]     = useState('')
+  const [error,     setError]     = useToastErrorState()
   const [editingId,   setEditingId]   = useState<string | null>(null)
   const [editingNome, setEditingNome] = useState('')
 
@@ -722,7 +723,7 @@ export function LabAccessModal({ empresaId, onClose }: {
   const [labControlAppId, setLabControlAppId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
   const [success, setSuccess] = useState('')
 
   const selectedMember = members.find(member => member.user_id === selectedUserId)

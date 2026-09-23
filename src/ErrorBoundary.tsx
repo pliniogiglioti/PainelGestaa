@@ -1,4 +1,6 @@
 import { Component, type ReactNode } from 'react'
+import { toast } from './lib/toast'
+import { translateFunctionErrorMessage } from './lib/functionError'
 
 interface Props {
   children: ReactNode
@@ -13,8 +15,15 @@ export class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false, message: '' }
 
   static getDerivedStateFromError(error: unknown): State {
-    const message = error instanceof Error ? error.message : String(error)
+    const message = translateFunctionErrorMessage(
+      error instanceof Error ? error.message : String(error),
+      'Ocorreu um erro inesperado. Tente novamente.',
+    )
     return { hasError: true, message }
+  }
+
+  componentDidCatch(error: unknown) {
+    toast.error(error, 'Ocorreu um erro inesperado. Tente novamente.')
   }
 
   render() {

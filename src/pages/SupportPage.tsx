@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 import type { SupportTicket, SupportTicketMessage } from '../lib/types'
 import styles from './SupportPage.module.css'
 
@@ -52,7 +53,7 @@ export default function SupportPage({ isAdmin }: { isAdmin: boolean }) {
   const [description, setDescription] = useState('')
   const [reply, setReply] = useState('')
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
 
   const appNames = useMemo(() => Object.fromEntries(apps.map(app => [app.id, app.name])), [apps])
 

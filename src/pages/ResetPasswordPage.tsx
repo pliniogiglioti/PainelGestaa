@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import styles from './LoginPage.module.css'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface ResetPasswordPageProps {
   recoveryMode: boolean
@@ -17,7 +18,7 @@ export default function ResetPasswordPage({
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [hasRecoverySession, setHasRecoverySession] = useState<boolean | null>(recoveryMode ? null : false)

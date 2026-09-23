@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { toast } from '../../lib/toast'
 import type { Lab, LabEnvio, LabEtiqueta, LabKanbanColuna, LabPreco, LabDentista } from '../../lib/types'
 import ModalTransition from '../ModalTransition'
 import { useSessionStorageState } from '../../hooks/useSessionStorageState'
@@ -85,7 +86,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
 
   const moveEnvio = async (envioId: string, status: string) => {
     const { error } = await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível mover o envio.'); return }
     setEnvios(prev => prev.map(e => e.id === envioId ? { ...e, status } : e))
     const e = envios.find(x => x.id === envioId)
     if (e) await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
@@ -104,7 +105,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
       motivo_arquivamento: motivo || null,
       updated_at: new Date().toISOString(),
     }).eq('id', envioId)
-    if (error) { setPendingArchiveId(null); return }
+    if (error) { toast.error(error, 'Não foi possível arquivar o envio.'); setPendingArchiveId(null); return }
     await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
     setEnvios(prev => prev.filter(e => e.id !== envioId))
     setPendingArchiveId(null)
@@ -118,7 +119,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível atualizar o pagamento.'); return }
     await registrarHistorico(envio.id, empresaId, userId, nextPago ? 'Pagamento registrado' : 'Pagamento removido')
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
@@ -140,7 +141,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
     }
 
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível atualizar a etapa.'); return }
 
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
@@ -151,7 +152,7 @@ export function LabDetailView({ lab, empresaId, userId, isAdmin, permissions, co
       .from('labs')
       .update({ ...payload, updated_at: new Date().toISOString() })
       .eq('id', lab.id)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível atualizar o laboratório.'); return }
     onLabUpdated()
   }
 
@@ -560,7 +561,7 @@ export function LabsAggregateDetailView({
 
   const moveEnvioAgg = async (envioId: string, status: string) => {
     const { error } = await supabase.from('lab_envios').update({ status, updated_at: new Date().toISOString() }).eq('id', envioId)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível mover o envio.'); return }
     setEnvios(prev => prev.map(item => item.id === envioId ? { ...item, status } : item))
     await registrarHistorico(envioId, empresaId, userId, `Movido para ${status}`)
   }
@@ -578,7 +579,7 @@ export function LabsAggregateDetailView({
       motivo_arquivamento: motivo || null,
       updated_at: new Date().toISOString(),
     }).eq('id', envioId)
-    if (error) { setPendingArchiveId(null); return }
+    if (error) { toast.error(error, 'Não foi possível arquivar o envio.'); setPendingArchiveId(null); return }
     await registrarHistorico(envioId, empresaId, userId, 'Arquivado')
     setEnvios(prev => prev.filter(item => item.id !== envioId))
     setPendingArchiveId(null)
@@ -592,7 +593,7 @@ export function LabsAggregateDetailView({
       updated_at: new Date().toISOString(),
     }
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível atualizar o pagamento.'); return }
     await registrarHistorico(envio.id, empresaId, userId, nextPago ? 'Pagamento registrado' : 'Pagamento removido')
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)
@@ -614,7 +615,7 @@ export function LabsAggregateDetailView({
     }
 
     const { error } = await supabase.from('lab_envios').update(payload).eq('id', envio.id)
-    if (error) return
+    if (error) { toast.error(error, 'Não foi possível atualizar a etapa.'); return }
 
     setEnvios(prev => prev.map(item => item.id === envio.id ? { ...item, ...payload } : item))
     setResumoEnvio(prev => prev?.id === envio.id ? { ...prev, ...payload } : prev)

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { read, utils } from 'xlsx'
 import styles from './AdminSettingsPage.module.css'
 import { supabase } from '../lib/supabase'
-import { getFunctionErrorMessage } from '../lib/functionError'
+import { getFunctionErrorMessage, translateFunctionErrorMessage } from '../lib/functionError'
 import type { App, DreClassificacao, DreGrupo, Empresa, EmpresaMembro, ExemploUpload, Profile } from '../lib/types'
 import ModalTransition from '../components/ModalTransition'
+import { toast } from '../lib/toast'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 // ── Constantes ────────────────────────────────────────────────────────────
 
@@ -263,12 +265,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [editingClass,    setEditingClass]    = useState<(DreClassificacao & { grupo?: { nome: string } | null }) | null>(null)
   const [editClassForm,   setEditClassForm]   = useState<{ nome: string; tipo: 'receita' | 'despesa'; grupoId: string }>({ nome: '', tipo: 'despesa', grupoId: '' })
   const [savingEditClass, setSavingEditClass] = useState(false)
-  const [editClassError,  setEditClassError]  = useState('')
+  const [editClassError,  setEditClassError]  = useToastErrorState()
   // Edição de grupo
   const [editingGrupo,    setEditingGrupo]    = useState<DreGrupo | null>(null)
   const [editGrupoNome,   setEditGrupoNome]   = useState('')
   const [savingEditGrupo, setSavingEditGrupo] = useState(false)
-  const [editGrupoError,  setEditGrupoError]  = useState('')
+  const [editGrupoError,  setEditGrupoError]  = useToastErrorState()
 
   // ── Tab: Grupos DRE ───────────────────────────────────────────────────
   const [grupos,        setGrupos]        = useState<DreGrupo[]>([])
@@ -283,7 +285,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [novoExArquivo,   setNovoExArquivo]   = useState('')
   const [novoExFile,      setNovoExFile]      = useState<File | null>(null)
   const [addingEx,        setAddingEx]        = useState(false)
-  const [exErro,          setExErro]          = useState('')
+  const [exErro,          setExErro]          = useToastErrorState()
   const exFileRef = useRef<HTMLInputElement>(null)
 
   // ── Tab: Usuarios ─────────────────────────────────────────────────────
@@ -296,15 +298,13 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [novoTipoUsuario, setNovoTipoUsuario] = useState<'titular' | 'colaborador'>('titular')
   const [novoAppIds,      setNovoAppIds]      = useState<string[]>([])
   const [addingUser,      setAddingUser]      = useState(false)
-  const [addUserErro,     setAddUserErro]     = useState('')
-  const [addUserOk,       setAddUserOk]       = useState('')
   const [savingUserId,    setSavingUserId]    = useState<string | null>(null)
   const [expiresDrafts,   setExpiresDrafts]   = useState<Record<string, string>>({})
   const [savingExpiryId,  setSavingExpiryId]  = useState<string | null>(null)
   const [confirmDelete,   setConfirmDelete]   = useState<Profile | null>(null)
   const [deleteCheck,     setDeleteCheck]     = useState(false)
   const [deletingId,      setDeletingId]      = useState<string | null>(null)
-  const [deleteErro,      setDeleteErro]      = useState('')
+  const [deleteErro,      setDeleteErro]      = useToastErrorState()
   const [savingRoleId,    setSavingRoleId]    = useState<string | null>(null)
   const [currentUserId,   setCurrentUserId]   = useState<string | null>(null)
   const [usuariosBusca,   setUsuariosBusca]   = useState('')
@@ -884,9 +884,10 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   }
 
   const enviarConvite = async () => {
-    setAddUserErro('')
-    setAddUserOk('')
-    if (!novoEmail.trim()) { setAddUserErro('Informe o e-mail do usuário.'); return }
+    if (!novoEmail.trim()) {
+      toast.warning('Informe o e-mail do usuário.')
+      return
+    }
 
     setAddingUser(true)
     try {
@@ -906,9 +907,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       })
 
       if (error || data?.error) {
-        setAddUserErro(data?.error ?? await getFunctionErrorMessage(error, 'Erro ao enviar convite.'))
+        const message = data?.error
+          ? translateFunctionErrorMessage(data.error, 'Não foi possível enviar o convite.')
+          : await getFunctionErrorMessage(error, 'Não foi possível enviar o convite.')
+        toast.error(message)
       } else {
-        setAddUserOk(`Convite enviado para ${novoEmail.trim()}!`)
+        toast.success(`Convite enviado para ${novoEmail.trim()}!`)
         setNovoEmail('')
         setNovoExpires('')
         setNovoRole('user')
@@ -918,7 +922,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         await fetchUsuarios()
       }
     } catch (e) {
-      setAddUserErro(e instanceof Error ? e.message : 'Erro ao enviar convite.')
+      toast.error(
+        translateFunctionErrorMessage(e instanceof Error ? e.message : e, 'Não foi possível enviar o convite.'),
+      )
     }
     setAddingUser(false)
   }
@@ -929,15 +935,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
     setNovoRole('user')
     setNovoTipoUsuario('titular')
     setNovoAppIds(appsDisponiveis.map(app => app.id))
-    setAddUserErro('')
-    setAddUserOk('')
     setShowAddUser(true)
   }
 
   const fecharModalAdicionarUsuario = () => {
     if (addingUser) return
     setShowAddUser(false)
-    setAddUserErro('')
   }
 
   const toggleNovoApp = (appId: string) => {
@@ -1730,7 +1733,6 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                     <span>Empresas: sem acesso. O vínculo com empresas pode ser definido após o cadastro.</span>
                   </div>
 
-                  {addUserErro && <p className={styles.erro}>{addUserErro}</p>}
                   <div className={styles.modalActions}>
                     <button className={styles.btnSecondary} onClick={fecharModalAdicionarUsuario} disabled={addingUser}>Cancelar</button>
                     <button className={styles.btnPrimary} onClick={enviarConvite} disabled={addingUser || !novoEmail.trim()}>
@@ -1740,8 +1742,6 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                 </div>
               </div>
             </ModalTransition>
-
-            {addUserOk && <p className={styles.ok}>{addUserOk}</p>}
 
             {/* Modal de confirmação de delete */}
             <ModalTransition open={!!confirmDelete}>

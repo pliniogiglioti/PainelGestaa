@@ -2,6 +2,8 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import type { OwnerV8Model, OwnerSettings, Plan } from '../components/vendas/types';
 import type { Empresa, EmpresaPreco } from '../lib/types';
 import { supabase } from '../lib/supabase';
+import { toast } from '../lib/toast';
+import { useToastErrorState } from '../hooks/useToastErrorState';
 import {
   loadOwnerV8Model,
   saveOwnerV8Model,
@@ -121,7 +123,7 @@ function VendasSetup({ empresa, onConcluir, onTrocarEmpresa, onVoltar }: SimpleS
   const [items, setItems] = useState<EmpresaPreco[]>([]);
   const [nome, setNome] = useState('');
   const [preco, setPreco] = useState('');
-  const [erro, setErro] = useState('');
+  const [erro, setErro] = useToastErrorState();
   const [saving, setSaving] = useState(false);
   const nomeRef = useRef<HTMLInputElement>(null);
 
@@ -274,9 +276,6 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
   const [ownerSettings, setOwnerSettings] = useState<OwnerSettings>(() => applyOwnerV8Model(loadOwnerV8Model()));
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardFromSeller, setWizardFromSeller] = useState(false);
-  const [pageToast, setPageToast] = useState<string | null>(null);
-  const pageToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   const [empresaPrecos, setEmpresaPrecos] = useState<EmpresaPreco[] | null>(null);
   const [loadingPrecos, setLoadingPrecos] = useState(true);
   const [loadingOwnerModel, setLoadingOwnerModel] = useState(true);
@@ -438,6 +437,8 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
         ...venda,
         empresa_venda_itens: itens.filter(item => item.venda_id === venda.id),
       })));
+    } else {
+      toast.error(loadError, 'Não foi possível carregar as vendas.');
     }
     setLoadingSales(false);
   }, [canViewAllSales, empresa.id, salesScopeReady]);
@@ -447,9 +448,7 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
   }, [fetchSales]);
 
   const notifyPage = useCallback((msg: string) => {
-    if (pageToastTimerRef.current) clearTimeout(pageToastTimerRef.current);
-    setPageToast(msg);
-    pageToastTimerRef.current = setTimeout(() => setPageToast(null), 3500);
+    toast.info(msg);
   }, []);
 
   const [savedSession, setSavedSession] = useState<SavedSellerSession | null>(() => loadSavedSellerSession());
@@ -699,7 +698,7 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
 
     if (error) {
       setSales(prev => prev.map(sale => sale.id === saleId ? { ...sale, concretizada: !concretizada } : sale));
-      notifyPage('Nao foi possivel atualizar a venda.');
+      toast.error(error, 'Não foi possível atualizar a venda.');
     }
   }
 
@@ -717,7 +716,7 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
 
     if (error) {
       setSales(previousSales);
-      notifyPage('Nao foi possivel deletar a venda.');
+      toast.error(error, 'Não foi possível excluir a venda.');
       return;
     }
 
@@ -965,11 +964,6 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
           </div>
         </div>
 
-        {pageToast && (
-          <div className={styles.pageToast}>
-            <div className={styles.pageToastInner}>{pageToast}</div>
-          </div>
-        )}
       </div>
     );
   }
@@ -1086,11 +1080,6 @@ export default function VendasPage({ empresa, userId, onTrocarEmpresa, onVoltar,
             empresaPrecos={empresaPrecos ?? []}
             empresaId={empresa.id}
           />
-        )}
-        {pageToast && (
-          <div className={styles.pageToast}>
-            <div className={styles.pageToastInner}>{pageToast}</div>
-          </div>
         )}
       </div>
     );

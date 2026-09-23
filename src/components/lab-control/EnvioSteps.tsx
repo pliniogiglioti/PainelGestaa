@@ -6,6 +6,7 @@ import { CLASSIFICACAO_PROTESE_OPTIONS, DEFAULT_ENVIO_STATUS, ETIQUETA_COR_PADRA
 import { IconAlert, IconPlus, IconTrash } from './icons'
 import { Modal, ReviewRow } from './shared'
 import { addBusinessDays, calcularPrazoEntrega, formatCurrencyMask, formatDate, getEnvioEtapas, getLabFeriados, normalizeServicoNome, parseMaskedCurrency, registrarHistorico, today } from './utils'
+import { useToastErrorState } from '../../hooks/useToastErrorState'
 
 interface EnvioFormState {
   tipo_trabalho: string; preco_servico: string
@@ -41,7 +42,7 @@ export function EnvioSteps({ lab, labs = [], precos = [], precosByLab, empresaId
 }) {
   const [step,   setStep]   = useState(1)
   const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState('')
+  const [error,  setError]  = useToastErrorState()
   const availableLabs = lab ? [lab, ...labs.filter(item => item.id !== lab.id)] : labs
   const labsById = Object.fromEntries(availableLabs.map(item => [item.id, item]))
   const [selectedLabId, setSelectedLabId] = useState(envio?.lab_id ?? lab?.id ?? '')

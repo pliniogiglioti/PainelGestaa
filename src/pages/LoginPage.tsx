@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import styles from './LoginPage.module.css'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface LoginPageProps {
   onForgotPassword: () => void
@@ -10,7 +11,7 @@ export default function LoginPage({ onForgotPassword }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useToastErrorState()
   const [loading, setLoading] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {

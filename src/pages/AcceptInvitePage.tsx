@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import styles from './RegisterPage.module.css'
 import { supabase } from '../lib/supabase'
+import { useToastErrorState } from '../hooks/useToastErrorState'
 
 interface AcceptInvitePageProps {
   email: string
@@ -12,7 +13,7 @@ export default function AcceptInvitePage({ email, onSuccess }: AcceptInvitePageP
   const [password,        setPassword]        = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword,    setShowPassword]    = useState(false)
-  const [error,           setError]           = useState('')
+  const [error,           setError]           = useToastErrorState()
   const [loading,         setLoading]         = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {

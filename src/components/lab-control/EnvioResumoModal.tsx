@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../../lib/supabase'
+import { toast } from '../../lib/toast'
 import type { LabAnexo, LabEnvio, LabHistorico, LabPreco } from '../../lib/types'
 import styles from '../../pages/LabControlPage.module.css'
 import { IconAlert, IconDownload, IconTrash, IconUpload, IconWhatsApp } from './icons'
@@ -62,8 +63,10 @@ export function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precos
     setUploadingAnexo(true)
     const path = `${empresaId}/${envio.id}/${Date.now()}_${file.name}`
     const { error: uploadErr } = await supabase.storage.from('lab-anexos').upload(path, file)
-    if (!uploadErr) {
-      await supabase.from('lab_anexos').insert({
+    if (uploadErr) {
+      toast.error(uploadErr, 'Não foi possível enviar o anexo.')
+    } else {
+      const { error: insertError } = await supabase.from('lab_anexos').insert({
         envio_id: envio.id,
         empresa_id: empresaId,
         user_id: userId,
@@ -72,21 +75,25 @@ export function EnvioResumoModal({ envio, labNome, labTelefone, feriados, precos
         tipo_mime: file.type || null,
         tamanho_bytes: file.size,
       })
-      await fetchAnexos()
+      if (insertError) toast.error(insertError, 'Não foi possível registrar o anexo.')
+      else await fetchAnexos()
     }
     setUploadingAnexo(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const downloadAnexo = async (anexo: LabAnexo) => {
-    const { data } = await supabase.storage.from('lab-anexos').createSignedUrl(anexo.storage_path, 60)
+    const { data, error } = await supabase.storage.from('lab-anexos').createSignedUrl(anexo.storage_path, 60)
+    if (error) { toast.error(error, 'Não foi possível baixar o anexo.'); return }
     if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
   }
 
   const excluirAnexo = async (anexo: LabAnexo) => {
     if (!confirm(`Excluir "${anexo.nome_arquivo}"?`)) return
-    await supabase.storage.from('lab-anexos').remove([anexo.storage_path])
-    await supabase.from('lab_anexos').delete().eq('id', anexo.id)
+    const { error: storageError } = await supabase.storage.from('lab-anexos').remove([anexo.storage_path])
+    if (storageError) { toast.error(storageError, 'Não foi possível excluir o arquivo do anexo.'); return }
+    const { error: deleteError } = await supabase.from('lab_anexos').delete().eq('id', anexo.id)
+    if (deleteError) { toast.error(deleteError, 'Não foi possível excluir o anexo.'); return }
     await fetchAnexos()
   }
 

@@ -8,6 +8,8 @@ import { ExtratoUpload } from '../components/extrato-upload/ExtratoUpload'
 import { useBackdropDismiss } from '../hooks/useBackdropDismiss'
 import { useSessionStorageState } from '../hooks/useSessionStorageState'
 import ModalTransition from '../components/ModalTransition'
+import { useToastErrorState } from '../hooks/useToastErrorState'
+import { toast } from '../lib/toast'
 
 type DreGrupo = Database['public']['Tables']['dre_grupos']['Row']
 
@@ -317,9 +319,9 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [step,           setStep]           = useState<Step>(1)
   const [saving,         setSaving]         = useState(false)
   const [aiLoading,      setAiLoading]      = useState(false)
-  const [aiError,        setAiError]        = useState('')
+  const [aiError,        setAiError]        = useToastErrorState()
   const [aiWarning,      setAiWarning]      = useState('')
-  const [error,          setError]          = useState('')
+  const [error,          setError]          = useToastErrorState()
   const [form,           setForm]           = useState<FormState>(INITIAL_FORM)
   const [lancamentos,    setLancamentos]    = useState<DreLancamento[]>([])
   const [classificacoes, setClassificacoes] = useState<(DreClassificacao & { grupo: { nome: string } | null })[]>([])
@@ -362,7 +364,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   const [editClassItem,      setEditClassItem]      = useState<DreLancamento | null>(null)
   const [editClassForm,      setEditClassForm]      = useState<{ tipo: string; classificacaoNome: string; grupo: string }>({ tipo: '', classificacaoNome: '', grupo: '' })
   const [editClassSaving,    setEditClassSaving]    = useState(false)
-  const [editClassError,     setEditClassError]     = useState('')
+  const [editClassError,     setEditClassError]     = useToastErrorState()
   const [loading, setLoading] = useState(false)
   const mesesListboxRef = useRef<HTMLDivElement | null>(null)
  const fetchLancamentos = async (targetUserId?: string, adminOverride?: boolean) => {
@@ -924,7 +926,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     )
     if (!confirmado) return
     const { error } = await supabase.from('dre_lancamentos').delete().eq('id', item.id)
-    if (error) { alert(`Erro ao excluir: ${error.message}`); return }
+    if (error) { toast.error(error.message, 'Não foi possível excluir o lançamento.'); return }
     fetchLancamentos()
   }
 
@@ -977,7 +979,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
       setMesesFiltro([])
       fetchLancamentos()
     } catch (e) {
-      alert(`Erro ao excluir: ${e instanceof Error ? e.message : 'Desconhecido'}`)
+      toast.error(e instanceof Error ? e.message : e, 'Não foi possível excluir os lançamentos.')
     } finally {
       setDeletingPeriodo(false)
     }
