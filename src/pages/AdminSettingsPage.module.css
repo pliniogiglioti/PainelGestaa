@@ -707,6 +707,107 @@
   justify-content: flex-end;
 }
 
+.inviteModal {
+  max-width: 760px;
+  max-height: min(820px, calc(100vh - 32px));
+  overflow-y: auto;
+}
+
+.inviteModalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.inviteModalHeader > div {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.modalCloseButton {
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.03);
+  color: var(--text-muted);
+  font-size: 23px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modalCloseButton:hover {
+  border-color: rgba(213, 175, 69, 0.4);
+  color: var(--text);
+}
+
+.inviteStatusOption {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.02);
+}
+
+.inviteStatusDot {
+  width: 9px;
+  height: 9px;
+  margin-top: 2px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: #37c878;
+  box-shadow: 0 0 0 4px rgba(55, 200, 120, 0.12);
+}
+
+.inviteStatusOption span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.inviteStatusOption small {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.inviteAppsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.02);
+}
+
+.inviteAppsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  max-height: 245px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.inviteLinksNote {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 /* ── Usuários em cards ─────────────────────────────────────────────────── */
 
 .userCards {
@@ -1327,6 +1428,14 @@
   }
 
   .inviteFields {
+    grid-template-columns: 1fr;
+  }
+
+  .inviteModal {
+    padding: 20px;
+  }
+
+  .inviteAppsGrid {
     grid-template-columns: 1fr;
   }
 

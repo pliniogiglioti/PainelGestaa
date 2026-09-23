@@ -65,15 +65,19 @@ async function carregarAcessoUsuario(session: Session) {
 
   if (profile?.role !== 'admin' && profile?.ativo === false) {
     await supabase.auth.signOut()
-    return { permitido: false, allowedInternalPaths: null as string[] | null }
+    return { permitido: false, isAdmin: false, allowedInternalPaths: null as string[] | null }
   }
 
   if (profile?.role === 'admin' || profile?.app_access_ids == null) {
-    return { permitido: true, allowedInternalPaths: null as string[] | null }
+    return {
+      permitido: true,
+      isAdmin: profile?.role === 'admin',
+      allowedInternalPaths: null as string[] | null,
+    }
   }
 
   if (profile.app_access_ids.length === 0) {
-    return { permitido: true, allowedInternalPaths: [] as string[] }
+    return { permitido: true, isAdmin: false, allowedInternalPaths: [] as string[] }
   }
 
   const { data: apps, error: appsError } = await supabase
@@ -82,7 +86,7 @@ async function carregarAcessoUsuario(session: Session) {
     .in('id', profile.app_access_ids)
 
   if (appsError) {
-    return { permitido: true, allowedInternalPaths: null as string[] | null }
+    return { permitido: true, isAdmin: false, allowedInternalPaths: null as string[] | null }
   }
 
   const allowedInternalPaths = Array.from(
@@ -97,7 +101,7 @@ async function carregarAcessoUsuario(session: Session) {
     ),
   )
 
-  return { permitido: true, allowedInternalPaths }
+  return { permitido: true, isAdmin: false, allowedInternalPaths }
 }
 
 async function sairDoFluxoRecuperacao() {
@@ -140,6 +144,7 @@ function App() {
   const [isRecoveryFlow, setIsRecoveryFlow] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [termosAceitos, setTermosAceitos] = useState<boolean | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [allowedInternalPaths, setAllowedInternalPaths] = useState<string[] | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme')
@@ -164,6 +169,7 @@ function App() {
     if (!session) {
       setUser(null)
       setUserId(null)
+      setIsAdmin(false)
       return
     }
 
@@ -223,11 +229,12 @@ function App() {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
+        const { permitido, isAdmin: nextIsAdmin, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
           setUser(await sessionToUser(session))
           setUserId(session.user.id)
           setAllowedInternalPaths(nextAllowedPaths)
+          setIsAdmin(nextIsAdmin)
           if (session.user.email && hash.includes('type=invite')) {
             setInviteEmail(session.user.email)
           }
@@ -235,11 +242,13 @@ function App() {
           setUser(null)
           setUserId(null)
           setAllowedInternalPaths(null)
+          setIsAdmin(false)
         }
       } else {
         setUser(null)
         setUserId(null)
         setAllowedInternalPaths(null)
+        setIsAdmin(false)
       }
       setLoading(false)
     })
@@ -250,17 +259,19 @@ function App() {
         setUserId(null)
         setTermosAceitos(null)
         setAllowedInternalPaths(null)
+        setIsAdmin(false)
         setIsInviteFlow(false)
         setIsRecoveryFlow(false)
         return
       }
 
       void (async () => {
-        const { permitido, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
+        const { permitido, isAdmin: nextIsAdmin, allowedInternalPaths: nextAllowedPaths } = await carregarAcessoUsuario(session)
         if (permitido) {
           setUser(await sessionToUser(session))
           setUserId(session.user.id)
           setAllowedInternalPaths(nextAllowedPaths)
+          setIsAdmin(nextIsAdmin)
           if (event === 'SIGNED_IN' && session.user.email && window.location.hash.includes('type=invite')) {
             setIsInviteFlow(true)
             setInviteEmail(session.user.email)
@@ -273,6 +284,7 @@ function App() {
           setUserId(null)
           setTermosAceitos(null)
           setAllowedInternalPaths(null)
+          setIsAdmin(false)
         }
       })()
     })
@@ -300,6 +312,13 @@ function App() {
       navigate('/analise-dre/termospage')
     }
   }, [pathname, termosAceitos])
+
+  useEffect(() => {
+    if (user && pathname === '/admin-settings' && !isAdmin) {
+      window.history.replaceState({}, '', '/')
+      setPathname('/')
+    }
+  }, [isAdmin, pathname, user])
 
   useEffect(() => {
     const appPath = getProtectedAppPath(pathname)
@@ -348,6 +367,7 @@ function App() {
     await supabase.auth.signOut()
     setTermosAceitos(null)
     setUserId(null)
+    setIsAdmin(false)
   }
 
   const selecionarEmpresa = (emp: Empresa) => {
@@ -525,7 +545,7 @@ function App() {
           </div>
         )}
 
-        {(activePath === '/admin-settings' || mountedPaths.includes('/admin-settings')) && (
+        {isAdmin && (activePath === '/admin-settings' || mountedPaths.includes('/admin-settings')) && (
           <div style={{ display: activePath === '/admin-settings' ? 'block' : 'none' }}>
             <ErrorBoundary>
               <AdminSettingsPage onVoltar={() => navigate('/')} />

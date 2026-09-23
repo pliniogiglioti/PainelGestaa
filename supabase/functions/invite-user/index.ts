@@ -63,18 +63,45 @@ serve(async (req: Request) => {
     }
 
     // Lê o body
-    const { email, expires_at } = await req.json()
+    const { email, expires_at, role, tipo_usuario, ativo, app_access_ids } = await req.json()
     const normalizedEmail = String(email ?? '').trim().toLowerCase()
     if (!normalizedEmail) {
       return jsonResponse({ error: 'E-mail é obrigatório' }, 400)
     }
 
+    const normalizedRole = String(role ?? 'user')
+    const normalizedTipoUsuario = String(tipo_usuario ?? 'titular')
+    const normalizedAppIds = app_access_ids == null ? null : app_access_ids
+
+    if (!['user', 'editor', 'admin'].includes(normalizedRole)) {
+      return jsonResponse({ error: 'Função de usuário inválida' }, 400)
+    }
+
+    if (!['titular', 'colaborador'].includes(normalizedTipoUsuario)) {
+      return jsonResponse({ error: 'Tipo de usuário inválido' }, 400)
+    }
+
+    if (normalizedAppIds !== null && (
+      !Array.isArray(normalizedAppIds)
+      || normalizedAppIds.some(id => typeof id !== 'string')
+    )) {
+      return jsonResponse({ error: 'Lista de aplicativos inválida' }, 400)
+    }
+
     // Insere convite na tabela user_invitations
-    const { error: invErr } = await adminClient.from('user_invitations').insert({
-      email: normalizedEmail,
-      expires_at: expires_at ?? null,
-      invited_by: callerUser.id,
-    })
+    const { data: invitation, error: invErr } = await adminClient
+      .from('user_invitations')
+      .insert({
+        email: normalizedEmail,
+        expires_at: expires_at ?? null,
+        invited_by: callerUser.id,
+        role: normalizedRole,
+        tipo_usuario: normalizedTipoUsuario,
+        ativo: ativo !== false,
+        app_access_ids: normalizedRole === 'admin' ? null : normalizedAppIds,
+      })
+      .select('id')
+      .single()
 
     if (invErr) {
       return jsonResponse({ error: invErr.message }, 500)
@@ -88,7 +115,9 @@ serve(async (req: Request) => {
     if (authErr) {
       console.error('invite-user auth invite error', authErr)
       // Rollback: remove o convite se não conseguiu enviar o e-mail
-      await adminClient.from('user_invitations').delete().ilike('email', normalizedEmail).is('used_at', null)
+      if (invitation?.id) {
+        await adminClient.from('user_invitations').delete().eq('id', invitation.id)
+      }
       return jsonResponse({ error: authErr.message }, 500)
     }
 

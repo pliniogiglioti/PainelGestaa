@@ -59,6 +59,10 @@ export interface Database {
           invited_by: string | null
           created_at: string
           used_at:    string | null
+          role:       'user' | 'editor' | 'admin'
+          tipo_usuario: 'titular' | 'colaborador'
+          ativo:      boolean
+          app_access_ids: string[] | null
         }
         Insert: {
           id?:        string
@@ -67,10 +71,18 @@ export interface Database {
           invited_by?: string | null
           created_at?: string
           used_at?:   string | null
+          role?:       'user' | 'editor' | 'admin'
+          tipo_usuario?: 'titular' | 'colaborador'
+          ativo?:      boolean
+          app_access_ids?: string[] | null
         }
         Update: {
           expires_at?: string | null
           used_at?:    string | null
+          role?:       'user' | 'editor' | 'admin'
+          tipo_usuario?: 'titular' | 'colaborador'
+          ativo?:      boolean
+          app_access_ids?: string[] | null
         }
         Relationships: []
       }

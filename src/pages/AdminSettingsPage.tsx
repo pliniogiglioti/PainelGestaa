@@ -292,6 +292,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
   const [showAddUser,     setShowAddUser]     = useState(false)
   const [novoEmail,       setNovoEmail]       = useState('')
   const [novoExpires,     setNovoExpires]     = useState('')
+  const [novoRole,        setNovoRole]        = useState<'user' | 'editor' | 'admin'>('user')
+  const [novoTipoUsuario, setNovoTipoUsuario] = useState<'titular' | 'colaborador'>('titular')
+  const [novoAppIds,      setNovoAppIds]      = useState<string[]>([])
   const [addingUser,      setAddingUser]      = useState(false)
   const [addUserErro,     setAddUserErro]     = useState('')
   const [addUserOk,       setAddUserOk]       = useState('')
@@ -892,6 +895,12 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         body: {
           email: novoEmail.trim(),
           expires_at: novoExpires ? new Date(novoExpires).toISOString() : null,
+          role: novoRole,
+          tipo_usuario: novoTipoUsuario,
+          ativo: true,
+          app_access_ids: novoRole === 'admin' || novoAppIds.length === appsDisponiveis.length
+            ? null
+            : novoAppIds,
         },
         headers: { Authorization: `Bearer ${session?.access_token}` },
       })
@@ -902,6 +911,9 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
         setAddUserOk(`Convite enviado para ${novoEmail.trim()}!`)
         setNovoEmail('')
         setNovoExpires('')
+        setNovoRole('user')
+        setNovoTipoUsuario('titular')
+        setNovoAppIds([])
         setShowAddUser(false)
         await fetchUsuarios()
       }
@@ -909,6 +921,31 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
       setAddUserErro(e instanceof Error ? e.message : 'Erro ao enviar convite.')
     }
     setAddingUser(false)
+  }
+
+  const abrirModalAdicionarUsuario = () => {
+    setNovoEmail('')
+    setNovoExpires('')
+    setNovoRole('user')
+    setNovoTipoUsuario('titular')
+    setNovoAppIds(appsDisponiveis.map(app => app.id))
+    setAddUserErro('')
+    setAddUserOk('')
+    setShowAddUser(true)
+  }
+
+  const fecharModalAdicionarUsuario = () => {
+    if (addingUser) return
+    setShowAddUser(false)
+    setAddUserErro('')
+  }
+
+  const toggleNovoApp = (appId: string) => {
+    setNovoAppIds(current => (
+      current.includes(appId)
+        ? current.filter(id => id !== appId)
+        : [...current, appId]
+    ))
   }
 
   // ── Render ────────────────────────────────────────────────────────────
@@ -1555,17 +1592,44 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
               </div>
               <button
                 className={styles.btnPrimary}
-                onClick={() => { setShowAddUser(true); setAddUserErro(''); setAddUserOk('') }}
+                onClick={abrirModalAdicionarUsuario}
               >
                 + Adicionar Usuário
               </button>
             </div>
 
-            {/* Formulário de convite */}
-            {showAddUser && (
-              <div className={styles.inviteForm}>
-                <p className={styles.label}>Novo convite</p>
-                <div className={styles.inviteFields}>
+            {/* Modal de convite */}
+            <ModalTransition open={showAddUser}>
+              <div
+                className={styles.modalOverlay}
+                onMouseDown={event => {
+                  if (event.target === event.currentTarget) fecharModalAdicionarUsuario()
+                }}
+              >
+                <div
+                  className={`${styles.modalBox} ${styles.inviteModal}`}
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="invite-modal-title"
+                >
+                  <div className={styles.inviteModalHeader}>
+                    <div>
+                      <h3 id="invite-modal-title" className={styles.modalTitle}>Adicionar usuário</h3>
+                      <p className={styles.modalDesc}>
+                        Defina os acessos iniciais. O usuário receberá um convite por e-mail para informar o nome e criar a senha.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.modalCloseButton}
+                      onClick={fecharModalAdicionarUsuario}
+                      aria-label="Fechar"
+                    >
+                      ×
+                    </button>
+                  </div>
+
+                  <div className={styles.inviteFields}>
                   <div className={styles.field}>
                     <label className={styles.labelSm}>E-mail</label>
                     <input
@@ -1574,7 +1638,7 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       placeholder="usuario@email.com"
                       value={novoEmail}
                       onChange={e => setNovoEmail(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && enviarConvite()}
+                      autoFocus
                     />
                   </div>
                   <div className={styles.field}>
@@ -1586,25 +1650,96 @@ export default function AdminSettingsPage({ onVoltar }: AdminSettingsPageProps) 
                       onChange={e => setNovoExpires(e.target.value)}
                     />
                   </div>
+                    <div className={styles.field}>
+                      <label className={styles.labelSm}>Função</label>
+                      <select
+                        className={styles.input}
+                        value={novoRole}
+                        onChange={e => setNovoRole(e.target.value as 'user' | 'editor' | 'admin')}
+                      >
+                        <option value="user">Usuário</option>
+                        <option value="editor">Editor</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                    <div className={styles.field}>
+                      <label className={styles.labelSm}>Tipo de usuário</label>
+                      <select
+                        className={styles.input}
+                        value={novoTipoUsuario}
+                        onChange={e => setNovoTipoUsuario(e.target.value as 'titular' | 'colaborador')}
+                      >
+                        <option value="titular">Titular</option>
+                        <option value="colaborador">Colaborador</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className={styles.inviteStatusOption}>
+                    <span className={styles.inviteStatusDot} aria-hidden="true" />
+                    <span>
+                      <strong>Status: ativo</strong>
+                      <small>O acesso começa após o usuário aceitar o convite.</small>
+                    </span>
+                  </div>
+
+                  <div className={styles.inviteAppsSection}>
+                    <div className={styles.appAccessHeader}>
+                      <div className={styles.appAccessHeaderInfo}>
+                        <span className={styles.userCardLabel}>Apps liberados</span>
+                        <span className={styles.appAccessSummary}>
+                          {novoRole === 'admin'
+                            ? `Todos os ${appsDisponiveis.length} apps (admin)`
+                            : `${novoAppIds.length} de ${appsDisponiveis.length} apps selecionados`}
+                        </span>
+                      </div>
+                      {novoRole !== 'admin' && (
+                        <div className={styles.appAccessToolbarButtons}>
+                          <button type="button" className={styles.appAccessMiniButton} onClick={() => setNovoAppIds(appsDisponiveis.map(app => app.id))}>Todos</button>
+                          <button type="button" className={styles.appAccessMiniButton} onClick={() => setNovoAppIds([])}>Nenhum</button>
+                        </div>
+                      )}
+                    </div>
+                    {novoRole === 'admin' ? (
+                      <p className={styles.hint}>Admins mantêm acesso total a todos os aplicativos.</p>
+                    ) : (
+                      <div className={styles.inviteAppsGrid}>
+                        {appsDisponiveis.map(app => (
+                          <label
+                            key={app.id}
+                            className={`${styles.appAccessOption} ${novoAppIds.includes(app.id) ? styles.appAccessOptionActive : ''}`}
+                          >
+                            <input
+                              className={styles.appAccessCheckbox}
+                              type="checkbox"
+                              checked={novoAppIds.includes(app.id)}
+                              onChange={() => toggleNovoApp(app.id)}
+                            />
+                            <span className={styles.appAccessOptionBody}>
+                              <span className={styles.appAccessOptionName}>{app.name}</span>
+                              <span className={styles.appAccessOptionMeta}>{app.internal_link || app.external_link || 'Sem link'}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.inviteLinksNote}>
+                    <span className={styles.userCardLabel}>Vínculos</span>
+                    <span>Empresas: sem acesso. O vínculo com empresas pode ser definido após o cadastro.</span>
+                  </div>
+
+                  {addUserErro && <p className={styles.erro}>{addUserErro}</p>}
+                  <div className={styles.modalActions}>
+                    <button className={styles.btnSecondary} onClick={fecharModalAdicionarUsuario} disabled={addingUser}>Cancelar</button>
+                    <button className={styles.btnPrimary} onClick={enviarConvite} disabled={addingUser || !novoEmail.trim()}>
+                      {addingUser ? 'Enviando...' : 'Enviar convite'}
+                    </button>
+                  </div>
                 </div>
-                <div className={styles.inviteActions}>
-                  <button
-                    className={styles.btnSecondary}
-                    onClick={() => { setShowAddUser(false); setNovoEmail(''); setNovoExpires('') }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    className={styles.btnPrimary}
-                    onClick={enviarConvite}
-                    disabled={addingUser || !novoEmail.trim()}
-                  >
-                    {addingUser ? 'Enviando...' : 'Enviar convite'}
-                  </button>
-                </div>
-                {addUserErro && <p className={styles.erro}>{addUserErro}</p>}
               </div>
-            )}
+            </ModalTransition>
 
             {addUserOk && <p className={styles.ok}>{addUserOk}</p>}
 
