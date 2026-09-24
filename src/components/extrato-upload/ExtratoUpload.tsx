@@ -315,7 +315,12 @@ function encontrarLinhaCabecalho(rows: unknown[][], maxLinhas = 20): number {
  *  presentes em extratos Bradesco / Itaú.
  */
 function detectarColunas(headers: string[]): {
-  data: number; descricao: number; valor: number; tipo: number
+  /** Coluna de data principal. Quando existe "Pagamento" (ex: CliniCorp), ela tem
+   *  prioridade: a DFC é regime de caixa e o que vale é quando o dinheiro entrou/saiu. */
+  data: number
+  /** Coluna de data reserva (ex: "Vencimento"), usada quando a principal está vazia na linha */
+  dataAlt: number
+  descricao: number; valor: number; tipo: number
   credito: number; debito: number
   classificacao: number; grupo: number
 } {
@@ -342,8 +347,15 @@ function detectarColunas(headers: string[]): {
     return normHeaders.findIndex(h => h.startsWith('categoria'))
   }
 
+  // Match exato para não confundir com colunas como "Forma de pagamento"
+  const idxPagamento = normHeaders.findIndex(h =>
+    ['pagamento', 'data de pagamento', 'data do pagamento', 'data pagamento', 'dt pagamento'].includes(h),
+  )
+  const idxDataPadrao = idx(['data', 'date', 'dt', 'vencimento'])
+
   return {
-    data:          idx(['data', 'date', 'dt', 'vencimento']),
+    data:          idxPagamento >= 0 ? idxPagamento : idxDataPadrao,
+    dataAlt:       idxPagamento >= 0 && idxDataPadrao !== idxPagamento ? idxDataPadrao : -1,
     descricao:     idx(['descric', 'historico', 'memo', 'description', 'complement', 'lancamento']),
     valor:         normHeaders.findIndex(h => ['valor', 'value', 'amount', 'vl '].some(k => h.includes(k)) && !h.includes('saldo')),
     tipo:          idx(['tipo', 'type', 'natureza', 'dc', 'credito/debito', 'entrada/saida']),
@@ -352,6 +364,13 @@ function detectarColunas(headers: string[]): {
     classificacao: idxClassificacao(),
     grupo:         idx(['grupo', 'group', 'agrupamento']),
   }
+}
+
+/** Data bruta da linha: coluna principal ou, se estiver vazia, a coluna reserva */
+function lerDataBruta(row: unknown[], cols: { data: number; dataAlt: number }): unknown {
+  const principal = cols.data >= 0 ? row[cols.data] : ''
+  if (String(principal ?? '').trim() !== '' || cols.dataAlt < 0) return principal
+  return row[cols.dataAlt]
 }
 
 /** Normaliza valor brasileiro: "1.234,56" ou "-1.234,56" → 1234.56 (sempre positivo) */
@@ -501,7 +520,7 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
 
     const rawTipo  = cols.tipo      >= 0 ? row[cols.tipo]      : ''
     const rawDesc  = cols.descricao >= 0 ? row[cols.descricao] : row.find(c => c !== '') ?? ''
-    const rawData  = cols.data      >= 0 ? row[cols.data]      : ''
+    const rawData  = lerDataBruta(row, cols)
 
     let valorNum: number
     let tipo: 'receita' | 'despesa'
@@ -549,7 +568,8 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
     const classificacaoFinal = rawClassif
 
     linhas.push({
-      data:      formatarData(rawData),
+      // Data vazia fica vazia (a linha é descartada no filtro) — nunca assume a data de hoje
+      data:      String(rawData ?? '').trim() ? formatarData(rawData) : '',
       descricao: String(rawDesc ?? '').trim() || `Linha ${i + 1}`,
       valor:     valorNum,
       tipo,
@@ -571,6 +591,85 @@ function normalizar(s: string): string {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
+}
+
+const TOTALIZADOR_RE = /^(total|subtotal|saldo|s\.a\.|resultado|resumo|consolidado)/
+
+/** Formata a lista de linhas do Excel para a mensagem: "2, 3, 4 e mais 10" */
+function listarLinhas(linhas: number[]): string {
+  const MAX = 8
+  const exibidas = linhas.slice(0, MAX).join(', ')
+  return linhas.length > MAX ? `${exibidas} e mais ${linhas.length - MAX}` : exibidas
+}
+
+/**
+ * Percorre todas as linhas da planilha e aponta lançamentos sem data, com data
+ * inválida, sem descrição ou sem valor. Linhas vazias e totalizadores são ignorados.
+ * Sem essa checagem, uma data vazia virava a data de hoje e o lançamento era
+ * gravado no mês errado.
+ */
+function verificarLinhasObrigatorias(
+  rows: unknown[][],
+  headerIdx: number,
+  headers: string[],
+): { lancamentos: number; mensagens: string[] } {
+  const cols = detectarColunas(headers)
+  const usaSeparado = cols.credito >= 0 || cols.debito >= 0
+  const semData: number[] = []
+  const dataInvalida: number[] = []
+  const semDescricao: number[] = []
+  const semValor: number[] = []
+  let lancamentos = 0
+
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    const row = (rows[i] ?? []) as unknown[]
+    if (row.every(cell => String(cell ?? '').trim() === '')) continue
+
+    const rawData = lerDataBruta(row, cols)
+    const temData = String(rawData ?? '').trim() !== ''
+    const descricao = cols.descricao >= 0 ? String(row[cols.descricao] ?? '').trim() : ''
+    if (TOTALIZADOR_RE.test(descricao.toLowerCase())) continue
+
+    const valorNum = usaSeparado
+      ? Math.max(
+        parseValor(cols.credito >= 0 ? row[cols.credito] : ''),
+        parseValor(cols.debito  >= 0 ? row[cols.debito]  : ''),
+      )
+      : cols.valor >= 0 ? parseValor(row[cols.valor]) : 0
+
+    // Linha sem valor e sem data/descrição não é lançamento (cabeçalho repetido, observação etc.)
+    if (!valorNum && !(temData && descricao)) continue
+    lancamentos++
+
+    const linhaExcel = i + 1
+    if (!temData) semData.push(linhaExcel)
+    else if (!/^\d{2}\/\d{2}\/\d{4}$/.test(formatarData(rawData))) dataInvalida.push(linhaExcel)
+    if (!descricao) semDescricao.push(linhaExcel)
+    if (!valorNum) semValor.push(linhaExcel)
+  }
+
+  const colunaData = cols.data < 0
+    ? 'de data'
+    : cols.dataAlt >= 0
+      ? `"${headers[cols.data]}" nem na "${headers[cols.dataAlt]}"`
+      : `"${headers[cols.data]}"`
+  const mensagens: string[] = []
+  if (cols.data < 0) {
+    mensagens.push('Não encontramos uma coluna de data (ex.: "Data", "Vencimento").')
+  } else if (semData.length > 0) {
+    mensagens.push(`${semData.length} lançamento(s) sem data na coluna ${colunaData} — linhas ${listarLinhas(semData)}.`)
+  }
+  if (dataInvalida.length > 0) {
+    mensagens.push(`${dataInvalida.length} lançamento(s) com data em formato não reconhecido — linhas ${listarLinhas(dataInvalida)}. Use o formato 01/01/2026.`)
+  }
+  if (semDescricao.length > 0) {
+    mensagens.push(`${semDescricao.length} lançamento(s) sem descrição — linhas ${listarLinhas(semDescricao)}.`)
+  }
+  if (semValor.length > 0) {
+    mensagens.push(`${semValor.length} lançamento(s) sem valor — linhas ${listarLinhas(semValor)}.`)
+  }
+
+  return { lancamentos, mensagens }
 }
 
 /**
@@ -629,37 +728,25 @@ async function validarEstruturaArquivo(
       }
     }
 
-    // Verifica se ao menos uma linha tem data DD/MM/AAAA e valor numérico
-    const cols = detectarColunas(
-      (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim()),
-    )
-    let linhasValidas = 0
-    for (let i = headerIdx + 1; i < Math.min(rows.length, headerIdx + 20); i++) {
-      const row = rows[i] as unknown[]
-      if (row.every(cell => String(cell ?? '').trim() === '')) continue
+    const headers = (rows[headerIdx] as unknown[]).map(h => String(h ?? '').trim())
+    const problemas = verificarLinhasObrigatorias(rows, headerIdx, headers)
 
-      const rawData = cols.data >= 0 ? row[cols.data] : ''
-      const dataStr = formatarData(rawData)
-
-      let valorNum = 0
-      if (cols.valor >= 0) {
-        valorNum = Math.abs(parseValor(row[cols.valor]))
-      } else if (cols.credito >= 0 || cols.debito >= 0) {
-        valorNum = Math.max(
-          parseValor(cols.credito >= 0 ? row[cols.credito] : ''),
-          parseValor(cols.debito  >= 0 ? row[cols.debito]  : ''),
-        )
-      }
-
-      if (/^\d{2}\/\d{2}\/\d{4}$/.test(dataStr) && valorNum > 0) linhasValidas++
-    }
-
-    if (linhasValidas === 0) {
+    if (problemas.lancamentos === 0) {
       return {
         ok: false,
         motivo:
           `Modelo reconhecido (${nomeMatch}), mas nenhuma linha com data DD/MM/AAAA e valor numérico foi encontrada. ` +
           `Verifique se as datas estão no formato "01/01/2026" e os valores são números.`,
+      }
+    }
+
+    if (problemas.mensagens.length > 0) {
+      return {
+        ok: false,
+        motivo:
+          `O arquivo não foi importado porque há lançamentos com informações faltando:\n` +
+          problemas.mensagens.map(m => `• ${m}`).join('\n') +
+          `\nCorrija a planilha e envie novamente.`,
       }
     }
 
@@ -1138,12 +1225,14 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
       const headerIdxIA = encontrarLinhaCabecalho(rows)
       const headersIA = (rows[headerIdxIA] as unknown[]).map(h => String(h ?? '').trim())
       const colsIA = detectarColunas(headersIA)
-      const dataColIdx = colsIA.data
-      // Normaliza células: coluna de data → DD/MM/AAAA; outros números → string decimal; resto → string
+      const dataColIdxs = [colsIA.data, colsIA.dataAlt].filter(i => i >= 0)
+      // Normaliza células: colunas de data → DD/MM/AAAA; outros números → string decimal; resto → string
       const rowsNorm = rows.map((row, rowIdx) =>
         (row as unknown[]).map((c, colIdx) => {
           if (rowIdx <= headerIdxIA) return String(c ?? '').trim() // preserva cabeçalho e metadados
-          if (colIdx === dataColIdx) return formatarData(c)        // converte serial/data → DD/MM/AAAA
+          if (dataColIdxs.includes(colIdx)) {                      // converte serial/data → DD/MM/AAAA
+            return String(c ?? '').trim() ? formatarData(c) : ''   // vazio continua vazio (nunca "hoje")
+          }
           return typeof c === 'number' ? c.toFixed(2) : String(c ?? '').trim()
         })
       ).filter(row => row.some(c => c))  // remove linhas totalmente vazias
@@ -1658,16 +1747,20 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
 
       // Aprende com este upload: upsert no histórico para classificações válidas
       // Salva/atualiza histórico: upsert garante que alterações do usuário sobrescrevem o DB
-      // O Map deduplica caso a mesma descrição apareça várias vezes no mesmo lote
+      // O Map é indexado por descricao_normalizada (a mesma chave única do banco): o upsert
+      // falha com "ON CONFLICT DO UPDATE cannot affect row a second time" se o lote repetir
+      // uma chave — o que acontecia quando a chave "stripped" de uma linha era igual à
+      // chave exata de outra. A chave exata sempre prevalece sobre a stripped.
       type HistoricoItem = { empresa_id: string; descricao_normalizada: string; classificacao: string; grupo: string; tipo: 'receita' | 'despesa'; updated_at: string }
       const historicoMap = new Map<string, HistoricoItem>()
+      const chavesExatas = new Set<string>()
       linhasClass.forEach((linha) => {
         if (!linha.classificacao || linha.classificacao === 'Não Identificado') return
         const now        = new Date().toISOString()
         const exato      = normalize(linha.descricao)
-        const keyExato   = `${empresaId}|${exato}`
         const grupoOficial = resolveGrupo(linha.classificacao, linha.tipo, dbMap) || linha.grupo
-        historicoMap.set(keyExato, {
+        chavesExatas.add(exato)
+        historicoMap.set(exato, {
           empresa_id:            empresaId,
           descricao_normalizada: exato,
           classificacao:         linha.classificacao,
@@ -1678,9 +1771,8 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
         // Salva também a chave stripped para que próximos uploads com datas/referências
         // diferentes sejam reconhecidos diretamente (tier 1b) sem scan linear
         const stripped    = normalizeKey(linha.descricao)
-        const keyStripped = `${empresaId}|__strip__|${stripped}`
-        if (stripped && stripped !== exato && !historicoMap.has(keyStripped)) {
-          historicoMap.set(keyStripped, {
+        if (stripped && stripped !== exato && !historicoMap.has(stripped) && !chavesExatas.has(stripped)) {
+          historicoMap.set(stripped, {
             empresa_id:            empresaId,
             descricao_normalizada: stripped,
             classificacao:         linha.classificacao,
@@ -1692,10 +1784,14 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
       })
       const historicoItems = [...historicoMap.values()]
       if (historicoItems.length > 0) {
-        // Falha no histórico é ignorada intencionalmente: os lançamentos já foram
-        // salvos acima e reverter a fase causaria duplicatas na próxima tentativa.
-        await supabase.from('dre_classificacao_historico')
+        // Falha no histórico não reverte a fase: os lançamentos já foram salvos acima
+        // e tentar de novo causaria duplicatas. Apenas avisa o usuário.
+        const { error: histErr } = await supabase.from('dre_classificacao_historico')
           .upsert(historicoItems, { onConflict: 'empresa_id,descricao_normalizada' })
+        if (histErr) {
+          console.error('[Histórico] Erro ao salvar:', histErr)
+          toast.warning('Lançamentos salvos, mas não foi possível memorizar as classificações para as próximas importações.')
+        }
       }
 
       setSucessoSalvo(toInsert.length)
@@ -1802,7 +1898,7 @@ export function ExtratoUpload({ empresaId, onSaved, onClose }: ExtratoUploadProp
           </div>
           {msgErroUpload && (
             <div className={styles.errosBox}>
-              <strong>⚠️ {msgErroUpload}</strong>
+              <strong style={{ whiteSpace: 'pre-line' }}>⚠️ {msgErroUpload}</strong>
               {exemplosDb.some(e => e.arquivo) && (
                 <div className={styles.exemplosWrapErro}>
                   <span>Baixe um modelo:</span>

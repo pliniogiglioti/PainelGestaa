@@ -605,8 +605,13 @@
   transition: background 0.15s ease, opacity 0.15s ease;
 }
 
-.deletePeriodoBtn:hover {
+.deletePeriodoBtn:hover:not(:disabled) {
   background: rgba(255, 100, 100, 0.16);
+}
+
+.deletePeriodoBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ── Modal excluir período ── */

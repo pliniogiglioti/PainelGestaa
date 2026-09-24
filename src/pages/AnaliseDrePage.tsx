@@ -1649,11 +1649,14 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
               </select>
             </label>
 
-            {canExcluirPeriodo && anoFiltro !== 'todos' && (
+            {canExcluirPeriodo && (
               <button
                 className={styles.deletePeriodoBtn}
                 onClick={() => setShowDeletePeriodo(true)}
-                title="Excluir todos os lançamentos do período selecionado"
+                disabled={anoFiltro === 'todos'}
+                title={anoFiltro === 'todos'
+                  ? 'Selecione um ano no filtro para excluir um período'
+                  : 'Excluir todos os lançamentos do período selecionado'}
               >
                 🗑 Excluir período
               </button>
