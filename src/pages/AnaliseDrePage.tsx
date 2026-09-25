@@ -359,6 +359,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
   // Excluir período
   const [showDeletePeriodo, setShowDeletePeriodo] = useState(false)
   const [deletingPeriodo,   setDeletingPeriodo]   = useState(false)
+  const [tipoExclusao,      setTipoExclusao]      = useState<TipoFiltro>('todos')
   // Editar Classificação
   const [showEditClassModal, setShowEditClassModal] = useState(false)
   const [editClassItem,      setEditClassItem]      = useState<DreLancamento | null>(null)
@@ -930,18 +931,38 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     fetchLancamentos()
   }
 
-  /** IDs dos lançamentos do período selecionado (ano + meses, ignora filtro de tipo) */
-  const idsPeriodoSelecionado = useMemo(() => {
+  /** Lançamentos do período selecionado (ano + meses, ignora filtro de tipo da tela) */
+  const lancamentosPeriodo = useMemo(() => {
     if (anoFiltro === 'todos') return []
-    return lancamentos
-      .filter(item => {
-        const src = item.data_lancamento ?? item.created_at
-        if (!src || src.slice(0, 4) !== anoFiltro) return false
-        if (mesesFiltro.length > 0 && !mesesFiltro.includes(src.slice(5, 7))) return false
-        return true
-      })
-      .map(item => item.id)
+    return lancamentos.filter(item => {
+      const src = item.data_lancamento ?? item.created_at
+      if (!src || src.slice(0, 4) !== anoFiltro) return false
+      if (mesesFiltro.length > 0 && !mesesFiltro.includes(src.slice(5, 7))) return false
+      return true
+    })
   }, [lancamentos, anoFiltro, mesesFiltro])
+
+  const resumoPeriodo = useMemo(() => {
+    const resumo = { receita: { qtd: 0, total: 0 }, despesa: { qtd: 0, total: 0 } }
+    for (const item of lancamentosPeriodo) {
+      if (item.tipo !== 'receita' && item.tipo !== 'despesa') continue
+      resumo[item.tipo].qtd += 1
+      resumo[item.tipo].total += Number(item.valor)
+    }
+    return resumo
+  }, [lancamentosPeriodo])
+
+  /** IDs que serão excluídos, respeitando o tipo escolhido no modal */
+  const idsPeriodoSelecionado = useMemo(() => (
+    lancamentosPeriodo
+      .filter(item => tipoExclusao === 'todos' || item.tipo === tipoExclusao)
+      .map(item => item.id)
+  ), [lancamentosPeriodo, tipoExclusao])
+
+  const abrirExcluirPeriodo = () => {
+    setTipoExclusao(tipoFiltro)
+    setShowDeletePeriodo(true)
+  }
 
   const excluirLancamentosPeriodo = async () => {
     if (!canExcluirPeriodo) return
@@ -950,6 +971,16 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
     try {
       // Deleta diretamente no servidor por filtro de data (evita limite de URL com listas de IDs)
       const meses = mesesFiltro.length > 0 ? mesesFiltro : null
+      const excluirIntervalo = async (inicio: string, fim: string) => {
+        let query = supabase
+          .from('dre_lancamentos').delete()
+          .eq('empresa_id', empresa.id)
+          .gte('data_lancamento', inicio)
+          .lt('data_lancamento', fim)
+        if (tipoExclusao !== 'todos') query = query.eq('tipo', tipoExclusao)
+        const { error } = await query
+        if (error) throw new Error(error.message)
+      }
 
       if (meses) {
         // Deleta mês a mês para evitar queries complexas
@@ -958,21 +989,11 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
           const proxMes = mes === '12'
             ? `${Number(anoFiltro) + 1}-01-01`
             : `${anoFiltro}-${String(Number(mes) + 1).padStart(2, '0')}-01`
-          const { error } = await supabase
-            .from('dre_lancamentos').delete()
-            .eq('empresa_id', empresa.id)
-            .gte('data_lancamento', inicioMes)
-            .lt('data_lancamento', proxMes)
-          if (error) throw new Error(error.message)
+          await excluirIntervalo(inicioMes, proxMes)
         }
       } else {
         // Deleta o ano inteiro de uma vez
-        const { error } = await supabase
-          .from('dre_lancamentos').delete()
-          .eq('empresa_id', empresa.id)
-          .gte('data_lancamento', `${anoFiltro}-01-01`)
-          .lt('data_lancamento', `${Number(anoFiltro) + 1}-01-01`)
-        if (error) throw new Error(error.message)
+        await excluirIntervalo(`${anoFiltro}-01-01`, `${Number(anoFiltro) + 1}-01-01`)
       }
 
       setShowDeletePeriodo(false)
@@ -1652,7 +1673,7 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             {canExcluirPeriodo && (
               <button
                 className={styles.deletePeriodoBtn}
-                onClick={() => setShowDeletePeriodo(true)}
+                onClick={abrirExcluirPeriodo}
                 disabled={anoFiltro === 'todos'}
                 title={anoFiltro === 'todos'
                   ? 'Selecione um ano no filtro para excluir um período'
@@ -2114,6 +2135,36 @@ export default function AnaliseDrePage({ empresa, onTrocarEmpresa, onVoltar }: A
             <div className={styles.modalHeader}>
               <h2>Excluir período</h2>
               <button className={styles.closeBtn} onClick={() => setShowDeletePeriodo(false)} disabled={deletingPeriodo}>✕</button>
+            </div>
+
+            <label className={styles.filterLabel} style={{ marginBottom: 12 }}>
+              O que excluir
+              <select
+                value={tipoExclusao}
+                onChange={e => setTipoExclusao(e.target.value as TipoFiltro)}
+                className={styles.filterSelect}
+                disabled={deletingPeriodo}
+              >
+                <option value="todos">Receitas e despesas</option>
+                <option value="receita">Somente receitas</option>
+                <option value="despesa">Somente despesas</option>
+              </select>
+            </label>
+
+            <div className={styles.deletePeriodoResumo}>
+              {(['receita', 'despesa'] as const).map(tipo => {
+                const incluido = tipoExclusao === 'todos' || tipoExclusao === tipo
+                return (
+                  <div
+                    key={tipo}
+                    className={`${styles.deletePeriodoResumoItem} ${incluido ? styles.deletePeriodoResumoItemAtivo : ''}`}
+                  >
+                    <span>{tipo === 'receita' ? 'Receitas' : 'Despesas'}</span>
+                    <strong>{resumoPeriodo[tipo].qtd} · {moeda(resumoPeriodo[tipo].total)}</strong>
+                    <small>{incluido ? 'será excluído' : 'será mantido'}</small>
+                  </div>
+                )
+              })}
             </div>
 
             <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>

@@ -642,6 +642,45 @@
   line-height: 1.5;
 }
 
+.deletePeriodoResumo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.deletePeriodoResumoItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-muted);
+  opacity: 0.6;
+}
+
+.deletePeriodoResumoItem strong {
+  font-size: 14px;
+  color: var(--text);
+}
+
+.deletePeriodoResumoItem small {
+  font-size: 11px;
+}
+
+.deletePeriodoResumoItemAtivo {
+  border-color: rgba(255, 100, 100, 0.5);
+  background: rgba(255, 100, 100, 0.07);
+  opacity: 1;
+}
+
+.deletePeriodoResumoItemAtivo small {
+  color: #ff7070;
+  font-weight: 600;
+}
+
 .deletePeriodoBtns {
   display: flex;
   gap: 10px;
