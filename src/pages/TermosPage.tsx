@@ -45,13 +45,34 @@ export default function TermosPage({ userId, userName, onAceitar }: TermosPagePr
     if (!aceito) return
     setLoading(true)
     setErro('')
-    const { error } = await supabase.from('termos_aceite').insert({
+
+    // Garante um token válido: se a aba ficou parada, o JWT pode ter expirado (401)
+    const { data: sessionData } = await supabase.auth.getSession()
+    const expiraEm = sessionData.session?.expires_at ?? 0
+    if (!sessionData.session || expiraEm * 1000 < Date.now() + 60_000) {
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (refreshError) {
+        setErro('Sua sessão expirou. Faça login novamente para aceitar os termos.')
+        setLoading(false)
+        return
+      }
+    }
+
+    const inserir = () => supabase.from('termos_aceite').insert({
       user_id:    userId,
       version:    '1.0',
       app:        'dfc-clinicscale',
       user_agent: navigator.userAgent,
     })
+
+    let { error } = await inserir()
+    if (error && (error.code === 'PGRST301' || error.code === 'PGRST303' || /jwt/i.test(error.message))) {
+      const { error: refreshError } = await supabase.auth.refreshSession()
+      if (!refreshError) ({ error } = await inserir())
+    }
+
     if (error && error.code !== '23505') {
+      console.error('Erro ao registrar aceite dos termos:', error)
       setErro('Erro ao registrar aceite. Tente novamente.')
       setLoading(false)
       return
