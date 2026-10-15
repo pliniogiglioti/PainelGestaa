@@ -522,6 +522,10 @@ function parsePlanilha(buffer: ArrayBuffer): LinhaExtrato[] {
     const rawDesc  = cols.descricao >= 0 ? row[cols.descricao] : row.find(c => c !== '') ?? ''
     const rawData  = lerDataBruta(row, cols)
 
+    // CliniCorp conta corrente: Tipo "Vendas" é o tratamento vendido, ainda não pago.
+    // O dinheiro aparece depois nas linhas "Entrada" — importar as duas duplicaria a receita.
+    if (normalizar(String(rawTipo ?? '')) === 'vendas') continue
+
     let valorNum: number
     let tipo: 'receita' | 'despesa'
 
