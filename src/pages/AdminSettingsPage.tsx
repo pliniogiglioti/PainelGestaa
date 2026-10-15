@@ -28,7 +28,7 @@ const EXEMPLOS_ESTATICOS = [
   { nome: 'Exemplo Básico', arquivo: 'exemplo.xlsx'    },
   { nome: 'Conta Azul',     arquivo: 'conta-azul.xlsx' },
   { nome: 'CliniCorp',      arquivo: 'clinicorp.xlsx'  },
-  { nome: 'CliniCorp 2',    arquivo: 'clinicorp-2.xlsx' },
+  { nome: 'CliniCorp Conta Corrente', arquivo: 'clinicorp-conta-corrente.xlsx' },
 ]
 
 const USERS_PER_PAGE = 5
